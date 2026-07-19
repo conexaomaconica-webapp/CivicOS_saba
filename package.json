@@ -13,9 +13,10 @@
     "dev:web": "turbo run dev --filter=@saas/web",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
+    "test": "turbo run test && node architecture-tests.js",
     "clean": "turbo run clean && rm -rf node_modules",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "verify": "pnpm clean && pnpm install && pnpm lint && pnpm build && pnpm test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

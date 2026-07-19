@@ -12,8 +12,7 @@ export const referenceDashboardWidget = defineWidget({
 });
 
 export const referenceRoute = defineRoute({
-  id: 'reference.route',
   path: '/reference',
-  requireAuth: true,
-  requiredPermissions: ['reference:execute']
+  permissions: ['reference:execute'],
+  component: async () => ({ default: () => null })
 });
