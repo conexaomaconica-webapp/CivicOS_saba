@@ -1,0 +1,48 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@saas/core": [
+        "../../packages/core/src"
+      ],
+      "@saas/core/*": [
+        "../../packages/core/src/*"
+      ],
+      "@saas/shared": [
+        "../../packages/shared/src"
+      ],
+      "@saas/shared/*": [
+        "../../packages/shared/src/*"
+      ],
+      "@saas/ui": [
+        "../../packages/ui/src"
+      ],
+      "@saas/ui/*": [
+        "../../packages/ui/src/*"
+      ]
+    },
+    "allowJs": true,
+    "noEmit": true,
+    "jsx": "preserve"
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "next-env.d.ts",
+    "next.config.ts",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    "out"
+  ]
+}

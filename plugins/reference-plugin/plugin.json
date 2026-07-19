@@ -1,0 +1,65 @@
+{
+  "id": "reference-plugin",
+  "name": "Reference Plugin",
+  "version": "1.0.0",
+  "description": "Gold standard reference implementation for testing CivicOS v1 contracts",
+  "author": "Antigravity Dev Team",
+  "license": "MIT",
+  "dependencies": [],
+  "runtime": {
+    "minCoreVersion": "1.0.0",
+    "sandbox": "logical",
+    "permissions": ["storage", "logging", "events"],
+    "services": ["StorageService"]
+  },
+  "settings": [
+    {
+      "key": "reference.retries",
+      "label": "Number of retries for reference operations",
+      "type": "number",
+      "default": 3
+    }
+  ],
+  "permissions": [
+    {
+      "key": "reference:execute",
+      "label": "Execute Reference Tools",
+      "description": "Allows execution of reference workflows"
+    }
+  ],
+  "navigation": [
+    {
+      "id": "reference-dashboard",
+      "label": "Reference Plugin",
+      "icon": "box",
+      "path": "/reference",
+      "priority": 100,
+      "requiredPermissions": ["reference:execute"]
+    }
+  ],
+  "commands": [
+    {
+      "id": "reference.ping",
+      "title": "Ping Reference System",
+      "icon": "activity",
+      "category": "Reference",
+      "permission": "reference:execute"
+    }
+  ],
+  "widgets": [
+    {
+      "id": "reference.metric",
+      "slot": "dashboard.top",
+      "component": "ReferenceMetricWidget",
+      "priority": 10,
+      "requiredPermissions": ["reference:execute"]
+    }
+  ],
+  "schemas": [],
+  "eventsPublished": [
+    "reference.executed.v1"
+  ],
+  "eventsConsumed": [
+    "system.boot"
+  ]
+}

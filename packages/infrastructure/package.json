@@ -1,0 +1,21 @@
+{
+  "name": "@saas/infrastructure",
+  "version": "1.0.0",
+  "description": "Shared infrastructure layer (DB, Storage, Outbox) for CivicOS plugins",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "test": "vitest run",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "@saas/core": "workspace:*",
+    "@saas/shared": "workspace:*",
+    "@saas/plugin-business-directory": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.2"
+  }
+}

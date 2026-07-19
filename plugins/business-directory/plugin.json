@@ -1,0 +1,85 @@
+{
+  "id": "business-directory",
+  "name": "Business Directory",
+  "version": "1.0.0",
+  "description": "Business Directory Foundation Plugin",
+  "author": "Antigravity Dev Team",
+  "license": "MIT",
+  "dependencies": [],
+  "runtime": {
+    "minCoreVersion": "1.0.0",
+    "sandbox": "logical",
+    "permissions": [],
+    "services": []
+  },
+  "settings": [],
+  "permissions": [
+    {
+      "key": "business.create",
+      "label": "Criar Anúncio",
+      "description": "Permite criar negócios no domínio (metadado para policy engine)"
+    },
+    {
+      "key": "business.write",
+      "label": "Editar Anúncio",
+      "description": "Permite editar um anúncio existente"
+    },
+    {
+      "key": "business.manage",
+      "label": "Gerenciar Anúncios",
+      "description": "Permite visualizar o painel operacional de anúncios"
+    }
+  ],
+  "routes": [
+    {
+      "id": "business.create.route",
+      "path": "/guia/anunciar",
+      "componentId": "business-directory:create-page",
+      "requireAuth": true,
+      "requiredCapabilities": ["business.create"]
+    },
+    {
+      "id": "business.edit.route",
+      "path": "/guia/anuncios/:id/editar",
+      "componentId": "business-directory:edit-page",
+      "requireAuth": true,
+      "requiredCapabilities": ["business.write"]
+    },
+    {
+      "id": "business.dashboard.route",
+      "path": "/guia/painel",
+      "componentId": "business-directory:dashboard-page",
+      "requireAuth": true,
+      "requiredCapabilities": ["business.manage"]
+    }
+  ],
+  "navigation": [
+    {
+      "id": "business.dashboard.nav",
+      "label": "Gerenciar Empresas",
+      "path": "/guia/painel",
+      "priority": 100,
+      "requiredCapabilities": ["business.manage"]
+    }
+  ],
+  "commands": [],
+  "widgets": [
+    {
+      "id": "business.lifecycle.summary",
+      "componentId": "business-directory:summary-widget",
+      "slot": "dashboard:home",
+      "priority": 10,
+      "requiredCapabilities": ["business.manage"]
+    }
+  ],
+  "schemas": [],
+  "eventsPublished": [
+    "business.created.v1",
+    "business.submitted.v1",
+    "business.approved.v1",
+    "business.rejected.v1",
+    "business.published.v1",
+    "business.archived.v1"
+  ],
+  "eventsConsumed": []
+}
