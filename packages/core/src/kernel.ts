@@ -30,7 +30,7 @@ import { PresentationQueryRuntime } from './presentation/query/presentation-quer
 import { PresentationSnapshotBuilder } from './presentation/query/presentation-snapshot-builder';
 import { MemoryPresentationCache } from './presentation/query/presentation-cache';
 import { RouteResolver } from './presentation/query/route-resolver';
-import { NavigationResolver } from './presentation/query/navigation-resolver';
+import { NavigationResolver } from './navigation/navigation-resolver';
 import { LayoutResolver } from './presentation/query/layout-resolver';
 import { WidgetResolver } from './presentation/query/widget-resolver';
 import type { PolicyEngine, WorkflowRuntime, ExecutionRuntime, CapabilityPlatform } from './facades';
@@ -388,7 +388,10 @@ export class Kernel {
 
       // Construct the Presentation Facade
       const routeResolver = new RouteResolver(registries.presentationRoutes);
-      const navigationResolver = new NavigationResolver(registries.presentationNavigation);
+      const navigationResolver = new NavigationResolver(
+        registries.presentationNavigation,
+        registries.presentationRoutes
+      );
       const layoutResolver = new LayoutResolver(registries.presentationLayouts);
       const widgetResolver = new WidgetResolver(registries.presentationWidgets);
       const builder = new PresentationSnapshotBuilder(

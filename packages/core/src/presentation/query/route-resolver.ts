@@ -10,6 +10,8 @@ export class RouteResolver {
    */
   resolveAll(context: PresentationContext): RouteDefinition[] {
     const rawRoutes = this.routeRegistry.getAll();
+    console.log('RouteResolver context:', context);
+    console.log('RouteResolver raw routes:', rawRoutes);
     const resolved: RouteDefinition[] = [];
 
     const capabilitiesSet = new Set(context.capabilities);
@@ -23,6 +25,7 @@ export class RouteResolver {
 
       if (route.requiredPermissions && route.requiredPermissions.length > 0) {
         const hasAllPerms = route.requiredPermissions.every(perm => permissionsSet.has(perm));
+        console.log('Checking permissions for', route.id, route.requiredPermissions, 'hasAllPerms:', hasAllPerms, 'context permissions:', permissionsSet);
         if (!hasAllPerms) continue;
       }
 

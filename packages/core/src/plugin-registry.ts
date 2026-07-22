@@ -10,6 +10,7 @@
 
 import type { Result } from '@saas/shared';
 import type { PluginContext } from './plugins/plugin-context';
+import type { NavigationItem } from './navigation/navigation-types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -77,16 +78,7 @@ export interface ApiRouteDefinition {
   readonly permissions?: readonly string[];
 }
 
-/** Navigation item a plugin can contribute to the shell UI. */
-export interface NavigationItem {
-  readonly id: string;
-  readonly label: string;
-  readonly icon?: string;
-  readonly path: string;
-  readonly order?: number;
-  readonly badge?: string | number;
-  readonly children?: readonly NavigationItem[];
-}
+
 
 /** Middleware definition a plugin can contribute. */
 export interface MiddlewareDefinition {

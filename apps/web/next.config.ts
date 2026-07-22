@@ -18,11 +18,14 @@ const nextConfig: NextConfig = {
   // Strict mode for catching bugs
   reactStrictMode: true,
 
-  // Experimental features
-  experimental: {
-    // Enable typed routes
-    typedRoutes: true,
+  // Ignore ESLint errors during builds (handled in separate pipeline)
+  eslint: {
+    ignoreDuringBuilds: true,
   },
+
+  // Enable typed routes
+  typedRoutes: true,
+
 };
 
 export default nextConfig;

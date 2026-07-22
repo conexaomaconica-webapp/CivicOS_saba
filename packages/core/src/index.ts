@@ -84,7 +84,6 @@ export type {
   EventBusReader,
   RouteDefinition,
   ApiRouteDefinition,
-  NavigationItem,
   MiddlewareDefinition,
   MigrationDefinition,
 } from './plugin-registry';
@@ -249,3 +248,8 @@ export type {
   LayoutDefinition,
   SlotDefinition,
 } from './presentation/presentation-types';
+
+// -- Navigation Engine ------------------------------------------------------
+export type {
+  NavigationItem,
+} from './navigation/navigation-types';

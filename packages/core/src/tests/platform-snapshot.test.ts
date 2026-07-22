@@ -8,7 +8,7 @@ const mockReader = {
   listDirectories: async () => ['business-directory'],
   readJson: async (path: string) => {
     if (path.includes('plugin.json')) {
-      return { id: 'saas.business-directory', version: '1.0.0', name: 'Business Directory' };
+      return { id: 'saas-business-directory', version: '1.0.0', name: 'Business Directory' };
     }
     if (path.includes('routes.json')) {
       return [{ path: '/guia', page: 'DirectoryPage', permission: 'business.view' }];
@@ -61,6 +61,9 @@ describe('Presentation Snapshot Architecture', () => {
       }
     });
 
+    console.log('Snapshot Routes:', JSON.stringify(snapshot.routes, null, 2));
+    console.log('Snapshot Nav:', JSON.stringify(snapshot.navigation, null, 2));
+
     // Verify it is completely immutable
     expect(Object.isFrozen(snapshot)).toBe(true);
 
@@ -72,13 +75,13 @@ describe('Presentation Snapshot Architecture', () => {
     // Verify routes
     expect(snapshot.routes).toHaveLength(1);
     expect(snapshot.routes[0].path).toBe('/guia');
-    expect(snapshot.routes[0].pluginId).toBe('saas.business-directory');
+    expect(snapshot.routes[0].id).toBe('saas-business-directory:/guia');
     expect((snapshot.routes[0] as any).component).toBeUndefined(); // Should NOT have React component
 
     // Verify navigation
     expect(snapshot.navigation).toHaveLength(1);
-    expect(snapshot.navigation[0].id).toBe('nav.guia');
-    expect(snapshot.navigation[0].path).toBe('/guia');
+    expect(snapshot.navigation[0].id).toBe('saas-business-directory:nav.guia');
+    expect(snapshot.navigation[0].route).toBe('/guia');
 
     // Verify widgets and slots
     expect(snapshot.widgets).toHaveLength(1);

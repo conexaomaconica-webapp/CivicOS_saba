@@ -2,12 +2,15 @@ import type {
   PluginManifest,
   RouteDefinition,
   ApiRouteDefinition,
-  NavigationItem,
   PluginContext,
   PluginLifecycleHooks,
+  PresentationSnapshot,
 } from '@saas/core';
+import type { NavigationItem } from './navigation/navigation-types';
 
-export type { PluginContext, PluginLifecycleHooks };
+export type { PluginContext, PluginLifecycleHooks, PresentationSnapshot };
+
+export * from './navigation/navigation-types';
 
 export interface CapabilityDefinition {
   readonly provides?: readonly string[];

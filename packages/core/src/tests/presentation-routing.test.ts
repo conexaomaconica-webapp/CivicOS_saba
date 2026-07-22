@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { describe, it, expect, beforeEach } from 'vitest';
-import { RouteRegistry, NavigationRegistry, WidgetRegistry, SlotRegistry, LayoutRegistry } from '../presentation/presentation-registries';
+import { RouteRegistry, WidgetRegistry, SlotRegistry, LayoutRegistry } from '../presentation/presentation-registries';
+import { NavigationRegistry } from '../navigation/navigation-registry';
 import { PresentationResolver } from '../presentation/presentation-resolver';
 import type { PresentationContext } from '../presentation/presentation-types';
 
@@ -100,9 +101,9 @@ describe('Presentation Routing & Resolver', () => {
     navigationRegistry.register({
       id: 'business.dashboard.nav',
       label: 'Gerenciar Empresas',
-      path: '/guia/painel', // Matches the static route
-      priority: 100,
-      requiredCapabilities: ['business.manage']
+      route: '/guia/painel', // Matches the static route
+      order: 100,
+      capability: 'business.manage'
     });
 
     const contextWithManage: PresentationContext = {

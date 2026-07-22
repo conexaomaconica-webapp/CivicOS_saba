@@ -3,13 +3,14 @@
 // ============================================================================
 
 import type { PresentationContext, PresentationSnapshot, RouteDefinition } from './presentation-types';
+import { NavigationResolver } from '../navigation/navigation-resolver';
 import type { 
-  LayoutRegistry, 
-  NavigationRegistry, 
-  RouteRegistry, 
+  WidgetRegistry, 
   SlotRegistry, 
-  WidgetRegistry 
+  LayoutRegistry 
 } from './presentation-registries';
+import type { NavigationRegistry } from '../navigation/navigation-registry';
+import type { RouteRegistry } from './presentation-registries';
 
 export interface ResolvedRoute {
   route: RouteDefinition;
@@ -43,31 +44,11 @@ export class PresentationResolver {
       return true;
     });
 
-    // 2. Filter Navigation based on resolved routes and its own requirements
-    // A navigation item whose target route was hidden should also be hidden.
-    // For dynamic routes (like /path/:id), we just check if it matches ANY route.
-    // However, navigation usually points to static routes like /path
+    // 2. Resolve Navigation via NavigationResolver
+    const navResolver = new NavigationResolver(this.navigationRegistry, this.routeRegistry);
+    let resolvedNavigation = navResolver.resolveAll(context, resolvedRoutes);
     
-    // We create a function to check if a navigation path matches any allowed route
-    const isNavigationPathAllowed = (path: string) => {
-      // It must match a route in the registry that made it through our capability check
-      const match = this.routeRegistry.match(path);
-      if (!match) return false;
-      return resolvedRoutes.some(r => r.id === match.route.id);
-    };
-    
-    const resolvedNavigation = this.navigationRegistry.getAll().filter(item => {
-      if (!isNavigationPathAllowed(item.path)) {
-        return false;
-      }
-      if (item.requiredCapabilities && !item.requiredCapabilities.every(c => context.capabilities.includes(c))) {
-        return false;
-      }
-      if (item.requiredPermissions && !item.requiredPermissions.every(p => context.permissions.includes(p))) {
-        return false;
-      }
-      return true;
-    });
+    // Navigation filtering based on routes is now handled inside NavigationResolver
 
     // 3. Filter Widgets
     // Widgets might have custom visibility rules evaluated here (simplified for V1)

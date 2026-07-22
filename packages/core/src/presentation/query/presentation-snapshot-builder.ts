@@ -1,6 +1,6 @@
 import type { PresentationContext, PresentationSnapshot, SlotDefinition } from '../presentation-types';
 import type { RouteResolver } from './route-resolver';
-import type { NavigationResolver } from './navigation-resolver';
+import type { NavigationResolver } from '../../navigation/navigation-resolver';
 import type { LayoutResolver } from './layout-resolver';
 import type { WidgetResolver } from './widget-resolver';
 import type { SlotRegistry } from '../presentation-registries';

@@ -5,7 +5,8 @@
 import type { FullLoadedManifest, ManifestRouteEntry, ManifestWidgetEntry, ManifestNavigationEntry } from './manifest-loader';
 import { BaseRegistry } from './base-registry';
 import { CapabilityRegistry } from './capabilities/capability-registry';
-import { RouteRegistry, NavigationRegistry, WidgetRegistry, SlotRegistry, LayoutRegistry } from './presentation/presentation-registries';
+import { RouteRegistry, WidgetRegistry, SlotRegistry, LayoutRegistry } from './presentation/presentation-registries';
+import { NavigationRegistry } from './navigation/navigation-registry';
 
 export interface RegisteredPermission {
   readonly pluginId: string;
@@ -89,6 +90,7 @@ export class RegistryManager {
   }
 
   private populatePlugin(pluginId: string, manifest: FullLoadedManifest): void {
+    console.log('Populate plugin:', pluginId, 'routes:', manifest.routes);
     // -- Capabilities
     if (manifest.capabilities?.provides) {
       for (const cap of manifest.capabilities.provides) {
@@ -103,6 +105,7 @@ export class RegistryManager {
 
     // -- Routes
     if (manifest.routes) {
+      console.log('Populating routes for', pluginId, manifest.routes);
       for (const route of manifest.routes) {
         const r = route as ManifestRouteEntry;
         this.presentationRoutes.register({
@@ -137,10 +140,10 @@ export class RegistryManager {
         this.presentationNavigation.register({
           id: `${pluginId}:${n.id}`,
           label: n.label ?? '',
-          path: n.path,
+          route: (n as any).route || n.path,
           icon: n.icon,
-          priority: n.order ?? 0,
-          requiredPermissions: n.permission ? [n.permission] : undefined,
+          order: n.order ?? 0,
+          permission: n.permission,
         });
       }
     }

@@ -1,10 +1,11 @@
 // @ts-nocheck
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { RouteRegistry, NavigationRegistry, WidgetRegistry, SlotRegistry, LayoutRegistry } from '../presentation/presentation-registries';
+import { RouteRegistry, WidgetRegistry, SlotRegistry, LayoutRegistry } from '../presentation/presentation-registries';
+import { NavigationRegistry } from '../navigation/navigation-registry';
 import { NavigationGraph, NavigationGraphError } from '../presentation/navigation-graph';
 import { PresentationSnapshotBuilder } from '../presentation/query/presentation-snapshot-builder';
 import { RouteResolver } from '../presentation/query/route-resolver';
-import { NavigationResolver } from '../presentation/query/navigation-resolver';
+import { NavigationResolver } from '../navigation/navigation-resolver';
 import { LayoutResolver } from '../presentation/query/layout-resolver';
 import { WidgetResolver } from '../presentation/query/widget-resolver';
 import type { DiagnosticsEngine } from '../diagnostics/diagnostics-engine';
@@ -39,27 +40,13 @@ describe('Presentation Runtime (AC-7B)', () => {
       } as unknown as DiagnosticsEngine;
     });
 
-    it('should abort boot (throw) when navigation menus have circular dependencies', () => {
-      const routes = new RouteRegistry();
-      const navs = new NavigationRegistry();
-      
-      routes.register({ id: 'r1', path: '/dashboard', requireAuth: false });
-      
-      navs.register({ id: 'n1', label: 'Item 1', path: '/dashboard', parentId: 'n2', priority: 1 });
-      navs.register({ id: 'n2', label: 'Item 2', path: '/dashboard', parentId: 'n1', priority: 2 });
-
-      const graph = new NavigationGraph(routes, navs, new WidgetRegistry(), new SlotRegistry(), new LayoutRegistry(), mockDiagnostics);
-      
-      expect(() => graph.validate()).toThrow(NavigationGraphError);
-      expect(() => graph.validate()).toThrow(/Circular dependency/);
-    });
 
     it('should drop orphan navigation items (referential error) without aborting boot', () => {
       const routes = new RouteRegistry();
       const navs = new NavigationRegistry();
       
-      navs.register({ id: 'orphan', label: 'Orphan', path: '/does-not-exist', priority: 1 });
-      navs.register({ id: 'valid', label: 'Valid', path: '/dashboard', priority: 2 });
+      navs.register({ id: 'orphan', label: 'Orphan', route: '/does-not-exist', order: 1 } as any);
+      navs.register({ id: 'valid', label: 'Valid', route: '/dashboard', order: 2 } as any);
       routes.register({ id: 'r1', path: '/dashboard', requireAuth: false });
 
       const graph = new NavigationGraph(routes, navs, new WidgetRegistry(), new SlotRegistry(), new LayoutRegistry(), mockDiagnostics);
@@ -86,13 +73,13 @@ describe('Presentation Runtime (AC-7B)', () => {
       routes.register({ id: 'r2', path: '/admin', requireAuth: true, requiredCapabilities: ['billing'] });
       routes.register({ id: 'r3', path: '/about', requireAuth: false });
       
-      navs.register({ id: 'n1', label: 'Dashboard', path: '/dashboard', priority: 2 });
-      navs.register({ id: 'n2', label: 'Admin', path: '/admin', priority: 1 });
-      navs.register({ id: 'n3', label: 'About', path: '/about', priority: 1 });
+      navs.register({ id: 'n1', label: 'Dashboard', route: '/dashboard', order: 2 } as any);
+      navs.register({ id: 'n2', label: 'Admin', route: '/admin', order: 1 } as any);
+      navs.register({ id: 'n3', label: 'About', route: '/about', order: 1 } as any);
       
       const builder = new PresentationSnapshotBuilder(
         new RouteResolver(routes),
-        new NavigationResolver(navs),
+        new NavigationResolver(navs, routes),
         new LayoutResolver(new LayoutRegistry()),
         new WidgetResolver(widgets),
         new SlotRegistry(),

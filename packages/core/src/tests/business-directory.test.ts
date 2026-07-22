@@ -14,10 +14,8 @@ describe('Business Directory Plugin Verification', () => {
     });
 
     // Prova 1: O CivicOS reconhece o novo domínio ativado
-    const diag = await kernel.diagnostics();
-    const hasDirectory = diag.report.contributors['core.plugins']?.metrics?.activePlugins !== undefined;
-    // We expect the plugin to be reported somewhere or at least it doesn't crash
-    expect(hasDirectory).toBe(true);
+    const activePlugins = kernel._internal.activePlugins;
+    expect(activePlugins).toContain('business-directory');
 
     // Since the full implementation of capabilities() isn't wired in the fake kernel yet, 
     // we just check the internal loaded registries
@@ -28,6 +26,6 @@ describe('Business Directory Plugin Verification', () => {
     // Though we only declared them via SDK and exported them, we test that the kernel doesn't throw.
     // In a real environment, the Plugin Manifest / PluginRegistry would parse exported workflows.
     // Here we just ensure we haven't broken the boot sequence.
-    expect(diag).toBeDefined();
+    expect(activePlugins.length).toBeGreaterThan(0);
   });
 });

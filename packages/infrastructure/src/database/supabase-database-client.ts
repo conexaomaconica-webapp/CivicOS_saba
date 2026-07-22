@@ -8,7 +8,7 @@ export class SupabaseDatabaseClient implements DatabaseClient {
     this.client = createClient(supabaseUrl, supabaseAnonKey);
   }
 
-  async query<T>(sql: string, params: any[]): Promise<T[]> {
+  async query<T>(_sql: string, _params: any[]): Promise<T[]> {
     // Note: To execute raw SQL with supabase-js requires RPC or GraphQL.
     // For this demonstration/adapter we are using standard supabase operations
     // where possible, so raw query might be limited without Drizzle.
@@ -18,7 +18,7 @@ export class SupabaseDatabaseClient implements DatabaseClient {
   async insert<T>(table: string, data: Partial<T>): Promise<T> {
     const { data: result, error } = await this.client
       .from(table)
-      .insert(data)
+      .insert(data as any)
       .select()
       .single();
 
@@ -32,7 +32,7 @@ export class SupabaseDatabaseClient implements DatabaseClient {
   async update<T>(table: string, id: string, data: Partial<T>): Promise<T> {
     const { data: result, error } = await this.client
       .from(table)
-      .update(data)
+      .update(data as any)
       .eq('id', id)
       .select()
       .single();

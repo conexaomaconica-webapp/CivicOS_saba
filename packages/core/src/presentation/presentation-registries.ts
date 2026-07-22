@@ -1,7 +1,6 @@
 import { BaseRegistry } from '../base-registry';
 import type { 
-  LayoutDefinition, 
-  NavigationItem, 
+  LayoutDefinition,
   RouteDefinition, 
   SlotDefinition, 
   WidgetDefinition 
@@ -74,34 +73,7 @@ export class RouteRegistry extends BaseRegistry<RouteDefinition[]> {
   }
 }
 
-export class NavigationRegistry extends BaseRegistry<NavigationItem[]> {
-  private readonly items = new Map<string, NavigationItem>();
 
-  register(item: NavigationItem): void {
-    this.assertNotFrozen();
-    
-    if (this.items.has(item.id)) {
-      throw new Error(`Navigation item ID "${item.id}" is already registered.`);
-    }
-    
-    this.items.set(item.id, item);
-    this.incrementVersion();
-  }
-
-  getAll(): NavigationItem[] {
-    return Array.from(this.items.values());
-  }
-
-  remove(id: string): void {
-    this.assertNotFrozen();
-    this.items.delete(id);
-    this.incrementVersion();
-  }
-
-  snapshot(): NavigationItem[] {
-    return Array.from(this.items.values()).map(i => structuredClone(i));
-  }
-}
 
 export class WidgetRegistry extends BaseRegistry<WidgetDefinition[]> {
   private readonly widgets = new Map<string, WidgetDefinition>();

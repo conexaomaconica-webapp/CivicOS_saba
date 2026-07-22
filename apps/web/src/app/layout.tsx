@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Providers } from './Providers';
+import { ShellWrapper } from '../components/shell/ShellWrapper';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -32,7 +33,9 @@ export default function RootLayout({
       </head>
       <body>
         <Providers>
-          {children}
+          <ShellWrapper>
+            {children}
+          </ShellWrapper>
         </Providers>
       </body>
     </html>

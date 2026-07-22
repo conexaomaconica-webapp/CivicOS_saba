@@ -4,7 +4,9 @@
 
 import type { DiagnosticsEngine } from '../diagnostics/diagnostics-engine';
 
-import type { LayoutRegistry, NavigationRegistry, RouteRegistry, SlotRegistry, WidgetRegistry } from './presentation-registries';
+import type { LayoutRegistry, RouteRegistry, SlotRegistry, WidgetRegistry } from './presentation-registries';
+import type { NavigationRegistry } from '../navigation/navigation-registry';
+import type { NavigationItem } from '../navigation/navigation-types';
 
 export class NavigationGraphError extends Error {
   constructor(message: string) {
@@ -35,48 +37,63 @@ export class NavigationGraph {
 
   private checkStructuralIntegrity(): void {
     // 1. Check for circular dependencies in Navigation Menus
+    // With the new nested `children` structure, infinite recursion is possible if the JS object graph is circular.
+    // JSON.stringify in snapshot() would fail, but we'll do a basic tree traversal.
     const items = this.navigationRegistry.getAll();
-    const visited = new Set<string>();
-    const stack = new Set<string>();
+    const visited = new Set<NavigationItem>();
 
-    const checkCycle = (itemId: string) => {
-      if (stack.has(itemId)) {
-        throw new NavigationGraphError(`Circular dependency detected in navigation menu: "${itemId}"`);
+    const checkCycle = (item: NavigationItem) => {
+      if (visited.has(item)) {
+        throw new NavigationGraphError(`Circular dependency detected in navigation menu object: "${item.id}"`);
       }
-      if (visited.has(itemId)) return;
-
-      visited.add(itemId);
-      stack.add(itemId);
-
-      const item = items.find(i => i.id === itemId);
-      if (item && item.parentId) {
-        checkCycle(item.parentId);
+      visited.add(item);
+      
+      if (item.children) {
+        for (const child of item.children) {
+          checkCycle(child);
+        }
       }
-
-      stack.delete(itemId);
+      visited.delete(item);
     };
 
     for (const item of items) {
-      checkCycle(item.id);
+      checkCycle(item);
     }
   }
 
   private checkReferentialIntegrity(): void {
     // 1. Navigation Orphan Links (Referential Error)
     const items = this.navigationRegistry.getAll();
-    for (const item of items) {
-      if (!this.routeRegistry.get(item.path)) {
-        // Drop from registry
-        this.navigationRegistry.remove(item.id);
+    
+    const checkItem = (item: NavigationItem, parentId?: string) => {
+      // Safely handle missing route (e.g. from tests or invalid manifests)
+      if (!item.route) return;
+      
+      // Allow external links
+      if (item.route.startsWith('http')) return;
+      
+      if (!this.routeRegistry.get(item.route)) {
+        // Drop from registry (note: this currently removes the ROOT item if any child fails. For a robust impl, we'd need a deep prune)
+        const idToRemove = parentId || item.id;
+        this.navigationRegistry.remove(idToRemove);
         
         // Report to diagnostics
-        this.diagnostics.recordEvent(`Navigation Graph: Dropped orphan menu "${item.id}" pointing to "${item.path}"`);
+        this.diagnostics.recordEvent(`Navigation Graph: Dropped orphan menu "${item.id}" pointing to "${item.route}"`);
         
-        // We will fake a manual injection into Diagnostics Engine for now
-        // In a real scenario, NavigationGraph might be a DiagnosticsContributor itself, 
-        // but since this happens AT BOOT time (linter), we report it to the timeline and logs.
-        console.warn(`[NAVIGATION] Orphan Menu Item dropped: "${item.id}" -> "${item.path}". Recommendation: Register route or remove menu entry.`);
+        console.warn(`[NAVIGATION] Orphan Menu Item dropped: "${item.id}" -> "${item.route}". Recommendation: Register route or remove menu entry.`);
       }
+      
+      if (item.children) {
+        for (const child of item.children) {
+          checkItem(child, parentId || item.id);
+        }
+      }
+    };
+    
+    // We clone to avoid modifying while iterating
+    const itemsToCheck = [...items];
+    for (const item of itemsToCheck) {
+      checkItem(item);
     }
 
     // 2. Widget pointing to non-existent slot

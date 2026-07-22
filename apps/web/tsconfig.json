@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "baseUrl": ".",
     "plugins": [
       {
         "name": "next"
@@ -15,6 +16,12 @@
       ],
       "@saas/core/*": [
         "../../packages/core/src/*"
+      ],
+      "@saas/sdk": [
+        "../../packages/sdk/src"
+      ],
+      "@saas/sdk/*": [
+        "../../packages/sdk/src/*"
       ],
       "@saas/shared": [
         "../../packages/shared/src"

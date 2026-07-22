@@ -2,6 +2,8 @@
 // Presentation Types — Presentation Platform (AC-7A)
 // ============================================================================
 
+import type { NavigationItem } from '../navigation/navigation-types';
+
 export interface PresentationVersions {
   readonly registryVersion: number;
   readonly capabilityVersion: number;
@@ -51,16 +53,6 @@ export interface RouteDefinition {
   readonly requiredPermissions?: string[];
 }
 
-export interface NavigationItem {
-  readonly id: string;
-  readonly label: string;
-  readonly path: string; // The target route path
-  readonly icon?: string;
-  readonly parentId?: string;
-  readonly priority: number;
-  readonly requiredCapabilities?: string[];
-  readonly requiredPermissions?: string[];
-}
 
 export interface WidgetDefinition {
   readonly id: string;
