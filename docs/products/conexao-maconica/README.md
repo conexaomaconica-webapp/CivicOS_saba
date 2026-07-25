@@ -1,0 +1,96 @@
+# Engenharia do Produto — Conexão Maçônica
+
+**Branch:** `product/conexao-maconica-v1`  
+**Base:** `foundation-v1.0` (commit `bdbdd34`)  
+**Status:** Fase de Documentação Técnica
+
+---
+
+## Contexto
+
+A Fundação SaaS (CivicOS) foi oficialmente encerrada e congelada na tag `foundation-v1.0`.  
+O pipeline global foi validado com `VERIFY_EXIT_CODE=0`.  
+O repositório encontra-se limpo e sem alterações pendentes.
+
+A Conexão Maçônica é o primeiro produto construído sobre essa plataforma estável.
+
+---
+
+## Documentos Técnicos Executáveis
+
+Cada documento deve ser produzido, revisado e aprovado antes de iniciar o próximo.
+
+| # | Documento | Status | Aprovação |
+|---|---|---|---|
+| 00 | Especificação Funcional v1.0 | ⏳ Aguardando | — |
+| 01 | Arquitetura Técnica | ⏳ Aguardando spec | — |
+| 02 | Schema SQL Completo | 🔒 Bloqueado | — |
+| 03 | Matriz RBAC | 🔒 Bloqueado | — |
+| 04 | Mapa de Telas | 🔒 Bloqueado | — |
+| 05 | Fluxos e Jornadas | 🔒 Bloqueado | — |
+| 06 | Critérios de Aceite | 🔒 Bloqueado | — |
+| 07 | Backlog (Épicos e Histórias) | 🔒 Bloqueado | — |
+| 08 | Plano de Sprints | 🔒 Bloqueado | — |
+
+---
+
+## Gate de Implementação
+
+O código do produto só será iniciado quando **todos** estes critérios forem atendidos:
+
+- [ ] A fronteira entre plataforma e produto está definida
+- [ ] Os módulos e responsabilidades estão definidos
+- [ ] O banco cobre o MVP sem duplicações graves
+- [ ] As políticas RLS estão projetadas
+- [ ] Cada perfil tem permissões claras
+- [ ] Todas as telas do MVP estão mapeadas
+- [ ] Os fluxos críticos possuem início, regras e final
+- [ ] O primeiro épico tem critérios de aceite
+- [ ] Existe plano de rollback e migrations
+- [ ] A Fundação permanece intacta
+
+---
+
+## Regra de Governança
+
+> Nenhuma regra de negócio específica da Conexão Maçônica entra em `packages/core` ou em plugins genéricos sem justificativa arquitetural documentada.
+
+Ver: [ADR-001 — Limites entre Plataforma e Produto](decisions/ADR-001-limites-plataforma-produto.md)
+
+---
+
+## Estrutura de Arquivos
+
+```text
+docs/products/conexao-maconica/
+├── README.md                              ← este arquivo
+├── 00-especificacao-funcional-v1.md
+├── 01-arquitetura-tecnica.md
+├── 02-schema-database.md
+├── 03-matriz-rbac.md
+├── 04-mapa-de-telas.md
+├── 05-fluxos-e-jornadas.md
+├── 06-criterios-de-aceite.md
+├── 07-backlog.md
+├── 08-plano-de-sprints.md
+└── decisions/
+    ├── ADR-001-limites-plataforma-produto.md
+    └── ...
+```
+
+---
+
+## Ordem de Implementação Recomendada (após aprovação dos documentos)
+
+```text
+ 1. Estrutura do produto e configuração do tenant
+ 2. Entidades organizacionais maçônicas
+ 3. Perfis, vínculos e permissões
+ 4. Cadastro e moderação de empresas
+ 5. Planos e assinaturas
+ 6. Página pública da empresa
+ 7. Busca e categorias
+ 8. Mapas
+ 9. Painéis
+10. Recursos avançados
+```
