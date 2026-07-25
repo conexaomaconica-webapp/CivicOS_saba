@@ -5,8 +5,8 @@ import React, { useEffect, useState } from 'react';
 
 export default function DiagnosticsPage() {
   const { kernel, isLoading, error } = useKernelSafe();
-  const [diagnostics, setDiagnostics] = useState<any>(null);
-  const [errorFetching, setErrorFetching] = useState<any>(null);
+  const [diagnostics, setDiagnostics] = useState<unknown>(null);
+  const [errorFetching, setErrorFetching] = useState<unknown>(null);
 
   useEffect(() => {
     if (kernel) {
@@ -18,7 +18,7 @@ export default function DiagnosticsPage() {
 
   if (isLoading) return <div>Loading Kernel...</div>;
   if (error) return <div>Kernel failed to load: {String(error)}</div>;
-  if (errorFetching) return <div>Error fetching diagnostics: {String(errorFetching)}</div>;
+  if (errorFetching) return <div>Error fetching diagnostics: {JSON.stringify(errorFetching)}</div>;
   if (!diagnostics) return <div>Checking diagnostics...</div>;
 
   return (

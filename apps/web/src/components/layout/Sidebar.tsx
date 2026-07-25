@@ -1,3 +1,5 @@
+
+'use client';
 import React from 'react';
 import { NavigationSnapshot, NavigationItem } from '@saas/sdk';
 import Link from 'next/link';

@@ -52,7 +52,7 @@ export default function RegisterPage() {
       setFetchingTenant(false);
     };
 
-    resolveTenant();
+    void resolveTenant();
   }, [supabase]);
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -81,8 +81,8 @@ export default function RegisterPage() {
         alert('Cadastro realizado com sucesso! Verifique seu e-mail para confirmação se necessário.');
         router.push('/login');
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Erro inesperado ao realizar cadastro.');
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Erro inesperado ao realizar cadastro.');
     } finally {
       setLoading(false);
     }
@@ -90,7 +90,7 @@ export default function RegisterPage() {
 
   return (
     <form
-      onSubmit={handleRegister}
+      onSubmit={(e) => { void handleRegister(e); }}
       style={{
         display: 'flex',
         flexDirection: 'column',

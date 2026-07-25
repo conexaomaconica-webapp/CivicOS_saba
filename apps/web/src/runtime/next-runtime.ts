@@ -29,8 +29,11 @@ export class NextRuntime implements HostRuntime {
     const provider = new KernelProvider(() => ({
       pluginsDir: './plugins',
       reader: {
+        // eslint-disable-next-line @typescript-eslint/require-await
         exists: async () => false,
+        // eslint-disable-next-line @typescript-eslint/require-await
         readJson: async () => null,
+        // eslint-disable-next-line @typescript-eslint/require-await
         listDirectories: async () => [],
       },
       coreVersion: '1.0',

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+
 import { SupabaseBusinessRepositoryAdapter } from './business-repository-adapter';
 import { Business } from '@saas/plugin-business-directory';
 import type { DatabaseClient } from '../../database/database-client';
@@ -7,40 +8,41 @@ import type { BusinessRecord } from '../business-mapper';
 class MockDatabaseClient implements DatabaseClient {
   public records: Record<string, BusinessRecord> = {};
 
-  async query<T>(sql: string, params?: any[]): Promise<T[]> {
+  query<T>(sql: string, params?: unknown[]): Promise<T[]> {
     if (sql.includes('slug = $1')) {
       const slug = params?.[0];
       const match = Object.values(this.records).find(r => r.slug === slug);
-      return (match ? [match] : []) as unknown as T[];
+      return Promise.resolve((match ? [match] : []) as unknown as T[]);
     }
     
     if (sql.includes('id = $1')) {
-      const id = params?.[0];
+      const param = params?.[0];
+      const id = typeof param === 'string' ? param : '';
       const match = this.records[id];
-      return (match ? [match] : []) as unknown as T[];
+      return Promise.resolve((match ? [match] : []) as unknown as T[]);
     }
     
-    return [];
+    return Promise.resolve([]);
   }
 
-  async insert<T>(table: string, data: Partial<T>): Promise<T> {
+  insert<T>(table: string, data: Partial<T>): Promise<T> {
     const record = data as unknown as BusinessRecord;
     this.records[record.id] = record;
-    return record as unknown as T;
+    return Promise.resolve(record as unknown as T);
   }
 
-  async update<T>(table: string, id: string, data: Partial<T>): Promise<T> {
+  update<T>(table: string, id: string, data: Partial<T>): Promise<T> {
     const record = data as unknown as BusinessRecord;
     this.records[id] = record;
-    return record as unknown as T;
+    return Promise.resolve(record as unknown as T);
   }
 
-  async delete(table: string, id: string): Promise<boolean> {
+  delete(table: string, id: string): Promise<boolean> {
     delete this.records[id];
-    return true;
+    return Promise.resolve(true);
   }
 
-  async transaction<T>(callback: (tx: DatabaseClient) => Promise<T>): Promise<T> {
+  transaction<T>(callback: (tx: DatabaseClient) => Promise<T>): Promise<T> {
     return callback(this);
   }
 }

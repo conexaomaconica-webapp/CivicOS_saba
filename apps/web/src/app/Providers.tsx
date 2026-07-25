@@ -2,7 +2,7 @@
 
 import { ReactNode, useMemo, createContext, useContext, useEffect, useState } from 'react';
 import { KernelProvider } from '@saas/app-sdk';
-import { NextRuntime } from '../runtime/next-runtime';
+import { createWebRuntime } from '../runtime/create-web-runtime';
 
 interface ThemeContextType {
   theme: 'light' | 'dark';
@@ -20,7 +20,7 @@ export function useTheme() {
 
 export function Providers({ children }: { children: ReactNode }) {
   // We use useMemo to ensure the runtime is only created once per client
-  const runtime = useMemo(() => new NextRuntime(), []);
+  const runtime = useMemo(() => createWebRuntime(), []);
   
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 

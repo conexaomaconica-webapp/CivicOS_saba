@@ -1,4 +1,5 @@
-import type { UnitOfWork, TransactionManager } from '@saas/core';
+
+import { TransactionManager, UnitOfWork } from '@saas/core';
 
 /**
  * A basic implementation of UnitOfWork. 
@@ -8,20 +9,15 @@ import type { UnitOfWork, TransactionManager } from '@saas/core';
  * This implementation provides the architectural boundary for Phase 4.5.
  */
 export class SupabaseUnitOfWork implements UnitOfWork {
-  async execute<T>(callback: () => Promise<T>): Promise<T> {
-    try {
-      // In a Drizzle ORM implementation, we would start a transaction here
-      // db.transaction(async (tx) => { ... })
-      return await callback();
-    } catch (err) {
-      // Rollback logic would go here
-      throw err;
-    }
+  execute<T>(callback: () => Promise<T>): Promise<T> {
+    // In a Drizzle ORM implementation, we would start a transaction here
+    // db.transaction(async (tx) => { ... })
+    return callback();
   }
 }
 
 export class SupabaseTransactionManager implements TransactionManager {
-  async begin(): Promise<UnitOfWork> {
-    return new SupabaseUnitOfWork();
+  begin(): Promise<UnitOfWork> {
+    return Promise.resolve(new SupabaseUnitOfWork());
   }
 }

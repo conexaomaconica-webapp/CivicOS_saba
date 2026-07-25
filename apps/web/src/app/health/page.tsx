@@ -5,20 +5,18 @@ import React, { useEffect, useState } from 'react';
 
 export default function HealthPage() {
   const { kernel, isLoading, error } = useKernelSafe();
-  const [health, setHealth] = useState<any>(null);
-  const [errorFetching, setErrorFetching] = useState<any>(null);
+  const [health, setHealth] = useState<unknown>(null);
+  const [errorFetching, setErrorFetching] = useState<unknown>(null);
 
   useEffect(() => {
     if (kernel) {
-      kernel.health()
-        .then(res => setHealth(res))
-        .catch(err => setErrorFetching(err));
+      kernel.diagnostics().then(setHealth).catch(setErrorFetching);
     }
   }, [kernel]);
 
   if (isLoading) return <div>Loading Kernel...</div>;
   if (error) return <div>Kernel failed to load: {String(error)}</div>;
-  if (errorFetching) return <div>Error fetching health: {String(errorFetching)}</div>;
+  if (errorFetching) return <div>Error fetching health: {JSON.stringify(errorFetching)}</div>;
   if (!health) return <div>Checking health...</div>;
 
   return (

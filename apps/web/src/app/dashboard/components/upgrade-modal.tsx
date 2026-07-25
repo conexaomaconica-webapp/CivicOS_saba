@@ -57,16 +57,16 @@ export default function UpgradeModal({
 
         if (dbPlans && dbPlans.length > 0) {
           const mapped: Partial<Record<'bronze' | 'prata' | 'ouro', number>> = {};
-          dbPlans.forEach((p: any) => {
+          dbPlans.forEach((p: { tier: string; price_annual: string | number }) => {
             if (p.tier === 'bronze' || p.tier === 'prata' || p.tier === 'ouro') {
-              mapped[p.tier as 'bronze' | 'prata' | 'ouro'] = parseFloat(p.price_annual);
+              mapped[p.tier] = typeof p.price_annual === 'string' ? parseFloat(p.price_annual) : Number(p.price_annual);
             }
           });
           setPlansConfig(prev => ({ ...prev, ...mapped }));
         }
       }
     };
-    fetchPlans();
+    void fetchPlans();
   }, [supabase]);
 
   // Recalculate pro-rata whenever selectedTier or plansConfig changes
@@ -87,8 +87,9 @@ export default function UpgradeModal({
     setPaymentStatus('pending');
     
     // Simulate active Pix checking status webhook (2.5 seconds)
-    setTimeout(async () => {
-      try {
+    setTimeout(() => {
+      void (async () => {
+        try {
         // 1. Upgrade business to the selected plan_tier in db
         const { error: upgradeError } = await supabase
           .from('businesses')
@@ -118,10 +119,11 @@ export default function UpgradeModal({
           onSuccess();
         }, 1500);
 
-      } catch (err: any) {
-        setErrorMsg(err.message || 'Erro ao processar ativação do plano.');
-        setPaymentStatus('idle');
-      }
+        } catch (err: unknown) {
+          setErrorMsg(err instanceof Error ? err.message : 'Erro ao processar ativação do plano.');
+          setPaymentStatus('idle');
+        }
+      })();
     }, 2500);
   };
 

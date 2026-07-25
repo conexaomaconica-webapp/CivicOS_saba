@@ -5,8 +5,7 @@
 // Runs on Edge Runtime for global low-latency.
 // ============================================================================
 
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { createMiddlewareSideClient } from '@/lib/supabase/middleware';
 
 export async function middleware(request: NextRequest) {
@@ -56,8 +55,13 @@ export async function middleware(request: NextRequest) {
     }
 
     // Resolve user details and roles
-    const userRole = user.user_metadata?.role ?? 'usuario_comum';
-    const userTenantId = user.user_metadata?.tenant_id ?? null;
+    interface UserMetadata {
+      role?: string;
+      tenant_id?: string;
+    }
+    const metadata = (user?.user_metadata ?? {}) as UserMetadata;
+    const userRole = metadata.role ?? 'usuario_comum';
+    const userTenantId = metadata.tenant_id ?? null;
 
     // RBAC: Admin Routes (/admin/*)
     if (isAdminRoute) {

@@ -7,8 +7,9 @@ export interface DatabaseTransaction {
   rollback(): Promise<void>;
 }
 
+
 export interface DatabaseClient {
-  query<T>(sql: string, params?: any[]): Promise<T[]>;
+  query<T>(sql: string, params?: unknown[]): Promise<T[]>;
   insert<T>(table: string, data: Partial<T>): Promise<T>;
   update<T>(table: string, id: string, data: Partial<T>): Promise<T>;
   delete(table: string, id: string): Promise<boolean>;

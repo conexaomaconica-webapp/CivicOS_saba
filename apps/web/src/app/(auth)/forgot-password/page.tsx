@@ -28,8 +28,8 @@ export default function ForgotPasswordPage() {
       } else {
         setSuccess(true);
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Erro inesperado ao enviar link de recuperação.');
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Erro inesperado ao enviar link de recuperação.');
     } finally {
       setLoading(false);
     }
@@ -37,7 +37,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <form
-      onSubmit={handleResetPassword}
+      onSubmit={(e) => { void handleResetPassword(e); }}
       style={{
         display: 'flex',
         flexDirection: 'column',

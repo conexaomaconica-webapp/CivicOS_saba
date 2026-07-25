@@ -3,6 +3,7 @@
 // ============================================================================
 
 
+
 export interface OutboxTransport {
-  publish(event: any): Promise<void>;
+  publish(event: unknown): Promise<void>;
 }

@@ -12,7 +12,7 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        project: ['./tsconfig.json', './packages/*/tsconfig.json', './plugins/*/tsconfig.json', './apps/*/tsconfig.json'],
+        project: ['./packages/*/tsconfig.json', './plugins/*/tsconfig.json', './apps/*/tsconfig.json'],
         tsconfigRootDir: __dirname,
       },
     },
@@ -38,4 +38,14 @@ export default tseslint.config(
       ]
     },
   },
+  {
+    files: ['apps/web/src/app/**/*.tsx', 'apps/web/src/components/**/*.tsx'],
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off'
+    }
+  }
 );

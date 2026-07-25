@@ -11,16 +11,16 @@ interface Business {
   name: string;
   category: string;
   plan_tier: 'bronze' | 'prata' | 'ouro';
-  phone: string;
-  address: string;
+  phone: string | null;
+  address: string | null;
 }
 
 interface Banner {
   id: string;
   image_url: string;
-  impressions: number;
-  clicks: number;
-  is_active: boolean;
+  impressions: number | null;
+  clicks: number | null;
+  is_active: boolean | null;
 }
 
 export default function DashboardPage() {
@@ -28,7 +28,7 @@ export default function DashboardPage() {
   const supabase = createClient();
 
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<import('@supabase/supabase-js').User | null>(null);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [stats, setStats] = useState({ clicks: 0, impressions: 0, rating: 0 });
@@ -100,7 +100,7 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, [supabase, router]);
 
   const handleOpenUpgrade = (business: Business) => {
@@ -160,6 +160,7 @@ export default function DashboardPage() {
           color: 'oklch(0.60 0.01 200)',
           border: '1px solid oklch(0.60 0.01 200 / 0.3)',
         };
+      case 'bronze':
       default:
         return {
           backgroundColor: 'var(--bg-tertiary)',
@@ -243,7 +244,7 @@ export default function DashboardPage() {
             Página Inicial
           </Link>
           <button
-            onClick={handleLogout}
+            onClick={() => { void handleLogout(); }}
             style={{
               padding: 'var(--space-2) var(--space-4)',
               borderRadius: 'var(--radius-md)',
@@ -533,7 +534,7 @@ export default function DashboardPage() {
           businessName={selectedBusiness.name}
           businessId={selectedBusiness.id}
           onSuccess={() => {
-            loadData();
+            void loadData();
             setIsUpgradeOpen(false);
           }}
         />

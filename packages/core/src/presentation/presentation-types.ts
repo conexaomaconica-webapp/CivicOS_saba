@@ -51,6 +51,7 @@ export interface RouteDefinition {
   readonly requireAuth: boolean;
   readonly requiredCapabilities?: string[];
   readonly requiredPermissions?: string[];
+  readonly props?: Record<string, unknown>;
 }
 
 

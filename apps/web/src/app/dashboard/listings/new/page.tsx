@@ -4,14 +4,21 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import type { User } from '@supabase/supabase-js';
+import type { Database } from '@/types/database.types';
 
+interface AppUserMetadata {
+  tenant_id?: string;
+}
+
+type BusinessInsert = Database["public"]["Tables"]["businesses"]["Insert"];
 export default function NewListingWizardPage() {
   const router = useRouter();
   const supabase = createClient();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Form Fields
@@ -87,7 +94,7 @@ export default function NewListingWizardPage() {
         try {
           const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
           if (!res.ok) throw new Error();
-          const data = await res.json();
+          const data = (await res.json()) as Record<string, string | undefined>;
           if (data.erro) {
             setErrorMsg('CEP não encontrado. Por favor, digite os dados do endereço manualmente.');
           } else {
@@ -102,13 +109,13 @@ export default function NewListingWizardPage() {
               if (numInput) numInput.focus();
             }, 100);
           }
-        } catch (err) {
+        } catch {
           setErrorMsg('Falha ao conectar com o serviço de CEP. Preencha os campos abaixo.');
         } finally {
           setFetchingCep(false);
         }
       };
-      fetchCep();
+      fetchCep().catch(console.error);
     }
   }, [cep]);
 
@@ -122,7 +129,8 @@ export default function NewListingWizardPage() {
       setUser(user);
 
       // Resolve tenant_id
-      let tenantId = user.user_metadata?.tenant_id;
+      const metadata = user.user_metadata as AppUserMetadata | undefined;
+      let tenantId = metadata?.tenant_id;
       if (!tenantId) {
         const { data: tenantList } = await supabase.from('tenants').select('id').limit(1);
         if (tenantList && tenantList.length > 0) {
@@ -138,16 +146,16 @@ export default function NewListingWizardPage() {
 
         if (dbPlans && dbPlans.length > 0) {
           const mapped: Partial<Record<'bronze' | 'prata' | 'ouro', number>> = {};
-          dbPlans.forEach((p: any) => {
+          dbPlans.forEach((p) => {
             if (p.tier === 'bronze' || p.tier === 'prata' || p.tier === 'ouro') {
-              mapped[p.tier as 'bronze' | 'prata' | 'ouro'] = parseFloat(p.price_annual);
+              mapped[p.tier] = p.price_annual;
             }
           });
           setPlansConfig(prev => ({ ...prev, ...mapped }));
         }
       }
     };
-    fetchUserAndPlans();
+    fetchUserAndPlans().catch(console.error);
   }, [supabase, router]);
 
   const validateStep = () => {
@@ -181,14 +189,15 @@ export default function NewListingWizardPage() {
     setStep(prev => prev - 1);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg(null);
 
     try {
       // Resolve tenant_id from user metadata
-      let tenantId = user?.user_metadata?.tenant_id;
+      const metadata = user?.user_metadata as AppUserMetadata | undefined;
+      let tenantId = metadata?.tenant_id;
       
       // Fallback: if no tenant_id exists in user metadata, fetch a default one to satisfy database constraint
       if (!tenantId) {
@@ -211,8 +220,8 @@ export default function NewListingWizardPage() {
           .normalize('NFD')
           .replace(/[\u0300-\u036f]/g, '')
           .replace(/\s+/g, '-')
-          .replace(/[^\w\-]+/g, '')
-          .replace(/\-\-+/g, '-');
+          .replace(/[^\w-]+/g, '')
+          .replace(/--+/g, '-');
       };
       const slug = `${slugify(name)}-${Math.random().toString(36).substring(2, 6)}`;
 
@@ -220,7 +229,8 @@ export default function NewListingWizardPage() {
       const finalAddress = `${logradouro}, ${numero}${complemento.trim() ? ' - ' + complemento.trim() : ''}, ${bairro}, ${cidade} - ${estado} (CEP: ${cep})`;
 
       // Insert business listing into businesses table
-      const { error } = await supabase.from('businesses').insert({
+      if (!user) throw new Error('Usuário não autenticado.');
+      const payload: BusinessInsert = {
         tenant_id: tenantId,
         owner_id: user.id,
         name,
@@ -232,7 +242,8 @@ export default function NewListingWizardPage() {
         address: finalAddress,
         plan_tier: plan,
         slug,
-      });
+      };
+      const { error } = await supabase.from('businesses').insert(payload);
 
       if (error) {
         setErrorMsg(error.message);
@@ -247,8 +258,9 @@ export default function NewListingWizardPage() {
           }
         });
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Ocorreu um erro ao cadastrar o anúncio.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Ocorreu um erro ao cadastrar o anúncio.';
+      setErrorMsg(message);
     } finally {
       setLoading(false);
     }
@@ -402,7 +414,7 @@ export default function NewListingWizardPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <form onSubmit={(e) => { void handleSubmit(e); }} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           {/* Step 1: Basic Info */}
           {step === 1 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>

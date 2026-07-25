@@ -14,9 +14,9 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test && node architecture-tests.js",
-    "clean": "turbo run clean && rm -rf node_modules",
+    "clean": "rimraf --glob packages/*/dist packages/*/*.tsbuildinfo plugins/*/dist plugins/*/*.tsbuildinfo apps/*/.next apps/*/*.tsbuildinfo",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
-    "verify": "pnpm clean && pnpm install && pnpm lint && pnpm build && pnpm test"
+    "verify": "pnpm clean && pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm build && pnpm test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -25,6 +25,7 @@
     "@typescript-eslint/parser": "^8.64.0",
     "eslint": "^10.7.0",
     "prettier": "^3.4.0",
+    "rimraf": "^5.0.0",
     "turbo": "^2.4.0",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.64.0"

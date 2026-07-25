@@ -15,7 +15,7 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Active Session State
-  const [activeUser, setActiveUser] = useState<any>(null);
+  const [activeUser, setActiveUser] = useState<import('@supabase/supabase-js').User | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export default function LoginPage() {
       setActiveUser(user);
       setCheckingSession(false);
     };
-    checkSession();
+    void checkSession();
   }, [supabase]);
 
   const handleLogout = async () => {
@@ -34,8 +34,8 @@ export default function LoginPage() {
       await supabase.auth.signOut();
       setActiveUser(null);
       router.refresh();
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Erro ao deslogar da conta.');
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Erro ao deslogar da conta.');
     } finally {
       setLoading(false);
     }
@@ -58,8 +58,8 @@ export default function LoginPage() {
         router.refresh();
         router.push('/dashboard');
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Erro inesperado ao realizar login.');
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Erro inesperado ao realizar login.');
     } finally {
       setLoading(false);
     }
@@ -145,7 +145,7 @@ export default function LoginPage() {
           </Link>
           
           <button
-            onClick={handleLogout}
+            onClick={() => { void handleLogout(); }}
             disabled={loading}
             style={{
               padding: 'var(--space-3)',
@@ -168,7 +168,7 @@ export default function LoginPage() {
 
   return (
     <form
-      onSubmit={handleLogin}
+      onSubmit={(e) => { void handleLogin(e); }}
       style={{
         display: 'flex',
         flexDirection: 'column',

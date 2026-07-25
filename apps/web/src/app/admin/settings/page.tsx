@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import type { Database } from '@/types/database.types';
 
 export default function AdminSettingsPage() {
   const router = useRouter();
@@ -11,8 +12,8 @@ export default function AdminSettingsPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [tenant, setTenant] = useState<any>(null);
+  const [user, setUser] = useState<import('@supabase/supabase-js').User | null>(null);
+  const [tenant, setTenant] = useState<Database['public']['Tables']['tenants']['Row'] | null>(null);
   
   // Prices State
   const [prices, setPrices] = useState<Record<'bronze' | 'prata' | 'ouro', number>>({
@@ -84,22 +85,22 @@ export default function AdminSettingsPage() {
             prata: 299,
             ouro: 499,
           };
-          dbPlans.forEach((p: any) => {
+          dbPlans.forEach((p: { tier: string; price_annual: string | number }) => {
             if (p.tier === 'bronze' || p.tier === 'prata' || p.tier === 'ouro') {
-              mapped[p.tier as 'bronze' | 'prata' | 'ouro'] = parseFloat(p.price_annual);
+              mapped[p.tier] = typeof p.price_annual === 'string' ? parseFloat(p.price_annual) : Number(p.price_annual);
             }
           });
           setPrices(mapped);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching admin settings:', err);
-        setErrorMsg(err.message || 'Erro ao carregar configurações administrativas.');
+        setErrorMsg(err instanceof Error ? err.message : 'Erro ao carregar configurações administrativas.');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAdminData();
+    void fetchAdminData();
   }, [supabase, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -139,9 +140,9 @@ export default function AdminSettingsPage() {
       }
 
       setSuccessMsg('Configurações e valores de planos salvos com sucesso!');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving settings:', err);
-      setErrorMsg(err.message || 'Erro ao salvar alterações.');
+      setErrorMsg(err instanceof Error ? err.message : 'Erro ao salvar alterações.');
     } finally {
       setSaving(false);
     }
@@ -289,7 +290,7 @@ export default function AdminSettingsPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+        <form onSubmit={(e) => { void handleSubmit(e); }} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
           {/* Section: General Info */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-semibold)', borderBottom: '1px solid var(--border-default)', paddingBottom: 'var(--space-2)' }}>

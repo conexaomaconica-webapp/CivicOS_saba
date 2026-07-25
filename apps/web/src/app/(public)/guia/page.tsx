@@ -61,10 +61,10 @@ export default async function GuiaPage({ searchParams }: Props) {
   const rawList = dbBusinesses || [];
 
   // 3. Sort lists by tiers: Ouro -> Prata -> Bronze
-  const sortedBusinesses = [...rawList].sort((a: any, b: any) => {
+  const sortedBusinesses = [...rawList].sort((a: { plan_tier?: string | null }, b: { plan_tier?: string | null }) => {
     const tierOrder: Record<string, number> = { ouro: 1, prata: 2, bronze: 3 };
-    const orderA = tierOrder[a.plan_tier] ?? 4;
-    const orderB = tierOrder[b.plan_tier] ?? 4;
+    const orderA = tierOrder[a.plan_tier || ''] ?? 4;
+    const orderB = tierOrder[b.plan_tier || ''] ?? 4;
     return orderA - orderB;
   });
 
@@ -217,7 +217,7 @@ export default async function GuiaPage({ searchParams }: Props) {
         }}
       >
         {sortedBusinesses.length > 0 ? (
-          sortedBusinesses.map((b: any) => {
+          sortedBusinesses.map((b: { id: string; name: string; category: string; description: string | null; address: string | null; slug: string | null; plan_tier: string | null }) => {
             const isOuro = b.plan_tier === 'ouro';
             const isPrata = b.plan_tier === 'prata';
 
@@ -349,7 +349,7 @@ export default async function GuiaPage({ searchParams }: Props) {
 
                   {/* Actions CTAs */}
                   <Link
-                    href={`/guia/${b.slug}`}
+                    href={`/guia/${b.slug || ''}`}
                     style={{
                       width: '100%',
                       padding: 'var(--space-2-5, 0.625rem)',

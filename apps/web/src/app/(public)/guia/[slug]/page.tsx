@@ -26,7 +26,7 @@ async function getCompanyBySlug(slug: string) {
   
   const review_count = reviews?.length || 0;
   const average_rating = (reviews && review_count > 0)
-    ? (reviews.reduce((acc: number, curr: any) => acc + curr.rating, 0) / review_count).toFixed(1)
+    ? (reviews.reduce((acc: number, curr: { rating: number }) => acc + curr.rating, 0) / review_count).toFixed(1)
     : '5.0';
 
   return {
