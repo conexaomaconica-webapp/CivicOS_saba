@@ -20,6 +20,7 @@
     "@saas/app-sdk": "workspace:*",
     "@saas/core": "workspace:*",
     "@saas/plugin-community-directory": "workspace:^",
+    "@saas/plugin-conexao-maconica": "workspace:*",
     "@saas/sdk": "workspace:*",
     "@saas/shared": "workspace:*",
     "@saas/ui": "workspace:*",

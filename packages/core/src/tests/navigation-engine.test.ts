@@ -72,7 +72,7 @@ describe('NavigationEngine (Sprint 1.0)', () => {
 
     const guestNavs = resolver.resolveAll(guestContext, resolvedRoutesGuest);
     expect(guestNavs).toHaveLength(1);
-    expect(guestNavs[0].id).toBe('nav-dashboard');
+    expect(guestNavs[0]?.id).toBe('nav-dashboard');
 
     // Context with admin permission and founder capability
     const adminContext: PresentationContext = {

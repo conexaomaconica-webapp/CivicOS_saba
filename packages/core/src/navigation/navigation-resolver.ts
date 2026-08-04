@@ -30,19 +30,33 @@ export class NavigationResolver {
   ): NavigationItem[] {
     const capabilitiesSet = new Set(context.capabilities);
     const permissionsSet = new Set(context.permissions);
+    const rolesSet = new Set(context.capabilities); // Roles are stored as capabilities in this system
     
     const filtered: NavigationItem[] = [];
 
     for (const nav of items) {
+      // Filter by capability
       if (nav.capability && !capabilitiesSet.has(nav.capability)) {
         continue;
       }
 
+      // Filter by permission
       if (nav.permission && !permissionsSet.has(nav.permission)) {
         continue;
       }
-      
-      // Note: Role and Policy filtering could be added here later if needed
+
+      // Filter by role
+      if (nav.role && !rolesSet.has(nav.role)) {
+        continue;
+      }
+
+      // Filter by policy
+      if (nav.policy) {
+        const policyDecision = context.policyDecision?.[nav.policy];
+        if (policyDecision !== true) {
+          continue;
+        }
+      }
 
       // Filter by resolved routes
       if (nav.route && !nav.route.startsWith('http')) {
@@ -59,9 +73,14 @@ export class NavigationResolver {
 
       // Recursively process children
       if (resolvedNav.children && resolvedNav.children.length > 0) {
+        const filteredChildren = this.filterAndSortItems(resolvedNav.children, context, resolvedRoutes);
+        // Only include parent if it has a route or has visible children
+        if (filteredChildren.length === 0 && !resolvedNav.route) {
+          continue;
+        }
         resolvedNav = {
           ...resolvedNav,
-          children: this.filterAndSortItems(resolvedNav.children, context, resolvedRoutes)
+          children: filteredChildren
         };
       }
 

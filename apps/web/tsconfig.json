@@ -34,6 +34,18 @@
       ],
       "@saas/ui/*": [
         "../../packages/ui/src/*"
+      ],
+      "@saas/plugin-conexao-maconica": [
+        "../../plugins/conexao-maconica/src"
+      ],
+      "@saas/plugin-conexao-maconica/*": [
+        "../../plugins/conexao-maconica/src/*"
+      ],
+      "@saas/plugin-community-directory": [
+        "../../plugins/community-directory/src"
+      ],
+      "@saas/plugin-community-directory/*": [
+        "../../plugins/community-directory/src/*"
       ]
     },
     "allowJs": true,
