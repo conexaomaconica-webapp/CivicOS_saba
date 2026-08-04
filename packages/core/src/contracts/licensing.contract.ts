@@ -6,14 +6,15 @@
 // ============================================================================
 
 export interface LicenseLimits {
-  readonly maxUsers: number;
-  readonly maxStorageBytes: number;
-  readonly maxBanners: number;
-  readonly maxListings: number; // For business directories
-  readonly maxMasonicLojas: number; // For masonic directories
-  readonly maxEvents: number;
-  readonly aiFeaturesEnabled: boolean;
-  readonly importerEnabled: boolean;
+  readonly maxUsers?: number;
+  readonly maxStorageBytes?: number;
+  readonly maxBanners?: number;
+  readonly maxListings?: number; // For business directories
+  readonly maxEvents?: number;
+  readonly aiFeaturesEnabled?: boolean;
+  readonly importerEnabled?: boolean;
+  /** Custom domain/product limits. Specific commercial limits are resolved via Entitlements Engine. */
+  readonly customLimits?: Readonly<Record<string, number>>;
 }
 
 export interface LicensingService {

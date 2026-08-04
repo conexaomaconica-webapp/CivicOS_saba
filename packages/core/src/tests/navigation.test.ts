@@ -29,7 +29,7 @@ describe('NavigationResolver', () => {
     { id: 'r1', path: '/dashboard', requireAuth: true },
     { id: 'r2', path: '/admin', requireAuth: true, requiredCapabilities: ['admin'] },
     { id: 'r3', path: '/guia', requireAuth: false },
-    { id: 'r4', path: '/painel/maconico', requireAuth: true, requiredPermissions: ['masonic:dashboard:view'] },
+    { id: 'r4', path: '/plugin/example-dashboard', requireAuth: true, requiredPermissions: ['example.dashboard.view'] },
     { id: 'r5', path: '/admin/organizacoes', requireAuth: true, requiredPermissions: ['organization:manage'] },
   ];
 
@@ -77,13 +77,13 @@ describe('NavigationResolver', () => {
     it('deve mostrar item quando usuário tem a permissão necessária', () => {
       navigationRegistry.register({
         id: 'nav1',
-        label: 'Painel Maçônico',
-        route: '/painel/maconico',
+        label: 'Painel Exemplo',
+        route: '/plugin/example-dashboard',
         order: 1,
-        permission: 'masonic:dashboard:view',
+        permission: 'example.dashboard.view',
       } as any);
 
-      const context = { ...baseContext, permissions: ['masonic:dashboard:view'] };
+      const context = { ...baseContext, permissions: ['example.dashboard.view'] };
       const result = resolver.resolveAll(context, baseRoutes);
 
       expect(result.length).toBe(1);
@@ -93,10 +93,10 @@ describe('NavigationResolver', () => {
     it('deve ocultar item quando usuário NÃO tem a permissão necessária', () => {
       navigationRegistry.register({
         id: 'nav1',
-        label: 'Painel Maçônico',
-        route: '/painel/maconico',
+        label: 'Painel Exemplo',
+        route: '/plugin/example-dashboard',
         order: 1,
-        permission: 'masonic:dashboard:view',
+        permission: 'example.dashboard.view',
       } as any);
 
       const context = { ...baseContext, permissions: [] };
@@ -345,12 +345,12 @@ describe('NavigationResolver', () => {
   describe('Contexto com Múltiplas Permissões/Capabilities', () => {
     it('deve mostrar todos os itens permitidos quando usuário tem múltiplas permissões', () => {
       navigationRegistry.register({ id: 'n1', label: 'Dashboard', route: '/dashboard', order: 1 } as any);
-      navigationRegistry.register({ id: 'n2', label: 'Painel Maçônico', route: '/painel/maconico', order: 2, permission: 'masonic:dashboard:view' } as any);
+      navigationRegistry.register({ id: 'n2', label: 'Painel Exemplo', route: '/plugin/example-dashboard', order: 2, permission: 'example.dashboard.view' } as any);
       navigationRegistry.register({ id: 'n3', label: 'Organizações', route: '/admin/organizacoes', order: 3, permission: 'organization:manage' } as any);
 
       const context = {
         ...baseContext,
-        permissions: ['masonic:dashboard:view', 'organization:manage'],
+        permissions: ['example.dashboard.view', 'organization:manage'],
       };
       const result = resolver.resolveAll(context, baseRoutes);
 
