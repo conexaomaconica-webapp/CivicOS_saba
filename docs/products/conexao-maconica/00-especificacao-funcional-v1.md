@@ -348,6 +348,39 @@ _A camada de inteligência e valor agregado._
 
 ---
 
-## 11. Conclusão
+## 12. Política de Vínculo de Empresas e Concorrência Ética (Masonic Business Link & Fair Competition Policy)
 
-Esta especificação revisada **v1.1** é o artefato mandatário que pautará as próximas fases: Modelagem Técnica, Schema SQL, RBAC e planejamento das Sprints, garantindo alinhamento total com as exigências de negócio e operacionais estabelecidas pelo arquiteto-chefe.
+Esta política estabelece os critérios funcionais para declaração, verificação, exibição e governança dos vínculos maçônicos das empresas cadastradas na plataforma Conexão Maçônica, assim como as garantias de livre concorrência e ética comercial.
+
+### 12.1 Modalidades de Vínculo
+Uma empresa cadastrada pode possuir um ou mais vínculos maçônicos caracterizados pelas seguintes categorias:
+1. **Proprietário / Sócio Maçom (`owner_partner`):** Empresa cujo controle societário ou propriedade direta pertence a um membro verificado da ordem.
+2. **Empresa da Família Maçônica (`family_member`):** Empresa pertencente a cônjuge, filho(a) ou dependente direto de um irmão verificado.
+3. **Empresa Representada por Irmão (`brother_representative`):** Empresa onde um irmão verificado atua como executivo principal, diretor ou representante legal autorizado.
+4. **Parceiro Institucional (`institutional_partner`):** Empresa sem sócio maçom direto, mas formalmente conveniada com Lojas ou Potências para concessão de benefícios à comunidade.
+
+### 12.2 Múltiplos Vínculos e Vínculo Principal
+- Uma empresa pode ter múltiplos vínculos registrados (ex: dois sócios de Lojas distintas).
+- Deve ser obrigatoriamente designado um **Vínculo Principal (`primary_link`)** para fins de exibição nos cards e destaque institucional padrão.
+- Cada vínculo é registrado de forma individualizada com seu próprio ciclo de vida, status de verificação e histórico.
+
+### 12.3 Consentimento, Evidências e Autorização Comercial
+- **Evidências por Tipo (`link_evidence`):** A declaração exige comprovação proporcional (documento de regularidade/capitulação, contrato social, declaração de representação ou convênio assinado).
+- **Autorização Comercial (`business_authorization`):** Exigência de consentimento formal da empresa autorizando a vinculação do seu nome comercial à comunidade.
+- **Consentimento de Exposição Pública (`public_consent`):** O irmão declarante e a empresa devem consentir explicitamente com o nível de visibilidade pública do vínculo (público geral vs. exclusivo para membros autenticados).
+- **Validade e Revogação:** Todo vínculo possui prazo de validade configurável (renovação anual/periódica) e pode ser revogado por iniciativa da empresa, do declarante ou por moderação institucional.
+
+### 12.4 Concorrência Ética e Livre Mercado
+- **Ausência de Exclusividade:** A plataforma não concede exclusividade territorial ou por categoria de mercado a qualquer empresa.
+- **Ranking Transparente:**
+  - **Ranking Orgânico:** Ordenado estritamente por critérios de relevância, geolocalização, completude do perfil e avaliações legítimas.
+  - **Ranking Patrocinado:** Destaques pagos exibidos de forma claramente identificada ("Patrocinado"), sem adulterar os resultados orgânicos.
+- **Contestação e Sanções:** Qualquer descumprimento, declaração falsa de vínculo ou fraude sujeita o cadastro à suspensão imediata e denúncia às instâncias de moderação.
+- **Proteção Anticoncorrencial:** Avaliações, denúncias ou ações deliberadas de concorrentes visando prejudicar um estabelecimento serão monitoradas, exigirão fundamentação e estarão sujeitas a sanções por abuso de plataforma.
+
+---
+
+## 13. Conclusão
+
+Esta especificação revisada **v1.1 (com Adendo de Política de Vínculo)** é o artefato mandatário que pauta as próximas fases: Modelagem Técnica, Schema SQL, RBAC e planejamento das Sprints, garantindo alinhamento total com as exigências de negócio e operacionais estabelecidas pelo arquiteto-chefe.
+

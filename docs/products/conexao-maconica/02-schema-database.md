@@ -1374,6 +1374,85 @@ CREATE INDEX idx_outbox_events_unpublished ON public.outbox_events(published, cr
 
 ---
 
+#### 6.15 Schemas Conceituais de Extensão — Masonic Business Link Policy
+
+As tabelas de extensão abaixo modelam os vínculos comerciais sem alterar o schema da Fundação CivicOS (`tenant_members`, `organization_people` e `businesses` mantêm suas semânticas puras da plataforma):
+
+##### 6.15.1 `public.business_masonic_links`
+```sql
+CREATE TABLE IF NOT EXISTS public.business_masonic_links (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  business_id UUID NOT NULL,
+  declaring_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  link_type TEXT NOT NULL CHECK (link_type IN ('owner_partner', 'family_member', 'brother_representative', 'institutional_partner')),
+  organization_id UUID REFERENCES public.organizations(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'suspended', 'revoked', 'expired')),
+  is_primary BOOLEAN NOT NULL DEFAULT false,
+  valid_until TIMESTAMPTZ,
+  verified_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  verified_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT fk_bml_business FOREIGN KEY (tenant_id, business_id) REFERENCES public.businesses(tenant_id, id) ON DELETE CASCADE
+);
+CREATE INDEX idx_bml_tenant_business ON public.business_masonic_links(tenant_id, business_id);
+```
+
+##### 6.15.2 `public.business_masonic_link_evidence`
+```sql
+CREATE TABLE IF NOT EXISTS public.business_masonic_link_evidence (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  link_id UUID NOT NULL REFERENCES public.business_masonic_links(id) ON DELETE CASCADE,
+  evidence_type TEXT NOT NULL CHECK (evidence_type IN ('document_pdf', 'image', 'declaration', 'agreement_doc')),
+  file_url TEXT NOT NULL,
+  uploaded_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+##### 6.15.3 `public.business_masonic_link_authorizations`
+```sql
+CREATE TABLE IF NOT EXISTS public.business_masonic_link_authorizations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  link_id UUID NOT NULL REFERENCES public.business_masonic_links(id) ON DELETE CASCADE,
+  authorized_by_business_owner UUID NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
+  authorization_status TEXT NOT NULL DEFAULT 'granted' CHECK (authorization_status IN ('granted', 'revoked')),
+  granted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  revoked_at TIMESTAMPTZ
+);
+```
+
+##### 6.15.4 `public.business_masonic_link_publication_consents`
+```sql
+CREATE TABLE IF NOT EXISTS public.business_masonic_link_publication_consents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  link_id UUID NOT NULL REFERENCES public.business_masonic_links(id) ON DELETE CASCADE,
+  visibility_scope TEXT NOT NULL DEFAULT 'authenticated_members' CHECK (visibility_scope IN ('public_all', 'authenticated_members', 'private_admin')),
+  consent_given BOOLEAN NOT NULL DEFAULT true,
+  consented_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+##### 6.15.5 `public.business_masonic_link_history` (Audit Trail Imutável)
+```sql
+CREATE TABLE IF NOT EXISTS public.business_masonic_link_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  link_id UUID NOT NULL REFERENCES public.business_masonic_links(id) ON DELETE CASCADE,
+  previous_status TEXT,
+  new_status TEXT NOT NULL,
+  actor_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  action_reason TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+---
+
 ## 7. Estratégia de Isolamento Multi-Tenant & RLS (Clarificação de Segurança)
 
 Para eliminar ambiguidade sobre segurança e performance:

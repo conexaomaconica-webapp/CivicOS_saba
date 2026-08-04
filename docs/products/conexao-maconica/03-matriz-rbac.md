@@ -596,8 +596,55 @@ CREATE POLICY "RLS_leads_select_advertiser"
 
 ---
 
-## 12. Conclusão
+## 12. Catálogo e Matriz de Permissões de Vínculo (Masonic Link RBAC Matrix)
 
+Este catálogo estabelece as permissões granulares para a gestão do ciclo de vida dos vínculos comerciais maçônicos, garantindo a segregação de funções entre o usuário declarante, a empresa, os moderadores do tenant e administradores.
+
+### 12.1 Catálogo de Permissões `masonic_link:*`
+
+| Código da Permissão | Descrição | Nível de Risco / Escopo |
+|---|---|---|
+| `masonic_link:declare` | Permite iniciar a declaração de um novo vínculo comercial | Baixo (Usuário Autenticado) |
+| `masonic_link:view_own` | Permite visualizar as declarações de vínculo da própria conta | Baixo (Usuário Autenticado) |
+| `masonic_link:update_own` | Permite alterar rascunhos da própria declaração antes da submissão | Baixo (Usuário Autenticado) |
+| `masonic_link:submit` | Permite submeter a declaração de vínculo para moderação | Baixo (Usuário Autenticado) |
+| `masonic_link:set_primary` | Permite definir qual vínculo é a afiliação principal da empresa | Médio (Gestor da Empresa) |
+| `masonic_link:review` | Permite colocar o vínculo em análise pela moderação | Médio (Tenant Moderator) |
+| `masonic_link:approve` | Permite aprovar formalmente o vínculo maçônico | Alto (Tenant Moderator / Admin) |
+| `masonic_link:request_correction` | Permite solicitar correções ao declarante | Médio (Tenant Moderator) |
+| `masonic_link:reject` | Permite rejeitar uma solicitação de vínculo inconsistente | Alto (Tenant Moderator / Admin) |
+| `masonic_link:suspend` | Permite suspender temporariamente um vínculo ativo | Alto (Tenant Moderator / Admin) |
+| `masonic_link:revoke` | Permite revogar em definitivo o vínculo | Crítico (Tenant Admin) |
+| `masonic_link:evidence:view` | Permite visualizar documentos comprovatórios sensíveis | **Crítico / Elevado (Acesso Auditado)** |
+| `masonic_link:authorization:manage` | Permite ao proprietário da empresa autorizar/revogar o vínculo | Médio (Business Owner) |
+| `masonic_link:public_consent:manage` | Permite gerenciar o consentimento de exibição pública | Médio (Declarante / Business Owner) |
+| `masonic_link:contest` | Permite abrir contestação formal contra vínculo ou denúncia | Médio (Usuário Autenticado) |
+
+### 12.2 Mapeamento de Permissões por Papel
+
+| Permissão | Declarante (`user`) | Business Owner (`owner`) | Tenant Moderator (`moderator`) | Tenant Admin (`tenant_admin`) | Elevated Evidence Auditor (`master`) |
+|---|:---:|:---:|:---:|:---:|:---:|
+| `masonic_link:declare` | 🟢 | 🟢 | 🟢 | 🟢 | 🔴 |
+| `masonic_link:view_own` | 🟢 | 🟢 | 🟢 | 🟢 | 🔴 |
+| `masonic_link:update_own` | 🟢 (rascunho) | 🔴 | 🔴 | 🔴 | 🔴 |
+| `masonic_link:submit` | 🟢 | 🔴 | 🔴 | 🔴 | 🔴 |
+| `masonic_link:set_primary` | 🔴 | 🟢 | 🔴 | 🟢 | 🔴 |
+| `masonic_link:review` | 🔴 | 🔴 | 🟢 | 🟢 | 🔴 |
+| `masonic_link:approve` | 🔴 | 🔴 | 🟢 | 🟢 | 🔴 |
+| `masonic_link:request_correction` | 🔴 | 🔴 | 🟢 | 🟢 | 🔴 |
+| `masonic_link:reject` | 🔴 | 🔴 | 🟢 | 🟢 | 🔴 |
+| `masonic_link:suspend` | 🔴 | 🔴 | 🟢 | 🟢 | 🔴 |
+| `masonic_link:revoke` | 🔴 | 🔴 | 🔴 | 🟢 | 🔴 |
+| `masonic_link:evidence:view` | 🟢 (próprias) | 🔴 | 🟡 (somente em análise) | 🟢 (auditado) | 🔒 **Acesso Elevado** |
+| `masonic_link:authorization:manage` | 🔴 | 🟢 | 🔴 | 🟢 | 🔴 |
+| `masonic_link:public_consent:manage` | 🟢 | 🟢 | 🔴 | 🔴 | 🔴 |
+| `masonic_link:contest` | 🟢 | 🟢 | 🔴 | 🔴 | 🔴 |
+
+---
+
+## 13. Conclusão
+
+Esta Matriz RBAC consolida a separação rigorosa de escopos, protegendo dados sensíveis de evidências através de privilégios de acesso elevado e auditoria obrigatória.
 O **Documento 03 — Matriz RBAC v2.2.0** encerra com sucesso a fase de especificação do modelo de autorização e controle de acesso do produto.
 
 - **Status**: Concluído (v2.2.0 pronta para aprovação definitiva).

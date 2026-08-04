@@ -183,3 +183,25 @@ Ao avançar para o Documento 02 (Schema SQL), as seguintes regras impostas por e
 - O CRM da plataforma e o Gestor de Leads do anunciante **NÃO** podem compartilhar a mesma tabela física, pois pertencem a bounded contexts de operação e tenant diferentes.
 - A condição de fundador, o status de verificação maçônica e os planos vigentes devem possuir persistência independente e não compor um campo único do tipo `badge`.
 - Toda tabela pertencente aos Bounded Contexts de negócio deverá obrigatoriamente possuir `tenant_id` e políticas RLS restritas ao seu contexto de permissão.
+
+---
+
+## 16. Extensão Arquitetural: Masonic Business Link Policy
+
+Este módulo de extensão define como o vínculo comercial maçônico se integra à arquitetura da plataforma sem contaminar o Kernel da Fundação CivicOS.
+
+### 16.1 Composição de Serviços e Módulos
+A arquitetura do vínculo opera através da composição desacoplada dos seguintes componentes:
+1. **Business Directory (Foundation):** Fornece o Aggregate Root `Business` neutro (dados cadastrais de mercado).
+2. **Masonic Domain Extension (Plugin):** Gerencia os vínculos institucionais e comerciais (`BusinessMasonicLink`).
+3. **Credential Engine:** Valida evidências, credenciais de irmãos e declarações institucionais.
+4. **Moderation Service:** Controla os fluxos de aprovação, suspensão, revisão e revogação de vínculos.
+5. **Search and Ranking Engine:** Computa ordenações orgânicas imutáveis por patrocinados e aplica relevância de vínculo sem alterar o índice base do catálogo.
+6. **Consent & Privacy (LGPD):** Registra autorizações comerciais e consentimentos explícitos para exibição pública de dados de afiliação.
+
+### 16.2 Desacoplamento do Aggregate Root `Business`
+- **Independência de Domínio:** O vínculo maçônico **NÃO** fica embutido ou serializado como campo interno no Aggregate `Business` da Fundação.
+- **Relação 1:N Externa:** O modelo admite múltiplos vínculos por empresa (`Business 1 ── N BusinessMasonicLink`), cada qual com seu ciclo de vida independente.
+- **Temporalidade e Verificabilidade:** Todo vínculo é temporal (prazo de vigência e histórico imutável) e verificável via `Credential Engine`.
+- **Diferenciação Semântica:** A presença de um vínculo ativo **não é sinônimo** de "Empresa Verificada". Uma empresa pode possuir vínculo declarado com verificação em andamento, suspenso ou aprovado com privilégios distintos.
+
