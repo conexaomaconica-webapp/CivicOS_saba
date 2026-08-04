@@ -105,13 +105,15 @@ export class RegistryManager {
 
     // -- Routes
     if (manifest.routes) {
-      console.log('Populating routes for', pluginId, manifest.routes);
       for (const route of manifest.routes) {
-        const r = route as ManifestRouteEntry;
+        const r = route as ManifestRouteEntry & { pathname?: string; componentId?: string };
+        const pathStr = r.path ?? r.pathname;
+        if (!pathStr) continue;
+
         this.presentationRoutes.register({
-          id: `${pluginId}:${r.path}`,
-          path: r.path,
-          componentId: r.page,
+          id: `${pluginId}:${pathStr}`,
+          path: pathStr,
+          componentId: r.page ?? r.componentId,
           layoutId: r.layout,
           requireAuth: !r.public,
           requiredCapabilities: r.capability ? [r.capability] : undefined,
@@ -123,12 +125,19 @@ export class RegistryManager {
     // -- Widgets
     if (manifest.widgets) {
       for (const widget of manifest.widgets) {
-        const w = widget as ManifestWidgetEntry;
+        const w = widget as ManifestWidgetEntry & { zone?: string; componentId?: string; priority?: number };
+        const slotId = w.slot ?? w.zone;
+        if (!slotId) continue;
+
+        if (!this.presentationSlots.has(slotId)) {
+          this.presentationSlots.register({ id: slotId, description: `Slot ${slotId}` });
+        }
+
         this.presentationWidgets.register({
           id: `${pluginId}:${w.id}`,
-          componentId: w.component ?? '',
-          slot: w.slot,
-          priority: w.order ?? 0,
+          componentId: w.component ?? w.componentId ?? '',
+          slot: slotId,
+          priority: w.order ?? w.priority ?? 0,
         });
       }
     }
@@ -165,21 +174,25 @@ export class RegistryManager {
     // -- Slots
     if (manifest.slots) {
       for (const slot of manifest.slots) {
-        this.presentationSlots.register({
-          id: slot.id,
-          description: slot.description
-        });
+        if (!this.presentationSlots.has(slot.id)) {
+          this.presentationSlots.register({
+            id: slot.id,
+            description: slot.description
+          });
+        }
       }
     }
 
     // -- Layouts
     if (manifest.layouts) {
       for (const layout of manifest.layouts) {
-        this.presentationLayouts.register({
-          id: layout.id,
-          componentId: layout.component,
-          slots: layout.slots
-        });
+        if (!this.presentationLayouts.has(layout.id)) {
+          this.presentationLayouts.register({
+            id: layout.id,
+            componentId: layout.component,
+            slots: layout.slots
+          });
+        }
       }
     }
   }

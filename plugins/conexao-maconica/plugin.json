@@ -37,25 +37,25 @@
     "routes": [
       {
         "id": "masonic-dashboard",
-        "pathname": "/painel/maçonico",
+        "path": "/painel/maçonico",
         "componentId": "MasonicDashboard",
         "permission": "masonic:dashboard:view"
       },
       {
         "id": "organization-management",
-        "pathname": "/admin/organizacoes",
+        "path": "/admin/organizacoes",
         "componentId": "OrganizationManagement",
         "permission": "organization:manage"
       },
       {
         "id": "verification-management",
-        "pathname": "/admin/verificacoes",
+        "path": "/admin/verificacoes",
         "componentId": "VerificationManagement",
         "permission": "credential:verify"
       },
       {
         "id": "founder-management",
-        "pathname": "/admin/fundadores",
+        "path": "/admin/fundadores",
         "componentId": "FounderManagement",
         "permission": "founder:manage"
       }

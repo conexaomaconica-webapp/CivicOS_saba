@@ -228,12 +228,14 @@ export class ManifestLoader {
       ),
     ]);
 
+    const presentation = (pluginJson as unknown as { presentation?: { routes?: ManifestRouteEntry[]; widgets?: ManifestWidgetEntry[]; navigation?: ManifestNavigationEntry[] } }).presentation;
+
     return {
       plugin: pluginJson,
       capabilities: capabilities ?? undefined,
-      routes: routes ?? undefined,
-      widgets: widgets ?? undefined,
-      navigation: navigation ?? undefined,
+      routes: routes ?? presentation?.routes ?? undefined,
+      widgets: widgets ?? presentation?.widgets ?? undefined,
+      navigation: navigation ?? presentation?.navigation ?? undefined,
       permissions: permissions ?? undefined,
       settings: settings ?? undefined,
       slots: slots ?? undefined,

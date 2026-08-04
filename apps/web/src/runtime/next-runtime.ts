@@ -1,6 +1,4 @@
-import { HostRuntime, CivicOSInstance, KernelProvider } from '@saas/core';
-// Import adapters
-// import { SupabaseBusinessRepositoryAdapter } from '@saas/infrastructure';
+import { HostRuntime, CivicOSInstance, KernelProvider, NodeManifestReader } from '@saas/core';
 
 export class NextRuntime implements HostRuntime {
   private static instance: CivicOSInstance | null = null;
@@ -25,18 +23,10 @@ export class NextRuntime implements HostRuntime {
       console.warn('NextRuntime.boot() called on the client side. CivicOS should only boot on the server.');
     }
 
-    // In a real scenario we'd use NodeManifestReader
     const provider = new KernelProvider(() => ({
       pluginsDir: './plugins',
-      reader: {
-        // eslint-disable-next-line @typescript-eslint/require-await
-        exists: async () => false,
-        // eslint-disable-next-line @typescript-eslint/require-await
-        readJson: async () => null,
-        // eslint-disable-next-line @typescript-eslint/require-await
-        listDirectories: async () => [],
-      },
-      coreVersion: '1.0',
+      reader: new NodeManifestReader(),
+      coreVersion: '1.0.0',
     }));
     
     return await provider.getKernel();

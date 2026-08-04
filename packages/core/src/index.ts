@@ -25,6 +25,7 @@ export type { UnitOfWork, TransactionManager } from './transactions/transaction-
 
 // -- Manifest Loader --------------------------------------------------------
 export { ManifestLoader } from './manifest-loader';
+export { NodeManifestReader } from './node-manifest-reader';
 export type {
   ManifestReader,
   FullLoadedManifest,
