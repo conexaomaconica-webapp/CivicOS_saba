@@ -13,18 +13,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://conexaomaconica.com.br'),
   title: {
-    default: 'Conexão Maçônica — Rede de Confiança, Negócios e Serviços Maçônicos',
-    template: '%s | Conexão Maçônica',
+    default: 'CivicOS — Plataforma SaaS Multi-Tenant',
+    template: '%s | CivicOS',
   },
-  description: 'Plataforma oficial de relacionamento comercial, diretório de empresas verificadas e rede de apoio mútuo para a comunidade maçônica.',
-  openGraph: {
-    title: 'Conexão Maçônica — Rede de Confiança, Negócios e Serviços Maçônicos',
-    description: 'Encontre e contrate empresas de irmãos verificados com garantia de procedência e apoio institucional.',
-    url: 'https://conexaomaconica.com.br',
-    siteName: 'Conexão Maçônica',
-    locale: 'pt_BR',
-    type: 'website',
-  },
+  description: 'Plataforma SaaS modular de utilidade pública e ecossistemas comunitários.',
   robots: {
     index: true,
     follow: true,

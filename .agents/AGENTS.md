@@ -2,18 +2,16 @@
 
 ## SEO, Arquitetura de Conteúdo e Marketing de Posicionamento (SABA-seo.md)
 
-Sempre que você criar, refatorar ou ajustar páginas, componentes de layout, metadata ou estruturas de rotas, aplique ESTRITAMENTE as regras de SEO e Marketing de Posicionamento consolidadas em `docs/SABA-seo.md`:
+Sempre que você criar, refatorar ou ajustar páginas públicas, componentes de layout, metadata ou estruturas de rotas, aplique as regras de SEO e Marketing de Posicionamento consolidadas em `docs/SABA-seo.md`, observando estritamente os seguintes princípios:
 
-1. **Metadata por Página (Next.js App Router)**:
-   - Toda página deve exportar `generateMetadata` (dinâmico) ou `metadata` (estático) próprio com:
-     - `title`: Termo principal | Conexão Maçônica (~60 caracteres)
-     - `description`: Meta description persuasiva com CTA (~155 caracteres)
-     - `alternates.canonical`: URL canônica completa
-     - `openGraph`: title, description, url, siteName, locale, type
+1. **Metadata por Rota Pública Indexável (Next.js App Router)**:
+   - Toda **rota pública indexável** deve exportar `generateMetadata` (dinâmico) ou `metadata` (estático) resolvido via contexto do tenant (`host -> tenant -> produto -> rota`).
+   - Rotas autenticadas, administrativas, modais e operacionais devem utilizar `noindex` ou exclusão no `robots.ts`.
+   - NUNCA fixar metadados estáticos de um único tenant no layout raiz global da plataforma.
 
 2. **Dados Estruturados (JSON-LD)**:
-   - Toda página de conteúdo ou serviço deve incluir o componente `<StructuredData schema={...} />`.
-   - Utilizar os schemas adequados: `SoftwareApplication` / `Product` (SaaS), `Service` (páginas-pilar), `FAQPage` (seções de perguntas), e `BreadcrumbList` (navegação interna).
+   - Toda página pública de conteúdo, serviço ou produto deve incluir o componente `<StructuredData schema={...} />` coerente com o conteúdo real e visível da tela.
+   - Utilizar os schemas adequados (`SoftwareApplication`, `Service`, `FAQPage`, `BreadcrumbList`, `LocalBusiness`), sem promessa de rich result garantido.
 
 3. **Performance e Core Web Vitals**:
    - Utilizar fontes via `next/font/google` (`Inter`), NUNCA tags `<link>` externas para Google Fonts.
@@ -27,7 +25,7 @@ Sempre que você criar, refatorar ou ajustar páginas, componentes de layout, me
 
 5. **Checklist de Página-Pilar**:
    - H1 natural com termo principal.
-   - Parágrafo de abertura direto (2-3 frases).
-   - H2s cobrindo subtemas e diferenciais.
-   - Seção de FAQ (2-3 perguntas alimentando o schema `FAQPage`).
+   - Parágrafo de abertura direto e autocontido.
+   - H2s cobrindo subtemas e diferenciais reais.
+   - Seção de FAQ quando trouxer benefício real ao usuário (alimentando o schema `FAQPage`).
    - CTA claro (Demo/Cadastro para SaaS, Orçamento/WhatsApp para serviços).

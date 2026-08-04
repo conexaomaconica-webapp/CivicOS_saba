@@ -4,26 +4,9 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Store, Calendar, Users, HeartHandshake } from 'lucide-react';
-import { StructuredData } from '@/components/seo/StructuredData';
-
-const homeSchema = {
-  '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: 'Conexão Maçônica',
-  operatingSystem: 'Web',
-  applicationCategory: 'BusinessApplication',
-  description: 'Plataforma oficial de relacionamento comercial, diretório de empresas verificadas e rede de apoio mútuo para a comunidade maçônica.',
-  offers: {
-    '@type': 'Offer',
-    price: '0',
-    priceCurrency: 'BRL',
-  },
-};
-
 export default function HomePage() {
   return (
     <div className="flex flex-col gap-8 w-full max-w-4xl mx-auto">
-      <StructuredData schema={homeSchema} />
       {/* Hero Section */}
       <section className="flex flex-col gap-2 pt-4">
         <h2 className="text-3xl font-bold tracking-tight">O que você deseja encontrar?</h2>
