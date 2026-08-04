@@ -608,7 +608,7 @@ Este catálogo estabelece as permissões granulares para a gestão do ciclo de v
 | `masonic_link:view_own` | Permite visualizar as declarações de vínculo da própria conta | Baixo (Usuário Autenticado) |
 | `masonic_link:update_own` | Permite alterar rascunhos da própria declaração antes da submissão | Baixo (Usuário Autenticado) |
 | `masonic_link:submit` | Permite submeter a declaração de vínculo para moderação | Baixo (Usuário Autenticado) |
-| `masonic_link:set_primary` | Permite definir qual vínculo é a afiliação principal da empresa | Médio (Gestor da Empresa) |
+| `masonic_link:set_primary` | Permite definir qual vínculo é a afiliação principal ativa da empresa | Médio (Gestor da Empresa) |
 | `masonic_link:review` | Permite colocar o vínculo em análise pela moderação | Médio (Tenant Moderator) |
 | `masonic_link:approve` | Permite aprovar formalmente o vínculo maçônico | Alto (Tenant Moderator / Admin) |
 | `masonic_link:request_correction` | Permite solicitar correções ao declarante | Médio (Tenant Moderator) |
@@ -618,11 +618,11 @@ Este catálogo estabelece as permissões granulares para a gestão do ciclo de v
 | `masonic_link:evidence:view` | Permite visualizar documentos comprovatórios sensíveis | **Crítico / Elevado (Acesso Auditado)** |
 | `masonic_link:authorization:manage` | Permite ao proprietário da empresa autorizar/revogar o vínculo | Médio (Business Owner) |
 | `masonic_link:public_consent:manage` | Permite gerenciar o consentimento de exibição pública | Médio (Declarante / Business Owner) |
-| `masonic_link:contest` | Permite abrir contestação formal contra vínculo ou denúncia | Médio (Usuário Autenticado) |
+| `masonic_link:contest` | Permite abrir contestação formal fundamentada (com rate limit) | Médio (Usuário Autenticado) |
 
-### 12.2 Mapeamento de Permissões por Papel
+### 12.2 Mapeamento de Permissões por Papel e Contexto
 
-| Permissão | Declarante (`user`) | Business Owner (`owner`) | Tenant Moderator (`moderator`) | Tenant Admin (`tenant_admin`) | Elevated Evidence Auditor (`master`) |
+| Permissão | Declarante (`user`) | Business Owner (`owner`) | Tenant Moderator (`moderator`) | Tenant Admin (`tenant_admin`) | Master com Sessão Elevada Auditada |
 |---|:---:|:---:|:---:|:---:|:---:|
 | `masonic_link:declare` | 🟢 | 🟢 | 🟢 | 🟢 | 🔴 |
 | `masonic_link:view_own` | 🟢 | 🟢 | 🟢 | 🟢 | 🔴 |
@@ -635,10 +635,11 @@ Este catálogo estabelece as permissões granulares para a gestão do ciclo de v
 | `masonic_link:reject` | 🔴 | 🔴 | 🟢 | 🟢 | 🔴 |
 | `masonic_link:suspend` | 🔴 | 🔴 | 🟢 | 🟢 | 🔴 |
 | `masonic_link:revoke` | 🔴 | 🔴 | 🔴 | 🟢 | 🔴 |
-| `masonic_link:evidence:view` | 🟢 (próprias) | 🔴 | 🟡 (somente em análise) | 🟢 (auditado) | 🔒 **Acesso Elevado** |
+| `masonic_link:evidence:view` | 🟢 (próprias) | 🔴 | 🟡 (somente em análise) | 🟡 (finalidade/auditado) | 🔒 **Sessão Elevada Auditada** |
 | `masonic_link:authorization:manage` | 🔴 | 🟢 | 🔴 | 🟢 | 🔴 |
 | `masonic_link:public_consent:manage` | 🟢 | 🟢 | 🔴 | 🔴 | 🔴 |
-| `masonic_link:contest` | 🟢 | 🟢 | 🔴 | 🔴 | 🔴 |
+| `masonic_link:contest` | 🟢 (com rate-limit) | 🟢 | 🔴 | 🔴 | 🔴 |
+
 
 ---
 

@@ -352,35 +352,77 @@ _A camada de inteligência e valor agregado._
 
 Esta política estabelece os critérios funcionais para declaração, verificação, exibição e governança dos vínculos maçônicos das empresas cadastradas na plataforma Conexão Maçônica, assim como as garantias de livre concorrência e ética comercial.
 
-### 12.1 Modalidades de Vínculo
-Uma empresa cadastrada pode possuir um ou mais vínculos maçônicos caracterizados pelas seguintes categorias:
-1. **Proprietário / Sócio Maçom (`owner_partner`):** Empresa cujo controle societário ou propriedade direta pertence a um membro verificado da ordem.
-2. **Empresa da Família Maçônica (`family_member`):** Empresa pertencente a cônjuge, filho(a) ou dependente direto de um irmão verificado.
-3. **Empresa Representada por Irmão (`brother_representative`):** Empresa onde um irmão verificado atua como executivo principal, diretor ou representante legal autorizado.
-4. **Parceiro Institucional (`institutional_partner`):** Empresa sem sócio maçom direto, mas formalmente conveniada com Lojas ou Potências para concessão de benefícios à comunidade.
+### 12.1 Modalidades de Vínculo (Persistência vs. Exibição Pública)
+Para preservar a exatidão jurídica e institucional, a persistência distingue 8 modalidades de vínculo, agrupadas em categorias de exibição pública:
 
-### 12.2 Múltiplos Vínculos e Vínculo Principal
-- Uma empresa pode ter múltiplos vínculos registrados (ex: dois sócios de Lojas distintas).
-- Deve ser obrigatoriamente designado um **Vínculo Principal (`primary_link`)** para fins de exibição nos cards e destaque institucional padrão.
-- Cada vínculo é registrado de forma individualizada com seu próprio ciclo de vida, status de verificação e histórico.
+1. **Persistência de Tipos (`link_type`):**
+   - `owner`: Proprietário individual / titular verificado.
+   - `equity_partner`: Sócio cotista ou acionista verificado.
+   - `family_owner`: Cônjuge, filho(a) ou dependente de irmão verificado.
+   - `employee`: Colaborador / Empregado irmão.
+   - `executive`: Diretor, C-Level ou Executivo principal.
+   - `sales_representative`: Representante comercial credenciado.
+   - `authorized_agent`: Procurador ou Agente Autorizado.
+   - `institutional_partner`: Empresa parceira conveniada com Loja ou Potência.
 
-### 12.3 Consentimento, Evidências e Autorização Comercial
-- **Evidências por Tipo (`link_evidence`):** A declaração exige comprovação proporcional (documento de regularidade/capitulação, contrato social, declaração de representação ou convênio assinado).
-- **Autorização Comercial (`business_authorization`):** Exigência de consentimento formal da empresa autorizando a vinculação do seu nome comercial à comunidade.
-- **Consentimento de Exposição Pública (`public_consent`):** O irmão declarante e a empresa devem consentir explicitamente com o nível de visibilidade pública do vínculo (público geral vs. exclusivo para membros autenticados).
-- **Validade e Revogação:** Todo vínculo possui prazo de validade configurável (renovação anual/periódica) e pode ser revogado por iniciativa da empresa, do declarante ou por moderação institucional.
+2. **Agrupamento de Exibição Pública:**
+   - `owner` + `equity_partner` ──> *"Empresa de Irmão Proprietário/Sócio"*
+   - `family_owner` ──> *"Empresa da Família Maçônica"*
+   - `employee` + `executive` + `sales_representative` + `authorized_agent` ──> *"Representada por Irmão"*
+   - `institutional_partner` ──> *"Parceiro Institucional Conveniado"*
 
-### 12.4 Concorrência Ética e Livre Mercado
-- **Ausência de Exclusividade:** A plataforma não concede exclusividade territorial ou por categoria de mercado a qualquer empresa.
-- **Ranking Transparente:**
-  - **Ranking Orgânico:** Ordenado estritamente por critérios de relevância, geolocalização, completude do perfil e avaliações legítimas.
-  - **Ranking Patrocinado:** Destaques pagos exibidos de forma claramente identificada ("Patrocinado"), sem adulterar os resultados orgânicos.
-- **Contestação e Sanções:** Qualquer descumprimento, declaração falsa de vínculo ou fraude sujeita o cadastro à suspensão imediata e denúncia às instâncias de moderação.
-- **Proteção Anticoncorrencial:** Avaliações, denúncias ou ações deliberadas de concorrentes visando prejudicar um estabelecimento serão monitoradas, exigirão fundamentação e estarão sujeitas a sanções por abuso de plataforma.
+### 12.2 Ciclo de Vida Unificado e Derivação de Estados
+O ciclo de vida do vínculo opera através de 10 estados formais:
+`draft` ──> `pending_verification` ──> `under_review` ──┬──> `approved` ──> `active`
+                                                      ├──> `correction_requested`
+                                                      ├──> `rejected`
+                                                      ├──> `suspended`
+                                                      ├──> `expired`
+                                                      └──> `revoked`
+
+- **Diferença Semântica Fundamental:**
+  - `approved`: Moderação institucional validou a documentação e aceitou a solicitação.
+  - `active`: O vínculo está aprovado, dentro do prazo de validade (`valid_until > now()`), com autorização da empresa válida e consentimento de publicação concedido. Apenas vínculos no estado `active` recebem tratamento de exibição e elegibilidade no guia.
+
+### 12.3 Consentimento Granular por Campo (LGPD)
+O consentimento de exibição controla separadamente a audiência (`public_all`, `authenticated_members`, `private_admin`) e a visibilidade de campos individuais:
+- `display_name`: Exibir nome do irmão declarante.
+- `display_business_role`: Exibir cargo empresarial (ex: Diretor Comercial).
+- `display_masonic_role`: Exibir cargo ou função institucional.
+- `display_organization`: Exibir Loja Maçônica de afiliação.
+- `display_organization_unit`: Exibir número e oriente.
+- `display_contact`: Permitir contato fraterno direto via formulário/WhatsApp.
+- `display_profile_photo`: Desabilitado por padrão.
+- `display_masonic_degree`: Desabilitado por padrão e **NÃO exibido no MVP 1A/1B**.
+
+### 12.4 Autorização Empresarial Auditável
+Qualquer vínculo declarado por representante ou familiar exige autorização formal da empresa (`business_authorization`), contendo: emissor, cargo do autorizador, tipo de autorização, escopo autorizado (`company_listing`, `brand_usage`, `member_discount`, `commercial_contact`, `campaign_participation`), referência da evidência, data de concessão, validade e revogação.
+
+### 12.5 Concorrência Ética e Livre Mercado (Ordem Rígida de Ranking)
+1. **Ausência de Exclusividade:** Não há exclusividade por categoria, bairro ou região.
+2. **Ordem Hierárquica do Ranking Orgânico:**
+   1. Relevância da consulta textual.
+   2. Localização geográfica (quando aplicável).
+   3. Estado de publicação e atividade do anunciante.
+   4. Completude e qualidade do cadastro.
+   5. Avaliações legítimas registradas.
+   6. Disponibilidade de oferta ou benefício ativo.
+   7. Tipo de vínculo maçônico (**exclusivamente como critério secundário de desempate**).
+3. **Destaques Patrocinados:** Exibidos em slots transparentemente rotulados como *"Patrocinado"*, sem alterar a ordenação orgânica.
+4. **Condição de Fundador:** Homenagem e marco histórico institucional, sem garantias de topo de busca ou substituição de plano comercial.
+
+### 12.6 Diretrizes do Vínculo Principal (`primary_link`)
+- Somente vínculos no estado `active` podem ser designados como principal.
+- Máximo de **1 vínculo principal ativo por empresa por tenant**.
+- Caso o vínculo principal expire, seja suspenso ou revogado, a flag `is_primary` é automaticamente desativada. O sistema notifica o anunciante para eleger um substituto; **nenhum outro vínculo é promovido silenciosamente**.
+
+### 12.7 Processo Formal de Contestação (`masonic_link:contest`)
+- Permite a abertura de contestação fundamentada por usuários autenticados.
+- Fluxo: `abertura` ──> `notificação ao anunciante` ──> `prazo de defesa (7 dias)` ──> `análise do moderador` ──> `decisão` ──> `recurso institucional (opcional)`.
+- **Regra de Proteção Anticoncorrencial:** A abertura de contestação **não suspende automaticamente** o vínculo, evitando ataques maliciosos de concorrentes. A suspensão antes da decisão exige medida cautelar fundamentada pelo administrador do tenant.
 
 ---
 
 ## 13. Conclusão
 
-Esta especificação revisada **v1.1 (com Adendo de Política de Vínculo)** é o artefato mandatário que pauta as próximas fases: Modelagem Técnica, Schema SQL, RBAC e planejamento das Sprints, garantindo alinhamento total com as exigências de negócio e operacionais estabelecidas pelo arquiteto-chefe.
-
+Esta especificação revisada **v1.2 (com Política de Vínculo Refinada)** é o artefato mandatário que pauta as próximas fases de modelagem técnica e schema, garantindo alinhamento total com as exigências de negócio e operacionais estabelecidas pelo arquiteto-chefe.

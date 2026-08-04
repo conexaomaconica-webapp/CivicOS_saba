@@ -193,15 +193,16 @@ Este módulo de extensão define como o vínculo comercial maçônico se integra
 ### 16.1 Composição de Serviços e Módulos
 A arquitetura do vínculo opera através da composição desacoplada dos seguintes componentes:
 1. **Business Directory (Foundation):** Fornece o Aggregate Root `Business` neutro (dados cadastrais de mercado).
-2. **Masonic Domain Extension (Plugin):** Gerencia os vínculos institucionais e comerciais (`BusinessMasonicLink`).
+2. **Masonic Domain Extension (Plugin):** Gerencia os vínculos institucionais e comerciais (`BusinessMasonicLink`) suportando as 8 categorias de persistência (`owner`, `equity_partner`, `family_owner`, `employee`, `executive`, `sales_representative`, `authorized_agent`, `institutional_partner`).
 3. **Credential Engine:** Valida evidências, credenciais de irmãos e declarações institucionais.
-4. **Moderation Service:** Controla os fluxos de aprovação, suspensão, revisão e revogação de vínculos.
-5. **Search and Ranking Engine:** Computa ordenações orgânicas imutáveis por patrocinados e aplica relevância de vínculo sem alterar o índice base do catálogo.
-6. **Consent & Privacy (LGPD):** Registra autorizações comerciais e consentimentos explícitos para exibição pública de dados de afiliação.
+4. **Moderation Service:** Gerencia o ciclo de vida unificado de 10 estados (`draft`, `pending_verification`, `under_review`, `correction_requested`, `approved`, `active`, `rejected`, `suspended`, `expired`, `revoked`).
+5. **Authorization & Consent Service:** Administra autorizações empresariais auditáveis com escopos (`company_listing`, `brand_usage`, etc.) e preferências de consentimento granular de exibição.
+6. **Contest Management Engine:** Processa contestações formais contra vínculos ou denúncias maliciosas sem suspensão automática prévia.
+7. **Search and Ranking Engine:** Aplica a regra de ranking em 7 níveis onde o vínculo maçônico opera exclusivamente como critério secundário de desempate.
+8. **Consent & Privacy (LGPD):** Controla a expiração de URLs pré-assinadas de evidências e o descarte seguro de arquivos.
 
 ### 16.2 Desacoplamento do Aggregate Root `Business`
 - **Independência de Domínio:** O vínculo maçônico **NÃO** fica embutido ou serializado como campo interno no Aggregate `Business` da Fundação.
 - **Relação 1:N Externa:** O modelo admite múltiplos vínculos por empresa (`Business 1 ── N BusinessMasonicLink`), cada qual com seu ciclo de vida independente.
 - **Temporalidade e Verificabilidade:** Todo vínculo é temporal (prazo de vigência e histórico imutável) e verificável via `Credential Engine`.
-- **Diferenciação Semântica:** A presença de um vínculo ativo **não é sinônimo** de "Empresa Verificada". Uma empresa pode possuir vínculo declarado com verificação em andamento, suspenso ou aprovado com privilégios distintos.
-
+- **Diferenciação Semântica:** O estado `approved` (validação de moderação) é distinto do estado `active` (aprovado + validade vigente + autorização e consentimento ativos). Apenas o estado `active` concede elegibilidade de exibição no guia.
