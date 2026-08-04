@@ -14,20 +14,20 @@
 
 ## Produto — Conexão Maçônica
 
-### Documentação aprovada
+### Documentação aprovada e congelada (Tag `conexao-maconica-docs-approved`)
 
-- [x] Doc 00 — Especificação Funcional    ↳ Aprovado; adendo de vínculo em incorporação
-- [x] Doc 01 — Arquitetura Técnica    ↳ Aprovado; extensão de vínculo em incorporação
-- [x] Doc 02 — Schema Database    ↳ Aprovado; entidades de vínculo em incorporação
-- [x] Doc 03 — Matriz RBAC    ↳ Aprovado; permissões de vínculo em incorporação
+- [x] Doc 00 — Especificação Funcional ↳ Aprovado e Congelado (Adendo de vínculo incorporado)
+- [x] Doc 01 — Arquitetura Técnica ↳ Aprovado e Congelado (Extensão de vínculo incorporada)
+- [x] Doc 02 — Schema Database ↳ Aprovado e Congelado (Entidades de vínculo incorporadas)
+- [x] Doc 03 — Matriz RBAC ↳ Aprovado e Congelado (Permissões de vínculo incorporadas)
+- [x] Incorporar Política de Vínculo e Concorrência nos Docs 00–03 (Concluído)
 
-### Atualização transversal em andamento
+### Documentação da próxima fase (Desbloqueada)
 
-- [ ] Incorporar Política de Vínculo e Concorrência nos Docs 00–03
+- [ ] Doc 04 — Mapa de Telas (🔓 Liberado para elaboração)
 
-### Documentação ainda bloqueada
+### Documentação pendente
 
-- [ ] Doc 04 — Mapa de Telas
 - [ ] Doc 05 — Fluxos e Jornadas
 - [ ] Doc 06 — Critérios de Aceite
 - [ ] Doc 07 — Backlog
