@@ -10,7 +10,7 @@
 - [x] Presentation Engine
 - [x] Navigation Engine e Web Shell
 - [x] Testes e limites arquiteturais
-- [ ] Remover limite de domínio maçônico do contrato de licenciamento (Dívida em refatoração)
+- [x] Remover limite de domínio maçônico do contrato de licenciamento
 
 ## Produto — Conexão Maçônica
 
