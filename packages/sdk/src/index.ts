@@ -8,7 +8,7 @@ import type {
 } from '@saas/core';
 import type { NavigationItem } from './navigation/navigation-types';
 
-export type { PluginContext, PluginLifecycleHooks, PresentationSnapshot };
+export type { PluginContext, PluginLifecycleHooks, PresentationSnapshot, RouteDefinition, ApiRouteDefinition };
 
 export * from './navigation/navigation-types';
 

@@ -35,3 +35,9 @@ yarn-error.log*
 
 # typescript
 next-env.d.ts
+
+# supabase binaries
+supabase.exe
+supabase-go.exe
+supabase.zip
+supabase_cli/

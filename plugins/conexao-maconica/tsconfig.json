@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true,
+    "tsBuildInfoFile": "./tsconfig.tsbuildinfo",
+    "baseUrl": ".",
+    "types": ["node"]
+  },
+  "include": [
+    "src/domain/**/*",
+    "src/application/**/*",
+    "src/capabilities/**/*",
+    "src/events/**/*",
+    "src/policies/**/*",
+    "src/workflows/**/*",
+    "src/hooks.ts",
+    "src/index.ts",
+    "plugin.json"
+  ],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "src/presentation"]
+}

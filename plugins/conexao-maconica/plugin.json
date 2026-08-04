@@ -1,0 +1,125 @@
+{
+  "id": "conexao-maconica",
+  "name": "Conexão Maçônica",
+  "version": "1.0.0",
+  "description": "Plataforma de descoberta, geração de negócios e relacionamento comercial para a comunidade maçônica",
+  "author": "CivicOS Team",
+  "license": "Proprietary",
+  "coreVersion": ">=1.0.0",
+  "dependencies": [
+    "business-directory",
+    "billing-subscriptions",
+    "crm-sales",
+    "lead-management",
+    "notifications",
+    "analytics"
+  ],
+  "capabilities": [
+    "masonic-organization",
+    "masonic-verification",
+    "founder-program",
+    "masonic-badges",
+    "masonic-search",
+    "masonic-content-taxonomy"
+  ],
+  "permissions": [
+    "organization:create",
+    "organization:update",
+    "organization:view_public",
+    "organization:view_members",
+    "organization:people:manage",
+    "credential:type:manage",
+    "credential:request",
+    "credential:verify",
+    "credential:revoke",
+    "credential:evidence:upload",
+    "founder:qualify",
+    "founder:revoke",
+    "masonic:search",
+    "masonic:content:manage"
+  ],
+  "presentation": {
+    "routes": [
+      {
+        "id": "masonic-dashboard",
+        "pathname": "/painel/maçonico",
+        "componentId": "MasonicDashboard",
+        "permission": "masonic:dashboard:view"
+      },
+      {
+        "id": "organization-management",
+        "pathname": "/admin/organizacoes",
+        "componentId": "OrganizationManagement",
+        "permission": "organization:manage"
+      },
+      {
+        "id": "verification-management",
+        "pathname": "/admin/verificacoes",
+        "componentId": "VerificationManagement",
+        "permission": "credential:verify"
+      },
+      {
+        "id": "founder-management",
+        "pathname": "/admin/fundadores",
+        "componentId": "FounderManagement",
+        "permission": "founder:manage"
+      }
+    ],
+    "navigation": [
+      {
+        "id": "nav-masonic-dashboard",
+        "label": "Painel Maçônico",
+        "route": "/painel/maçonico",
+        "order": 10,
+        "permission": "masonic:dashboard:view",
+        "icon": "building-2"
+      },
+      {
+        "id": "nav-organizations",
+        "label": "Organizações",
+        "route": "/admin/organizacoes",
+        "order": 20,
+        "permission": "organization:view_public",
+        "icon": "users"
+      },
+      {
+        "id": "nav-verifications",
+        "label": "Verificações",
+        "route": "/admin/verificacoes",
+        "order": 30,
+        "permission": "credential:verify",
+        "icon": "shield-check"
+      },
+      {
+        "id": "nav-founders",
+        "label": "Fundadores",
+        "route": "/admin/fundadores",
+        "order": 40,
+        "permission": "founder:manage",
+        "icon": "award"
+      }
+    ],
+    "widgets": [
+      {
+        "id": "masonic-stats-widget",
+        "name": "Estatísticas Maçônicas",
+        "componentId": "MasonicStatsWidget",
+        "zone": "dashboard-sidebar",
+        "priority": 10,
+        "permission": "masonic:dashboard:view"
+      },
+      {
+        "id": "verification-status-widget",
+        "name": "Status de Verificação",
+        "componentId": "VerificationStatusWidget",
+        "zone": "business-detail-sidebar",
+        "priority": 5,
+        "permission": "business:view_private"
+      }
+    ]
+  },
+  "hooks": {
+    "onInstall": "setupMasonicDefaults",
+    "onUninstall": "cleanupMasonicData"
+  }
+}

@@ -25,7 +25,7 @@ Cada documento deve ser produzido, revisado e aprovado antes de iniciar o próxi
 | 00 | Especificação Funcional v1.1.0 | ✅ Source of Truth | Aprovada |
 | 01 | Arquitetura Técnica v1.0.0 | ✅ Aprovada | Aprovada |
 | 02 | Schema Database v2.1.0 | 🟡 Aprovado com Ajustes | Aprovada |
-| 03 | Matriz RBAC v2.2.0 | 🟡 Aguardando Aprovação Definitiva | — |
+| 03 | Matriz RBAC v2.2.0 | ✅ Aprovada | Aprovada |
 | 04 | Mapa de Telas | 🔒 Bloqueado (aguardando Doc 03) | — |
 | 05 | Fluxos e Jornadas | 🔒 Bloqueado | — |
 | 06 | Critérios de Aceite | 🔒 Bloqueado | — |
