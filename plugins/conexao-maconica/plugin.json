@@ -7,12 +7,7 @@
   "license": "Proprietary",
   "coreVersion": ">=1.0.0",
   "dependencies": [
-    "business-directory",
-    "billing-subscriptions",
-    "crm-sales",
-    "lead-management",
-    "notifications",
-    "analytics"
+    "business-directory"
   ],
   "capabilities": [
     "masonic-organization",
