@@ -9,14 +9,14 @@ interface PluginContext {
   };
 }
 
-export async function setupMasonicDefaults(context: PluginContext): Promise<void> {
+export function setupMasonicDefaults(context: PluginContext): void {
   const { logger } = context;
 
   logger.info('Setting up Conexão Maçônica defaults...');
   logger.info('Conexão Maçônica defaults configured successfully');
 }
 
-export async function cleanupMasonicData(context: PluginContext): Promise<void> {
+export function cleanupMasonicData(context: PluginContext): void {
   const { logger } = context;
 
   logger.info('Cleaning up Conexão Maçônica data...');

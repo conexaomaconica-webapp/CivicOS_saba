@@ -42,32 +42,7 @@ export const manifest = {
   ]
 };
 
-const routes: RouteDefinition[] = [
-  {
-    path: '/painel/maconico',
-    component: 'MasonicDashboard',
-    requireAuth: true,
-    requiredPermissions: ['masonic:dashboard:view']
-  },
-  {
-    path: '/admin/organizacoes',
-    component: 'OrganizationManagement',
-    requireAuth: true,
-    requiredPermissions: ['organization:manage']
-  },
-  {
-    path: '/admin/verificacoes',
-    component: 'VerificationManagement',
-    requireAuth: true,
-    requiredPermissions: ['credential:verify']
-  },
-  {
-    path: '/admin/fundadores',
-    component: 'FounderManagement',
-    requireAuth: true,
-    requiredPermissions: ['founder:manage']
-  }
-];
+const routes: RouteDefinition[] = [];
 
 const navigation: NavigationItem[] = [
   {

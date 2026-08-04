@@ -52,7 +52,7 @@ export default function DashboardPage() {
         .select('*')
         .eq('owner_id', user.id);
 
-      const loadedBusinesses = dbBusinesses || [];
+      const loadedBusinesses = (dbBusinesses || []) as unknown as Business[];
       setBusinesses(loadedBusinesses);
 
       if (loadedBusinesses.length > 0) {

@@ -64,7 +64,7 @@ export const masonicVerificationPolicies: PolicyDefinition[] = [
   {
     name: 'credential:verify',
     description: 'Aprovar/rejeitar emissão de selo (Anti-Self-Approval)',
-    evaluate: async (context) => {
+    evaluate: (context) => {
       if (!context.permissions.includes('credential:verify')) return false;
       
       // Anti-self-approval check would be done in the service layer
@@ -113,7 +113,7 @@ export const masonicSearchPolicies: PolicyDefinition[] = [
   {
     name: 'masonic:search',
     description: 'Realizar busca semântica maçônica',
-    evaluate: async (context) => {
+    evaluate: (context) => {
       // Feature flag check would be done in service layer
       return context.permissions.includes('masonic:search')
         || context.permissions.includes('business:view_public');

@@ -36,24 +36,24 @@ export const verifyCredentialWorkflow: WorkflowDefinition = {
     {
       id: 'validate_request',
       name: 'Validar Solicitação',
-      async execute(context: WorkflowContext, input: unknown) {
+      execute(context: WorkflowContext, input: unknown) {
         const { issuance_id } = input as { issuance_id: string };
         context.logger.info('Validating credential request', { issuance_id });
-        return { issuanceId: issuance_id, valid: true };
+        return Promise.resolve({ issuanceId: issuance_id, valid: true });
       }
     },
     {
       id: 'check_anti_self_approval',
       name: 'Verificar Anti-Self-Approval',
-      async execute(context: WorkflowContext) {
+      execute(context: WorkflowContext) {
         context.logger.info('Checking anti-self-approval');
-        return { approved: true };
+        return Promise.resolve({ approved: true });
       }
     },
     {
       id: 'verify_credential',
       name: 'Verificar Credencial',
-      async execute(context: WorkflowContext, input: unknown) {
+      execute(context: WorkflowContext, input: unknown) {
         const { issuanceId } = input as { issuanceId: string; valid: boolean };
         const { status } = context.input as { status: 'verified' | 'rejected'; notes?: string };
         
@@ -66,15 +66,16 @@ export const verifyCredentialWorkflow: WorkflowDefinition = {
           });
         }
         
-        return { updatedIssuance: { id: issuanceId, status } };
+        return Promise.resolve({ updatedIssuance: { id: issuanceId, status } });
       }
     },
     {
       id: 'notify_parties',
       name: 'Notificar Partes Envolvidas',
-      async execute(context: WorkflowContext, input: unknown) {
+      execute(context: WorkflowContext, input: unknown) {
         const { updatedIssuance } = input as { updatedIssuance: { id: string; status: string } };
         context.logger.info('Sending notifications for credential verification', { issuanceId: updatedIssuance.id });
+        return Promise.resolve();
       }
     }
   ],
@@ -107,34 +108,36 @@ export const qualifyFounderWorkflow: WorkflowDefinition = {
     {
       id: 'validate_business',
       name: 'Validar Empresa',
-      async execute(context: WorkflowContext, input: unknown) {
+      execute(context: WorkflowContext, input: unknown) {
         const { business_id, founder_number } = input as { business_id: string; founder_number: number };
         context.logger.info('Validating business for founder qualification', { business_id, founder_number });
-        return { businessId: business_id, founderNumber: founder_number, valid: true };
+        return Promise.resolve({ businessId: business_id, founderNumber: founder_number, valid: true });
       }
     },
     {
       id: 'create_qualification',
       name: 'Criar Qualificação',
-      async execute(context: WorkflowContext, input: unknown) {
+      execute(context: WorkflowContext, input: unknown) {
         const { businessId, founderNumber } = input as { businessId: string; founderNumber: number; valid: boolean };
         context.logger.info('Creating founder qualification', { businessId, founderNumber });
-        return { qualificationId: 'new-qualification-id', businessId, founderNumber };
+        return Promise.resolve({ qualificationId: 'new-qualification-id', businessId, founderNumber });
       }
     },
     {
       id: 'grant_entitlements',
       name: 'Conceder Entitlements de Fundador',
-      async execute(context: WorkflowContext, input: unknown) {
+      execute(context: WorkflowContext, input: unknown) {
         const { qualificationId, businessId } = input as { qualificationId: string; businessId: string };
         context.logger.info('Granting founder entitlements', { qualificationId, businessId });
+        return Promise.resolve();
       }
     },
     {
       id: 'notify_founder',
       name: 'Notificar Novo Fundador',
-      async execute(context: WorkflowContext) {
+      execute(context: WorkflowContext) {
         context.logger.info('Sending founder qualification notification');
+        return Promise.resolve();
       }
     }
   ],
@@ -167,26 +170,28 @@ export const businessOnboardingWorkflow: WorkflowDefinition = {
     {
       id: 'create_business',
       name: 'Criar Empresa',
-      async execute(context: WorkflowContext, input: unknown) {
+      execute(context: WorkflowContext, input: unknown) {
         const { businessData } = input as { businessData: Record<string, unknown> };
         context.logger.info('Creating business', { name: businessData.name });
-        return { businessId: 'new-business-id', ...businessData };
+        return Promise.resolve({ businessId: 'new-business-id', ...businessData });
       }
     },
     {
       id: 'request_verification',
       name: 'Solicitar Verificação Maçônica',
-      async execute(context: WorkflowContext, input: unknown) {
+      execute(context: WorkflowContext, input: unknown) {
         const { businessId } = input as { businessId: string };
         context.logger.info('Requesting masonic verification for business', { businessId });
+        return Promise.resolve();
       }
     },
     {
       id: 'send_welcome',
       name: 'Enviar Boas-vindas',
-      async execute(context: WorkflowContext, input: unknown) {
+      execute(context: WorkflowContext, input: unknown) {
         const { businessId } = input as { businessId: string };
         context.logger.info('Sending welcome notification', { businessId });
+        return Promise.resolve();
       }
     }
   ],
