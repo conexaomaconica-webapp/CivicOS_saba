@@ -44,8 +44,8 @@ Todas as permissões indicadas no mapa de telas foram auditadas e classificadas 
 |---|:---:|---|
 | `public` / `auth:user` | `EXISTENTE_NO_DOC_03` | Permissão pública / titular autenticado |
 | `business:create` / `update` / `view_private` / `moderate` | `EXISTENTE_NO_DOC_03` | Operações cadastrais e moderação da empresa |
-| `plans:manage` / `subscription:create` / `manage` | `EXISTENTE_NO_DOC_03` | Gestão de planos e contratação comercial |
-| `payment:create` / `refund` | `EXISTENTE_NO_DOC_03` | Operações financeiras (`payment:*`) |
+| `plans:manage` / `subscription:create` / `subscription:manage` | `EXISTENTE_NO_DOC_03` | Gestão de planos e contratação comercial |
+| `payment:create` / `refund` / `reconcile` | `EXISTENTE_NO_DOC_03` | Operações financeiras (`payment:*`) |
 | `legal_docs:manage` / `accept` | `EXISTENTE_NO_DOC_03` | Aceite de termos e documentos jurídicos |
 | `credential:verify` / `revoke` / `request` | `EXISTENTE_NO_DOC_03` | Gestão de credenciais comunitárias |
 | `credential:evidence:upload` | `EXISTENTE_NO_DOC_03` | Upload de documentos comprobatórios |
@@ -57,18 +57,18 @@ Todas as permissões indicadas no mapa de telas foram auditadas e classificadas 
 | `import:job:create` / `lead:view_received` | `EXISTENTE_NO_DOC_03` | Importações e recepção de leads |
 | `audit:logs:view` / `analytics:tenant:view` / `analytics:business:view` | `EXISTENTE_NO_DOC_03` | Leitura de auditoria e métricas |
 | `platform:superadmin` / `tenant:manage` / `template:manage` | `EXISTENTE_NO_DOC_03` | Ações globais da Torre de Controle |
-| `contract:view_own` / `contract:sign` | `PROPOSTA_PARA_DOC_03` | Lacuna: Visualização e assinatura de contrato específico |
-| `contract:manage` / `contract:void` / `contract:audit` | `PROPOSTA_PARA_DOC_03` | Lacuna: Gestão administrativa e anulação de contratos |
-| `contract:global_admin` | `PROPOSTA_PARA_DOC_03` | Lacuna: Governança global de contratos na Torre Master |
-| `tenant:provision` | `PROPOSTA_PARA_DOC_03` | Lacuna: Ações do Wizard de Provisionamento |
-| `billing_policy:manage` / `payment:reconcile` | `PROPOSTA_PARA_DOC_03` | Lacuna: Gestão de políticas de cobrança e conciliação |
-| `masonic_link:contest:review` / `masonic_link:contest:respond` | `PROPOSTA_PARA_DOC_03` | Lacuna: Ciclo de vida estrito de contestações fraternas |
+| `contract:view_own` / `contract:sign` | `EXISTENTE_NO_DOC_03` | Visualização e assinatura de contrato próprio |
+| `contract:manage` / `contract:void` / `contract:audit` | `EXISTENTE_NO_DOC_03` | Gestão administrativa, anulação e auditoria |
+| `contract:global_admin` | `EXISTENTE_NO_DOC_03` | Governança global de contratos na Torre Master |
+| `tenant:provision` / `tenant:publish` / `tenant:suspend` | `EXISTENTE_NO_DOC_03` | Ações do ciclo de vida do tenant |
+| `event:dlq:inspect` / `event:dlq:replay` / `event:dlq:discard` | `EXISTENTE_NO_DOC_03` | Ações operacionais da DLQ e mensageria |
+| `masonic_link:contest:review` / `masonic_link:contest:respond` | `EXISTENTE_NO_DOC_03` | Ciclo de vida estrito de contestações fraternas |
 
 ---
 
 ## 4. Regras do Domínio Maçônico e Instrumentos Independentes
 
-Para evitar simplificações inadequada no mapeamento do produto vertical Conexão Maçônica, o sistema estabelece as seguintes separações funcionais:
+Para evitar simplificações inadequadas no mapeamento do produto vertical Conexão Maçônica, o sistema estabelece as seguintes separações funcionais:
 
 1. **Autorização Empresarial como Instrumento Independente & Gate Condicional**: A autorização dada pelo representante legal, executivo, colaborador ou procurador para vincular e publicar a empresa no guia **NÃO é apenas uma seção do contrato comercial**. Trata-se de um registro próprio (`business_authorization`), coletado via modal/formulário em `ADV-007b`, com hash, termo e escopo de autorização revogável pelo representante da empresa. Quando o vínculo declarado em `ADV-002` for de representante (não-proprietário/sócio), a autorização (`ADV-007b`) atua como **gate obrigatório antes da seleção do plano (`ADV-003`), contrato (`ADV-005`) e pagamento (`ADV-006`)**.
 
@@ -95,13 +95,13 @@ A estratégia de lançamento foi estruturada em ondas incrementais, garantindo a
 │  1. MVP 1A-Core (Lançamento Operacional Inicial Web/PWA)  : 51 Elementos│
 │     (29 Main Routes + 2 Sub-routes + 4 Tabs + 8 Steps + 2 Overlays + 6 Aux)│
 │                                                                        │
-│  2. MVP 1A-Control (Automação da Torre de Controle Master): 13 Elementos│
-│     (03 Main Routes + 10 Wizard Steps em CTL-003-S01..S10)             │
+│  2. MVP 1A-Control (Automação da Torre de Controle Master): 14 Elementos│
+│     (03 Main Routes + 1 Tab (CTL-006) + 10 Wizard Steps)              │
 │                                                                        │
 │  3. MVP 1B (Expansão Comercial, CRM, Cupons & Analytics)  : 20 Elementos│
 │     (18 Main Routes + 2 Overlays)                                      │
 │                                                                        │
-│  TOTAL DE ELEMENTOS MATRICIALMENTE MAPEADOS               : 84 ELEMENTOS│
+│  TOTAL DE ELEMENTOS MATRICIALMENTE MAPEADOS               : 85 ELEMENTOS│
 └────────────────────────────────────────────────────────────────────────┘
 
 ONDAS ESTRATÉGICAS SEM ELEMENTOS PRÓPRIOS NA MATRIZ:
@@ -111,9 +111,9 @@ ONDAS ESTRATÉGICAS SEM ELEMENTOS PRÓPRIOS NA MATRIZ:
 
 ---
 
-## 6. Matriz Consolidada de Interfaces (84 Registros Individuais)
+## 6. Matriz Consolidada de Interfaces (85 Registros Individuais)
 
-Abaixo apresentamos a matriz única onde cada uma das 84 interfaces possui um ID exclusivo, rota neutra e classificação estrita.
+Abaixo apresentamos a matriz única onde cada uma das 85 interfaces possui um ID exclusivo, rota neutra e classificação estrita.
 
 ### 6.1 Área Pública (PUB-xxx — 17 Registros)
 
@@ -217,6 +217,21 @@ Abaixo apresentamos a matriz única onde cada uma das 84 interfaces possui um ID
 | **CTL-003-S10**| Wizard Step 10: Readiness & Publish | Wizard Step | `/master/tenants/novo#step-10`| Framework | MVP 1A-Control| `tenant:provision` | CTL-003-S09 | CTL-002 |
 | **CTL-004** | Catálogo & Espec. Templates | Main Route | `/master/templates` | Framework | MVP 1B | `template:manage` | CTL-001 | CTL-004 |
 | **CTL-005** | Governança Global Contratos | Main Route | `/master/contratos` | Framework | MVP 1B | `contract:global_admin`| CTL-001 | CTL-005 |
+| **CTL-006** | Operações Eventos / DLQ | Internal Tab | `/master?tab=events-dlq`| Framework | MVP 1A-Control| `event:dlq:inspect` / `event:dlq:replay` / `event:dlq:discard` | CTL-001 | CTL-001 |
+
+#### Detalhamento Funcional da Aba CTL-006 (Operações Mensageria & DLQ Inspector)
+1. **Inspeção de Eventos (`event:dlq:inspect`)**:
+   - Exibe a lista sanitizada de entregas falhadas a partir da view `vw_operational_dlq_sanitized`.
+   - Oferece filtros operacionais por `tenant_id`, `consumer_name`, `status` (`requires_operator_action`, `replaying`, `discarded`, `resolved`) e janela de datas.
+   - Apresenta o histórico de tentativas (`event_delivery_attempts`), contagem de retentativas, `correlation_id` e pilha de erro tratada (`error_stack`).
+2. **Re-execução de Evento / Replay (`event:dlq:replay`)**:
+   - Exige **sessão elevada ativa** (`support:elevated_session:use`) com token de elevação aprovado por segundo operador.
+   - Exige justificativa técnica obrigatória gravada em `resolution_notes`.
+   - Validação rigorosa de escopo do tenant e controle idempotente por `(event_id, consumer_name)`.
+3. **Descarte Auditado (`event:dlq:discard`)**:
+   - **NÃO EXCLUI** o evento nem o registro da DLQ do banco de dados.
+   - Atualiza o status da entrega para `discarded`, registrando obrigatoriamente a justificativa técnica em `resolution_notes`, o `resolved_by` e `resolved_at`.
+   - Gera evento de auditoria imutável em `audit_logs`.
 
 ### 6.6 Telas Auxiliares & Componentes de Estado (AUX-xxx — 6 Registros)
 
@@ -233,7 +248,7 @@ Abaixo apresentamos a matriz única onde cada uma das 84 interfaces possui um ID
 
 ## 7. Recálculo Oficial e Totais por Categoria de Interface
 
-A contagem oficial final foi recalculada diretamente dos 84 registros da Matriz Consolidada (Seção 6), apresentando total coerência matemática por categoria e por fase:
+A contagem oficial final foi recalculada diretamente dos 85 registros da Matriz Consolidada (Seção 6), apresentando total coerência matemática por categoria e por fase:
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -241,20 +256,20 @@ A contagem oficial final foi recalculada diretamente dos 84 registros da Matriz 
 │                                                                        │
 │  1. Main Routes (Pages)                         : 50 Interfaces        │
 │  2. Sub-routes (Sub-pages)                      : 02 Interfaces        │
-│  3. Internal Tabs (Tabs)                        : 04 Interfaces        │
+│  3. Internal Tabs (Tabs)                        : 05 Interfaces        │
 │  4. Wizard Steps (Steps)                        : 18 Passos            │
 │  5. Overlays (Modais / Drawers)                 : 04 Overlays          │
 │  6. State Components (Aux)                      : 06 Componentes       │
 │                                                                        │
-│  TOTAL DE ELEMENTOS INDEPENDENTES DE INTERFACE  : 84 ELEMENTOS        │
+│  TOTAL DE ELEMENTOS INDEPENDENTES DE INTERFACE  : 85 ELEMENTOS        │
 └────────────────────────────────────────────────────────────────────────┘
 
 DISTRIBUIÇÃO POR FASE DE LANÇAMENTO:
   • MVP 1A-Core    : 51 Elementos (29 Main Routes + 2 Sub-routes + 4 Tabs + 8 Wizard + 2 Overlays + 6 Aux)
-  • MVP 1A-Control : 13 Elementos (03 Main Routes + 10 Wizard Steps em CTL-003-S01..S10)
+  • MVP 1A-Control : 14 Elementos (03 Main Routes + 1 Tab (CTL-006) + 10 Wizard Steps em CTL-003-S01..S10)
   • MVP 1B         : 20 Elementos (18 Main Routes + 2 Overlays)
 
-  TOTAL DE ELEMENTOS MATRICIALMENTE MAPEADOS       : 84 ELEMENTOS
+  TOTAL DE ELEMENTOS MATRICIALMENTE MAPEADOS       : 85 ELEMENTOS
 ```
 
 ---

@@ -43,6 +43,26 @@ Este documento estabelece a modelagem lógica e física completa do banco de dad
 
 ## 3. Matriz Comparativa: Foundation vs. Produto
 
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│               RECALCULO OFICIAL DO SCHEMA (88 TABELAS)                 │
+│                                                                        │
+│  • Total Geral de Tabelas                         : 88 Tabelas         │
+│  • Tabelas de Origem Foundation                   : 06 Tabelas         │
+│  • Tabelas Novas do Produto (CivicOS / Vertical)  : 82 Tabelas         │
+│  • Faseamento MVP 1A                              : 79 Tabelas         │
+│  • Faseamento MVP 1B                              : 09 Tabelas         │
+│                                                                        │
+│  INVENTÁRIO POR BOUNDED CONTEXT:                                       │
+│  - Commerce (13), Directory (9), Internal CRM (6), Masonic (5),        │
+│    Legal (5), Entitlements (5), Leads (5), Import (5),                 │
+│    Messaging & Event Operations (5), Core (4), RBAC (4),               │
+│    Credentials (4), Content (4), Platform (3), Marketing (3),          │
+│    Notifications (3), Content/Promo (2), Founder (1),                  │
+│    Audit (1), Analytics (1).                                           │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
 | Tabela | Origem | Ação no Produto | Ownership | Escopo Tenancy | MVP |
 |---|---|---|---|---|---|
 | `tenants` | Foundation | Reutilizada sem alteração | Core | Global | 1A |
@@ -128,8 +148,11 @@ Este documento estabelece a modelagem lógica e física completa do banco de dad
 | `import_execution_history` | Produto | Nova tabela | Import | Tenant-Scoped | 1A |
 | `audit_logs` | Produto | Nova tabela | Audit | Tenant-Scoped | 1A |
 | `analytics_events` | Produto | Nova tabela | Analytics | Tenant-Scoped | 1A |
-| `business_metric_rollups` | Produto | Nova tabela | Analytics | Tenant-Scoped | 1A |
 | `outbox_events` | Produto | Nova tabela (Padrão Outbox transacional) | Messaging | Tenant-Scoped | 1A |
+| `event_deliveries` | Produto | Nova tabela (Estado atual por consumidor) | Messaging | Tenant-Scoped | 1A |
+| `event_delivery_attempts` | Produto | Nova tabela (Histórico imutável de retentativas) | Messaging | Tenant-Scoped | 1A |
+| `event_consumptions` | Produto | Nova tabela (Registro de idempotência concluída) | Messaging | Tenant-Scoped | 1A |
+| `failed_event_queue` | Produto | Nova tabela (Dead Letter Queue auditável) | Messaging | Tenant-Scoped | 1A |
 
 ---
 
@@ -1519,6 +1542,177 @@ CREATE TABLE IF NOT EXISTS public.business_masonic_link_history (
 2. **Acesso por URLs Temporárias**: Proibição de URLs públicas permanentes. O acesso a documentos é concedido exclusivamente via URLs assinadas pré-geradas com validade máxima de 15 minutos.
 3. **Acesso Auditado**: A visualização de qualquer evidência sensível requer a permissão `masonic_link:evidence:view` e registra uma entrada mandatória em `audit_logs`.
 4. **Higienização e Antivírus**: Todos os arquivos submetidos passam por sanitização de metadados EXIF, validação estrita de MIME tipo e verificação de vírus/malware antes da persistência final.
+
+---
+
+---
+
+### 6.17 Bounded Context Mensageria, Outbox & DLQ (Messaging & Event Operations Context)
+
+> **AVISO DE MODELAGEM**: DDL CONCEITUAL — NÃO EXECUTÁVEL (SUJEITO À MIGRATION REVIEW)
+>
+> As estruturas SQL abaixo representam a modelagem conceitual do **Messaging & Event Operations Context** (proprietário das 5 tabelas assíncronas), separado rigorosamente do **Analytics Context** (`analytics_events`, `business_metric_rollups`) e do **Audit Context** (`audit_logs`). Nenhuma migration SQL foi executada no Supabase.
+
+#### 1. `outbox_events` (Registro Imutável de Eventos do Sistema)
+```sql
+CREATE TABLE public.outbox_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id TEXT NOT NULL UNIQUE,
+  event_type TEXT NOT NULL,
+  schema_version TEXT NOT NULL DEFAULT '1.0',
+  event_version TEXT NOT NULL DEFAULT '1.0',
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE RESTRICT,
+  aggregate_type TEXT NOT NULL,
+  aggregate_id TEXT NOT NULL,
+  aggregate_version INT NOT NULL DEFAULT 1,
+  producer TEXT NOT NULL,
+  correlation_id TEXT,
+  causation_id TEXT,
+  trace_id TEXT,
+  actor_type TEXT, -- 'user', 'system', 'api_key'
+  actor_id TEXT,   -- Referência mínima ao ator sem duplicação de PII
+  payload JSONB NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending', -- pending, processing, dispatched, failed
+  available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  locked_at TIMESTAMPTZ,
+  locked_by TEXT,
+  last_error TEXT,
+  retry_count INT NOT NULL DEFAULT 0,
+  next_retry_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_outbox_processing ON public.outbox_events(status, available_at) WHERE status IN ('pending', 'failed');
+CREATE INDEX idx_outbox_tenant ON public.outbox_events(tenant_id, event_type);
+```
+
+#### 2. `event_deliveries` (Estado Atual de Entrega por Consumidor)
+```sql
+CREATE TABLE public.event_deliveries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id TEXT NOT NULL REFERENCES public.outbox_events(event_id) ON DELETE RESTRICT,
+  consumer_name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending', -- pending, delivered, failed
+  attempt_count INT NOT NULL DEFAULT 0,
+  next_retry_at TIMESTAMPTZ,
+  last_attempt_at TIMESTAMPTZ,
+  delivered_at TIMESTAMPTZ,
+  last_error_code TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT unq_event_delivery_consumer UNIQUE (event_id, consumer_name)
+);
+```
+
+#### 3. `event_delivery_attempts` (Histórico Imutável de Tentativas)
+```sql
+CREATE TABLE public.event_delivery_attempts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  delivery_id UUID NOT NULL REFERENCES public.event_deliveries(id) ON DELETE RESTRICT,
+  event_id TEXT NOT NULL REFERENCES public.outbox_events(event_id) ON DELETE RESTRICT,
+  consumer_name TEXT NOT NULL,
+  attempt_number INT NOT NULL,
+  attempted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  execution_time_ms INT NOT NULL DEFAULT 0,
+  status TEXT NOT NULL, -- success, failed
+  error_stack TEXT,
+  CONSTRAINT unq_delivery_attempt_seq UNIQUE (delivery_id, attempt_number),
+  CONSTRAINT chk_attempt_num_positive CHECK (attempt_number > 0),
+  CONSTRAINT chk_exec_time_non_negative CHECK (execution_time_ms >= 0)
+);
+```
+
+#### 4. `event_consumptions` (Registro de Execução Concluída e Idempotência)
+```sql
+CREATE TABLE public.event_consumptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id TEXT NOT NULL REFERENCES public.outbox_events(event_id) ON DELETE RESTRICT,
+  consumer_name TEXT NOT NULL,
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE RESTRICT,
+  processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  execution_time_ms INT NOT NULL DEFAULT 0,
+  result_status TEXT NOT NULL DEFAULT 'success', -- success, skipped_idempotent
+  CONSTRAINT unq_event_consumer UNIQUE (event_id, consumer_name)
+);
+```
+
+#### 5. `failed_event_queue` (Dead Letter Queue — DLQ Auditável)
+```sql
+CREATE TABLE public.failed_event_queue (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id TEXT NOT NULL REFERENCES public.outbox_events(event_id) ON DELETE RESTRICT,
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE RESTRICT,
+  consumer_name TEXT NOT NULL,
+  payload_redacted JSONB NOT NULL,
+  first_failed_at TIMESTAMPTZ NOT NULL,
+  last_failed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  error_stack TEXT,
+  retry_count INT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'requires_operator_action', -- requires_operator_action, replaying, discarded, resolved
+  resolution_notes TEXT,
+  resolved_by UUID REFERENCES auth.users(id),
+  resolved_at TIMESTAMPTZ,
+  CONSTRAINT unq_dlq_event_consumer UNIQUE (event_id, consumer_name)
+);
+```
+
+#### 6. Projeção Sanitizada para Inspeção Operacional (`vw_operational_dlq_sanitized`)
+```sql
+-- View de projeção sanitizada vinculada à aba CTL-006 (Torre de Controle):
+-- Impede acesso direto de Tenant Admin às tabelas base da Outbox.
+-- Avalia RLS via a tabela subjacente failed_event_queue.
+CREATE VIEW public.vw_operational_dlq_sanitized
+WITH (security_invoker = true) AS
+SELECT
+  dlq.id AS dlq_id,
+  dlq.event_id,
+  dlq.tenant_id,
+  dlq.consumer_name,
+  dlq.payload_redacted,
+  dlq.first_failed_at,
+  dlq.last_failed_at,
+  dlq.retry_count,
+  dlq.status,
+  dlq.resolution_notes
+FROM public.failed_event_queue dlq;
+
+-- Grants restritos à View
+GRANT SELECT ON public.vw_operational_dlq_sanitized TO authenticated;
+GRANT ALL ON public.vw_operational_dlq_sanitized TO service_role;
+
+-- Requisito Obrigatório para Migration Review (RLS na tabela base):
+-- ALTER TABLE public.failed_event_queue ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE public.failed_event_queue FORCE ROW LEVEL SECURITY;
+```
+
+#### 7. Índices Operacionais Obrigatórios (Requisitos para Migration Review)
+```sql
+-- Índices para polling eficiente do Worker de Outbox e inspeção da DLQ
+CREATE INDEX idx_outbox_poll ON public.outbox_events(status, available_at, next_retry_at, created_at);
+CREATE INDEX idx_deliveries_consumer ON public.event_deliveries(event_id, consumer_name);
+CREATE INDEX idx_deliveries_retry ON public.event_deliveries(status, next_retry_at);
+CREATE INDEX idx_attempts_delivery_seq ON public.event_delivery_attempts(delivery_id, attempt_number);
+CREATE INDEX idx_dlq_tenant_status ON public.failed_event_queue(tenant_id, status, last_failed_at);
+```
+
+#### 8. Diretrizes de Retenção por Classe de Evento e Arquivamento
+
+> **Status da Política de Retenção:** `PROPOSED`
+>
+> Os prazos indicados são parâmetros arquiteturais iniciais e dependem de validação jurídica, contábil, fiscal e do Encarregado de Dados (DPO) antes da criação das migrations e jobs de expurgo.
+
+A retenção de dados da camada de mensageria é orientada pela **classe do evento**, superando o prazo fixo único:
+
+| Classe do Evento | Período de Retenção | Diretriz de Arquivamento / Expurgo |
+|---|---|---|
+| **`operational_transient`** | 30 dias pós-despacho | Elegível para expurgo automatizado |
+| **`financial`** | Prazos legais contábeis (5 anos) | Persistido com marca d'água imutável em cold storage |
+| **`contractual`** | Vigência + 5 anos legais | Mantido no banco principal até término do ciclo jurídico |
+| **`security`** | Mínimo 1 ano | Preservado para auditoria de acesso elevado e segurança |
+| **`dlq_resolution`** | Permanente (Audit Trail) | Registros de descarte (`discarded`) ou resolução mantêm log imutável |
+
+1. **Particionamento Futuro**: Em escala de produção, as tabelas `outbox_events` e `event_delivery_attempts` serão particionadas por intervalo mensal (`created_at`).
+2. **Preservação Auditável**: Registros da DLQ descartados (`discarded`) mantêm o evento e a justificativa para auditoria, sem deleção física da linha do banco.
 
 
 ---

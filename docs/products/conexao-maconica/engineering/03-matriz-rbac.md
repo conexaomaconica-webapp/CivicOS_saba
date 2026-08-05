@@ -109,167 +109,239 @@ Feature Flags (tenant_features)
 - **Escopo**: Business-Scoped.
 - **Função**: Acesso estritamente de leitura ao painel e relatórios de métricas da empresa. **Não acessa faturas nem executa alterações**.
 
+#### 3.3 Papel de Suporte da Plataforma (`platform_support`)
+- **Escopo**: Global Operational / Support.
+- **Função**: Agente de suporte técnico e operações da infraestrutura CivicOS. Solicita sessões elevadas auditadas (`support:elevation:request`), investiga incidentes na DLQ (`event:dlq:inspect`), executa replay de eventos retidos (`event:dlq:replay`) e utiliza credenciais elevadas em endpoints auditados (`support:elevated_session:use`). **É estritamente proibido de aprovar a própria solicitação de elevação**.
+
 ---
 
 ## 4. Catálogo Unificado de Permissões Granulares
 
 As permissões utilizam a nomenclatura padronizada `<modulo>:<recurso>:<acao>` com verbos operacionais estritos:
 
-| Módulo | Código da Permissão | Descrição Granular |
-|---|---|---|
-| **Platform** | `tenant:view_public` | Visualizar informações públicas básicas do tenant |
-| | `tenant:settings:update` | Alterar configurações operacionais do tenant |
-| | `tenant:domains:manage` | Gerenciar domínios customizados e SSL |
-| | `tenant:features:toggle` | Ativar ou desativar Feature Flags do tenant |
-| **RBAC** | `rbac:roles:manage` | Criar e editar papéis customizados |
-| | `rbac:user_roles:assign` | Atribuir papéis a usuários do tenant |
-| | `rbac:user_roles:revoke` | Revogar papéis de usuários do tenant |
-| **Directory** | `business:create` | Cadastrar nova empresa no diretório |
-| | `business:view_public` | Visualizar dados públicos da empresa publicada |
-| | `business:view_private` | Visualizar painel privado da empresa |
-| | `business:update` | Editar dados cadastrais básicos da empresa |
-| | `business:deactivate` | Desativar temporariamente a empresa |
-| | `business:restore` | Reativar empresa desativada |
-| | `business:delete_permanently`| Excluir permanentemente o registro da empresa |
-| | `business:ownership:transfer` | Transferir a titularidade da empresa para outro usuário |
-| | `business:members:assign` | Convidar e atribuir colaboradores em `business_members` |
-| | `business:members:revoke` | Revogar colaboradores de `business_members` |
-| | `business:locations:manage` | Adicionar e editar endereços da empresa |
-| | `business:contacts:manage` | Adicionar e editar contatos (WhatsApp, E-mail, Redes) |
-| | `business:hours:manage` | Alterar horários de funcionamento semanal |
-| | `business:media:create` | Adicionar fotos e mídias à galeria |
-| | `business:media:delete` | Remover fotos e mídias da galeria |
-| | `categories:manage` | Criar e alterar categorias e subcategorias |
-| **Masonic** | `organization:create` | Cadastrar Loja ou Potência Maçônica |
-| | `organization:update` | Editar dados da organização institucional |
-| | `organization:view_public` | Visualizar dados públicos institucionais |
-| | `organization:view_members` | Visualizar quadro de membros resguardado |
-| | `organization:people:manage` | Cadastrar e gerenciar membros institucionais |
-| **Credentials**| `credential:type:manage` | Cadastrar tipos de selos no sistema |
-| | `credential:request` | Solicitar emissão do selo de regularidade |
-| | `credential:verify` | Aprovar ou rejeitar emissão de selo |
-| | `credential:revoke` | Revogar selo emitido anteriormente |
-| | `credential:evidence:upload` | Anexar documentos e comprovantes de verificação |
-| **Founder** | `founder:qualify` | Conceder número e registro de Membro Fundador |
-| | `founder:revoke` | Suspender ou revogar qualificação de Fundador |
-| **Marketing** | `highlight:create` | Agendar destaque visual (home, carrossel, busca) |
-| | `highlight:cancel` | Cancelar destaque visual ativo |
-| | `sponsorship:manage` | Configurar patrocínio de canais/categorias |
-| **Billing** | `plans:manage` | Definir preços e versões dos planos |
-| | `subscription:create` | Contratar novo plano comercial |
-| | `subscription:upgrade` | Executar upgrade imediato de plano |
-| | `subscription:downgrade` | Agendar downgrade para o término da vigência |
-| | `subscription:cancel` | Solicitar cancelamento de assinatura |
-| | `invoices:view` | Visualizar faturas e detalhamento de cobrança |
-| | `payments:create` | Efetuar pagamento ou enviar comprovante |
-| | `payments:refund` | Processar estorno ou reembolso financeiro |
-| | `financial:adjust` | Conceder créditos manuais ou abates |
-| **Contracts** | `legal_docs:manage` | Criar e atualizar versões de Termos de Uso |
-| | `legal_docs:accept` | Registrar aceite formal de documento legal |
-| | `privacy:export_own` | Exportar relatórios de dados pessoais LGPD |
-| | `privacy:revoke_consent`| Revogar consentimentos de tratamento de dados |
-| **Entitlements**| `entitlement:def:manage` | Definir novos entitlements no catálogo |
-| | `entitlement:grant:create` | Conceder direitos de uso a uma empresa |
-| | `entitlement:override` | Forçar alteração de cota por autorização admin |
-| | `entitlement:usage:view` | Consultar consumo de cotas e limites |
-| **CRM Internal**| `crm:stages:manage` | Configurar etapas do pipeline de vendas |
-| | `crm:prospect:create` | Cadastrar prospecto comercial de empresa |
-| | `crm:opportunity:manage`| Criar e mover oportunidades no funil |
-| | `crm:proposal:send` | Emitir proposta financeira de plano |
-| | `crm:renewals:manage` | Gerenciar casos de renovação de contratos anuais |
-| **Leads** | `lead:send` | Enviar mensagem/orçamento para empresa |
-| | `lead:view_received` | Visualizar leads recebidos pela própria empresa |
-| | `lead:reply` | Responder mensagem de cliente no lead |
-| | `lead:status:update` | Alterar status do lead (novo, contactado, ganho) |
-| **Import** | `import:job:create` | Enviar planilha CSV/XLSX para carga |
-| | `import:job:execute` | Processar e importar linhas validadas |
-| **Analytics** | `analytics:tenant:view` | Visualizar dashboard geral do tenant |
-| | `analytics:business:view`| Visualizar métricas da própria empresa |
-| | `audit:logs:view` | Consultar registros de auditoria do sistema |
-| **Support** | `support:elevation:request` | Solicitar sessão de acesso elevado temporário |
-| | `support:elevation:approve` | Aprovar sessão de acesso elevado (segundo operador) |
-| | `support:elevated_session:use` | Utilizar sessão elevada aprovada em endpoint auditado |
+| Módulo | Código da Permissão | Descrição Granular | Escopo | Elevação Exigida? | Auditável? |
+|---|---|---|---|:---:|:---:|
+| **Platform** | `tenant:view_public` | Visualizar informações públicas da instância do tenant | Global/Tenant | ❌ | ❌ |
+| | `tenant:settings:update` | Alterar configurações operacionais do tenant | Tenant-Scoped | ❌ | ✅ |
+| | `tenant:domains:manage` | Gerenciar domínios customizados e SSL | Tenant-Scoped | ❌ | ✅ |
+| | `tenant:features:toggle` | Ativar ou desativar Feature Flags do tenant | Tenant-Scoped | ❌ | ✅ |
+| | `tenant:provision` | Executar Wizard de Provisionamento de Tenant | Global Platform| ❌ | ✅ |
+| | `tenant:publish` | Publicar tenant na infraestrutura ativa | Global Platform| ❌ | ✅ |
+| | `tenant:suspend` | Suspender operações da instância do tenant | Global Platform| 🔒 | ✅ |
+| | `tenant:archive` | Arquivar tenant inativo | Global Platform| 🔒 | ✅ |
+| | `tenant:reactivate` | Reativar tenant suspenso ou arquivado | Global Platform| 🔒 | ✅ |
+| | `tenant:manage` | Gestão administrativa de tenants | Global Platform| ❌ | ✅ |
+| | `template:manage` | Configurar especificação de templates | Global Platform| ❌ | ✅ |
+| | `platform:superadmin` | Ações de governança master | Global Platform| 🔒 | ✅ |
+| **RBAC** | `rbac:roles:manage` | Criar e editar papéis customizados | Tenant-Scoped | ❌ | ✅ |
+| | `rbac:user_roles:assign` | Atribuir papéis a usuários do tenant | Tenant-Scoped | ❌ | ✅ |
+| | `rbac:user_roles:revoke` | Revogar papéis de usuários do tenant | Tenant-Scoped | ❌ | ✅ |
+| | `admin:read` | Leitura geral do painel administrativo | Tenant-Scoped | ❌ | ❌ |
+| **Directory** | `business:create` | Cadastrar nova empresa no diretório | Tenant-Scoped | ❌ | ✅ |
+| | `business:view_public` | Visualizar dados públicos da empresa publicada | Global/Tenant | ❌ | ❌ |
+| | `business:view_private` | Visualizar rascunho ou perfil suspenso de empresa | Business-Scoped| ❌ | ❌ |
+| | `business:update` | Editar dados cadastrais básicos da empresa | Business-Scoped| ❌ | ✅ |
+| | `business:deactivate` | Desativar temporariamente a empresa | Business-Scoped| ❌ | ✅ |
+| | `business:restore` | Reativar empresa desativada | Business-Scoped| ❌ | ✅ |
+| | `business:delete_permanently`| Excluir permanentemente o registro da empresa | Global Platform| 🔒 | ✅ |
+| | `business:ownership:transfer`| Transferir a titularidade principal da empresa | Business-Scoped| 🔒 | ✅ |
+| | `business:members:assign` | Convidar e atribuir colaboradores na empresa | Business-Scoped| ❌ | ✅ |
+| | `business:members:revoke` | Revogar colaboradores da empresa | Business-Scoped| ❌ | ✅ |
+| | `business:locations:manage` | Adicionar e editar endereços da empresa | Business-Scoped| ❌ | ✅ |
+| | `business:contacts:manage` | Adicionar e editar contatos (WhatsApp, E-mail) | Business-Scoped| ❌ | ✅ |
+| | `business:hours:manage` | Alterar horários de funcionamento semanal | Business-Scoped| ❌ | ✅ |
+| | `business:media:create` | Adicionar fotos e mídias à galeria | Business-Scoped| ❌ | ✅ |
+| | `business:media:delete` | Remover fotos e mídias da galeria | Business-Scoped| ❌ | ✅ |
+| | `business:moderate` | Aprovar ou solicitar ajuste no cadastro | Tenant-Scoped | ❌ | ✅ |
+| | `categories:manage` | Criar e alterar categorias e subcategorias | Tenant/Global | ❌ | ✅ |
+| **Masonic** | `organization:create` | Cadastrar Loja ou Potência Maçônica | Tenant-Scoped | ❌ | ✅ |
+| | `organization:update` | Editar dados da organização institucional | Tenant-Scoped | ❌ | ✅ |
+| | `organization:view_public` | Visualizar dados públicos institucionais | Global/Tenant | ❌ | ❌ |
+| | `organization:view_members` | Visualizar quadro de membros resguardado | Tenant-Scoped | ❌ | ❌ |
+| | `organization:people:manage` | Cadastrar e gerenciar membros institucionais | Tenant-Scoped | ❌ | ✅ |
+| | `masonic_link:contest:review`| Analisar denúncias de contestação fraterna | Tenant-Scoped | ❌ | ✅ |
+| | `masonic_link:contest:respond`| Enviar defesa contra contestação aberta | Business-Scoped| ❌ | ✅ |
+| **Credentials**| `credential:type:manage` | Cadastrar tipos de selos no sistema | Tenant/Global | ❌ | ✅ |
+| | `credential:request` | Solicitar emissão do selo de regularidade | Business-Scoped| ❌ | ✅ |
+| | `credential:verify` | Aprovar ou rejeitar emissão de selo | Tenant-Scoped | ❌ | ✅ |
+| | `credential:revoke` | Revogar selo emitido anteriormente | Tenant-Scoped | 🔒 | ✅ |
+| | `credential:evidence:upload`| Anexar documentos e comprovantes de verificação | Business-Scoped| ❌ | ✅ |
+| **Founder** | `founder:qualify` | Conceder registro de Membro Fundador | Tenant-Scoped | 🔒 | ✅ |
+| | `founder:revoke` | Suspender ou revogar qualificação de Fundador | Tenant-Scoped | 🔒 | ✅ |
+| **Marketing** | `highlight:create` | Agendar destaque visual (home, carrossel, busca) | Business-Scoped| ❌ | ✅ |
+| | `highlight:cancel` | Cancelar destaque visual ativo | Business-Scoped| ❌ | ✅ |
+| | `sponsorship:manage` | Configurar patrocínio de canais/categorias | Tenant-Scoped | ❌ | ✅ |
+| | `coupons:manage` | Gerenciar vitrine de cupons de desconto | Tenant-Scoped | ❌ | ✅ |
+| | `events:manage` | Gerenciar agenda de eventos comunitários | Tenant-Scoped | ❌ | ✅ |
+| **Billing** | `plans:manage` | Definir preços e versões dos planos | Tenant-Scoped | ❌ | ✅ |
+| | `subscription:create` | Contratar novo plano comercial | Business-Scoped| ❌ | ✅ |
+| | `subscription:manage` | Gerenciar parâmetros da assinatura ativa | Business-Scoped| ❌ | ✅ |
+| | `subscription:upgrade` | Executar upgrade imediato de plano | Business-Scoped| ❌ | ✅ |
+| | `subscription:downgrade` | Agendar downgrade para o término da vigência | Business-Scoped| ❌ | ✅ |
+| | `subscription:cancel` | Solicitar cancelamento de assinatura | Business-Scoped| ❌ | ✅ |
+| | `subscription:reactivate`| Reativar assinatura suspensa por billing | Tenant-Scoped | 🔒 | ✅ |
+| | `invoices:view` | Visualizar faturas e detalhamento de cobrança | Business-Scoped| ❌ | ❌ |
+| | `payment:create` | Efetuar pagamento ou enviar comprovante | Business-Scoped| ❌ | ✅ |
+| | `payment:refund` | Processar estorno ou reembolso financeiro | Tenant-Scoped | 🔒 | ✅ |
+| | `payment:reconcile` | Conciliar pagamentos do provedor | Tenant-Scoped | 🔒 | ✅ |
+| | `financial:adjust` | Conceder créditos manuais ou abates | Tenant-Scoped | 🔒 | ✅ |
+| **Contracts** | `legal_docs:manage` | Criar e atualizar versões de Termos de Uso | Tenant/Global | ❌ | ✅ |
+| | `legal_docs:accept` | Registrar aceite formal de documento legal | Authenticated | ❌ | ✅ |
+| | `privacy:export_own` | Exportar relatórios de dados pessoais LGPD | Authenticated | ❌ | ✅ |
+| | `privacy:revoke_consent`| Revogar consentimentos de tratamento de dados | Authenticated | ❌ | ✅ |
+| | `contract:view_own` | Visualizar minuta e contrato próprio | Business-Scoped| ❌ | ❌ |
+| | `contract:sign` | Executar assinatura eletrônica com hash SHA-256 | Business-Scoped| ❌ | ✅ |
+| | `contract:manage` | Gestão administrativa de contratos | Tenant-Scoped | ❌ | ✅ |
+| | `contract:void` | Anulação jurídica de contrato | Tenant-Scoped | 🔒 | ✅ |
+| | `contract:audit` | Auditoria completa de minutas e assinaturas | Tenant-Scoped | 🔒 | ✅ |
+| | `contract:global_admin`| Governança global de contratos na Torre Master| Global Platform| 🔒 | ✅ |
+| **Entitlements**| `entitlement:def:manage` | Definir novos entitlements no catálogo | Global Platform| ❌ | ✅ |
+| | `entitlement:grant:create` | Conceder direitos de uso a uma empresa | Tenant-Scoped | ❌ | ✅ |
+| | `entitlement:override` | Forçar alteração de cota por autorização admin | Tenant-Scoped | 🔒 | ✅ |
+| | `entitlement:usage:view` | Consultar consumo de cotas e limites | Business-Scoped| ❌ | ❌ |
+| **CRM Internal**| `crm:stages:manage` | Configurar etapas do pipeline de vendas | Global Operational| ❌ | ✅ |
+| | `crm:prospect:create` | Cadastrar prospecto comercial de empresa | Global Operational| ❌ | ✅ |
+| | `crm:opportunity:manage`| Criar e mover oportunidades no funil | Global Operational| ❌ | ✅ |
+| | `crm:proposal:send` | Emitir proposta financeira de plano | Global Operational| ❌ | ✅ |
+| | `crm:renewals:manage` | Gerenciar casos de renovação de contratos anuais | Global Operational| ❌ | ✅ |
+| **Messaging** | `event:dlq:inspect` | Visualizar DLQ sanitizada (vw_operational_dlq_sanitized) | Tenant-Scoped | ❌ | ❌ |
+| | `event:dlq:replay` | Reprocessar evento falhado com justificativa | Global/Tenant | 🔒 | ✅ |
+| | `event:dlq:discard` | Marcar entrega como descartada na auditoria | Global/Tenant | 🔒 | ✅ |
+| **Support** | `support:elevation:request` | Solicitar sessão de acesso elevado temporário | Support/Master | ❌ | ✅ |
+| | `support:elevation:approve` | Aprovar sessão elevada (proibida autoaprovação)| Master/Tenant | 🔒 | ✅ |
+| | `support:elevation:revoke` | Revogar sessão elevada ativa | Master/Tenant | 🔒 | ✅ |
+| | `support:elevation:view_audit`| Consultar logs de sessões elevadas | Master/Tenant | 🔒 | ✅ |
+| | `support:elevated_session:use`| Utilizar sessão elevada em endpoint auditado | Support/Master | 🔒 | ✅ |
+| **Theme** | `theme:override:view` | Visualizar rascunho e histórico de tema | Tenant-Scoped | ❌ | ❌ |
+| | `theme:override:edit` | Editar variáveis do tema em ADM-021 | Tenant-Scoped | ❌ | ✅ |
+| | `theme:override:preview` | Gerar pré-visualização em sandbox | Tenant-Scoped | ❌ | ❌ |
+| | `theme:override:publish` | Publicar novo tema em produção | Tenant-Scoped | 🔒 | ✅ |
+| | `theme:override:rollback`| Restaurar versão anterior do tema | Tenant-Scoped | 🔒 | ✅ |
+| | `theme:history:view` | Consultar histórico de edições do tema | Tenant-Scoped | ❌ | ❌ |
+| **Leads** | `lead:send` | Enviar mensagem/orçamento para empresa | Public/Auth | ❌ | ✅ |
+| | `lead:view_received` | Visualizar leads recebidos pela própria empresa | Business-Scoped| 🔒* | ❌ |
+| | `lead:reply` | Responder mensagem de cliente no lead | Business-Scoped| 🔒* | ✅ |
+| | `lead:status:update` | Alterar status do lead | Business-Scoped| 🔒* | ✅ |
+| **Import** | `import:job:create` | Enviar planilha CSV/XLSX para carga | Tenant-Scoped | ❌ | ✅ |
+| | `import:job:execute` | Processar e importar linhas validadas | Tenant-Scoped | ❌ | ✅ |
+| **Analytics** | `analytics:tenant:view` | Visualizar dashboard geral do tenant | Tenant-Scoped | ❌ | ❌ |
+| | `analytics:business:view`| Visualizar métricas da própria empresa | Business-Scoped| ❌ | ❌ |
+| | `audit:logs:view` | Consultar registros de auditoria do sistema | Tenant/Global | 🔒 | ❌ |
 
 ---
 
-## 5. Matriz RBAC Oficial (100% Papéis × 100% Permissões)
+## 5. Matriz RBAC Oficial (100% Papéis × 100% Permissões Sem Duplicidades)
 
-Esta matriz especifica os privilégios atribuídos exclusivamente aos papéis do sistema:
+Esta matriz especifica os privilégios atribuídos aos papéis do sistema:
 
-| Permissão | `master` | `tenant_admin` | `crm_sales` | `business_owner` | `business_co_owner` | `business_manager` | `business_finance` | `business_marketing` | `business_support` | `business_viewer` |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| `tenant:view_public` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `tenant:settings:update` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `tenant:domains:manage` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `tenant:features:toggle` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `rbac:roles:manage` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `rbac:user_roles:assign` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `rbac:user_roles:revoke` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `business:create` | ✅ | ✅ | ❌ | ❌* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `business:view_public` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `business:view_private` | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `business:update` | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `business:deactivate` | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `business:restore` | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `business:delete_permanently`| ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `business:ownership:transfer`| ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `business:members:assign` | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `business:members:revoke` | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `business:locations:manage` | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `business:contacts:manage` | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `business:hours:manage` | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `business:media:create` | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ |
-| `business:media:delete` | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ |
-| `categories:manage` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `organization:create` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `organization:update` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `organization:view_public` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `organization:view_members` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `organization:people:manage` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `credential:type:manage` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `credential:request` | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `credential:verify` | ✅ | ✅* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `credential:revoke` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `credential:evidence:upload`| ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `founder:qualify` | ✅ | ✅* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `founder:revoke` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `highlight:create` | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| `highlight:cancel` | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| `sponsorship:manage` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `plans:manage` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `subscription:create` | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| `subscription:upgrade` | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| `subscription:downgrade` | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| `subscription:cancel` | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `invoices:view` | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| `payments:create` | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| `payments:refund` | ✅ | ✅* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `financial:adjust` | ✅ | ✅* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `legal_docs:manage` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `legal_docs:accept` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `privacy:export_own` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `privacy:revoke_consent`| ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `entitlement:def:manage` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `entitlement:grant:create` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `entitlement:override` | ✅ | ✅* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `entitlement:usage:view` | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| `crm:stages:manage` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `crm:prospect:create` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `crm:opportunity:manage`| ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `crm:proposal:send` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `crm:renewals:manage` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `lead:send` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `lead:view_received` | 🔒* | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
-| `lead:reply` | 🔒* | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
-| `lead:status:update` | 🔒* | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
-| `import:job:create` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `import:job:execute` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `analytics:tenant:view` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `analytics:business:view`| ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| `audit:logs:view` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `support:elevation:request`| ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `support:elevation:approve`| ✅* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `support:elevated_session:use`| 🔒* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Permissão | `master` | `platform_support` | `tenant_admin` | `crm_sales` | `business_owner` | `business_co_owner` | `business_manager` | `business_finance` | `business_marketing` | `business_support` | `business_viewer` |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| `tenant:view_public` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `tenant:settings:update` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `tenant:domains:manage` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `tenant:features:toggle` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `tenant:provision` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `tenant:publish` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `tenant:suspend` | 🔒* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `tenant:archive` | 🔒* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `tenant:reactivate` | 🔒* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `tenant:manage` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `template:manage` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `platform:superadmin` | 🔒* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `rbac:roles:manage` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `rbac:user_roles:assign` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `rbac:user_roles:revoke` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `admin:read` | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `business:create` | ✅ | ❌ | ✅ | ❌ | ❌* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `business:view_public` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `business:view_private` | ✅ | 🔒* | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `business:update` | ✅ | 🔒* | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `business:deactivate` | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `business:restore` | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `business:delete_permanently`| 🔒* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `business:ownership:transfer`| ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `business:members:assign` | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `business:members:revoke` | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `business:locations:manage` | ✅ | 🔒* | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `business:contacts:manage` | ✅ | 🔒* | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `business:hours:manage` | ✅ | 🔒* | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `business:media:create` | ✅ | 🔒* | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| `business:media:delete` | ✅ | 🔒* | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| `business:moderate` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `categories:manage` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `organization:create` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `organization:update` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `organization:view_public` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `organization:view_members` | ✅ | 🔒* | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `organization:people:manage` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `masonic_link:contest:review`| ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `masonic_link:contest:respond`| ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `credential:type:manage` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `credential:request` | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `credential:verify` | ✅ | ❌ | ✅* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `credential:revoke` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `credential:evidence:upload`| ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `founder:qualify` | ✅ | ❌ | ✅* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `founder:revoke` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `highlight:create` | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| `highlight:cancel` | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| `sponsorship:manage` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `coupons:manage` | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| `events:manage` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `plans:manage` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `subscription:create` | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| `subscription:manage` | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| `subscription:upgrade` | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| `subscription:downgrade` | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| `subscription:cancel` | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `subscription:reactivate`| ✅ | 🔒* | ✅* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `invoices:view` | ✅ | 🔒* | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| `payment:create` | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| `payment:refund` | ✅ | 🔒* | ✅* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `payment:reconcile` | ✅ | 🔒* | ✅* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `financial:adjust` | ✅ | 🔒* | ✅* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `legal_docs:manage` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `legal_docs:accept` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `privacy:export_own` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `privacy:revoke_consent`| ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `contract:view_own` | ✅ | 🔒* | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| `contract:sign` | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `contract:manage` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `contract:void` | 🔒* | 🔒* | 🔒* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `contract:audit` | 🔒* | 🔒* | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `contract:global_admin`| 🔒* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `entitlement:def:manage` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `entitlement:grant:create` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `entitlement:override` | ✅ | 🔒* | ✅* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `entitlement:usage:view` | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| `crm:stages:manage` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `crm:prospect:create` | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `crm:opportunity:manage`| ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `crm:proposal:send` | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `crm:renewals:manage` | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `event:dlq:inspect` | ✅ | 🔒* | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `event:dlq:replay` | 🔒* | 🔒* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `event:dlq:discard` | 🔒* | 🔒* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `support:elevation:request`| ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `support:elevation:approve`| 🔒* | ❌ | 🔒* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `support:elevation:revoke` | 🔒* | ❌ | 🔒* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `support:elevation:view_audit`| 🔒* | 🔒* | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `support:elevated_session:use`| 🔒* | 🔒* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `theme:override:view` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `theme:override:edit` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `theme:override:preview` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `theme:override:publish` | 🔒* | ❌ | 🔒* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `theme:override:rollback` | 🔒* | ❌ | 🔒* | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `theme:history:view` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `lead:send` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `lead:view_received` | 🔒* | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
+| `lead:reply` | 🔒* | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
+| `lead:status:update` | 🔒* | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
+| `import:job:create` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `import:job:execute` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `analytics:tenant:view` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `analytics:business:view`| ✅ | 🔒* | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| `audit:logs:view` | 🔒* | 🔒* | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 > **Legenda de Restrições**:
 > - `✅*`: Exige regra de Anti-Self-Approval (`requested_by != approved_by`).
