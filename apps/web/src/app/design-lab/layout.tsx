@@ -20,9 +20,11 @@ export const metadata: Metadata = {
 // Strict Server-side Feature Flag Assert
 function assertDesignLabEnabled(): void {
   const isProd = process.env.NODE_ENV === 'production';
-  const enabled = process.env.DESIGN_LAB_ENABLED === 'true';
+  const enabled = isProd
+    ? process.env.DESIGN_LAB_ENABLED === 'true'
+    : process.env.DESIGN_LAB_ENABLED !== 'false';
 
-  if (isProd || !enabled) {
+  if (!enabled) {
     notFound();
   }
 }

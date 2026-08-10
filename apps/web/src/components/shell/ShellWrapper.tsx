@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { useKernelSafe } from '@saas/app-sdk';
 import { PresentationSnapshot, NavigationSnapshot } from '@saas/sdk';
 import { NavigationRenderer } from '../navigation/NavigationRenderer';
@@ -12,8 +13,16 @@ interface ShellWrapperProps {
 }
 
 export function ShellWrapper({ children }: ShellWrapperProps) {
+  const pathname = usePathname();
+  const isDesignLab = pathname?.startsWith('/design-lab');
+
   const { kernel, isLoading, error } = useKernelSafe();
   const [snapshot, setSnapshot] = useState<PresentationSnapshot | null>(null);
+
+  // If rendering inside Design Lab, bypass product shell completely
+  if (isDesignLab) {
+    return <>{children}</>;
+  }
 
   useEffect(() => {
     if (kernel) {
