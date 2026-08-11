@@ -87,6 +87,9 @@ importers:
       '@saas/plugin-community-directory':
         specifier: workspace:^
         version: link:../../plugins/community-directory
+      '@saas/plugin-conexao-maconica':
+        specifier: workspace:*
+        version: link:../../plugins/conexao-maconica
       '@saas/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
