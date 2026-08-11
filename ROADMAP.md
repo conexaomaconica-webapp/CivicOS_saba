@@ -33,8 +33,8 @@
 
 ### Documentação de planejamento (Próxima fase)
 
-- [x] Doc 08 — Backlog Priorizado (proposto, em `docs/products/conexao-maconica/engineering/08-backlog-priorizado.md`, 90 PBIs / 385 SP)
-- [ ] Doc 09 — Plano de Sprints (aguardando aprovação do Doc 08)
+- [x] Doc 08 — Backlog Priorizado (aprovado e congelado, em `docs/products/conexao-maconica/engineering/08-backlog-priorizado.md`, 90 PBIs / 385 SP)
+- [x] Doc 09 — Plano de Sprints (proposto, em `docs/products/conexao-maconica/engineering/09-plano-de-sprints.md`, 13 sprints / ~26 semanas)
 
 ### Implementação (🔒 Bloqueada até Doc 09 aprovado)
 
