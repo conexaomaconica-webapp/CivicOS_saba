@@ -22,20 +22,23 @@
 - [x] Doc 03 — Matriz RBAC ↳ Aprovado e Congelado (Permissões de vínculo incorporadas)
 - [x] Incorporar Política de Vínculo e Concorrência nos Docs 00–03 (Concluído)
 
-### Documentação da próxima fase (Desbloqueada)
+### Documentação de engenharia — Concluída, aguardando reconciliação
 
-- [ ] Doc 04 — Mapa de Telas (🔓 Liberado para elaboração)
+- [x] Doc 04 — Mapa de Telas (concluído, em `docs/products/conexao-maconica/engineering/04-mapa-de-telas.md`)
+- [x] Doc 05 — Fluxos e Jornadas (concluído, em `docs/products/conexao-maconica/engineering/05-fluxos-e-jornadas.md`)
+- [x] Doc 06 — Arquitetura Orientada a Eventos (concluído, em `docs/products/conexao-maconica/engineering/06-event-driven-architecture.md`)
+- [x] Doc 07 — Critérios de Aceite (concluído, em `docs/products/conexao-maconica/engineering/07-criterios-de-aceite.md`)
 
-### Documentação pendente
+> **Nota**: Docs 04–07 existem e estão completos. Classificados como "concluídos, aguardando reconciliação" — não pendentes, não congelados. A reconciliação formal (correções de contagem CTL, lacunas RBAC, ortogonalidade de estados, normalização de referências ADV-007b, segregação MVP 1A vs 1B) será endereçada no ciclo de Documento 08/09.
 
-- [ ] Doc 05 — Fluxos e Jornadas
-- [ ] Doc 06 — Critérios de Aceite
-- [ ] Doc 07 — Backlog
-- [ ] Doc 08 — Plano de Sprints
+### Documentação de planejamento (Próxima fase)
 
-### Implementação
+- [ ] Doc 08 — Backlog Priorizado
+- [ ] Doc 09 — Plano de Sprints
 
-- [ ] Migrations SQL do Produto (🔒 Bloqueadas)
+### Implementação (🔒 Bloqueada até Doc 09 aprovado)
+
+- [ ] Migrations SQL do Produto
 - [ ] Seeds
 - [ ] Políticas RLS
 - [ ] Runtime RBAC
