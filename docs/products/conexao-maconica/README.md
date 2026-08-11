@@ -31,7 +31,7 @@ Cada documento deve ser produzido, revisado e aprovado antes de iniciar o próxi
 | 06 | Arquitetura Orientada a Eventos | ✅ Aprovado | Aprovada |
 | 07 | Critérios de Aceite v1.0.0 | ✅ Aprovado | Aprovada |
 | 08 | Backlog Priorizado v1.0.0 | ✅ Aprovado e Congelado | Aprovada |
-| 09 | Plano de Sprints v1.0.0 | 🟡 Proposto (aguardando aprovação) | — |
+| 09 | Plano de Sprints v1.0.0 | ✅ Aprovado e Congelado | Aprovada |
 
 ---
 

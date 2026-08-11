@@ -1,7 +1,7 @@
 # Documento 08 — Backlog Priorizado
 
 **Versão:** 1.0.0
-**Status:** Proposto (aguardando aprovação)
+**Status:** Aprovado e Congelado
 **Base:** `Docs 00–07 (Congelados)` & `Community Framework v1.0`
 **Produto:** Conexão Maçônica
 **Plataforma:** CivicOS (`foundation-v1.0`)

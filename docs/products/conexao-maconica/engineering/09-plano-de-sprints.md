@@ -1,8 +1,8 @@
 # Documento 09 — Plano de Sprints
 
 **Versão:** 1.0.0
-**Status:** Proposto (aguardando aprovação)
-**Base:** `Doc 08 — Backlog Priorizado (Aprovado)`, `Docs 00–07 (Congelados)`, `Community Framework v1.0`
+**Status:** Aprovado e Congelado
+**Base:** `Doc 08 — Backlog Priorizado (Aprovado e Congelado)`, `Docs 00–07 (Aprovados e Congelados)`, `Community Framework v1.0`
 **Produto:** Conexão Maçônica
 **Plataforma:** CivicOS (`foundation-v1.0`)
 **Escopo:** Execução dos 90 PBIs / 385 SP em 13 sprints de 2 semanas, com duas tracks paralelas (Infra + App)
@@ -25,29 +25,51 @@ Este documento converte o **Backlog Priorizado (Doc 08)** em um **cronograma de 
 | Parâmetro | Valor |
 |---|---|
 | Duração da sprint | 2 semanas |
-| Tamanho do time | 4 devs (2 Infra + 2 App) até o Sprint 2; depois 3 App + 1 Infra |
-| Velocity nominal | 40–50 SP/sprint (time completo) |
-| Velocity por track | Infra: 20–25 SP/sprint · App: 20–25 SP/sprint |
+| Tamanho do time | 4 devs — Sprint 0: 4 na Fundação/Infra (track única) · Sprint 1–6: 3 App + 1 Infra · Sprint 7–8: 2 Infra (Torre) + 2 App (Design Lab/preparação MVP 1B) · Sprint 9–11: 3 App + 1 Infra · Sprint 12: 2 Infra + 2 App (buffer) |
+| Velocity nominal | 40–50 SP/sprint (teto teórico com time completo e zero espera) |
+| Velocity por track (proporcional) | ~10–12,5 SP/dev: 1 dev = 10–12 SP · 2 devs = 20–25 SP · 3 devs = 30–37 SP · 4 devs = 40–50 SP |
 | Cadência de revisão | Review a cada sprint (demo funcional) + Retro |
 | Homologação visual | Design Lab como Definition of Ready para PBIs de UI (contínuo) |
 
-> **Aviso**: velocity é nominal. As 2 primeiras sprints (0 e 1) são dominadas pela Fundação/Infra. O plano prevê buffer de ~10% (≈35 SP) ao final (Sprint 12) para absorção de imprevistos.
+> **Aviso — velocidade nominal × comprometida**: o teto nominal (40–50 SP) **não** é o compromisso médio. O plano compromete **~29,6 SP/sprint** (385 SP ÷ 13 sprints). A diferença é consumida por (i) cadeia crítica de dependências (Fundação no Sprint 0, Wizard `CTL-003` estritamente sequencial), (ii) homologação visual (Design Lab como DoR) e (iii) buffer de capacidade. O buffer é expresso como **capacidade não comprometida** (SP livres por sprint) — separado dos story points dos PBIs, nunca como "PBI de reserva".
 
 ---
 
 ## 3. Modelo de Execução (Tracks)
 
 ```text
-Sprint 0-1: Track única (Infra domina; App prepara shell/design)
-Sprint 2+:  Track A — Infra (hardening, RLS, EDA, Torre de Controle)
-            Track B — App (telas, jornadas, integrações)
-Sprint 7-8: Torre de Controle (1 App + 1 Infra) // MVP 1B desbloqueia
-Sprint 9+:  Time concentrado em MVP 1B
+Sprint 0:   Fundação/Infra — track única, time completo (4 devs)
+Sprint 1–6: 3 App + 1 Infra (Infra: hardening RLS/EDA/apoio; Torre Base no Sprint 6)
+Sprint 7–8: Torre de Controle — 2 Infra (wizard + DLQ) + 2 App (Design Lab/homologação + preparação técnica do MVP 1B)
+Sprint 9–11: MVP 1B — 3 App + 1 Infra (apoio)
+Sprint 12:  2 Infra (Governança Global) + 2 App (capacidade livre = buffer)
 ```
 
+### 3.1 Alocação de Capacidade por Sprint (devs × tracks × SP)
+
+> Capacidade proporcional: ~10–12,5 SP/dev (Sprint 0 usa o teto nominal do time completo). "Livres" = capacidade não comprometida (buffer).
+
+| Sprint | Devs App/Infra | Cap. App | Cap. Infra | SP App/Infra | Livres |
+|---|---|---|---|---|---|
+| 0 | 0 / 4 | — | 40–50 | 0 / 47 | ~0–3 |
+| 1 | 3 / 1 | 30–37 | 10–12 | 32 / 0 | ~8–18 |
+| 2 | 3 / 1 | 30–37 | 10–12 | 23 / 0 | ~17–27 |
+| 3 | 3 / 1 | 30–37 | 10–12 | 30 / 0 | ~10–20 |
+| 4 | 3 / 1 | 30–37 | 10–12 | 26 / 0 | ~14–24 |
+| 5 | 3 / 1 | 30–37 | 10–12 | 33 / 0 | ~7–17 |
+| 6 | 3 / 1 | 30–37 | 10–12 | 31 / 8 | ~1–11 |
+| 7 | 2 / 2 | 20–25 | 20–25 | 0 / 22 | ~18–28 |
+| 8 | 2 / 2 | 20–25 | 20–25 | 0 / 18 | ~22–32 |
+| 9 | 3 / 1 | 30–37 | 10–12 | 29 / 0 | ~11–21 |
+| 10 | 3 / 1 | 30–37 | 10–12 | 34 / 0 | ~6–16 |
+| 11 | 3 / 1 | 30–37 | 10–12 | 34 / 0 | ~6–16 |
+| 12 | 2 / 2 | 20–25 | 20–25 | 0 / 18 | ~22–32 (buffer) |
+
+> **Nota (Sprints 7–8)**: os 2 devs App sem PBI comprometido atuam em Design Lab/homologação visual e na preparação técnica do MVP 1B (spikes, refinamento, contrato de dados) — capacidade livre, não ociosa.
+
 **Gates entre fases:**
-- **Gate 1 (pós Sprint 1)**: `INF-001`–`INF-006` verdes (schema migrado, RLS testada, RBAC runtime operacional, Outbox/DLQ processando). → desbloqueia track App.
-- **Gate 2 (pós Sprint 6)**: MVP 1A-Core completo + rota de onboarding de ponta a ponta homologada. → desbloqueia MVP 1A-Control.
+- **Gate 1 (pós Sprint 0)**: `INF-001`–`INF-006` verdes (schema migrado, RLS testada, RBAC runtime operacional, Outbox/DLQ processando). → desbloqueia track App no Sprint 1.
+- **Gate 2 (pós Sprint 6)**: MVP 1A-Core completo, incluindo `CTL-001`/`CTL-002` (Torre Base), + rota de onboarding de ponta a ponta homologada. → desbloqueia MVP 1A-Control.
 - **Gate 3 (pós Sprint 8)**: Torre de Controle operacional. → desbloqueia MVP 1B.
 
 ---
@@ -55,6 +77,8 @@ Sprint 9+:  Time concentrado em MVP 1B
 ## 4. Plano de Sprints
 
 ### Sprint 0 — Fundação (Infra) — 7 PBIs / 47 SP
+
+> **Alocação**: track única — os 4 devs formam o time completo na Fundação (capacidade nominal de **40–50 SP**). O compromisso de 47 SP está **dentro** da faixa nominal do time, mas apresenta risco elevado pela **baixa paralelização da cadeia crítica** `INF-001 → INF-002 → INF-004 → INF-005/INF-006` (Risco na §7).
 
 | PBI-ID | SP | Critério de Pronto |
 |---|---|---|
@@ -71,6 +95,8 @@ Sprint 9+:  Time concentrado em MVP 1B
 ---
 
 ### Sprint 1 — Auth & Onboarding Core — 9 PBIs / 32 SP
+
+> **Alocação**: Track B — App (3 devs · 9 PBIs · 32 SP, dentro da capacidade 30–37) · Track A — Infra (1 dev · hardening RLS/EDA em paralelo).
 
 | PBI-ID | SP | Critério de Pronto |
 |---|---|---|
@@ -90,6 +116,8 @@ Sprint 9+:  Time concentrado em MVP 1B
 
 ### Sprint 2 — Onboarding: Contratação & Pagamento — 6 PBIs / 23 SP
 
+> **Alocação**: Track B — App (3 devs · 6 PBIs · 23 SP) · Track A — Infra (1 dev · apoio a EDA/RLS).
+
 | PBI-ID | SP | Critério de Pronto |
 |---|---|---|
 | ADV-003 | 3 | Seleção do Plano (`CRIT-VSC-005`) |
@@ -104,6 +132,8 @@ Sprint 9+:  Time concentrado em MVP 1B
 ---
 
 ### Sprint 3 — Área Pública I — 10 PBIs / 30 SP
+
+> **Alocação**: Track B — App (3 devs · 10 PBIs · 30 SP) · Track A — Infra (1 dev · apoio).
 
 | PBI-ID | SP | Critério de Pronto |
 |---|---|---|
@@ -124,6 +154,8 @@ Sprint 9+:  Time concentrado em MVP 1B
 
 ### Sprint 4 — Painel do Anunciante — 6 PBIs / 26 SP
 
+> **Alocação**: Track B — App (3 devs · 6 PBIs · 26 SP) · Track A — Infra (1 dev · apoio).
+
 | PBI-ID | SP | Critério de Pronto |
 |---|---|---|
 | ADV-009 | 5 | Dashboard do Anunciante (`CRIT-VSC-012`) |
@@ -139,6 +171,8 @@ Sprint 9+:  Time concentrado em MVP 1B
 
 ### Sprint 5 — Moderação & Publicação I — 7 PBIs / 33 SP
 
+> **Alocação**: Track B — App (3 devs · 7 PBIs · 33 SP) · Track A — Infra (1 dev · apoio).
+
 | PBI-ID | SP | Critério de Pronto |
 |---|---|---|
 | ADM-001 | 5 | Dashboard Administrativo Tenant |
@@ -153,7 +187,9 @@ Sprint 9+:  Time concentrado em MVP 1B
 
 ---
 
-### Sprint 6 — Financeiro, Auditoria & Operação — 8 PBIs / 31 SP
+### Sprint 6 — Financeiro, Auditoria & Torre Base — 10 PBIs / 39 SP
+
+> **Alocação**: Track A — Infra (1 dev · 2 PBIs · 8 SP: `CTL-001`, `CTL-002`) · Track B — App (3 devs · 8 PBIs · 31 SP).
 
 | PBI-ID | SP | Critério de Pronto |
 |---|---|---|
@@ -165,17 +201,19 @@ Sprint 9+:  Time concentrado em MVP 1B
 | ADM-018 | 2 | Central de Notificações Admin |
 | ADM-020 | 3 | Trilha de Auditoria (`CRIT-TRN-015`) |
 | ADM-021 | 3 | Configurações da Operação |
+| CTL-001 | 3 | Dashboard Consolidado Master |
+| CTL-002 | 5 | Gestão de Instâncias |
 
-> **Entrega chave**: governança financeira e operacional do tenant. **Gate 2** — MVP 1A-Core completo.
+> **Entrega chave**: governança financeira e operacional do tenant + **Torre Base**. **Gate 2** — MVP 1A-Core completo (inclui `CTL-001`/`CTL-002`).
 
 ---
 
-### Sprint 7 — Torre de Controle: Base + Wizard 1–5 — 10 PBIs / 30 SP
+### Sprint 7 — Torre de Controle: Wizard 1–5 + Enablers — 8 PBIs / 22 SP
+
+> **Alocação**: Track A — Infra (2 devs · 8 PBIs · 22 SP: Torre + enablers) · Track B — App (2 devs · Design Lab/homologação + preparação do MVP 1B — 0 SP comprometidos). Sprint 7 inicia com `CTL-003` (Wizard), já que a Torre Base (`CTL-001`/`CTL-002`) foi entregue no Sprint 6.
 
 | PBI-ID | SP | Critério de Pronto |
 |---|---|---|
-| CTL-001 | 3 | Dashboard Consolidado Master |
-| CTL-002 | 5 | Gestão de Instâncias |
 | CTL-003 | 3 | Wizard Provisionamento (main) |
 | CTL-003-S01 | 2 | Step 1: Selecionar Template |
 | CTL-003-S02 | 2 | Step 2: Identificação Básica |
@@ -185,11 +223,13 @@ Sprint 9+:  Time concentrado em MVP 1B
 | XS-003 | 3 | Job expurgo de rascunhos (GAP-DOC07-001) |
 | XS-004 | 3 | Envelope Push padronizado (GAP-DOC07-002) |
 
-> **Entrega chave**: Torre Master navegável + primeiros 5 passos do wizard de provisionamento.
+> **Entrega chave**: primeiros 5 passos do wizard de provisionamento + enablers transversais.
 
 ---
 
 ### Sprint 8 — Torre de Controle: Wizard 6–10 + DLQ — 6 PBIs / 18 SP
+
+> **Alocação**: Track A — Infra (2 devs · 6 PBIs · 18 SP) · Track B — App (2 devs · Design Lab/homologação + preparação do MVP 1B — 0 SP comprometidos).
 
 | PBI-ID | SP | Critério de Pronto |
 |---|---|---|
@@ -206,6 +246,8 @@ Sprint 9+:  Time concentrado em MVP 1B
 
 ### Sprint 9 — MVP 1B: Descoberta Avançada & Cupons — 7 PBIs / 29 SP
 
+> **Alocação**: Track B — App (3 devs · 7 PBIs · 29 SP) · Track A — Infra (1 dev · apoio).
+
 | PBI-ID | SP | Critério de Pronto |
 |---|---|---|
 | PUB-005b | 5 | Mapa Avançado (Heatmap) |
@@ -219,6 +261,8 @@ Sprint 9+:  Time concentrado em MVP 1B
 ---
 
 ### Sprint 10 — MVP 1B: Contestações & CRM — 5 PBIs / 34 SP
+
+> **Alocação**: Track B — App (3 devs · 5 PBIs · 34 SP) · Track A — Infra (1 dev · apoio).
 
 | PBI-ID | SP | Critério de Pronto |
 |---|---|---|
@@ -234,6 +278,8 @@ Sprint 9+:  Time concentrado em MVP 1B
 
 ### Sprint 11 — MVP 1B: Analytics & Importação — 6 PBIs / 34 SP
 
+> **Alocação**: Track B — App (3 devs · 6 PBIs · 34 SP) · Track A — Infra (1 dev · apoio).
+
 | PBI-ID | SP | Critério de Pronto |
 |---|---|---|
 | ADV-015 | 8 | Analytics & Desempenho do Anunciante |
@@ -245,15 +291,15 @@ Sprint 9+:  Time concentrado em MVP 1B
 
 ---
 
-### Sprint 12 — MVP 1B: Governança Global + Buffer — 3 PBIs / 18 SP
+### Sprint 12 — MVP 1B: Governança Global — 3 PBIs / 18 SP comprometidos
+
+> **Alocação**: Track A — Infra (2 devs · 3 PBIs · 18 SP) · Track B — App (2 devs · capacidade livre). **Buffer**: com capacidade de 40–50 SP, a sprint compromete 18 SP e mantém **22–32 SP livres (não comprometidos)** como buffer — absorve atrasos acumulados sem inflar o escopo em story points.
 
 | PBI-ID | SP | Critério de Pronto |
 |---|---|---|
 | CTL-004 | 8 | Catálogo & Especificação de Templates |
 | CTL-005 | 5 | Governança Global de Contratos (`CRIT-VSC-013`) |
 | XS-002 | 5 | Webhook de contratação para CRM externo (GAP-DOC07-003) |
-
-> **Buffer**: 18 SP reservados nesta sprint também absorvem atrasos acumulados (≈10% do total).
 
 ---
 
@@ -269,17 +315,17 @@ flowchart LR
         S2 --> S3[Sprint 3<br/>Área Pública<br/>30 SP]
         S3 --> S4[Sprint 4<br/>Painel Anunciante<br/>26 SP]
         S4 --> S5[Sprint 5<br/>Moderação<br/>33 SP]
-        S5 --> S6[Sprint 6<br/>Financeiro/Operação<br/>31 SP]
+        S5 --> S6[Sprint 6<br/>Financeiro + Torre Base<br/>39 SP]
     end
     subgraph FASE3[MVP 1A-Control]
-        S6 --> S7[Sprint 7<br/>Torre Base + Wizard 1-5<br/>30 SP]
+        S6 --> S7[Sprint 7<br/>Torre Wizard 1-5<br/>22 SP]
         S7 --> S8[Sprint 8<br/>Wizard 6-10 + DLQ<br/>18 SP]
     end
     subgraph FASE4[MVP 1B]
         S8 --> S9[Sprint 9<br/>Descoberta & Cupons<br/>29 SP]
         S9 --> S10[Sprint 10<br/>Contestações & CRM<br/>34 SP]
         S10 --> S11[Sprint 11<br/>Analytics & Importação<br/>34 SP]
-        S11 --> S12[Sprint 12<br/>Governança + Buffer<br/>18 SP]
+        S11 --> S12[Sprint 12<br/>Governança Global<br/>18 SP]
     end
 ```
 
@@ -287,22 +333,22 @@ flowchart LR
 
 ## 6. Consolidação do Cronograma
 
-| Sprint | Fase | PBIs | SP | Data-alvo (relativa) |
-|---|---|---|---|---|
-| 0 | Fundação | 7 | 47 | Semana 1–2 |
-| 1 | MVP 1A-Core | 9 | 32 | Semana 3–4 |
-| 2 | MVP 1A-Core | 6 | 23 | Semana 5–6 |
-| 3 | MVP 1A-Core | 10 | 30 | Semana 7–8 |
-| 4 | MVP 1A-Core | 6 | 26 | Semana 9–10 |
-| 5 | MVP 1A-Core | 7 | 33 | Semana 11–12 |
-| 6 | MVP 1A-Core | 8 | 31 | Semana 13–14 |
-| 7 | MVP 1A-Control | 10 | 30 | Semana 15–16 |
-| 8 | MVP 1A-Control | 6 | 18 | Semana 17–18 |
-| 9 | MVP 1B | 7 | 29 | Semana 19–20 |
-| 10 | MVP 1B | 5 | 34 | Semana 21–22 |
-| 11 | MVP 1B | 6 | 34 | Semana 23–24 |
-| 12 | MVP 1B | 3 | 18 | Semana 25–26 |
-| **Total** | — | **90** | **385** | **~26 semanas** |
+| Sprint | Fase | Tracks | PBIs | SP | Data-alvo (relativa) |
+|---|---|---|---|---|---|
+| 0 | Fundação | Infra (time completo) | 7 | 47 | Semana 1–2 |
+| 1 | MVP 1A-Core | App (9) | 9 | 32 | Semana 3–4 |
+| 2 | MVP 1A-Core | App (6) | 6 | 23 | Semana 5–6 |
+| 3 | MVP 1A-Core | App (10) | 10 | 30 | Semana 7–8 |
+| 4 | MVP 1A-Core | App (6) | 6 | 26 | Semana 9–10 |
+| 5 | MVP 1A-Core | App (7) | 7 | 33 | Semana 11–12 |
+| 6 | MVP 1A-Core | App (8) + Infra (2) | 10 | 39 | Semana 13–14 |
+| 7 | MVP 1A-Control | Infra (8) | 8 | 22 | Semana 15–16 |
+| 8 | MVP 1A-Control | Infra (6) | 6 | 18 | Semana 17–18 |
+| 9 | MVP 1B | App (7) | 7 | 29 | Semana 19–20 |
+| 10 | MVP 1B | App (5) | 5 | 34 | Semana 21–22 |
+| 11 | MVP 1B | App (6) | 6 | 34 | Semana 23–24 |
+| 12 | MVP 1B | Infra (3) + buffer 22–32 SP livres | 3 | 18 | Semana 25–26 |
+| **Total** | — | — | **90** | **385** | **~26 semanas** |
 
 ---
 
@@ -310,7 +356,8 @@ flowchart LR
 
 | Risco | Impacto | Mitigação |
 |---|---|---|
-| **Velocity superestimada** (NFR-003 500 RPS, testes RLS extensos) | Sprint 0–1 estouram | Buffer de 18 SP na Sprint 12; revisão de velocity após Sprint 2 |
+| **Velocity superestimada** (NFR-003 500 RPS, testes RLS extensos) | Sprint 0–1 estouram | Buffer de **capacidade livre de 22–32 SP** na Sprint 12; revisão de velocity após Sprint 2 |
+| **Sprint 0 — baixa paralelização da cadeia crítica** (47 SP dentro do nominal do time completo; `INF-001→002→004→005/006` sequencial) | Gate 1 atrasa → App bloqueada | Time completo na Fundação; priorização da cadeia crítica; `INF-003` em paralelo (independe de RLS) |
 | **Dependência de gateway de pagamento** (RISK-001) | ADV-006 atrasa onboarding | QR Code PIX estático/contingência; integração em paralelo com mock |
 | **Wizard CTL-003 estritamente sequencial** | Sprint 7–8 sem paralelismo | 2 devs no wizard; DLQ (CTL-006) independe e pode ser antecipado |
 | **Contestações (ADM-004) acopladas à moderação** | Retrabalho se MVP 1B atrasar | Jornada J4 congelada no Doc 05; contrato de dados fixo desde Sprint 5 |
@@ -322,10 +369,11 @@ flowchart LR
 
 Para que o Doc 09 passe de **Proposto** para **Aprovado e congelado**:
 
-- [ ] Aprovação do **PO** (alinhamento de prioridade e escopo MVP 1A-Core).
-- [ ] Aprovação do **Tech Lead** (capacidade, arquitetura e dependências técnicas).
-- [ ] Confirmação do **Infra Lead** (Sprint 0 realista para schema/RLS/RBAC/EDA).
-- [ ] Tag de reconciliação `conexao-maconica-docs-04-07-reconciled` criada (pré-requisito).
+- [x] **Doc 08 — Backlog Priorizado** congelado formalmente (status atualizado para *Aprovado e Congelado*, subtotais reconciliados em 385 SP).
+- [x] Aprovação do **PO** (alinhamento de prioridade e escopo MVP 1A-Core).
+- [x] Aprovação do **Tech Lead** (capacidade, arquitetura e dependências técnicas).
+- [x] Confirmação do **Infra Lead** (Sprint 0 realista para schema/RLS/RBAC/EDA — 47 SP com time completo).
+- [x] Tag de reconciliação `conexao-maconica-docs-04-07-reconciled` criada (pré-requisito). Com a tag criada, os Docs 00–07 passam a **Aprovados e Congelados**.
 
 ---
 
