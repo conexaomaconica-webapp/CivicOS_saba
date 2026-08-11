@@ -23,7 +23,7 @@ O backlog é a ponte entre a especificação documental congelada e a execução
 |---|---|
 | **PBI-ID** | Identificador único e imutável. Prefixos: `INF-` (infraestrutura/fundação), `PUB-`, `USR-`, `ADV-`, `ADM-`, `CTL-`, `AUX-` (interfaces do Doc 04), `XS-` (transversal). |
 | **Título** | Descrição concisa da entrega. |
-| **Fase** | `Fundação` / `MVP 1A-Core` / `MVP 1A-Control` / `MVP 1B` / `Transversal` |
+| **Fase** | `Fundação` / `MVP 1A-Core` / `MVP 1A-Control` / `MVP 1B`. PBIs transversais (`XS-xxx`) são posicionados dentro da fase de execução (ex: `Fundação (Sprint 0)`, `MVP 1B`). |
 | **AP** | Acceptance Package do Doc 07 (`AP-001` a `AP-005`) ou `—` (infra/transversal). |
 | **Interfaces (Doc 04)** | IDs da Matriz de Interfaces responsáveis pelo PBI. |
 | **Jornada (Doc 05)** | Jornadas do usuário impactadas (J1–J11). |
@@ -56,9 +56,13 @@ O backlog é a ponte entre a especificação documental congelada e a execução
 
 ## 5. Backlog Priorizado
 
-### 5.1 Fundação (Infraestrutura) — 6 PBIs
+### 5.1 Fundação (Infraestrutura) — 7 PBIs
 
-> Bloqueia o MVP 1A-Core. RLS, RBAC Runtime, EDA (Outbox/DLQ) e LGPD são pré-requisitos estruturais de qualquer tela.
+> Bloqueia o MVP 1A-Core. RLS (INF-002), RBAC Runtime (INF-004), EDA/Outbox-DLQ (INF-003) e LGPD (INF-006) são pré-requisitos estruturais. Inclui `XS-001` (Pipeline CI/CD), que inicia no **Sprint 0**.
+>
+> **Dependência global da Fundação**: todos os PBIs do MVP 1A-Core dependem, direta ou indiretamente, da conclusão da Fundação (`INF-001` a `INF-006`). PBIs com `Deps = Fundação` (ex: `PUB-001`, `AUX-001`) carregam essa dependência global implícita, sem listar cada `INF` individual. Escopo por tipo de tela:
+> - **Telas públicas**: dependem de `INF-001` (Schema) + `INF-002` (RLS).
+> - **Telas autenticadas, administrativas e de controle**: dependem adicionalmente de `INF-004` (RBAC Runtime), `INF-003` (Outbox/DLQ) e `INF-005` (Entitlements) conforme o caso.
 
 | PBI-ID | Título | Fase | AP | Interfaces (Doc 04) | Jornada (Doc 05) | Critério (Doc 07) | Deps | SP | Tipo | Risco | DoD-Ref |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -68,18 +72,19 @@ O backlog é a ponte entre a especificação documental congelada e a execução
 | INF-004 | Runtime RBAC (`has_tenant_role`, `has_business_permission`, sessão elevada, Anti-Self-Approval) | Fundação | — | ADM-005 | J2, J9 | CRIT-TRN-004, CRIT-TRN-005, CRIT-TRN-006 | INF-002 | 8 | Enabler | Alto | CRIT-TRN-031 |
 | INF-005 | Entitlements Core (planos, versões, cotas e consumo) | Fundação | — | ADM-008, ADV-003 | J3, J6, J7 | CRIT-VSC-005, CRIT-TRN-021 | INF-004 | 5 | Enabler | Alto | CRIT-TRN-031 |
 | INF-006 | LGPD Base (aceites, consentimentos, exportação, revogação) | Fundação | — | USR-007 | J3 | CRIT-TRN-012, CRIT-TRN-013, CRIT-TRN-014 | INF-004 | 5 | Enabler | Alto | CRIT-TRN-031 |
+| XS-001 | Pipeline CI/CD (lint, typecheck, test, build) + ambientes staging/prod | Fundação (Sprint 0) | — | — | J1–J11 | CRIT-TRN-030, CRIT-TRN-031 | — | 5 | Enabler | Alto | CRIT-TRN-031 |
 
-**Total Fundação:** 42 SP
+**Total Fundação:** 47 SP
 
 ---
 
-### 5.2 MVP 1A-Core — 48 PBIs
+### 5.2 MVP 1A-Core — 50 PBIs
 
 #### 5.2.1 AP-001 Descoberta & Busca Pública (10 PBIs)
 
 | PBI-ID | Título | Fase | AP | Interfaces (Doc 04) | Jornada (Doc 05) | Critério (Doc 07) | Deps | SP | Tipo | Risco | DoD-Ref |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| PUB-001 | Splash & Carregamento inicial | MVP 1A-Core | AP-001 | PUB-001 | J1 | CRIT-TRN-022 | — | 1 | Feature | Baixo | CRIT-TRN-031 |
+| PUB-001 | Splash & Carregamento inicial | MVP 1A-Core | AP-001 | PUB-001 | J1 | CRIT-TRN-022 | Fundação | 1 | Feature | Baixo | CRIT-TRN-031 |
 | PUB-002 | Home do Guia Comercial | MVP 1A-Core | AP-001 | PUB-002 | J1 | CRIT-VSC-001 | INF-002 | 3 | Feature | Médio | CRIT-TRN-031 |
 | PUB-003 | Busca Global (lista) com filtros | MVP 1A-Core | AP-001 | PUB-003, PUB-004 | J1 | CRIT-VSC-001, CRIT-TRN-023 | PUB-002 | 5 | Feature | Médio | CRIT-TRN-031 |
 | PUB-004 | Drawer de Filtros Avançados | MVP 1A-Core | AP-001 | PUB-004 | J1 | CRIT-VSC-001, CRIT-TRN-018 | PUB-003 | 3 | Feature | Baixo | CRIT-TRN-031 |
@@ -171,15 +176,17 @@ O backlog é a ponte entre a especificação documental congelada e a execução
 
 **Subtotal AP-005 (1A-Core):** 8 SP
 
-#### 5.2.8 Componentes de Estado (1 PBI)
+#### 5.2.8 Componentes de Estado & Enablers Transversais (3 PBIs)
 
 | PBI-ID | Título | Fase | AP | Interfaces (Doc 04) | Jornada (Doc 05) | Critério (Doc 07) | Deps | SP | Tipo | Risco | DoD-Ref |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| AUX-001 | Componentes de Estado Auxiliares (loading/empty/404/500/403/maintenance) | MVP 1A-Core | — | AUX-001 a AUX-006 | J1–J11 | CRIT-TRN-022, CRIT-TRN-016, CRIT-TRN-017, CRIT-TRN-018 | — | 3 | Enabler | Baixo | CRIT-TRN-031 |
+| AUX-001 | Componentes de Estado Auxiliares (loading/empty/404/500/403/maintenance) | MVP 1A-Core | — | AUX-001 a AUX-006 | J1–J11 | CRIT-TRN-022, CRIT-TRN-016, CRIT-TRN-017, CRIT-TRN-018 | Fundação | 3 | Enabler | Baixo | CRIT-TRN-031 |
+| XS-003 | Job de expurgo de rascunhos inativos (GAP-DOC07-001) | MVP 1A-Core | — | — | J2 | CRIT-TRN-014 | INF-001 | 3 | Enabler | Baixo | CRIT-TRN-031 |
+| XS-004 | Envelope padronizado de Push Notification Mobile (GAP-DOC07-002) | MVP 1A-Core | — | USR-005, ADM-018 | J5 | CRIT-TRN-026 | INF-003 | 3 | Enabler | Médio | CRIT-TRN-031 |
 
-**Subtotal Componentes de Estado:** 3 SP
+**Subtotal Componentes de Estado & Transversais (1A-Core):** 9 SP
 
-**Total MVP 1A-Core:** 183 SP
+**Total MVP 1A-Core:** 189 SP
 
 ---
 
@@ -206,9 +213,9 @@ O backlog é a ponte entre a especificação documental congelada e a execução
 
 ---
 
-### 5.4 MVP 1B — 20 PBIs
+### 5.4 MVP 1B — 21 PBIs
 
-> Expansão comercial (CRM, Cupons, Analytics, Contestações, Importação, Mapa Avançado, Organizações e Governança Global).
+> Expansão comercial (CRM, Cupons, Analytics, Contestações, Importação, Mapa Avançado, Organizações e Governança Global). Inclui `XS-002` (webhook de contratação para CRM externo), associado ao `ADM-016`.
 
 | PBI-ID | Título | Fase | AP | Interfaces (Doc 04) | Jornada (Doc 05) | Critério (Doc 07) | Deps | SP | Tipo | Risco | DoD-Ref |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -232,41 +239,30 @@ O backlog é a ponte entre a especificação documental congelada e a execução
 | ADM-019 | Analytics & Desempenho Tenant | MVP 1B | AP-005 | ADM-019 | J2 | CRIT-TRN-025 | ADM-001 | 5 | Feature | Médio | CRIT-TRN-031 |
 | CTL-004 | Catálogo & Especificação de Templates | MVP 1B | AP-005 | CTL-004 | J11 | CRIT-TRN-007 | CTL-003 | 8 | Feature | Médio | CRIT-TRN-031 |
 | CTL-005 | Governança Global de Contratos | MVP 1B | AP-005 | CTL-005 | J11 | CRIT-VSC-013 | CTL-001, ADM-011 | 5 | Feature | Alto | CRIT-TRN-031 |
+| XS-002 | Webhook de contratação para CRM externo (GAP-DOC07-003) | MVP 1B | — | ADM-016 | J6 | CRIT-TRN-026 | INF-003, ADM-016 | 5 | Enabler | Médio | CRIT-TRN-031 |
 
-**Total MVP 1B:** 114 SP
-
----
-
-### 5.5 Transversais (Cross-cutting) — 4 PBIs
-
-| PBI-ID | Título | Fase | AP | Interfaces (Doc 04) | Jornada (Doc 05) | Critério (Doc 07) | Deps | SP | Tipo | Risco | DoD-Ref |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| XS-001 | Pipeline CI/CD (lint, typecheck, test, build) + ambientes staging/prod | Transversal | — | — | J1–J11 | CRIT-TRN-030, CRIT-TRN-031 | — | 5 | Enabler | Alto | CRIT-TRN-031 |
-| XS-002 | Webhook de contratação para CRM externo (GAP-DOC07-003) | Transversal | — | ADM-016 | J6 | CRIT-TRN-026 | INF-003 | 5 | Enabler | Médio | CRIT-TRN-031 |
-| XS-003 | Job de expurgo de rascunhos inativos (GAP-DOC07-001) | Transversal | — | — | J2 | CRIT-TRN-014 | INF-001 | 3 | Enabler | Baixo | CRIT-TRN-031 |
-| XS-004 | Envelope padronizado de Push Notification Mobile (GAP-DOC07-002) | Transversal | — | USR-005, ADM-018 | J5 | CRIT-TRN-026 | INF-003 | 3 | Enabler | Médio | CRIT-TRN-031 |
-
-**Total Transversais:** 16 SP
+**Total MVP 1B:** 115 SP
 
 ---
 
 ## 6. Consolidado de Estimativas
 
+> Os 4 PBIs transversais (`XS-001`–`XS-004`) estão **posicionados e contabilizados dentro de sua fase de execução**: `XS-001` na Fundação, `XS-003`/`XS-004` no MVP 1A-Core e `XS-002` no MVP 1B.
+
 | Fase | PBIs | SP |
 |---|---|---|
-| Fundação | 6 | 42 |
-| MVP 1A-Core | 48 | 183 |
+| Fundação (6 INF + XS-001) | 7 | 47 |
+| MVP 1A-Core (48 + XS-003, XS-004) | 50 | 189 |
 | MVP 1A-Control | 12 | 34 |
-| MVP 1B | 20 | 114 |
-| Transversais | 4 | 16 |
-| **Total** | **90** | **389** |
+| MVP 1B (20 + XS-002) | 21 | 115 |
+| **Total** | **90** | **385** |
 
 ---
 
 ## 7. Dependências Estruturais e Riscos
 
 ### 7.1 Cadeia Crítica de Dependências
-1. `INF-001` (Schema) → `INF-002` (RLS) → `INF-004` (RBAC Runtime) → todos os PBIs de tela.
+1. `INF-001` (Schema) → `INF-002` (RLS): **telas públicas** (ex: `PUB-001`, `PUB-002`, `AUX-001`). A cadeia segue para `INF-004` (RBAC Runtime) apenas para **telas autenticadas, administrativas e de controle** (ex: `PUB-011`, `ADV-009`, `ADM-001`, `CTL-001`).
 2. `INF-003` (Outbox/DLQ) → `ADV-006` (Checkout), `ADM-012` (Reconciliação), `CTL-006` (DLQ).
 3. `INF-005` (Entitlements) → `ADV-003` (Seleção de Plano), `ADM-008` (Planos).
 4. `INF-006` (LGPD) → `PUB-015`, `USR-007`, `ADV-005`.
@@ -284,5 +280,5 @@ O backlog é a ponte entre a especificação documental congelada e a execução
 
 1. **Aprovação do Doc 08 v1.0** (PO + Tech Lead).
 2. Elaboração do **Doc 09 — Plano de Sprints** (capacidade, paralelismo Infra/App, grafo de dependências).
-3. Abertura do **Sprint 0 (Foundation)** com `INF-001` a `INF-006`.
+3. Abertura do **Sprint 0 — Fundação** com `INF-001` a `INF-006` e `XS-001` (Pipeline CI/CD).
 4. Homologação visual continuada no **Design Lab** (Design System v1.0) como Definition of Ready para PBIs de UI.
