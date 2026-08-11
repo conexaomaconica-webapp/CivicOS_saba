@@ -33,8 +33,8 @@
 
 ### Documentação de planejamento (Próxima fase)
 
-- [ ] Doc 08 — Backlog Priorizado
-- [ ] Doc 09 — Plano de Sprints
+- [x] Doc 08 — Backlog Priorizado (proposto, em `docs/products/conexao-maconica/engineering/08-backlog-priorizado.md`, ~90 PBIs / 389 SP)
+- [ ] Doc 09 — Plano de Sprints (aguardando aprovação do Doc 08)
 
 ### Implementação (🔒 Bloqueada até Doc 09 aprovado)
 

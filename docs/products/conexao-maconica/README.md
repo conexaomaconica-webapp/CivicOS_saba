@@ -26,11 +26,12 @@ Cada documento deve ser produzido, revisado e aprovado antes de iniciar o próxi
 | 01 | Arquitetura Técnica v1.0.0 | ✅ Aprovada | Aprovada |
 | 02 | Schema Database v2.1.0 | 🟡 Aprovado com Ajustes | Aprovada |
 | 03 | Matriz RBAC v2.2.0 | ✅ Aprovada | Aprovada |
-| 04 | Mapa de Telas | 🔒 Bloqueado (aguardando Doc 03) | — |
-| 05 | Fluxos e Jornadas | 🔒 Bloqueado | — |
-| 06 | Critérios de Aceite | 🔒 Bloqueado | — |
-| 07 | Backlog (Épicos e Histórias) | 🔒 Bloqueado | — |
-| 08 | Plano de Sprints | 🔒 Bloqueado | — |
+| 04 | Mapa de Telas | ✅ Aprovado | Aprovada |
+| 05 | Fluxos e Jornadas | ✅ Aprovado | Aprovada |
+| 06 | Arquitetura Orientada a Eventos | ✅ Aprovado | Aprovada |
+| 07 | Critérios de Aceite v1.0.0 | 🟡 Concluído (aguardando reconciliação) | Em Homologação |
+| 08 | Backlog Priorizado v1.0.0 | 🟡 Proposto (aguardando aprovação) | — |
+| 09 | Plano de Sprints | 🔒 Bloqueado (aguardando Doc 08) | — |
 
 ---
 
@@ -70,9 +71,10 @@ docs/products/conexao-maconica/
 ├── 03-matriz-rbac.md
 ├── 04-mapa-de-telas.md
 ├── 05-fluxos-e-jornadas.md
-├── 06-criterios-de-aceite.md
-├── 07-backlog.md
-├── 08-plano-de-sprints.md
+├── 06-event-driven-architecture.md
+├── 07-criterios-de-aceite.md
+├── 08-backlog-priorizado.md
+├── 09-plano-de-sprints.md
 └── decisions/
     ├── ADR-001-limites-plataforma-produto.md
     └── ...
