@@ -47,7 +47,7 @@ function runCli(cmd) {
 // 1. Garante stack local rodando (Docker). `db reset` sinaliza erro claro se ausente.
 runCli(['start', '--exclude', 'studio,analytics,imgproxy,inbucket']);
 
-// 2. Reset completo: migrations em ordem (001–027) + seed.sql.
+// 2. Reset completo: migrations em ordem (001–028) + seed.sql.
 runCli(['db', 'reset']);
 
 // 3. Smoke do Gate 1: exceção no SQL -> exit != 0 -> script falha.

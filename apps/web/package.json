@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "clean": "rm -rf .next out *.tsbuildinfo",
-    "test": "vitest run test/auth-service.test.ts test/registration-validation.test.ts test/profile-service.test.ts test/masonic-links-service.test.ts test/onboarding-flow.test.ts test/business-registration.test.ts && npx tsx test/architecture.test.ts"
+    "test": "vitest run test/auth-service.test.ts test/registration-validation.test.ts test/profile-service.test.ts test/masonic-links-service.test.ts test/onboarding-flow.test.ts test/business-registration.test.ts test/plan-selection.test.ts && npx tsx test/architecture.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.2.2",
