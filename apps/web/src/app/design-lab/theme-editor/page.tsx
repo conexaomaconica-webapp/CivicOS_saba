@@ -131,7 +131,7 @@ export default function ThemeEditorPage() {
               2. Exportação de JSON Validação
             </h3>
             <button
-              onClick={() => navigator.clipboard.writeText(generatedExportJson)}
+              onClick={() => { void navigator.clipboard.writeText(generatedExportJson); }}
               className="text-xs text-blue-400 hover:text-white font-mono"
             >
               Copiar JSON

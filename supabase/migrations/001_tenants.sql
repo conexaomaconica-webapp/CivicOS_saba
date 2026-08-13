@@ -86,6 +86,7 @@ ALTER TABLE public.tenant_plugins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tenant_members ENABLE ROW LEVEL SECURITY;
 
 -- Tenants: users can only see tenants they are members of
+DROP POLICY IF EXISTS "Users can view own tenants" ON public.tenants;
 CREATE POLICY "Users can view own tenants"
   ON public.tenants
   FOR SELECT
@@ -97,6 +98,7 @@ CREATE POLICY "Users can view own tenants"
   );
 
 -- Tenant plugins: viewable by tenant members
+DROP POLICY IF EXISTS "Members can view tenant plugins" ON public.tenant_plugins;
 CREATE POLICY "Members can view tenant plugins"
   ON public.tenant_plugins
   FOR SELECT
@@ -108,6 +110,7 @@ CREATE POLICY "Members can view tenant plugins"
   );
 
 -- Tenant members: viewable by fellow members
+DROP POLICY IF EXISTS "Members can view fellow members" ON public.tenant_members;
 CREATE POLICY "Members can view fellow members"
   ON public.tenant_members
   FOR SELECT
@@ -119,6 +122,7 @@ CREATE POLICY "Members can view fellow members"
   );
 
 -- Admin-only write policies
+DROP POLICY IF EXISTS "Admins can manage tenant settings" ON public.tenants;
 CREATE POLICY "Admins can manage tenant settings"
   ON public.tenants
   FOR UPDATE
@@ -129,6 +133,7 @@ CREATE POLICY "Admins can manage tenant settings"
     )
   );
 
+DROP POLICY IF EXISTS "Admins can manage plugins" ON public.tenant_plugins;
 CREATE POLICY "Admins can manage plugins"
   ON public.tenant_plugins
   FOR ALL

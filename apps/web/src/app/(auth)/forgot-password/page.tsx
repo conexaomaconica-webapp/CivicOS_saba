@@ -3,11 +3,26 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { sendPasswordResetEmail } from '@/lib/auth/auth-service';
+import { validateEmail } from '@/lib/auth/validation';
+
+const FIELD_ERROR_STYLE = {
+  marginTop: 'var(--space-1)',
+  fontSize: 'var(--text-xs)',
+  color: 'var(--color-error-500)',
+  fontWeight: 'var(--font-weight-medium)',
+} as const;
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <span style={FIELD_ERROR_STYLE}>{message}</span>;
+}
 
 export default function ForgotPasswordPage() {
   const supabase = createClient();
 
   const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -18,10 +33,19 @@ export default function ForgotPasswordPage() {
     setErrorMsg(null);
     setSuccess(false);
 
+    const nextEmailError = validateEmail(email);
+    setEmailError(nextEmailError ?? undefined);
+    if (nextEmailError) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/update-password`,
-      });
+      const { error } = await sendPasswordResetEmail(
+        supabase,
+        email.trim(),
+        `${window.location.origin}/auth/callback?next=/update-password`,
+      );
 
       if (error) {
         setErrorMsg(error.message);
@@ -109,7 +133,10 @@ export default function ForgotPasswordPage() {
           type="email"
           required
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setEmailError(validateEmail(e.target.value) ?? undefined);
+          }}
           placeholder="exemplo@email.com"
           style={{
             padding: 'var(--space-3)',
@@ -130,6 +157,7 @@ export default function ForgotPasswordPage() {
             e.target.style.backgroundColor = 'var(--bg-tertiary)';
           }}
         />
+        <FieldError message={emailError} />
       </div>
 
       {/* Submit Button */}

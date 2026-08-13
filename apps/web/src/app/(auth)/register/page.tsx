@@ -4,14 +4,37 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { signUp } from '@/lib/auth/auth-service';
+import {
+  validateRegistration,
+  hasErrors,
+  type RegistrationErrors,
+  type RegistrationFields,
+} from '@/lib/auth/validation';
+
+const FIELD_ERROR_STYLE = {
+  marginTop: 'var(--space-1)',
+  fontSize: 'var(--text-xs)',
+  color: 'var(--color-error-500)',
+  fontWeight: 'var(--font-weight-medium)',
+} as const;
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <span style={FIELD_ERROR_STYLE}>{message}</span>;
+}
 
 export default function RegisterPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [fields, setFields] = useState<RegistrationFields>({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
+  const [errors, setErrors] = useState<RegistrationErrors>({});
   const [tenantName, setTenantName] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -23,7 +46,6 @@ export default function RegisterPage() {
       if (typeof window === 'undefined') return;
 
       const host = window.location.host;
-      // Resolve subdomain, skipping localhost and IP addresses
       if (host.startsWith('localhost') || /^\d+\.\d+\.\d+\.\d+/.test(host)) {
         setFetchingTenant(false);
         return;
@@ -55,29 +77,37 @@ export default function RegisterPage() {
     void resolveTenant();
   }, [supabase]);
 
+  const updateField = (key: keyof RegistrationFields, value: string) => {
+    const nextFields = { ...fields, [key]: value };
+    setFields(nextFields);
+    // CRIT-TRN-023 — validate in real time, error next to the field.
+    const nextErrors = validateRegistration(nextFields);
+    setErrors({ ...errors, [key]: nextErrors[key] });
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg(null);
 
+    const nextErrors = validateRegistration(fields);
+    setErrors(nextErrors);
+
+    if (hasErrors(nextErrors)) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-            role: 'usuario_comum', // default role
-            tenant_id: tenantId, // associated tenant if signed up through subdomain
-          },
-        },
+      const result = await signUp(supabase, fields.email.trim(), fields.password, {
+        name: fields.name.trim(),
+        role: 'usuario_comum',
+        tenant_id: tenantId,
       });
 
-      if (error) {
-        setErrorMsg(error.message);
+      if (result.error) {
+        setErrorMsg(result.error.message);
       } else {
-        // Sign-up successful. Depending on email confirmation settings,
-        // we either redirect to verify email page or auto-login.
         alert('Cadastro realizado com sucesso! Verifique seu e-mail para confirmação se necessário.');
         router.push('/login');
       }
@@ -110,7 +140,7 @@ export default function RegisterPage() {
         </h3>
         <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
           {tenantName
-            ? `Crie seu perfil de membro para participar deste ecossistema.`
+            ? 'Crie seu perfil de membro para participar deste ecossistema.'
             : 'Preencha os campos abaixo para iniciar sua jornada.'}
         </p>
       </div>
@@ -147,8 +177,8 @@ export default function RegisterPage() {
           id="name"
           type="text"
           required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          value={fields.name}
+          onChange={(e) => updateField('name', e.target.value)}
           placeholder="Ex: João Silva"
           style={{
             padding: 'var(--space-3)',
@@ -160,15 +190,8 @@ export default function RegisterPage() {
             transition: 'border-color var(--duration-fast) var(--ease-default)',
             outline: 'none',
           }}
-          onFocus={(e) => {
-            e.target.style.borderColor = 'var(--border-focus)';
-            e.target.style.backgroundColor = 'var(--bg-secondary)';
-          }}
-          onBlur={(e) => {
-            e.target.style.borderColor = 'var(--border-default)';
-            e.target.style.backgroundColor = 'var(--bg-tertiary)';
-          }}
         />
+        <FieldError message={errors.name} />
       </div>
 
       {/* Email Input */}
@@ -187,8 +210,8 @@ export default function RegisterPage() {
           id="email"
           type="email"
           required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          value={fields.email}
+          onChange={(e) => updateField('email', e.target.value)}
           placeholder="exemplo@email.com"
           style={{
             padding: 'var(--space-3)',
@@ -200,15 +223,8 @@ export default function RegisterPage() {
             transition: 'border-color var(--duration-fast) var(--ease-default)',
             outline: 'none',
           }}
-          onFocus={(e) => {
-            e.target.style.borderColor = 'var(--border-focus)';
-            e.target.style.backgroundColor = 'var(--bg-secondary)';
-          }}
-          onBlur={(e) => {
-            e.target.style.borderColor = 'var(--border-default)';
-            e.target.style.backgroundColor = 'var(--bg-tertiary)';
-          }}
         />
+        <FieldError message={errors.email} />
       </div>
 
       {/* Password Input */}
@@ -227,10 +243,9 @@ export default function RegisterPage() {
           id="password"
           type="password"
           required
-          minLength={6}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Mínimo 6 caracteres"
+          value={fields.password}
+          onChange={(e) => updateField('password', e.target.value)}
+          placeholder="Mínimo 8 caracteres"
           style={{
             padding: 'var(--space-3)',
             borderRadius: 'var(--radius-md)',
@@ -241,15 +256,41 @@ export default function RegisterPage() {
             transition: 'border-color var(--duration-fast) var(--ease-default)',
             outline: 'none',
           }}
-          onFocus={(e) => {
-            e.target.style.borderColor = 'var(--border-focus)';
-            e.target.style.backgroundColor = 'var(--bg-secondary)';
+        />
+        <FieldError message={errors.password} />
+      </div>
+
+      {/* Confirm Password Input */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+        <label
+          htmlFor="confirm-password"
+          style={{
+            fontSize: 'var(--text-xs)',
+            fontWeight: 'var(--font-weight-semibold)',
+            color: 'var(--text-secondary)',
           }}
-          onBlur={(e) => {
-            e.target.style.borderColor = 'var(--border-default)';
-            e.target.style.backgroundColor = 'var(--bg-tertiary)';
+        >
+          Confirmar Senha
+        </label>
+        <input
+          id="confirm-password"
+          type="password"
+          required
+          value={fields.confirmPassword}
+          onChange={(e) => updateField('confirmPassword', e.target.value)}
+          placeholder="Repita a sua senha"
+          style={{
+            padding: 'var(--space-3)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-default)',
+            backgroundColor: 'var(--bg-tertiary)',
+            color: 'var(--text-primary)',
+            fontSize: 'var(--text-sm)',
+            transition: 'border-color var(--duration-fast) var(--ease-default)',
+            outline: 'none',
           }}
         />
+        <FieldError message={errors.confirmPassword} />
       </div>
 
       {/* Submit Button */}
@@ -272,18 +313,6 @@ export default function RegisterPage() {
           gap: 'var(--space-2)',
           boxShadow: 'var(--shadow-sm)',
           marginTop: 'var(--space-2)',
-        }}
-        onMouseEnter={(e) => {
-          if (!loading && !fetchingTenant) {
-            e.currentTarget.style.backgroundColor = 'var(--accent-hover)';
-            e.currentTarget.style.transform = 'translateY(-1px)';
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!loading && !fetchingTenant) {
-            e.currentTarget.style.backgroundColor = 'var(--accent)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }
         }}
       >
         {loading ? (

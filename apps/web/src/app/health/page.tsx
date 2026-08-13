@@ -1,23 +1,14 @@
 'use client';
 
-import { useKernelSafe } from '@saas/app-sdk';
-import React, { useEffect, useState } from 'react';
+import { useBoot } from '@/app/Providers';
+import React from 'react';
 
 export default function HealthPage() {
-  const { kernel, isLoading, error } = useKernelSafe();
-  const [health, setHealth] = useState<unknown>(null);
-  const [errorFetching, setErrorFetching] = useState<unknown>(null);
+  const boot = useBoot();
+  const diagnostics = boot?.diagnostics ?? null;
 
-  useEffect(() => {
-    if (kernel) {
-      kernel.diagnostics().then(setHealth).catch(setErrorFetching);
-    }
-  }, [kernel]);
-
-  if (isLoading) return <div>Loading Kernel...</div>;
-  if (error) return <div>Kernel failed to load: {String(error)}</div>;
-  if (errorFetching) return <div>Error fetching health: {JSON.stringify(errorFetching)}</div>;
-  if (!health) return <div>Checking health...</div>;
+  if (boot?.error) return <div>Kernel failed to load: {boot.error}</div>;
+  if (!diagnostics) return <div>Loading Kernel...</div>;
 
   return (
     <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
@@ -30,7 +21,7 @@ export default function HealthPage() {
           borderRadius: '8px',
         }}
       >
-        {JSON.stringify(health, null, 2)}
+        {JSON.stringify(diagnostics, null, 2)}
       </pre>
     </div>
   );

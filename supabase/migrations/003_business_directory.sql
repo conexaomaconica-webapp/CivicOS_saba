@@ -110,22 +110,26 @@ ALTER TABLE public.business_reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.business_favorites ENABLE ROW LEVEL SECURITY;
 
 -- --- Businesses (Empresas) Policies ---
+DROP POLICY IF EXISTS "Anyone can view businesses within active tenant" ON public.businesses;
 CREATE POLICY "Anyone can view businesses within active tenant"
   ON public.businesses
   FOR SELECT
   USING (tenant_id = public.current_tenant_id() OR public.get_current_user_role() = 'master');
 
+DROP POLICY IF EXISTS "Owners can manage own businesses" ON public.businesses;
 CREATE POLICY "Owners can manage own businesses"
   ON public.businesses
   FOR ALL
   USING (owner_id = auth.uid() OR public.get_current_user_role() = 'master');
 
 -- --- Banners Policies ---
+DROP POLICY IF EXISTS "Anyone can view active banners in active tenant" ON public.business_banners;
 CREATE POLICY "Anyone can view active banners in active tenant"
   ON public.business_banners
   FOR SELECT
   USING (tenant_id = public.current_tenant_id() AND is_active = true OR public.get_current_user_role() = 'master');
 
+DROP POLICY IF EXISTS "Owners can manage banners of their own businesses" ON public.business_banners;
 CREATE POLICY "Owners can manage banners of their own businesses"
   ON public.business_banners
   FOR ALL
@@ -135,33 +139,39 @@ CREATE POLICY "Owners can manage banners of their own businesses"
   );
 
 -- --- Reviews (Avaliações) Policies ---
+DROP POLICY IF EXISTS "Anyone can view reviews in active tenant" ON public.business_reviews;
 CREATE POLICY "Anyone can view reviews in active tenant"
   ON public.business_reviews
   FOR SELECT
   USING (tenant_id = public.current_tenant_id() OR public.get_current_user_role() = 'master');
 
+DROP POLICY IF EXISTS "Logged in users can post reviews" ON public.business_reviews;
 CREATE POLICY "Logged in users can post reviews"
   ON public.business_reviews
   FOR INSERT
   WITH CHECK (auth.uid() = user_id AND tenant_id = public.current_tenant_id());
 
+DROP POLICY IF EXISTS "Users can manage own reviews" ON public.business_reviews;
 CREATE POLICY "Users can manage own reviews"
   ON public.business_reviews
   FOR UPDATE
   USING (user_id = auth.uid() OR public.get_current_user_role() = 'master')
   WITH CHECK (user_id = auth.uid() OR public.get_current_user_role() = 'master');
 
+DROP POLICY IF EXISTS "Users can delete own reviews" ON public.business_reviews;
 CREATE POLICY "Users can delete own reviews"
   ON public.business_reviews
   FOR DELETE
   USING (user_id = auth.uid() OR public.get_current_user_role() = 'master');
 
 -- --- Favorites Policies ---
+DROP POLICY IF EXISTS "Users can view own favorites" ON public.business_favorites;
 CREATE POLICY "Users can view own favorites"
   ON public.business_favorites
   FOR SELECT
   USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can manage own favorites" ON public.business_favorites;
 CREATE POLICY "Users can manage own favorites"
   ON public.business_favorites
   FOR ALL

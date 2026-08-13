@@ -7,7 +7,6 @@ export class SupabaseDatabaseClient implements DatabaseClient {
   private client: SupabaseClient<any, "public", any>;
 
   constructor(supabaseUrl: string, supabaseAnonKey: string) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     this.client = createClient(supabaseUrl, supabaseAnonKey);
   }
 

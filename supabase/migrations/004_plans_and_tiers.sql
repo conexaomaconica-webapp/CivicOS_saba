@@ -31,11 +31,13 @@ CREATE INDEX IF NOT EXISTS idx_businesses_slug ON public.businesses(slug);
 -- 3. Row-Level Security on tenant_plans
 ALTER TABLE public.tenant_plans ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Anyone can select tenant plans" ON public.tenant_plans;
 CREATE POLICY "Anyone can select tenant plans"
   ON public.tenant_plans
   FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Admins can manage tenant plans" ON public.tenant_plans;
 CREATE POLICY "Admins can manage tenant plans"
   ON public.tenant_plans
   FOR ALL

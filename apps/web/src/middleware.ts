@@ -41,10 +41,11 @@ export async function middleware(request: NextRequest) {
   const isAdminRoute = path.startsWith('/admin');
   const isDashboardRoute = path.startsWith('/dashboard');
   const isProfileRoute = path.startsWith('/perfil') || path.startsWith('/profile');
+  const isUserAreaRoute = path.startsWith('/usuario');
   const isAuthRoute = path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/forgot-password');
 
   // If trying to access protected routes
-  if (isAdminRoute || isDashboardRoute || isProfileRoute) {
+  if (isAdminRoute || isDashboardRoute || isProfileRoute || isUserAreaRoute) {
     if (!user) {
       // Not authenticated, redirect to login
       const redirectUrl = request.nextUrl.clone();

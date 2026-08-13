@@ -15,6 +15,9 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test && node architecture-tests.js",
     "clean": "rimraf --glob packages/*/dist packages/*/*.tsbuildinfo plugins/*/dist plugins/*/*.tsbuildinfo apps/*/.next apps/*/*.tsbuildinfo",
+    "supabase:start": "node scripts/db-migrate-test.cjs",
+    "db:migrate:test": "node scripts/db-migrate-test.cjs",
+    "test:rls": "node scripts/run-rls-tests.cjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "verify": "pnpm clean && pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm build && pnpm test"
   },

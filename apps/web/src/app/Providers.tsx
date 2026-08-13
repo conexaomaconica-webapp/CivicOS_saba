@@ -1,8 +1,7 @@
 'use client';
 
-import { ReactNode, useMemo, createContext, useContext, useEffect, useState } from 'react';
-import { KernelProvider } from '@saas/app-sdk';
-import { createWebRuntime } from '../runtime/create-web-runtime';
+import { ReactNode, createContext, useContext, useEffect, useState } from 'react';
+import type { BootData } from '../runtime/types';
 
 interface ThemeContextType {
   theme: 'light' | 'dark';
@@ -14,21 +13,34 @@ const ThemeContext = createContext<ThemeContextType>({
   toggleTheme: () => {},
 });
 
+const BootContext = createContext<BootData | null>(null);
+
 export function useTheme() {
   return useContext(ThemeContext);
 }
 
-export function Providers({ children }: { children: ReactNode }) {
-  // We use useMemo to ensure the runtime is only created once per client
-  const runtime = useMemo(() => createWebRuntime(), []);
-  
+/**
+ * Exposes the serialized CivicOS boot data (kernel is booted on the server).
+ * Returns null until the provider is mounted.
+ */
+export function useBoot(): BootData | null {
+  return useContext(BootContext);
+}
+
+export function Providers({
+  children,
+  bootData,
+}: {
+  children: ReactNode;
+  bootData: BootData;
+}) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('civicos-theme') as 'light' | 'dark' | null;
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const initialTheme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
-    
+
     setTheme(initialTheme);
     document.documentElement.classList.toggle('dark', initialTheme === 'dark');
     document.documentElement.setAttribute('data-theme', initialTheme);
@@ -44,9 +56,7 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      <KernelProvider runtime={runtime}>
-        {children}
-      </KernelProvider>
+      <BootContext.Provider value={bootData}>{children}</BootContext.Provider>
     </ThemeContext.Provider>
   );
 }

@@ -81,7 +81,8 @@ BEGIN
 
   -- Create public profile
   INSERT INTO public.profiles (id, name, email, role, tenant_id)
-  VALUES (NEW.id, target_name, NEW.email, target_role, target_tenant_id);
+  VALUES (NEW.id, target_name, NEW.email, target_role, target_tenant_id)
+  ON CONFLICT (id) DO NOTHING;
 
   -- If a tenant_id was supplied, also establish workspace membership
   IF target_tenant_id IS NOT NULL THEN
@@ -106,11 +107,13 @@ CREATE OR REPLACE TRIGGER trg_handle_new_user
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- 1. Read Policies
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 CREATE POLICY "Users can view own profile"
   ON public.profiles
   FOR SELECT
   USING (id = auth.uid());
 
+DROP POLICY IF EXISTS "Socio admins can view tenant profiles" ON public.profiles;
 CREATE POLICY "Socio admins can view tenant profiles"
   ON public.profiles
   FOR SELECT
@@ -119,12 +122,14 @@ CREATE POLICY "Socio admins can view tenant profiles"
     tenant_id = (SELECT tenant_id FROM public.profiles WHERE id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "Masters can view all profiles" ON public.profiles;
 CREATE POLICY "Masters can view all profiles"
   ON public.profiles
   FOR SELECT
   USING (public.get_current_user_role() = 'master');
 
 -- 2. Update Policies
+DROP POLICY IF EXISTS "Users can update own profile fields" ON public.profiles;
 CREATE POLICY "Users can update own profile fields"
   ON public.profiles
   FOR UPDATE
@@ -134,6 +139,7 @@ CREATE POLICY "Users can update own profile fields"
     role = (SELECT role FROM public.profiles WHERE id = auth.uid()) -- Prevents self-escalation of roles
   );
 
+DROP POLICY IF EXISTS "Masters can manage all profiles" ON public.profiles;
 CREATE POLICY "Masters can manage all profiles"
   ON public.profiles
   FOR ALL

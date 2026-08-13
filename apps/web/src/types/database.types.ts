@@ -477,12 +477,14 @@ export type Database = {
         Row: {
           address: string | null
           category: string
+          cnpj: string | null
           company_type: string
           created_at: string
           description: string | null
           email: string | null
           id: string
           is_active: boolean
+          legal_name: string | null
           logo_url: string | null
           name: string
           owner_id: string
@@ -497,12 +499,14 @@ export type Database = {
         Insert: {
           address?: string | null
           category: string
+          cnpj?: string | null
           company_type?: string
           created_at?: string
           description?: string | null
           email?: string | null
           id?: string
           is_active?: boolean
+          legal_name?: string | null
           logo_url?: string | null
           name: string
           owner_id: string
@@ -517,12 +521,14 @@ export type Database = {
         Update: {
           address?: string | null
           category?: string
+          cnpj?: string | null
           company_type?: string
           created_at?: string
           description?: string | null
           email?: string | null
           id?: string
           is_active?: boolean
+          legal_name?: string | null
           logo_url?: string | null
           name?: string
           owner_id?: string
@@ -1212,6 +1218,362 @@ export type Database = {
           },
         ]
       }
+      business_masonic_links: {
+        Row: {
+          business_id: string
+          created_at: string
+          declaring_user_id: string | null
+          id: string
+          is_primary: boolean
+          link_type: string
+          organization_id: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+          valid_until: string | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          declaring_user_id?: string | null
+          id?: string
+          is_primary?: boolean
+          link_type: string
+          organization_id?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          valid_until?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          declaring_user_id?: string | null
+          id?: string
+          is_primary?: boolean
+          link_type?: string
+          organization_id?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          valid_until?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_bml_business"
+            columns: ["tenant_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["tenant_id", "id"]
+          },
+          {
+            foreignKeyName: "business_masonic_links_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_masonic_links_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_masonic_link_evidence: {
+        Row: {
+          created_at: string
+          evidence_type: string
+          file_hash: string
+          file_path: string
+          file_size_bytes: number
+          id: string
+          link_id: string
+          mime_type: string
+          tenant_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          evidence_type: string
+          file_hash: string
+          file_path: string
+          file_size_bytes: number
+          id?: string
+          link_id: string
+          mime_type: string
+          tenant_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          evidence_type?: string
+          file_hash?: string
+          file_path?: string
+          file_size_bytes?: number
+          id?: string
+          link_id?: string
+          mime_type?: string
+          tenant_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_bmle_link"
+            columns: ["tenant_id", "link_id"]
+            isOneToOne: false
+            referencedRelation: "business_masonic_links"
+            referencedColumns: ["tenant_id", "id"]
+          },
+        ]
+      }
+      business_masonic_link_authorizations: {
+        Row: {
+          authorization_scope: string
+          authorization_type: string
+          authorized_by_name: string
+          authorized_by_role: string
+          evidence_reference_id: string | null
+          granted_at: string
+          id: string
+          link_id: string
+          revoked_at: string | null
+          revocation_reason: string | null
+          status: string
+          tenant_id: string
+          valid_until: string | null
+        }
+        Insert: {
+          authorization_scope: string
+          authorization_type: string
+          authorized_by_name: string
+          authorized_by_role: string
+          evidence_reference_id?: string | null
+          granted_at?: string
+          id?: string
+          link_id: string
+          revoked_at?: string | null
+          revocation_reason?: string | null
+          status?: string
+          tenant_id: string
+          valid_until?: string | null
+        }
+        Update: {
+          authorization_scope?: string
+          authorization_type?: string
+          authorized_by_name?: string
+          authorized_by_role?: string
+          evidence_reference_id?: string | null
+          granted_at?: string
+          id?: string
+          link_id?: string
+          revoked_at?: string | null
+          revocation_reason?: string | null
+          status?: string
+          tenant_id?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_bmla_link"
+            columns: ["tenant_id", "link_id"]
+            isOneToOne: false
+            referencedRelation: "business_masonic_links"
+            referencedColumns: ["tenant_id", "id"]
+          },
+        ]
+      }
+      business_masonic_link_publication_consents: {
+        Row: {
+          consented_at: string
+          display_business_role: boolean
+          display_contact: boolean
+          display_masonic_degree: boolean
+          display_masonic_role: boolean
+          display_name: boolean
+          display_organization: boolean
+          display_organization_unit: boolean
+          display_profile_photo: boolean
+          id: string
+          link_id: string
+          tenant_id: string
+          visibility_scope: string
+        }
+        Insert: {
+          consented_at?: string
+          display_business_role?: boolean
+          display_contact?: boolean
+          display_masonic_degree?: boolean
+          display_masonic_role?: boolean
+          display_name?: boolean
+          display_organization?: boolean
+          display_organization_unit?: boolean
+          display_profile_photo?: boolean
+          id?: string
+          link_id: string
+          tenant_id: string
+          visibility_scope?: string
+        }
+        Update: {
+          consented_at?: string
+          display_business_role?: boolean
+          display_contact?: boolean
+          display_masonic_degree?: boolean
+          display_masonic_role?: boolean
+          display_name?: boolean
+          display_organization?: boolean
+          display_organization_unit?: boolean
+          display_profile_photo?: boolean
+          id?: string
+          link_id?: string
+          tenant_id?: string
+          visibility_scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_bmlpc_link"
+            columns: ["tenant_id", "link_id"]
+            isOneToOne: false
+            referencedRelation: "business_masonic_links"
+            referencedColumns: ["tenant_id", "id"]
+          },
+        ]
+      }
+      business_masonic_link_contests: {
+        Row: {
+          appeal_status: string | null
+          appealed_at: string | null
+          created_at: string
+          decided_at: string | null
+          decision: string | null
+          decision_reason: string | null
+          description: string
+          id: string
+          link_id: string
+          opened_by: string | null
+          reason_code: string
+          responded_at: string | null
+          response_deadline: string
+          reviewed_by: string | null
+          severity: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          appeal_status?: string | null
+          appealed_at?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decision?: string | null
+          decision_reason?: string | null
+          description: string
+          id?: string
+          link_id: string
+          opened_by?: string | null
+          reason_code: string
+          responded_at?: string | null
+          response_deadline: string
+          reviewed_by?: string | null
+          severity?: string
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          appeal_status?: string | null
+          appealed_at?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decision?: string | null
+          decision_reason?: string | null
+          description?: string
+          id?: string
+          link_id?: string
+          opened_by?: string | null
+          reason_code?: string
+          responded_at?: string | null
+          response_deadline?: string
+          reviewed_by?: string | null
+          severity?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_bmlc_link"
+            columns: ["tenant_id", "link_id"]
+            isOneToOne: false
+            referencedRelation: "business_masonic_links"
+            referencedColumns: ["tenant_id", "id"]
+          },
+        ]
+      }
+      business_masonic_link_history: {
+        Row: {
+          action_reason: string | null
+          action_type: string
+          actor_id: string | null
+          changed_fields: string[] | null
+          correlation_id: string | null
+          created_at: string
+          id: string
+          link_id: string
+          new_data: Json | null
+          new_status: string
+          previous_data: Json | null
+          previous_status: string | null
+          source: string
+          tenant_id: string
+        }
+        Insert: {
+          action_reason?: string | null
+          action_type: string
+          actor_id?: string | null
+          changed_fields?: string[] | null
+          correlation_id?: string | null
+          created_at?: string
+          id?: string
+          link_id: string
+          new_data?: Json | null
+          new_status: string
+          previous_data?: Json | null
+          previous_status?: string | null
+          source?: string
+          tenant_id: string
+        }
+        Update: {
+          action_reason?: string | null
+          action_type?: string
+          actor_id?: string | null
+          changed_fields?: string[] | null
+          correlation_id?: string | null
+          created_at?: string
+          id?: string
+          link_id?: string
+          new_data?: Json | null
+          new_status?: string
+          previous_data?: Json | null
+          previous_status?: string | null
+          source?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_bmlh_link"
+            columns: ["tenant_id", "link_id"]
+            isOneToOne: false
+            referencedRelation: "business_masonic_links"
+            referencedColumns: ["tenant_id", "id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           code_number: number | null
@@ -1897,6 +2259,7 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
@@ -1914,6 +2277,7 @@ export type Enums<
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {

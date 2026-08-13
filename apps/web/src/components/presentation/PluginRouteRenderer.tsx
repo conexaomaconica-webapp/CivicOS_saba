@@ -1,39 +1,21 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useKernelSafe } from '@saas/app-sdk';
+import { useBoot } from '@/app/Providers';
 import { webComponentRegistry } from '../../runtime/web-component-registry';
 import { notFound } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function PluginRouteRenderer({ pathname }: { pathname: string }) {
-  const { kernel, isLoading } = useKernelSafe();
+  const boot = useBoot();
+  const snapshot = boot?.defaultSnapshot ?? null;
   const [routeInfo, setRouteInfo] = useState<{ componentId: string; props: Record<string, unknown> } | null>(null);
   const [routeNotFound, setRouteNotFound] = useState(false);
   const [accessDenied] = useState(false);
 
   useEffect(() => {
-    if (kernel) {
-      // In a full implementation, we'd query the kernel's RouteResolver or PresentationSnapshot.
-      // For this vertical slice, we simulate resolving the route from the kernel.
-      // We will ask the kernel for the snapshot.
-      const snapshot = kernel.presentation().snapshot({
-        tenantId: 'default',
-        userId: 'anonymous',
-        locale: 'pt-BR',
-        capabilities: [],
-        permissions: ['community-directory.view'],
-        versions: {
-          registryVersion: 1,
-          capabilityVersion: 1,
-          licenseVersion: 1,
-          permissionVersion: 1,
-          policyVersion: 1,
-          layoutVersion: 1
-        }
-      });
-
-      // For this vertical slice, we'll manually inject the mock route and props 
+    if (snapshot) {
+      // For this vertical slice, we'll manually inject the mock route and props
       // since we're bypassing the full registry population for the demo.
       // In a real flow, this would come naturally from snapshot.routes
       
@@ -41,11 +23,11 @@ export function PluginRouteRenderer({ pathname }: { pathname: string }) {
         tenantName: "Comunidade Demonstrativa",
         headline: "Encontre empresas e profissionais da comunidade",
         categories: [
-          { id: "saude", label: "Saúde", icon: "heart-pulse" },
-          { id: "juridico", label: "Jurídico", icon: "scale" }
+          { id: "saude", label: "Saǧde", icon: "heart-pulse" },
+          { id: "juridico", label: "Jur��dico", icon: "scale" }
         ],
         featuredBusinesses: [
-          { id: "1", name: "Clínica Horizonte", category: "Saúde", description: "Atendimento médico especializado." }
+          { id: "1", name: "Cl��nica Horizonte", category: "Saǧde", description: "Atendimento mǸdico especializado." }
         ]
       };
 
@@ -66,9 +48,9 @@ export function PluginRouteRenderer({ pathname }: { pathname: string }) {
         setRouteNotFound(true);
       }
     }
-  }, [kernel, pathname]);
+  }, [snapshot, pathname]);
 
-  if (isLoading || (!routeInfo && !routeNotFound && !accessDenied)) {
+  if (!snapshot && !boot?.error) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-10 w-1/3" />
@@ -76,6 +58,10 @@ export function PluginRouteRenderer({ pathname }: { pathname: string }) {
         <Skeleton className="h-64 w-full" />
       </div>
     );
+  }
+
+  if (boot?.error) {
+    notFound();
   }
 
   if (accessDenied) {

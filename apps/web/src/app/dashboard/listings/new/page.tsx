@@ -148,7 +148,7 @@ export default function NewListingWizardPage() {
           const mapped: Partial<Record<'bronze' | 'prata' | 'ouro', number>> = {};
           dbPlans.forEach((p) => {
             if (p.tier === 'bronze' || p.tier === 'prata' || p.tier === 'ouro') {
-              mapped[p.tier as 'bronze' | 'prata' | 'ouro'] = p.price_annual;
+              mapped[p.tier] = p.price_annual;
             }
           });
           setPlansConfig(prev => ({ ...prev, ...mapped }));

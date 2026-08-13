@@ -3,7 +3,6 @@
 import React from 'react';
 import { useDesignLab } from '../_providers/DesignLabProvider';
 import { MOCK_TENANTS } from '../_mocks/tenants';
-import { ThemePreset } from '../_types/design-lab';
 
 export default function ThemesLabPage() {
   const { preferences, setTheme } = useDesignLab();
@@ -93,7 +92,7 @@ export default function ThemesLabPage() {
               {/* Action Button */}
               <div className="pt-2">
                 <button
-                  onClick={() => setTheme(tenant.themePreset as ThemePreset)}
+                  onClick={() => setTheme(tenant.themePreset)}
                   className={`w-full py-2 px-4 rounded-lg text-xs font-medium transition-all ${
                     isActive
                       ? 'bg-amber-500 text-slate-950 font-bold shadow-md'

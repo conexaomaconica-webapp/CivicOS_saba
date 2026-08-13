@@ -53,7 +53,7 @@ export default function IconsLabPage() {
   const [copiedName, setCopiedName] = useState<string | null>(null);
 
   const handleCopy = (name: string) => {
-    navigator.clipboard.writeText(`<${name} />`);
+    void navigator.clipboard.writeText(`<${name} />`);
     setCopiedName(name);
     setTimeout(() => setCopiedName(null), 2000);
   };

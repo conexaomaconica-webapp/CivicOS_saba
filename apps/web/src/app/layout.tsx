@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { Providers } from './Providers';
 import { ShellWrapper } from '../components/shell/ShellWrapper';
+import { getBootData } from '../runtime/server-kernel';
 import './globals.css';
 
 const inter = Inter({
@@ -23,15 +24,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const bootData = await getBootData();
+
   return (
     <html lang="pt-BR" className={inter.variable} suppressHydrationWarning>
       <body className={inter.className}>
-        <Providers>
+        <Providers bootData={bootData}>
           <ShellWrapper>
             {children}
           </ShellWrapper>

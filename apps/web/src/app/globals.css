@@ -68,6 +68,34 @@ textarea {
   }
 }
 
+/* -- Skeleton Shimmer (AUX-001 / CRIT-TRN-022) ----------------------------- */
+@keyframes aux-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.aux-shimmer {
+  animation: aux-pulse 1.6s var(--ease-default) infinite;
+}
+
+/* -- Screen-reader-only (CRIT-TRN-018) ------------------------------------- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* -- Scrollbar (subtle) --------------------------------------------------- */
 ::-webkit-scrollbar {
   width: 6px;

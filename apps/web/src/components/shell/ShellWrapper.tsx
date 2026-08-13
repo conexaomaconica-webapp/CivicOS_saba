@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { usePathname } from 'next/navigation';
-import { useKernelSafe } from '@saas/app-sdk';
-import { PresentationSnapshot, NavigationSnapshot } from '@saas/sdk';
+import { useBoot } from '@/app/Providers';
+import { NavigationSnapshot } from '@saas/sdk';
 import { NavigationRenderer } from '../navigation/NavigationRenderer';
 import { ContextHeader } from '../layout/Header';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,37 +16,15 @@ export function ShellWrapper({ children }: ShellWrapperProps) {
   const pathname = usePathname();
   const isDesignLab = pathname?.startsWith('/design-lab');
 
-  const { kernel, isLoading, error } = useKernelSafe();
-  const [snapshot, setSnapshot] = useState<PresentationSnapshot | null>(null);
+  const boot = useBoot();
+  const snapshot = boot?.defaultSnapshot ?? null;
 
   // If rendering inside Design Lab, bypass product shell completely
   if (isDesignLab) {
     return <>{children}</>;
   }
 
-  useEffect(() => {
-    if (kernel) {
-      // Create a default session/permissions context using core presentation API
-      const defaultSnapshot = kernel.presentation().snapshot({
-        tenantId: 'default',
-        userId: 'anonymous',
-        locale: 'pt-BR',
-        capabilities: [],
-        permissions: [],
-        versions: {
-          registryVersion: 1,
-          capabilityVersion: 1,
-          licenseVersion: 1,
-          permissionVersion: 1,
-          policyVersion: 1,
-          layoutVersion: 1
-        }
-      });
-      setSnapshot(defaultSnapshot);
-    }
-  }, [kernel]);
-
-  if (isLoading || (!snapshot && !error)) {
+  if (!snapshot && !boot?.error) {
     return (
       <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
         {/* Fake Sidebar (Desktop) */}
@@ -105,10 +83,10 @@ export function ShellWrapper({ children }: ShellWrapperProps) {
     );
   }
 
-  if (error) {
+  if (boot?.error) {
     return (
       <div className="flex h-screen w-full items-center justify-center text-destructive">
-        Error loading CivicOS: {error.message}
+        Error loading CivicOS: {boot.error}
       </div>
     );
   }
