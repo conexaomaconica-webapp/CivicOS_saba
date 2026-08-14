@@ -772,11 +772,13 @@ REVOKE ALL ON FUNCTION public.is_current_user_tenant_member(UUID) FROM PUBLIC, a
 GRANT EXECUTE ON FUNCTION public.is_current_user_tenant_member(UUID) TO authenticated, service_role;
 
 DROP POLICY IF EXISTS "Users can view own tenants" ON public.tenants;
+DROP POLICY IF EXISTS "Authenticated members can view own tenants" ON public.tenants;
 CREATE POLICY "Authenticated members can view own tenants"
   ON public.tenants FOR SELECT TO authenticated
   USING (public.is_current_user_tenant_member(id) OR public.has_global_platform_role('master'));
 
 DROP POLICY IF EXISTS "Members can view fellow members" ON public.tenant_members;
+DROP POLICY IF EXISTS "Authenticated members can view fellow members" ON public.tenant_members;
 CREATE POLICY "Authenticated members can view fellow members"
   ON public.tenant_members FOR SELECT TO authenticated
   USING (public.is_current_user_tenant_member(tenant_id) OR public.has_global_platform_role('master'));
