@@ -59,6 +59,15 @@
   --accent-active: var(--color-primary-700);
   --accent-subtle: var(--color-primary-100);
 
+  /* -- Highlight Semantic Tokens (Light Mode) -----------------------------
+     Realce/ouro do tenant: selos, badges e detalhes finos. Cai na escala
+     primária por padrão; o tema do tenant pode sobrescrever (ex.: dourado).
+     ---------------------------------------------------------------- */
+  --highlight: var(--color-primary-500);
+  --highlight-hover: var(--color-primary-600);
+  --highlight-active: var(--color-primary-700);
+  --highlight-subtle: var(--color-primary-100);
+
   /* -- Status Semantic Tokens (Light Mode) ------------------------------- */
   --status-neutral-bg: oklch(0.95 0.004 250);
   --status-neutral-text: oklch(0.37 0.012 250);
@@ -182,6 +191,11 @@
   --accent-hover: var(--color-primary-300);
   --accent-active: var(--color-primary-500);
   --accent-subtle: oklch(0.25 0.06 260);
+
+  --highlight: var(--color-primary-400);
+  --highlight-hover: var(--color-primary-300);
+  --highlight-active: var(--color-primary-500);
+  --highlight-subtle: oklch(0.25 0.06 260);
 
   /* -- Status Semantic Tokens (Dark Mode) -------------------------------- */
   --status-neutral-bg: oklch(0.22 0.008 250);

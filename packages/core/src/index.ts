@@ -172,6 +172,32 @@ export {
 } from './tokens';
 
 // -- Contracts (type-only re-export) ----------------------------------------
+export {
+  approvedFontTokenSchema,
+  canPublishTenantTheme,
+  evaluateTenantThemeContrast,
+  legacyTenantBrandingSchema,
+  migrateLegacyTenantBranding,
+  productModuleDefinitionSchema,
+  publicTenantThemeSchema,
+  publicThemeAssetUrlSchema,
+  tenantModuleSelectionSchema,
+  tenantThemeColorsSchema,
+  tenantThemeConfigSchema,
+  themeContrastRatio,
+  themeHexColorSchema,
+  WHITE_LABEL_DEFAULT_THEME,
+} from './contracts/tenant-theme.contract';
+export type {
+  LegacyTenantBranding,
+  ProductModuleDefinition,
+  PublicTenantTheme,
+  TenantModuleSelection,
+  TenantThemeColors,
+  TenantThemeConfig,
+  ThemeContrastCheck,
+} from './contracts/tenant-theme.contract';
+
 export type {
   User,
   Session,

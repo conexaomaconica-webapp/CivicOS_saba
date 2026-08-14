@@ -5,9 +5,9 @@ import { useDesignLab } from '../_providers/DesignLabProvider';
 
 export default function ThemeEditorPage() {
   const { preferences } = useDesignLab();
-  const [primaryColor, setPrimaryColor] = useState('#1E3A8A');
-  const [accentColor, setAccentColor] = useState('#D97706');
-  const [surfaceColor, setSurfaceColor] = useState('#0F172A');
+  const [primaryColor, setPrimaryColor] = useState('#4A0E1A');
+  const [accentColor, setAccentColor] = useState('#C9A227');
+  const [surfaceColor, setSurfaceColor] = useState('#F3EEDD');
   const [themeName, setThemeName] = useState('Meu Tema Personalizado');
 
   const generatedExportJson = JSON.stringify(

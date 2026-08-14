@@ -16,8 +16,10 @@
 INSERT INTO public.tenants (id, name, slug, settings)
 VALUES
   ('00000000-0000-0000-0000-000000000001', 'CivicOS Master', 'civicos-master', '{"is_platform_root": true}'),
-  ('00000000-0000-0000-0000-000000000010', 'Grande Oriente de SP', 'grande-oriente-sp', '{}'),
-  ('00000000-0000-0000-0000-000000000011', 'Loja Luz do Oriente', 'luz-do-oriente', '{}')
+  ('00000000-0000-0000-0000-000000000010', 'Grande Oriente de SP', 'grande-oriente-sp',
+   '{"branding": {"appName": "Conexão Maçônica", "primaryColor": "#4A0E1A", "accentColor": "#C9A227", "radius": "lg", "density": "comfortable", "colorMode": "light"}}'),
+  ('00000000-0000-0000-0000-000000000011', 'Loja Luz do Oriente', 'luz-do-oriente',
+   '{"branding": {"appName": "Luz do Oriente", "primaryColor": "#0F5132", "accentColor": "#F59E0B", "radius": "md", "density": "compact", "colorMode": "light"}}')
 ON CONFLICT (id) DO NOTHING;
 
 -- ---------------------------------------------------------------------------

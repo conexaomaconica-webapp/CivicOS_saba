@@ -6,6 +6,10 @@
 
 @import '@saas/ui/tokens.css';
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* -- Reset ---------------------------------------------------------------- */
 *,
 *::before,

@@ -32,7 +32,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Espaçamento & Grid', href: '/design-lab/spacing', icon: '📐' },
       { label: 'Iconografia Lucide', href: '/design-lab/icons', icon: '🎨' },
       { label: 'Animações & Transitions', href: '/design-lab/animations', icon: '⚡' },
-      { label: 'Estados Auxiliares', href: '/design-lab/aux', icon: '🚦', badge: 'AUX-001..006' }
+      { label: 'Estados Auxiliares', href: '/design-lab/states', icon: '🚦', badge: 'AUX-001..006' }
     ]
   },
   {

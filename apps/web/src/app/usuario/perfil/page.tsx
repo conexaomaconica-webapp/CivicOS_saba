@@ -2,9 +2,11 @@ import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import ProfileForm from './profile-form';
 import CommunityLinks from './community-links';
+import PrivacyPanel from './privacy-panel';
 
 export const metadata = {
   title: 'Meu Perfil & Segurança',
+  robots: { index: false, follow: false },
 };
 
 const TAB_STYLE = {
@@ -24,6 +26,7 @@ export default async function ProfilePage({
 }) {
   const { tab } = await searchParams;
   const showVinculos = tab === 'vinculos';
+  const showPrivacidade = tab === 'privacidade';
 
   const supabase = await createServerSideClient();
   const {
@@ -108,10 +111,22 @@ export default async function ProfilePage({
           >
             Vínculos Comunitários
           </a>
+          <a
+            href="/usuario/perfil?tab=privacidade"
+            style={{
+              ...TAB_STYLE,
+              backgroundColor: showPrivacidade ? 'var(--bg-primary)' : 'transparent',
+              color: showPrivacidade ? 'var(--text-primary)' : 'var(--text-secondary)',
+            }}
+          >
+            Privacidade
+          </a>
         </nav>
 
         {showVinculos ? (
           <CommunityLinks />
+        ) : showPrivacidade ? (
+          <PrivacyPanel />
         ) : (
           <ProfileForm
             user={{

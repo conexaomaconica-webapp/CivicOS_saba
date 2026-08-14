@@ -50,6 +50,32 @@ export type {
   CreateTenantInput,
 } from './tenant.contract';
 
+export {
+  approvedFontTokenSchema,
+  canPublishTenantTheme,
+  evaluateTenantThemeContrast,
+  legacyTenantBrandingSchema,
+  migrateLegacyTenantBranding,
+  productModuleDefinitionSchema,
+  publicTenantThemeSchema,
+  publicThemeAssetUrlSchema,
+  tenantModuleSelectionSchema,
+  tenantThemeColorsSchema,
+  tenantThemeConfigSchema,
+  themeContrastRatio,
+  themeHexColorSchema,
+  WHITE_LABEL_DEFAULT_THEME,
+} from './tenant-theme.contract';
+export type {
+  LegacyTenantBranding,
+  ProductModuleDefinition,
+  PublicTenantTheme,
+  TenantModuleSelection,
+  TenantThemeColors,
+  TenantThemeConfig,
+  ThemeContrastCheck,
+} from './tenant-theme.contract';
+
 export type {
   Permission,
   Role,
@@ -104,4 +130,3 @@ export type {
   AIPromptDefinition,
   MetadataRegistryService,
 } from './metadata-registry.contract';
-

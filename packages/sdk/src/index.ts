@@ -10,6 +10,18 @@ import type { NavigationItem } from './navigation/navigation-types';
 
 export type { PluginContext, PluginLifecycleHooks, PresentationSnapshot, RouteDefinition, ApiRouteDefinition };
 
+// Public white-label contracts exposed through the supported plugin boundary.
+export {
+  productModuleDefinitionSchema,
+  tenantModuleSelectionSchema,
+  tenantThemeConfigSchema,
+} from '@saas/core';
+export type {
+  ProductModuleDefinition,
+  TenantModuleSelection,
+  TenantThemeConfig,
+} from '@saas/core';
+
 export * from './navigation/navigation-types';
 
 export interface CapabilityDefinition {

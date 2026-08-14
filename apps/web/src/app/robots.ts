@@ -1,16 +1,19 @@
 import type { MetadataRoute } from 'next';
+import { appUrl } from '@/lib/seo/app-url';
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://conexaomaconica.com.br';
+  const baseUrl = appUrl('');
+
+  const privatePaths = ['/admin/', '/dashboard/', '/api/', '/diagnostics/'];
+
+  const crawlers = ['*', 'GPTBot', 'ClaudeBot', 'PerplexityBot', 'Google-Extended', 'CCBot'];
 
   return {
-    rules: [
-      {
-        userAgent: '*',
-        allow: '/',
-        disallow: ['/admin/', '/dashboard/', '/api/', '/diagnostics/'],
-      },
-    ],
+    rules: crawlers.map((userAgent) => ({
+      userAgent,
+      allow: '/',
+      disallow: privatePaths,
+    })),
     sitemap: `${baseUrl}/sitemap.xml`,
   };
 }

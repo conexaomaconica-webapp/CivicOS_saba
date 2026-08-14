@@ -38,9 +38,9 @@ function NavItem({ item, activePath, depth = 0 }: { item: NavigationItem; active
         href={item.path}
         className={cn(
           "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-out",
-          isActive 
-            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/10" 
-            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          isActive
+            ? "bg-accent text-white shadow-sm shadow-accent/10"
+            : "text-secondary hover:bg-accent-subtle hover:text-accent",
           depth > 0 && "pl-6"
         )}
       >
@@ -55,7 +55,7 @@ function NavItem({ item, activePath, depth = 0 }: { item: NavigationItem; active
       </Link>
       
       {hasChildren && isActive && (
-        <div className="border-l border-border/60 ml-5 mt-1 space-y-0.5 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="border-l border-default/60 ml-5 mt-1 space-y-0.5 animate-in fade-in slide-in-from-top-1 duration-200">
           {item.children?.map((child) => (
             <NavItem key={child.id} item={child} activePath={activePath} depth={depth + 1} />
           ))}
@@ -72,8 +72,8 @@ export function Sidebar({ navigation, activePath = '/' }: SidebarProps) {
     <>
       {/* Mobile Overlay */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm md:hidden animate-in fade-in duration-200"
+        <div
+          className="fixed inset-0 z-40 bg-primary/80 backdrop-blur-sm md:hidden animate-in fade-in duration-200"
           onClick={() => {}}
           aria-hidden="true"
         />
@@ -81,13 +81,13 @@ export function Sidebar({ navigation, activePath = '/' }: SidebarProps) {
 
       {/* Sidebar */}
       <aside className={cn(
-        "hidden w-64 flex-col border-r bg-card text-card-foreground md:flex shrink-0 transition-all duration-300 z-50",
+        "hidden w-64 flex-col border-r border-default bg-secondary text-primary md:flex shrink-0 transition-all duration-300 z-50",
         isOpen ? "fixed inset-y-0 left-0 md:static md:relative animate-in slide-in-from-left duration-300" : "md:block"
       )}>
         {/* Brand Header */}
-        <div className="flex h-16 items-center px-6 border-b border-border font-semibold text-lg tracking-tight bg-muted/20">
-          <Icons.Shield className="h-5 w-5 mr-2 text-primary animate-pulse" />
-          <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">CivicOS</span>
+        <div className="flex h-16 items-center px-6 border-b border-default font-semibold text-lg tracking-tight bg-tertiary">
+          <Icons.Shield className="h-5 w-5 mr-2 text-accent" />
+          <span className="bg-gradient-to-r from-accent to-accent/70 bg-clip-text text-transparent">CivicOS</span>
         </div>
 
         {/* Navigation Content */}
@@ -96,7 +96,7 @@ export function Sidebar({ navigation, activePath = '/' }: SidebarProps) {
             {navigation.groups.map(group => (
               <div key={group.id} className="space-y-1.5">
                 {group.label && (
-                  <h4 className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/75">
+                  <h4 className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-secondary">
                     {group.label}
                   </h4>
                 )}

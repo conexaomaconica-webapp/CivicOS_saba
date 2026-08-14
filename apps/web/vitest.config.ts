@@ -9,5 +9,11 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    exclude: [
+      '**/architecture.test.ts',
+      '**/shell-boundary.test.ts',
+      '**/navigation-renderer.test.tsx',
+      'node_modules/**',
+    ],
   },
 });

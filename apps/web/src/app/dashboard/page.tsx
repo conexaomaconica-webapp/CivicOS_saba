@@ -4,13 +4,11 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import UpgradeModal from './components/upgrade-modal';
 
 interface Business {
   id: string;
   name: string;
   category: string;
-  plan_tier: 'bronze' | 'prata' | 'ouro';
   phone: string | null;
   address: string | null;
 }
@@ -31,11 +29,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<import('@supabase/supabase-js').User | null>(null);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
-  const [stats, setStats] = useState({ clicks: 0, impressions: 0, rating: 0 });
-  
-  // Upgrade Modal State
-  const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
-  const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
+  const [stats, setStats] = useState({ clicks: 0, impressions: 0 });
 
   const loadData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -49,7 +43,7 @@ export default function DashboardPage() {
       // Load businesses
       const { data: dbBusinesses } = await supabase
         .from('businesses')
-        .select('*')
+        .select('id, name, category, phone, address')
         .eq('owner_id', user.id);
 
       const loadedBusinesses = (dbBusinesses || []) as unknown as Business[];
@@ -74,22 +68,9 @@ export default function DashboardPage() {
           totalImpressions += b.impressions || 0;
         });
 
-        // Fetch reviews average
-        const { data: dbReviews } = await supabase
-          .from('business_reviews')
-          .select('rating')
-          .in('business_id', businessIds);
-
-        let avgRating = 0;
-        if (dbReviews && dbReviews.length > 0) {
-          const sum = dbReviews.reduce((acc, curr) => acc + curr.rating, 0);
-          avgRating = parseFloat((sum / dbReviews.length).toFixed(1));
-        }
-
         setStats({
           clicks: totalClicks,
           impressions: totalImpressions,
-          rating: avgRating || 4.5,
         });
       }
     } catch (err) {
@@ -102,11 +83,6 @@ export default function DashboardPage() {
   useEffect(() => {
     void loadData();
   }, [supabase, router]);
-
-  const handleOpenUpgrade = (business: Business) => {
-    setSelectedBusiness(business);
-    setIsUpgradeOpen(true);
-  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -144,31 +120,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
-  // Get tier label styling
-  const getTierBadgeStyle = (tier: 'bronze' | 'prata' | 'ouro') => {
-    switch (tier) {
-      case 'ouro':
-        return {
-          backgroundColor: 'oklch(0.95 0.05 85 / 0.1)',
-          color: 'oklch(0.70 0.15 85)',
-          border: '1px solid oklch(0.70 0.15 85 / 0.3)',
-        };
-      case 'prata':
-        return {
-          backgroundColor: 'oklch(0.95 0.01 200 / 0.1)',
-          color: 'oklch(0.60 0.01 200)',
-          border: '1px solid oklch(0.60 0.01 200 / 0.3)',
-        };
-      case 'bronze':
-      default:
-        return {
-          backgroundColor: 'var(--bg-tertiary)',
-          color: 'var(--text-secondary)',
-          border: '1px solid var(--border-default)',
-        };
-    }
-  };
 
   return (
     <div
@@ -327,8 +278,8 @@ export default function DashboardPage() {
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontWeight: 'var(--font-weight-semibold)' }}>
             Nota Média do Guia
           </span>
-          <span style={{ fontSize: 'var(--text-3xl)', fontWeight: 'var(--font-weight-bold)' }}>
-            ★ {stats.rating} <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', fontWeight: 'normal' }}>/ 5</span>
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+            Indisponível até a integração com o agregado moderado
           </span>
         </div>
       </div>
@@ -423,46 +374,16 @@ export default function DashboardPage() {
                   }}
                 >
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                      <h4 style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text-primary)' }}>
-                        {business.name}
-                      </h4>
-                      <span
-                        style={{
-                          fontSize: '0.65rem',
-                          padding: 'var(--space-1) var(--space-2)',
-                          borderRadius: 'var(--radius-full)',
-                          fontWeight: 'var(--font-weight-bold)',
-                          ...getTierBadgeStyle(business.plan_tier),
-                        }}
-                      >
-                        {business.plan_tier.toUpperCase()}
-                      </span>
-                    </div>
+                    <h4 style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text-primary)' }}>
+                      {business.name}
+                    </h4>
                     <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: '2px' }}>
                       {business.category} • {business.address || 'Sem endereço físico'}
                     </p>
                   </div>
-                  <div>
-                    {business.plan_tier !== 'ouro' && (
-                      <button
-                        onClick={() => handleOpenUpgrade(business)}
-                        style={{
-                          padding: 'var(--space-2) var(--space-3)',
-                          borderRadius: 'var(--radius-sm)',
-                          border: 'none',
-                          backgroundColor: 'var(--color-primary-500)',
-                          color: 'var(--text-inverse)',
-                          fontSize: 'var(--text-xs)',
-                          fontWeight: 'var(--font-weight-bold)',
-                          cursor: 'pointer',
-                          boxShadow: 'var(--shadow-sm)',
-                        }}
-                      >
-                        Fazer Upgrade
-                      </button>
-                    )}
-                  </div>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+                    Plano comercial indisponível
+                  </span>
                 </div>
               ))}
             </div>
@@ -526,19 +447,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Upgrade Modal */}
-      {isUpgradeOpen && selectedBusiness && (
-        <UpgradeModal
-          isOpen={isUpgradeOpen}
-          onClose={() => setIsUpgradeOpen(false)}
-          businessName={selectedBusiness.name}
-          businessId={selectedBusiness.id}
-          onSuccess={() => {
-            void loadData();
-            setIsUpgradeOpen(false);
-          }}
-        />
-      )}
     </div>
   );
 }

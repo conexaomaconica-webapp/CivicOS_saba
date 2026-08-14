@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { EmptyState } from '@/components/aux/EmptyState';
+import { EmptyState } from '@/components/ui-states/EmptyState';
 
 export default function Error({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (

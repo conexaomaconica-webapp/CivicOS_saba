@@ -7,10 +7,6 @@ import { createClient } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
 import type { Database } from '@/types/database.types';
 
-interface AppUserMetadata {
-  tenant_id?: string;
-}
-
 type BusinessInsert = Database["public"]["Tables"]["businesses"]["Insert"];
 export default function NewListingWizardPage() {
   const router = useRouter();
@@ -19,6 +15,7 @@ export default function NewListingWizardPage() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [tenantId, setTenantId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Form Fields
@@ -28,12 +25,6 @@ export default function NewListingWizardPage() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [website, setWebsite] = useState('');
-  const [plan, setPlan] = useState<'bronze' | 'prata' | 'ouro'>('bronze');
-  const [plansConfig, setPlansConfig] = useState<Record<'bronze' | 'prata' | 'ouro', number>>({
-    bronze: 0,
-    prata: 299,
-    ouro: 499,
-  });
 
   // CEP & Separated Address Fields
   const [cep, setCep] = useState('');
@@ -44,14 +35,6 @@ export default function NewListingWizardPage() {
   const [estado, setEstado] = useState('');
   const [complemento, setComplemento] = useState('');
   const [fetchingCep, setFetchingCep] = useState(false);
-
-  // Pro-rata Math Fields
-  const [daysRemaining, setDaysRemaining] = useState(365);
-  const [proRataPrices, setProRataPrices] = useState<Record<'bronze' | 'prata' | 'ouro', number>>({
-    bronze: 0,
-    prata: 299,
-    ouro: 499,
-  });
 
   // Custom Modern Dialog Modal State
   const [dialog, setDialog] = useState<{
@@ -66,23 +49,6 @@ export default function NewListingWizardPage() {
     title: '',
     message: '',
   });
-
-  // Calculate pro-rata proportional pricing
-  useEffect(() => {
-    const now = new Date();
-    const endOfYear = new Date(now.getFullYear(), 11, 31); // 31/12
-    const oneDay = 24 * 60 * 60 * 1000;
-    const remaining = Math.max(1, Math.ceil((endOfYear.getTime() - now.getTime()) / oneDay));
-    setDaysRemaining(remaining);
-
-    const prataPro = parseFloat(((plansConfig.prata / 365) * remaining).toFixed(2));
-    const ouroPro = parseFloat(((plansConfig.ouro / 365) * remaining).toFixed(2));
-    setProRataPrices({
-      bronze: 0,
-      prata: prataPro,
-      ouro: ouroPro,
-    });
-  }, [plansConfig]);
 
   // Autopopulate address fields using ViaCEP API
   useEffect(() => {
@@ -120,7 +86,7 @@ export default function NewListingWizardPage() {
   }, [cep]);
 
   useEffect(() => {
-    const fetchUserAndPlans = async () => {
+    const fetchUserAndTenant = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push('/login');
@@ -128,34 +94,20 @@ export default function NewListingWizardPage() {
       }
       setUser(user);
 
-      // Resolve tenant_id
-      const metadata = user.user_metadata as AppUserMetadata | undefined;
-      let tenantId = metadata?.tenant_id;
-      if (!tenantId) {
-        const { data: tenantList } = await supabase.from('tenants').select('id').limit(1);
-        if (tenantList && tenantList.length > 0) {
-          tenantId = tenantList[0]?.id;
-        }
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('tenant_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (error || !profile?.tenant_id) {
+        setErrorMsg('Não foi possível resolver o tenant autorizado para este cadastro.');
+        return;
       }
 
-      if (tenantId) {
-        const { data: dbPlans } = await supabase
-          .from('tenant_plans')
-          .select('tier, price_annual')
-          .eq('tenant_id', tenantId);
-
-        if (dbPlans && dbPlans.length > 0) {
-          const mapped: Partial<Record<'bronze' | 'prata' | 'ouro', number>> = {};
-          dbPlans.forEach((p) => {
-            if (p.tier === 'bronze' || p.tier === 'prata' || p.tier === 'ouro') {
-              mapped[p.tier] = p.price_annual;
-            }
-          });
-          setPlansConfig(prev => ({ ...prev, ...mapped }));
-        }
-      }
+      setTenantId(profile.tenant_id);
     };
-    fetchUserAndPlans().catch(console.error);
+    fetchUserAndTenant().catch(console.error);
   }, [supabase, router]);
 
   const validateStep = () => {
@@ -195,20 +147,8 @@ export default function NewListingWizardPage() {
     setErrorMsg(null);
 
     try {
-      // Resolve tenant_id from user metadata
-      const metadata = user?.user_metadata as AppUserMetadata | undefined;
-      let tenantId = metadata?.tenant_id;
-      
-      // Fallback: if no tenant_id exists in user metadata, fetch a default one to satisfy database constraint
       if (!tenantId) {
-        const { data: tenantList } = await supabase.from('tenants').select('id').limit(1);
-        if (tenantList && tenantList.length > 0) {
-          tenantId = tenantList[0]?.id;
-        }
-      }
-
-      if (!tenantId) {
-        throw new Error('Nenhum inquilino (tenant) ativo encontrado para associar o anúncio.');
+        throw new Error('Tenant autorizado não resolvido para associar o anúncio.');
       }
 
       // Generate slug based on business name
@@ -240,7 +180,8 @@ export default function NewListingWizardPage() {
         email,
         website,
         address: finalAddress,
-        plan_tier: plan,
+        publication_status: 'draft',
+        is_active: false,
         slug,
       };
       const { error } = await supabase.from('businesses').insert(payload);
@@ -251,8 +192,8 @@ export default function NewListingWizardPage() {
         setDialog({
           isOpen: true,
           type: 'success',
-          title: 'Cadastro Concluído!',
-          message: `Sua empresa "${name}" foi cadastrada com sucesso no guia comercial regional!`,
+          title: 'Rascunho salvo',
+          message: `A empresa "${name}" foi salva como rascunho e ainda não está publicada no guia.`,
           onConfirm: () => {
             router.push('/dashboard');
           }
@@ -272,7 +213,7 @@ export default function NewListingWizardPage() {
       { num: 1, label: 'Básico' },
       { num: 2, label: 'Contato' },
       { num: 3, label: 'Local' },
-      { num: 4, label: 'Plano' },
+      { num: 4, label: 'Revisão' },
     ];
 
     return (
@@ -715,109 +656,27 @@ export default function NewListingWizardPage() {
             </div>
           )}
 
-          {/* Step 4: Plan Selection */}
+          {/* Step 4: containment notice; commercial activation is server-authoritative. */}
           {step === 4 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-secondary)' }}>
-                Selecione o plano de exibição
-              </span>
-
-              {/* Bronze Plan */}
-              <label
+              <div
                 style={{
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-3)',
+                  flexDirection: 'column',
+                  gap: 'var(--space-2)',
                   padding: 'var(--space-4)',
                   borderRadius: 'var(--radius-lg)',
-                  border: plan === 'bronze' ? '2px solid var(--accent)' : '1px solid var(--border-default)',
-                  backgroundColor: plan === 'bronze' ? 'var(--accent-subtle)' : 'var(--bg-tertiary)',
-                  cursor: 'pointer',
+                  border: '1px solid var(--border-default)',
+                  backgroundColor: 'var(--bg-tertiary)',
                 }}
               >
-                <input
-                  type="radio"
-                  name="plan"
-                  value="bronze"
-                  checked={plan === 'bronze'}
-                  onChange={() => setPlan('bronze')}
-                  style={{ width: '1.25rem', height: '1.25rem', accentColor: 'var(--accent)' }}
-                />
-                <div>
-                  <h4 style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text-primary)' }}>Plano Bronze (Grátis)</h4>
-                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
-                    Exibição textual simples no guia comercial da comunidade.
-                  </p>
-                </div>
-              </label>
-
-              {/* Prata Plan */}
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-3)',
-                  padding: 'var(--space-4)',
-                  borderRadius: 'var(--radius-lg)',
-                  border: plan === 'prata' ? '2px solid var(--accent)' : '1px solid var(--border-default)',
-                  backgroundColor: plan === 'prata' ? 'var(--accent-subtle)' : 'var(--bg-tertiary)',
-                  cursor: 'pointer',
-                }}
-              >
-                <input
-                  type="radio"
-                  name="plan"
-                  value="prata"
-                  checked={plan === 'prata'}
-                  onChange={() => setPlan('prata')}
-                  style={{ width: '1.25rem', height: '1.25rem', accentColor: 'var(--accent)' }}
-                />
-                <div>
-                  <h4 style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text-primary)' }}>
-                    Plano Prata — R$ {plansConfig.prata.toFixed(2)}/ano
-                  </h4>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--accent)', fontWeight: 'var(--font-weight-semibold)', marginTop: '2px' }}>
-                    Pro-rata proporcional (até 31/12): R$ {proRataPrices.prata.toFixed(2)} (restam {daysRemaining} dias)
-                  </p>
-                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                    Capa personalizada, redes sociais completas e prioridade média no guia. Vencimento unificado (31/12).
-                  </p>
-                </div>
-              </label>
-
-              {/* Ouro Plan */}
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-3)',
-                  padding: 'var(--space-4)',
-                  borderRadius: 'var(--radius-lg)',
-                  border: plan === 'ouro' ? '2px solid var(--accent)' : '1px solid var(--border-default)',
-                  backgroundColor: plan === 'ouro' ? 'var(--accent-subtle)' : 'var(--bg-tertiary)',
-                  cursor: 'pointer',
-                }}
-              >
-                <input
-                  type="radio"
-                  name="plan"
-                  value="ouro"
-                  checked={plan === 'ouro'}
-                  onChange={() => setPlan('ouro')}
-                  style={{ width: '1.25rem', height: '1.25rem', accentColor: 'var(--accent)' }}
-                />
-                <div>
-                  <h4 style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text-primary)' }}>
-                    Plano Ouro — R$ {plansConfig.ouro.toFixed(2)}/ano
-                  </h4>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--accent)', fontWeight: 'var(--font-weight-semibold)', marginTop: '2px' }}>
-                    Pro-rata proporcional (até 31/12): R$ {proRataPrices.ouro.toFixed(2)} (restam {daysRemaining} dias)
-                  </p>
-                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                    Destaque total no topo, imagem de capa, galeria de fotos completa, botões de ação e direito a banners. Vencimento unificado (31/12).
-                  </p>
-                </div>
-              </label>
+                <h4 style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--text-primary)' }}>
+                  Contratação de plano temporariamente indisponível
+                </h4>
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+                  A empresa será salva como rascunho. Nenhum plano premium ou entitlement será ativado sem assinatura e pagamento confirmados pelo fluxo oficial.
+                </p>
+              </div>
             </div>
           )}
 

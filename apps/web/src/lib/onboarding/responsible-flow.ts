@@ -1,4 +1,5 @@
 import type { ResponsibleRelationship } from '@/lib/onboarding/onboarding-validation';
+import type { MasonicStatus } from '@/lib/masonic/masonic-affiliation';
 
 // ---------------------------------------------------------------------------
 // ADV-001 — responsible-account wizard persistence. Local first; the draft is
@@ -7,10 +8,21 @@ import type { ResponsibleRelationship } from '@/lib/onboarding/onboarding-valida
 
 export const RESPONSIBLE_DRAFT_KEY = 'adverter_onboarding_responsible';
 
+export interface MasonicDraft {
+  status: MasonicStatus;
+  isActive: boolean;
+  cimbCode: string;
+  lodgeName: string;
+  chapterName: string;
+  spouseMasonName: string;
+  masonicConsent: boolean;
+}
+
 export interface ResponsibleDraft {
   name: string;
   email: string;
   relationship: ResponsibleRelationship;
+  masonic?: MasonicDraft | null;
   savedAt: string;
 }
 
@@ -35,6 +47,24 @@ export function saveResponsibleDraft(
   return persisted;
 }
 
+function parseMasonic(raw: unknown): MasonicDraft | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const m = raw as Record<string, unknown>;
+  const isStatus = (v: unknown): v is MasonicStatus =>
+    typeof v === 'string' &&
+    ['mason', 'mason_wife', 'demolay', 'job_daughter', 'none'].includes(v);
+  if (!isStatus(m.status)) return null;
+  return {
+    status: m.status,
+    isActive: m.isActive === true,
+    cimbCode: typeof m.cimbCode === 'string' ? m.cimbCode : '',
+    lodgeName: typeof m.lodgeName === 'string' ? m.lodgeName : '',
+    chapterName: typeof m.chapterName === 'string' ? m.chapterName : '',
+    spouseMasonName: typeof m.spouseMasonName === 'string' ? m.spouseMasonName : '',
+    masonicConsent: m.masonicConsent === true,
+  };
+}
+
 export function loadResponsibleDraft(storage: ResponsiveStorage | null = getStorage()): ResponsibleDraft | null {
   if (!storage) return null;
   const raw = storage.getItem(RESPONSIBLE_DRAFT_KEY);
@@ -46,7 +76,12 @@ export function loadResponsibleDraft(storage: ResponsiveStorage | null = getStor
       typeof parsed.email === 'string' &&
       (parsed.relationship === 'owner' || parsed.relationship === 'representative')
     ) {
-      return parsed as ResponsibleDraft;
+      return {
+        name: parsed.name,
+        email: parsed.email,
+        relationship: parsed.relationship,
+        masonic: parsed.masonic ? parseMasonic(parsed.masonic) : null,
+      } as ResponsibleDraft;
     }
     return null;
   } catch {

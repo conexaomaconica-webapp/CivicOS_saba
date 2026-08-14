@@ -1,14 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import {
-  DEFAULT_PLANS,
+  CANONICAL_PLANS,
   fetchTenantPlans,
-  type CommercialPlan,
+  computeMonthlyEquivalenceText,
+  formatCentsToReais,
 } from '../src/lib/billing/plans-service';
+import { validateCoupon } from '../src/lib/billing/coupons-service';
+import { calculateSubscriptionQuote } from '../src/lib/billing/quote-service';
 import {
   savePlanDraft,
   loadPlanDraft,
   clearPlanDraft,
-  PLAN_DRAFT_KEY,
+  buildPlanDraftKey,
   type StorageLike,
 } from '../src/lib/onboarding/plan-selection-flow';
 
@@ -25,113 +28,149 @@ function makeStorage(): StorageLike {
   };
 }
 
-describe('DEFAULT_PLANS · ADV-003 (CRIT-VSC-005)', () => {
-  it('contém definições de planos Bronze, Prata e Ouro', () => {
-    expect(DEFAULT_PLANS.bronze).toBeDefined();
-    expect(DEFAULT_PLANS.prata).toBeDefined();
-    expect(DEFAULT_PLANS.ouro).toBeDefined();
+describe('CANONICAL_PLANS & Formatação Monetária · ADV-003 (CRIT-VSC-005)', () => {
+  it('contém os preços oficiais em centavos inteiros alinhados aos documentos do produto', () => {
+    expect(CANONICAL_PLANS.bronze.annualPriceCents).toBe(50000);   // R$ 500
+    expect(CANONICAL_PLANS.bronze.monthlyPriceCents).toBe(5000);   // R$ 50
+    expect(CANONICAL_PLANS.prata.annualPriceCents).toBe(80000);    // R$ 800
+    expect(CANONICAL_PLANS.prata.monthlyPriceCents).toBe(8000);    // R$ 80
+    expect(CANONICAL_PLANS.ouro.annualPriceCents).toBe(100000);   // R$ 1000
+    expect(CANONICAL_PLANS.ouro.monthlyPriceCents).toBe(10000);   // R$ 100
   });
 
-  it('valida que o plano Bronze é gratuito', () => {
-    expect(DEFAULT_PLANS.bronze.defaultPriceAnnual).toBe(0);
-    expect(DEFAULT_PLANS.bronze.defaultPriceMonthly).toBe(0);
+  it('formata valores em centavos para a moeda oficial BRL', () => {
+    expect(formatCentsToReais(50000)).toContain('500,00');
+    expect(formatCentsToReais(59900)).toContain('599,00');
+    expect(formatCentsToReais(0)).toBe('Grátis');
   });
 
-  it('valida que os planos pagos possuem recursos estendidos', () => {
-    expect(DEFAULT_PLANS.prata.defaultPriceAnnual).toBeGreaterThan(0);
-    expect(DEFAULT_PLANS.ouro.defaultPriceAnnual).toBeGreaterThan(DEFAULT_PLANS.prata.defaultPriceAnnual);
-
-    const prataFeatures = DEFAULT_PLANS.prata.features.filter((f) => f.included);
-    const ouroFeatures = DEFAULT_PLANS.ouro.features.filter((f) => f.included);
-
-    expect(ouroFeatures.length).toBeGreaterThan(prataFeatures.length);
+  it('calcula equivalências mensais informativas com arredondamento comercial correto', () => {
+    // R$ 500 / 12 = R$ 41,67/mês (arredondado para cima)
+    expect(computeMonthlyEquivalenceText(50000)).toContain('41,67');
+    // R$ 800 / 12 = R$ 66,67/mês
+    expect(computeMonthlyEquivalenceText(80000)).toContain('66,67');
+    // R$ 1000 / 12 = R$ 83,33/mês
+    expect(computeMonthlyEquivalenceText(100000)).toContain('83,33');
+    // Fundadores R$ 599 / 12 = R$ 49,92/mês
+    expect(computeMonthlyEquivalenceText(59900)).toContain('49,92');
   });
 });
 
-describe('fetchTenantPlans fallback', () => {
-  it('retorna os planos padrão quando o Supabase não retorna dados', async () => {
-    const mockSupabase = {
+describe('fetchTenantPlans & Tratamento de Erro do Supabase', () => {
+  it('lança exceção explicita quando o Supabase retorna erro de infraestrutura', async () => {
+    const mockSupabaseError = {
       from: () => ({
         select: () => ({
-          eq: () => Promise.resolve({ data: null, error: null }),
+          eq: () => Promise.resolve({ data: null, error: { message: 'Connection timeout' } }),
         }),
       }),
     } as any;
 
-    const plans = await fetchTenantPlans(mockSupabase, 'tenant-123');
+    await expect(fetchTenantPlans(mockSupabaseError, 'tenant-123')).rejects.toThrow(
+      'INFRASTRUCTURE_ERROR'
+    );
+  });
+
+  it('retorna os planos canônicos quando o tenant não possui customizações (retorno legítimo de array vazio)', async () => {
+    const mockSupabaseClean = {
+      from: () => ({
+        select: () => ({
+          eq: () => Promise.resolve({ data: [], error: null }),
+        }),
+      }),
+    } as any;
+
+    const plans = await fetchTenantPlans(mockSupabaseClean, 'tenant-123');
     expect(plans).toHaveLength(3);
-    expect(plans[0].tier).toBe('bronze');
-    expect(plans[1].tier).toBe('prata');
-    expect(plans[2].tier).toBe('ouro');
-  });
-
-  it('mescla preços customizados do tenant quando disponíveis', async () => {
-    const mockSupabase = {
-      from: () => ({
-        select: () => ({
-          eq: () =>
-            Promise.resolve({
-              data: [
-                { id: 'custom-prata', tier: 'prata', price_annual: 350.0 },
-              ],
-              error: null,
-            }),
-        }),
-      }),
-    } as any;
-
-    const plans = await fetchTenantPlans(mockSupabase, 'tenant-123');
-    const prataPlan = plans.find((p) => p.tier === 'prata');
-    expect(prataPlan?.priceAnnual).toBe(350.0);
-    expect(prataPlan?.priceMonthly).toBe(35.0);
+    expect(plans[0].annualPriceCents).toBe(50000);
+    expect(plans[1].annualPriceCents).toBe(80000);
+    expect(plans[2].annualPriceCents).toBe(100000);
   });
 });
 
-describe('plan-selection-flow · ADV-003', () => {
-  it('salva e restaura o rascunho do plano selecionado', () => {
-    const storage = makeStorage();
-    const saved = savePlanDraft(
-      {
-        planId: 'plan-prata',
-        tier: 'prata',
-        tierName: 'Plano Prata',
-        billingCycle: 'annual',
-        price: 299.0,
-      },
-      storage
+describe('validateCoupon & Motor de Cupons', () => {
+  it('não usa FUNDADOR599 como autoridade local de desconto ou reconhecimento', () => {
+    const res = validateCoupon('FUNDADOR599', 'ouro', 'annual', 100000);
+    expect(res.valid).toBe(false);
+    expect(res.errorCode).toBe('UNAVAILABLE');
+    expect(res.discountCents).toBe(0);
+  });
+
+  it('mantém qualquer cupom indisponível sem catálogo oficial persistido', () => {
+    const resInvalid = validateCoupon('INEXISTENTE', 'ouro', 'annual', 100000);
+    expect(resInvalid.valid).toBe(false);
+    expect(resInvalid.errorCode).toBe('UNAVAILABLE');
+  });
+});
+
+describe('calculateSubscriptionQuote · contenção', () => {
+  const mockSupabaseOk = {
+    from: () => ({
+      select: () => ({
+        eq: () => Promise.resolve({ data: [], error: null }),
+      }),
+    }),
+  } as any;
+
+  it('não apresenta uma cotação efêmera como persistida', async () => {
+    const res = await calculateSubscriptionQuote(
+      mockSupabaseOk,
+      'tenant-001',
+      'user-001',
+      'business-001',
+      { planId: 'plan-ouro', billingCycle: 'annual' }
     );
 
-    expect(saved?.savedAt).toBeTruthy();
-    expect(storage.getItem(PLAN_DRAFT_KEY)).toBeTruthy();
-
-    const loaded = loadPlanDraft(storage);
-    expect(loaded).toMatchObject({
-      planId: 'plan-prata',
-      tier: 'prata',
-      tierName: 'Plano Prata',
-      billingCycle: 'annual',
-      price: 299.0,
-    });
+    expect(res).toMatchObject({ isError: true, code: 'CHECKOUT_UNAVAILABLE' });
   });
 
-  it('retorna null quando não há rascunho de plano', () => {
-    expect(loadPlanDraft(makeStorage())).toBeNull();
+  it('não concede desconto por cupom hardcoded', async () => {
+    const res = await calculateSubscriptionQuote(
+      mockSupabaseOk,
+      'tenant-001',
+      'user-001',
+      'business-001',
+      { planId: 'plan-ouro', billingCycle: 'annual', couponCode: 'FUNDADOR599' }
+    );
+
+    expect(res).toMatchObject({ isError: true, code: 'CHECKOUT_UNAVAILABLE' });
+  });
+});
+
+describe('plan-selection-flow · Isolamento por Tenant e Usuário', () => {
+  it('constrói chave de armazenamento composta por tenantId e userId', () => {
+    const key = buildPlanDraftKey('t10', 'u101');
+    expect(key).toBe('civicos_plan_draft_t10_u101');
   });
 
-  it('limpa o rascunho do plano', () => {
+  it('persiste e recupera o rascunho de forma isolada', () => {
     const storage = makeStorage();
     savePlanDraft(
       {
+        tenantId: 't10',
+        userId: 'u101',
         planId: 'plan-ouro',
         tier: 'ouro',
         tierName: 'Plano Ouro',
-        billingCycle: 'monthly',
-        price: 49.9,
+        billingCycle: 'annual',
+        originalPriceCents: 100000,
+        discountCents: 40100,
+        finalPriceCents: 59900,
+        couponCode: 'FUNDADOR599',
       },
       storage
     );
 
-    clearPlanDraft(storage);
-    expect(loadPlanDraft(storage)).toBeNull();
+    const loaded = loadPlanDraft('t10', 'u101', storage);
+    expect(loaded).toMatchObject({
+      tenantId: 't10',
+      userId: 'u101',
+      planId: 'plan-ouro',
+      finalPriceCents: 59900,
+      couponCode: 'FUNDADOR599',
+    });
+
+    // Outro usuário não lê o rascunho de t10/u101
+    expect(loadPlanDraft('t10', 'u999', storage)).toBeNull();
   });
 });

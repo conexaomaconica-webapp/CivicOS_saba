@@ -1,5 +1,11 @@
 import { definePlugin, type PluginConfig, type RouteDefinition, type NavigationItem, type WidgetDefinition, type PermissionDefinition, type EventDefinition } from '@saas/sdk';
 
+export {
+  CONEXAO_MACONICA_DEFAULT_MODULES,
+  CONEXAO_MACONICA_MODULE_CATALOG,
+  CONEXAO_MACONICA_THEME,
+} from './domain/theme';
+
 export const manifest = {
   id: 'conexao-maconica',
   name: 'Conexão Maçônica',

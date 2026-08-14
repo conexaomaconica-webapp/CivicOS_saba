@@ -1,407 +1,373 @@
 import React from 'react';
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { headers } from 'next/headers';
+import type { LucideIcon } from 'lucide-react';
+import {
+  Briefcase,
+  Building2,
+  Hand,
+  Heart,
+  Search,
+  SearchX,
+  ShieldCheck,
+  ShoppingBasket,
+  Store,
+  Tags,
+  Utensils,
+} from 'lucide-react';
 import { createServerSideClient } from '@/lib/supabase/server';
+import { StructuredData } from '@/components/seo/StructuredData';
+import { appUrl } from '@/lib/seo/app-url';
+import { BusinessCard, type GuiaBusiness } from '@/components/guia/BusinessCard';
+import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
+import type { Database } from '@/types/database.types';
 
 type Props = {
   searchParams: Promise<{ q?: string; cat?: string }>;
 };
 
-export default async function GuiaPage({ searchParams }: Props) {
-  const { q = '', cat = 'Todas' } = await searchParams;
+export const metadata: Metadata = {
+  title: 'Guia Comercial — Empresas e serviços de irmãos verificados',
+  description:
+    'Diretório de empresas e serviços de irmãos maçons verificados: busque por categoria, veja selos de confiança e apoie a comunidade.',
+  alternates: { canonical: '/guia' },
+  openGraph: {
+    title: 'Guia Comercial de Irmãos — Conexão Maçônica',
+    description:
+      'Busque empresas e serviços de irmãos maçons, filtre por categoria e descubra negócios verificados.',
+    url: appUrl('/guia'),
+    type: 'website',
+  },
+};
 
-  // 1. Resolve current Tenant by subdomain
+const breadcrumbSchema = (tenantName: string) => ({
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Início', item: appUrl('/') },
+    { '@type': 'ListItem', position: 2, name: tenantName },
+  ],
+});
+
+const itemListSchema = (businesses: GuiaBusiness[]) => ({
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  itemListElement: businesses.slice(0, 20).map((business, index) => ({
+    '@type': 'ListItem',
+    position: index + 1,
+    name: business.name,
+    url: appUrl(`/guia/${business.slug ?? business.id}`),
+  })),
+});
+
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  utensils: Utensils,
+  hand: Hand,
+  building: Building2,
+  heart: Heart,
+  briefcase: Briefcase,
+  store: Store,
+  shopping: ShoppingBasket,
+};
+
+function formatCategoryFallback(slug: string): string {
+  return slug
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+type PublicDirectoryRow =
+  Database['public']['Functions']['public_directory_search']['Returns'][number];
+
+export default async function GuiaPage({ searchParams }: Props) {
+  const { q = '', cat = 'all' } = await searchParams;
+
   const headersList = await headers();
   const host = headersList.get('host') ?? '';
-  let subdomain: string | null = null;
-  if (!host.startsWith('localhost') && !/^\d+\.\d+\.\d+\.\d+/.test(host)) {
-    const parts = host.split('.');
-    if (parts.length >= 3) {
-      subdomain = parts[0] || null;
-    }
-  }
-
-  // Fallback to florianopolis for local developer testing
-  const tenantSlug = subdomain || 'florianopolis';
-
   const supabase = await createServerSideClient();
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('id, name')
-    .eq('slug', tenantSlug)
-    .maybeSingle();
+  const brand = await resolveTenantBrandContext();
+  const rpcArgs = {
+    p_host: host,
+    p_query: q.trim() || undefined,
+    p_category_slug: cat === 'all' ? undefined : cat,
+    p_city: undefined,
+    p_state: undefined,
+    p_after_name: undefined,
+    p_after_slug: undefined,
+    p_limit: 50,
+  };
+  const [allResult, filteredResult] = await Promise.all([
+    supabase.rpc('public_directory_search', {
+      ...rpcArgs,
+      p_query: undefined,
+      p_category_slug: undefined,
+    }),
+    supabase.rpc('public_directory_search', rpcArgs),
+  ]);
+  const allRows = Array.isArray(allResult.data)
+    ? allResult.data satisfies PublicDirectoryRow[]
+    : [];
+  const rows = Array.isArray(filteredResult.data)
+    ? filteredResult.data satisfies PublicDirectoryRow[]
+    : [];
+  const tenant = brand.tenantSlug
+    ? { name: brand.appName ?? brand.tenantSlug }
+    : null;
 
-  if (!tenant) {
+  if (!tenant || allResult.error || filteredResult.error) {
     return (
-      <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#09090b', color: '#fafafa', fontFamily: 'sans-serif' }}>
-        <div style={{ textAlign: 'center' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: 'bold' }}>Portal não encontrado</h1>
-          <p style={{ color: '#a1a1aa', marginTop: '1rem' }}>Inquilino "{tenantSlug}" inválido ou desativado.</p>
-          <Link href="/" style={{ color: '#6366f1', textDecoration: 'none', display: 'inline-block', marginTop: '1.5rem' }}>Voltar ao Início</Link>
+      <main className="flex min-h-[60vh] w-full items-center justify-center">
+        <div className="max-w-md rounded-xl border border-default bg-secondary p-8 text-center">
+          <h1 className="text-2xl font-bold text-primary">Portal não encontrado</h1>
+          <p className="mt-3 text-sm text-secondary">
+            O domínio informado é inválido, não verificado ou está desativado.
+          </p>
+          <Link
+            href="/"
+            className="mt-5 inline-flex items-center justify-center rounded-lg bg-accent px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-hover"
+          >
+            Voltar ao Início
+          </Link>
         </div>
       </main>
     );
   }
 
-  // 2. Fetch business listings with filters
-  let queryBuilder = supabase
-    .from('businesses')
-    .select('*')
-    .eq('tenant_id', tenant.id);
+  const categories = allRows
+    .filter(
+      (row): row is PublicDirectoryRow & {
+        primary_category_slug: string;
+        primary_category_name: string;
+      } => Boolean(row.primary_category_slug && row.primary_category_name),
+    )
+    .map((row) => ({
+      slug: row.primary_category_slug,
+      name: row.primary_category_name,
+      icon: null as string | null,
+    }))
+    .filter(
+    (category, index, all) =>
+      all.findIndex((other) => other.slug === category.slug) === index,
+  );
 
-  if (q.trim()) {
-    queryBuilder = queryBuilder.or(`name.ilike.%${q.trim()}%,category.ilike.%${q.trim()}%,description.ilike.%${q.trim()}%`);
-  }
+  const categoryNames = new Map(
+    categories.map((category) => [category.slug, category.name]),
+  );
 
-  if (cat !== 'Todas') {
-    queryBuilder = queryBuilder.eq('category', cat);
-  }
+  type CategoryOption = { slug: string; name: string; icon?: string | null };
+  const categoryOptions: CategoryOption[] = [
+    { slug: 'all', name: 'Todas' },
+    ...categories,
+  ];
 
-  const { data: dbBusinesses } = await queryBuilder;
-  const rawList = dbBusinesses || [];
-
-  // 3. Sort lists by tiers: Ouro -> Prata -> Bronze
-  const sortedBusinesses = [...rawList].sort((a: { plan_tier?: string | null }, b: { plan_tier?: string | null }) => {
-    const tierOrder: Record<string, number> = { ouro: 1, prata: 2, bronze: 3 };
-    const orderA = tierOrder[a.plan_tier || ''] ?? 4;
-    const orderB = tierOrder[b.plan_tier || ''] ?? 4;
-    return orderA - orderB;
+  // 3. Fetch published listings for this tenant, then filter in memory.
+  // Presentation is intentionally not ordered by configured plan_tier: the
+  // anonymous schema does not expose an authoritative effective plan yet.
+  const toBusiness = (row: PublicDirectoryRow): GuiaBusiness => ({
+    id: row.business_slug,
+    name: row.business_name,
+    slug: row.business_slug,
+    category: row.primary_category_slug,
+    description: row.description,
+    address: [row.city, row.state].filter(Boolean).join(' - ') || null,
+    plan_tier: row.effective_plan_code,
   });
+  const dbBusinesses = allRows.map(toBusiness);
+  const sorted = rows.map(toBusiness);
+  const verifiedSet = new Set(
+    allRows.filter((row) => row.is_verified).map((row) => row.business_slug),
+  );
+  const verifiedCount = sorted.filter((business) => verifiedSet.has(business.id)).length;
+  const tenantVerifiedCount = dbBusinesses.filter((business) =>
+    verifiedSet.has(business.id),
+  ).length;
 
-  const categories = ['Todas', 'Restaurantes', 'Serviços', 'Saúde', 'Mercados', 'Outros'];
+  const heroStats = [
+    { value: String(tenantVerifiedCount), label: 'empresas verificadas' },
+    { value: String(categories.length), label: 'categorias' },
+    { value: String(dbBusinesses.length), label: 'empresas publicadas' },
+  ];
+
+  const buildUrl = (nextCat: string, nextQuery: string) =>
+    `/guia?${new URLSearchParams({
+      cat: nextCat,
+      ...(nextQuery ? { q: nextQuery } : {}),
+    }).toString()}`;
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        backgroundColor: 'var(--bg-primary, #09090b)',
-        color: 'var(--text-primary, #fafafa)',
-        fontFamily: 'var(--font-sans, "Inter", sans-serif)',
-        padding: 'var(--space-8, 2rem) var(--space-6, 1.5rem)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 'var(--space-8, 2rem)',
-      }}
-    >
-      {/* Search Page Header */}
-      <div
-        style={{
-          width: '100%',
-          maxWidth: '64rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 'var(--space-4)',
-          borderBottom: '1px solid var(--border-default, #27272a)',
-          paddingBottom: 'var(--space-6, 1.5rem)',
-        }}
-      >
-        <div>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--accent, #6366f1)', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Portal de Guia Comercial
-          </span>
-          <h1 style={{ fontSize: 'var(--text-3xl, 1.875rem)', fontWeight: 'var(--font-weight-bold, 700)', marginTop: '2px' }}>
-            {tenant.name}
-          </h1>
-        </div>
+    <>
+      <StructuredData schema={breadcrumbSchema(tenant.name)} />
+      <StructuredData schema={itemListSchema(sorted)} />
 
-        <Link
-          href="/"
-          style={{
-            fontSize: 'var(--text-sm)',
-            color: 'var(--text-secondary, #a1a1aa)',
-            textDecoration: 'none',
-            border: '1px solid var(--border-default, #27272a)',
-            padding: 'var(--space-2) var(--space-4)',
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: 'var(--bg-secondary)',
-          }}
-        >
-          Voltar ao Início
-        </Link>
-      </div>
-
-      {/* Integrated Search Form & Category Pills */}
-      <div style={{ width: '100%', maxWidth: '64rem', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-        <form
-          action="/guia"
-          method="GET"
-          style={{
-            display: 'flex',
-            gap: 'var(--space-3)',
-            width: '100%',
-          }}
-        >
-          <input type="hidden" name="cat" value={cat} />
-          <input
-            type="text"
-            name="q"
-            defaultValue={q}
-            placeholder="O que você está procurando hoje? Ex: Café, Pizza, Advogado..."
-            style={{
-              flex: 1,
-              padding: 'var(--space-3)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-default, #27272a)',
-              backgroundColor: 'var(--bg-secondary, #18181b)',
-              color: 'var(--text-primary)',
-              fontSize: 'var(--text-sm)',
-              outline: 'none',
-            }}
-          />
-          <button
-            type="submit"
-            style={{
-              padding: 'var(--space-3) var(--space-6)',
-              borderRadius: 'var(--radius-md)',
-              backgroundColor: 'var(--accent, #6366f1)',
-              color: 'var(--text-inverse)',
-              fontWeight: 'bold',
-              border: 'none',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Pesquisar
-          </button>
-        </form>
-
-        {/* Category Filter Pills */}
-        <div
-          style={{
-            display: 'flex',
-            gap: 'var(--space-2)',
-            flexWrap: 'wrap',
-            paddingBottom: '2px',
-          }}
-        >
-          {categories.map((c) => {
-            const isSelected = cat === c;
-            // Build URL manually
-            const searchParamsString = `cat=${encodeURIComponent(c)}${q ? `&q=${encodeURIComponent(q)}` : ''}`;
-            
-            return (
-              <Link
-                key={c}
-                href={`/guia?${searchParamsString}`}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: 'var(--radius-full, 9999px)',
-                  fontSize: 'var(--text-xs)',
-                  fontWeight: '500',
-                  textDecoration: 'none',
-                  border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border-default)',
-                  backgroundColor: isSelected ? 'var(--accent-subtle)' : 'var(--bg-tertiary)',
-                  color: isSelected ? 'var(--accent)' : 'var(--text-secondary)',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                {c}
+      <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-4 pb-16 sm:px-6">
+        {/* Breadcrumb */}
+        <nav aria-label="Breadcrumb" className="mt-6 text-xs text-secondary">
+          <ol className="flex flex-wrap items-center gap-1.5">
+            <li>
+              <Link href="/" className="transition-colors hover:text-primary">
+                Início
               </Link>
-            );
-          })}
-        </div>
-      </div>
+            </li>
+            <li aria-hidden="true">/</li>
+            <li className="font-medium text-primary">{tenant.name}</li>
+          </ol>
+        </nav>
 
-      {/* Grid of Results */}
-      <div
-        style={{
-          width: '100%',
-          maxWidth: '64rem',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(19rem, 1fr))',
-          gap: 'var(--space-6, 1.5rem)',
-          marginTop: 'var(--space-4)',
-        }}
-      >
-        {sortedBusinesses.length > 0 ? (
-          sortedBusinesses.map((b: { id: string; name: string; category: string; description: string | null; address: string | null; slug: string | null; plan_tier: string | null }) => {
-            const isOuro = b.plan_tier === 'ouro';
-            const isPrata = b.plan_tier === 'prata';
+        {/* Hero institucional */}
+        <section className="flex flex-col items-center gap-6 text-center">
+          <div className="flex flex-col items-center gap-3">
+            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-highlight">
+              <span className="inline-block h-1.5 w-1.5 rotate-45 bg-highlight" aria-hidden="true" />
+              Guia Comercial da Comunidade
+              <span className="inline-block h-1.5 w-1.5 rotate-45 bg-highlight" aria-hidden="true" />
+            </span>
+            <h1 className="text-4xl font-bold tracking-tight text-primary md:text-5xl">
+              {tenant.name}
+            </h1>
+            <p className="max-w-2xl text-lg text-secondary">
+              Empresas e serviços de irmãos maçons, verificados e recomendados
+              pela comunidade. Filtre por categoria, confira os selos de
+              confiança e apoie quem apoia você.
+            </p>
+          </div>
 
-            return (
+          <dl className="grid w-full max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
+            {heroStats.map((stat) => (
               <div
-                key={b.id}
-                style={{
-                  backgroundColor: 'var(--bg-secondary, #18181b)',
-                  borderRadius: 'var(--radius-xl, 0.75rem)',
-                  border: isOuro 
-                    ? '2px solid var(--accent, #6366f1)' 
-                    : '1px solid var(--border-default, #27272a)',
-                  boxShadow: isOuro 
-                    ? '0 10px 15px -3px rgba(99, 102, 241, 0.15)' 
-                    : 'var(--shadow-sm)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'hidden',
-                  position: 'relative',
-                  transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                }}
+                key={stat.label}
+                className="flex flex-col rounded-xl border border-default bg-secondary px-4 py-3"
               >
-                {/* Visual Accent for Tiers */}
-                {isOuro && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '0.75rem',
-                      right: '0.75rem',
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: 'var(--accent)',
-                      color: 'var(--text-inverse)',
-                      fontSize: '0.65rem',
-                      fontWeight: 'bold',
-                      zIndex: 2,
-                    }}
-                  >
-                    ★ DESTAQUE OURO
-                  </div>
-                )}
-                {isPrata && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '0.75rem',
-                      right: '0.75rem',
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: 'var(--radius-sm)',
-                      backgroundColor: 'var(--bg-tertiary)',
-                      border: '1px solid var(--border-default)',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.65rem',
-                      fontWeight: 'bold',
-                      zIndex: 2,
-                    }}
-                  >
-                    PLANO PRATA
-                  </div>
-                )}
-
-                {/* Simulated Cap/Image Area */}
-                <div
-                  style={{
-                    height: '6rem',
-                    background: isOuro 
-                      ? 'linear-gradient(135deg, var(--accent) 0%, var(--color-primary-700) 100%)' 
-                      : 'var(--bg-tertiary, #09090b)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#ffffff',
-                    fontWeight: 'bold',
-                    fontSize: '1.25rem',
-                    padding: 'var(--space-4)',
-                    opacity: 0.9,
-                  }}
-                >
-                  {isOuro ? b.name : ''}
-                </div>
-
-                {/* Listing Details */}
-                <div
-                  style={{
-                    padding: 'var(--space-5, 1.25rem)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    flex: 1,
-                    gap: 'var(--space-3)',
-                  }}
-                >
-                  <div>
-                    <span style={{ fontSize: '0.65rem', color: 'var(--accent)', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                      {b.category}
-                    </span>
-                    <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'bold', marginTop: '2px', color: 'var(--text-primary)' }}>
-                      {b.name}
-                    </h3>
-                  </div>
-
-                  <p
-                    style={{
-                      fontSize: 'var(--text-xs)',
-                      color: 'var(--text-secondary)',
-                      lineHeight: 'var(--leading-relaxed)',
-                      flex: 1,
-                      minHeight: '2.5rem',
-                    }}
-                  >
-                    {b.description 
-                      ? (b.description.length > 90 ? `${b.description.substring(0, 90)}...` : b.description)
-                      : 'Sem descrição disponível para esta empresa comercial.'}
-                  </p>
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 'var(--space-2)',
-                      fontSize: 'var(--text-xs)',
-                      color: 'var(--text-secondary)',
-                    }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--accent)' }}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {b.address ? b.address.split(',')[0] : 'Endereço não disponível'}
-                    </span>
-                  </div>
-
-                  {/* Actions CTAs */}
-                  <Link
-                    href={`/guia/${b.slug || ''}`}
-                    style={{
-                      width: '100%',
-                      padding: 'var(--space-2-5, 0.625rem)',
-                      borderRadius: 'var(--radius-md)',
-                      backgroundColor: isOuro ? 'var(--accent)' : 'var(--bg-tertiary)',
-                      color: isOuro ? 'var(--text-inverse)' : 'var(--text-primary)',
-                      border: isOuro ? 'none' : '1px solid var(--border-default)',
-                      fontSize: 'var(--text-xs)',
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      textDecoration: 'none',
-                      boxShadow: 'var(--shadow-xs)',
-                      marginTop: 'var(--space-2)',
-                    }}
-                  >
-                    {isOuro ? 'Ver Anúncio Premium' : 'Ver Detalhes'}
-                  </Link>
-                </div>
+                <dt className="order-2 text-xs text-secondary">{stat.label}</dt>
+                <dd className="order-1 text-2xl font-bold text-highlight-active">
+                  {stat.value}
+                </dd>
               </div>
-            );
-          })
+            ))}
+          </dl>
+
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <a
+              href="#busca"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-accent-hover"
+            >
+              <Search className="h-4 w-4" aria-hidden="true" />
+              Buscar no guia
+            </a>
+            <Link
+              href="/anunciar/passo-1"
+              className="inline-flex items-center justify-center rounded-lg border border-default bg-secondary px-6 py-3 text-sm font-semibold text-primary transition-colors hover:bg-tertiary"
+            >
+              Anunciar minha empresa
+            </Link>
+          </div>
+        </section>
+
+        {/* Busca + filtros */}
+        <section
+          id="busca"
+          className="scroll-mt-6 rounded-2xl border border-default bg-secondary p-6 shadow-sm"
+        >
+          <form action="/guia" method="GET" className="flex flex-col gap-3 sm:flex-row">
+            <input type="hidden" name="cat" value={cat} />
+            <label htmlFor="guia-busca" className="sr-only">
+              Buscar no guia
+            </label>
+            <input
+              id="guia-busca"
+              type="text"
+              name="q"
+              defaultValue={q}
+              placeholder="O que você está procurando? Ex.: padaria, advogado, contador..."
+              className="flex-1 rounded-lg border border-default bg-primary px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
+            />
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-accent-hover"
+            >
+              <Search className="h-4 w-4" aria-hidden="true" />
+              Pesquisar
+            </button>
+          </form>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {categoryOptions.map((category) => {
+              const isSelected = cat === category.slug;
+              const Icon = CATEGORY_ICONS[category.icon ?? ''] ?? Tags;
+              return (
+                <Link
+                  key={category.slug}
+                  href={buildUrl(category.slug, q)}
+                  aria-current={isSelected ? 'page' : undefined}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                    isSelected
+                      ? 'border border-accent bg-accent text-white'
+                      : 'border border-default bg-tertiary text-secondary hover:bg-secondary hover:text-primary'
+                  }`}
+                >
+                  {category.slug !== 'all' && (
+                    <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
+                  {category.name}
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Resultado */}
+        {sorted.length > 0 ? (
+          <>
+            <section className="flex flex-col gap-5">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <h2 className="text-xl font-semibold tracking-tight text-primary">
+                  Todos os anúncios
+                </h2>
+                <span className="inline-flex items-center gap-1.5 text-xs text-secondary">
+                  <ShieldCheck className="h-3.5 w-3.5 text-highlight-active" aria-hidden="true" />
+                  {verifiedCount} {verifiedCount === 1 ? 'empresa' : 'empresas'} verificadas
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {sorted.map((business) => (
+                  <BusinessCard
+                    key={business.id}
+                    business={business}
+                    categoryName={categoryNames.get(business.category ?? '') ?? formatCategoryFallback(business.category ?? '')}
+                    verified={verifiedSet.has(business.id)}
+                  />
+                ))}
+              </div>
+            </section>
+          </>
         ) : (
-          <div
-            style={{
-              gridColumn: '1 / -1',
-              padding: 'var(--space-12, 3rem) var(--space-4)',
-              textAlign: 'center',
-              backgroundColor: 'var(--bg-secondary)',
-              border: '1px dashed var(--border-default)',
-              borderRadius: 'var(--radius-xl)',
-            }}
-          >
-            <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Nenhuma empresa localizada</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', marginTop: '0.5rem' }}>
-              Não encontramos resultados com o termo "{q}" {cat !== 'Todas' ? `na categoria "${cat}"` : ''}.
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-strong bg-secondary px-6 py-14 text-center">
+            <SearchX className="h-10 w-10 text-secondary" aria-hidden="true" />
+            <h2 className="text-lg font-bold text-primary">
+              Nenhuma empresa localizada
+            </h2>
+            <p className="max-w-md text-sm text-secondary">
+              Não encontramos resultados para
+              {q.trim() ? (
+                <>
+                  {' '}
+                  &quot;<span className="font-medium text-primary">{q}</span>&quot;
+                </>
+              ) : (
+                ' o filtro selecionado'
+              )}
+              {cat !== 'all' ? ' nesta categoria' : ''}.
             </p>
             <Link
               href="/guia"
-              style={{
-                display: 'inline-block',
-                marginTop: '1rem',
-                fontSize: 'var(--text-xs)',
-                color: 'var(--accent)',
-                fontWeight: 'bold',
-                textDecoration: 'none',
-              }}
+              className="mt-2 inline-flex items-center justify-center rounded-lg border border-accent px-5 py-2.5 text-sm font-bold text-accent transition-colors hover:bg-accent-subtle"
             >
-              Limpar Filtros de Busca
+              Limpar filtros de busca
             </Link>
           </div>
         )}
-      </div>
-    </main>
+      </main>
+    </>
   );
 }

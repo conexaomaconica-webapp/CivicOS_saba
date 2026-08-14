@@ -3,23 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CommercialPlan, BillingCycle, PlanTier } from '@/lib/billing/plans-service';
+import { computeMonthlyEquivalenceText, formatCentsToReais } from '@/lib/billing/plans-service';
 import { savePlanDraft, loadPlanDraft } from '@/lib/onboarding/plan-selection-flow';
 
 export interface PlanSelectionFormProps {
   authenticated: boolean;
+  tenantId: string;
+  userId: string;
   plans: CommercialPlan[];
-}
-
-function formatCurrency(amount: number): string {
-  if (amount === 0) return 'Grátis';
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(amount);
 }
 
 export default function PlanSelectionForm({
   authenticated,
+  tenantId,
+  userId,
   plans,
 }: PlanSelectionFormProps) {
   const router = useRouter();
@@ -30,12 +27,14 @@ export default function PlanSelectionForm({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const existing = loadPlanDraft();
-    if (existing) {
-      setSelectedTier(existing.tier);
-      setBillingCycle(existing.billingCycle);
+    if (tenantId && userId) {
+      const existing = loadPlanDraft(tenantId, userId);
+      if (existing) {
+        setSelectedTier(existing.tier);
+        setBillingCycle(existing.billingCycle);
+      }
     }
-  }, []);
+  }, [tenantId, userId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,21 +48,26 @@ export default function PlanSelectionForm({
       return;
     }
 
-    const price =
+    const originalPriceCents =
       billingCycle === 'annual'
-        ? targetPlan.priceAnnual
-        : targetPlan.priceMonthly;
+        ? targetPlan.annualPriceCents
+        : targetPlan.monthlyPriceCents;
 
     const saved = savePlanDraft({
+      tenantId,
+      userId,
       planId: targetPlan.id,
       tier: targetPlan.tier,
       tierName: targetPlan.name,
       billingCycle,
-      price,
+      originalPriceCents,
+      discountCents: 0,
+      finalPriceCents: originalPriceCents,
+      badgeOffer: targetPlan.badge,
     });
 
     if (!saved) {
-      setErrorMsg('Não foi possível salvar a escolha do plano neste navegador.');
+      setErrorMsg('Não foi possível salvar o rascunho do plano.');
       setLoading(false);
       return;
     }
@@ -116,7 +120,9 @@ export default function PlanSelectionForm({
       >
         <button
           type="button"
-          onClick={() => setBillingCycle('annual')}
+          onClick={() => {
+            setBillingCycle('annual');
+          }}
           style={{
             padding: 'var(--space-2) var(--space-4)',
             borderRadius: 'var(--radius-md)',
@@ -150,16 +156,19 @@ export default function PlanSelectionForm({
                   ? 'var(--text-inverse)'
                   : 'var(--accent)',
               fontSize: '10px',
+              fontWeight: 'bold',
               textTransform: 'uppercase',
             }}
           >
-            Economize 20%
+            2 Meses Grátis
           </span>
         </button>
 
         <button
           type="button"
-          onClick={() => setBillingCycle('monthly')}
+          onClick={() => {
+            setBillingCycle('monthly');
+          }}
           style={{
             padding: 'var(--space-2) var(--space-4)',
             borderRadius: 'var(--radius-md)',
@@ -190,13 +199,20 @@ export default function PlanSelectionForm({
       >
         {plans.map((plan) => {
           const isSelected = selectedTier === plan.tier;
-          const displayPrice =
-            billingCycle === 'annual' ? plan.priceAnnual : plan.priceMonthly;
+          const basePriceCents =
+            billingCycle === 'annual'
+              ? plan.annualPriceCents
+              : plan.monthlyPriceCents;
+
+          const displayPriceCents = basePriceCents;
+          const badgeText = plan.badge;
 
           return (
             <div
               key={plan.tier}
-              onClick={() => setSelectedTier(plan.tier)}
+              onClick={() => {
+                setSelectedTier(plan.tier);
+              }}
               style={{
                 position: 'relative',
                 display: 'flex',
@@ -217,7 +233,7 @@ export default function PlanSelectionForm({
                   : 'none',
               }}
             >
-              {plan.badge && (
+              {badgeText && (
                 <div
                   style={{
                     position: 'absolute',
@@ -233,7 +249,7 @@ export default function PlanSelectionForm({
                     letterSpacing: '0.05em',
                   }}
                 >
-                  {plan.badge}
+                  {badgeText}
                 </div>
               )}
 
@@ -277,25 +293,45 @@ export default function PlanSelectionForm({
                 </p>
 
                 <div style={{ marginBottom: 'var(--space-5)' }}>
-                  <span
+                  <div
                     style={{
-                      fontSize: 'var(--text-3xl)',
-                      fontWeight: 'var(--font-weight-bold)',
-                      color: 'var(--text-primary)',
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      gap: 'var(--space-1)',
                     }}
                   >
-                    {formatCurrency(displayPrice)}
-                  </span>
-                  {displayPrice > 0 && (
                     <span
                       style={{
-                        fontSize: 'var(--text-xs)',
-                        color: 'var(--text-secondary)',
-                        marginLeft: 'var(--space-1)',
+                        fontSize: 'var(--text-3xl)',
+                        fontWeight: 'var(--font-weight-bold)',
+                        color: 'var(--text-primary)',
                       }}
                     >
-                      / {billingCycle === 'annual' ? 'ano' : 'mês'}
+                      {formatCentsToReais(displayPriceCents)}
                     </span>
+                    {displayPriceCents > 0 && (
+                      <span
+                        style={{
+                          fontSize: 'var(--text-xs)',
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        / {billingCycle === 'annual' ? 'ano' : 'mês'}
+                      </span>
+                    )}
+                  </div>
+
+                  {billingCycle === 'annual' && plan.annualPriceCents > 0 && (
+                    <div
+                      style={{
+                        fontSize: 'var(--text-xs)',
+                        color: 'var(--accent)',
+                        marginTop: 'var(--space-1)',
+                        fontWeight: 'var(--font-weight-medium)',
+                      }}
+                    >
+                      Equivale a {computeMonthlyEquivalenceText(plan.annualPriceCents)}
+                    </div>
                   )}
                 </div>
 
@@ -343,11 +379,31 @@ export default function PlanSelectionForm({
         })}
       </div>
 
+      {/* Coupons stay unavailable until a persisted, tenant-scoped authority exists. */}
+      <div
+        style={{
+          padding: 'var(--space-4)',
+          backgroundColor: 'var(--bg-secondary)',
+          border: '1px solid var(--border-default)',
+          borderRadius: 'var(--radius-lg)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--space-3)',
+        }}
+      >
+        <strong style={{ fontSize: 'var(--text-xs)', color: 'var(--text-primary)' }}>
+          Cupons temporariamente indisponíveis
+        </strong>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+          A validação será liberada somente após a integração com o catálogo oficial do tenant.
+        </span>
+      </div>
+
       <button
         type="submit"
         disabled={loading}
         style={{
-          marginTop: 'var(--space-4)',
+          marginTop: 'var(--space-2)',
           padding: 'var(--space-4)',
           borderRadius: 'var(--radius-md)',
           backgroundColor: loading ? 'var(--accent-subtle)' : 'var(--accent)',
@@ -362,7 +418,7 @@ export default function PlanSelectionForm({
         {loading
           ? 'Salvando...'
           : authenticated
-          ? 'Continuar · Resumo Comercial'
+          ? 'Continuar · Ver status da contratação'
           : 'Continuar · Criar minha conta'}
       </button>
     </form>

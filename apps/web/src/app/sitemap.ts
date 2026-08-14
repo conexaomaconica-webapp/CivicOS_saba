@@ -1,7 +1,8 @@
 import type { MetadataRoute } from 'next';
+import { appUrl } from '@/lib/seo/app-url';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://conexaomaconica.com.br';
+  const baseUrl = appUrl('');
 
   return [
     {
@@ -11,28 +12,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1.0,
     },
     {
-      url: `${baseUrl}/empresas`,
+      url: appUrl('/guia'),
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.9,
     },
     {
-      url: `${baseUrl}/organizacoes`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/verificacao`,
+      url: appUrl('/anunciar/passo-1'),
       lastModified: new Date(),
       changeFrequency: 'monthly',
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/fundadores`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.8,
+      priority: 0.6,
     },
   ];
 }

@@ -11,6 +11,8 @@ import {
 } from '@/lib/onboarding/onboarding-validation';
 import { createBusinessDraft, type BusinessCategoryOption } from '@/lib/business/business-registration-service';
 import { loadResponsibleDraft, clearResponsibleDraft } from '@/lib/onboarding/responsible-flow';
+import { upsertMasonicAffiliation } from '@/lib/masonic/masonic-affiliation-service';
+import { MASONIC_STATUS_LABELS } from '@/lib/masonic/masonic-affiliation';
 
 const FIELD_ERROR_STYLE = {
   marginTop: 'var(--space-1)',
@@ -84,6 +86,36 @@ export default function BusinessForm({ categories, tenantId }: BusinessFormProps
       return;
     }
 
+    // LGPD (CRIT-TRN-012): antes de persistir qualquer dado sensível de vínculo,
+    // registra o consentimento destacado + aceite da Política de Privacidade
+    // versionada (com hash SHA-256 da minuta).
+    const hasMasonicDeclaration =
+      responsibleDraft?.masonic && responsibleDraft.masonic.status !== 'none';
+    if (hasMasonicDeclaration) {
+      const { error: consentError } = await supabase.rpc('grant_sensitive_consent', {
+        p_purpose: 'masonic_affiliation_publication',
+        p_version: '1.0',
+      });
+      if (consentError) {
+        setErrorMsg(
+          `Não foi possível registrar o consentimento LGPD: ${consentError.message}. Nenhum dado foi salvo.`,
+        );
+        setLoading(false);
+        return;
+      }
+      const { error: acceptanceError } = await supabase.rpc('accept_legal_doc', {
+        p_code: 'privacy_policy',
+        p_version: '1.0',
+      });
+      if (acceptanceError) {
+        setErrorMsg(
+          `Não foi possível registrar o aceite da Política de Privacidade: ${acceptanceError.message}.`,
+        );
+        setLoading(false);
+        return;
+      }
+    }
+
     const result = await createBusinessDraft(supabase, {
       tenantId,
       cnpj,
@@ -93,6 +125,9 @@ export default function BusinessForm({ categories, tenantId }: BusinessFormProps
       categoryId,
     });
     if (result.ok) {
+      if (hasMasonicDeclaration && responsibleDraft?.masonic) {
+        await upsertMasonicAffiliation(supabase, responsibleDraft.masonic);
+      }
       clearResponsibleDraft();
       router.push('/anunciar/passo-3');
     } else {
@@ -125,10 +160,25 @@ export default function BusinessForm({ categories, tenantId }: BusinessFormProps
             borderRadius: 'var(--radius-md)',
             fontSize: 'var(--text-xs)',
             color: 'var(--text-secondary)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-1)',
           }}
         >
-          Responsável: <strong>{responsibleDraft.name}</strong> ·{' '}
-          {responsibleDraft.relationship === 'owner' ? 'Proprietário / Sócio Direto' : 'Representante Comercial / Procurador'}
+          <span>
+            Responsável: <strong>{responsibleDraft.name}</strong> ·{' '}
+            {responsibleDraft.relationship === 'owner' ? 'Proprietário / Sócio Direto' : 'Representante Comercial / Procurador'}
+          </span>
+          {responsibleDraft.masonic && (
+            <span>
+              Vínculo maçônico:{' '}
+              <strong>
+                {MASONIC_STATUS_LABELS[responsibleDraft.masonic.status]}
+                {responsibleDraft.masonic.status === 'mason' &&
+                  ` · ${responsibleDraft.masonic.isActive ? 'Ativo' : 'Inativo / pendente'}`}
+              </strong>
+            </span>
+          )}
         </div>
       )}
 

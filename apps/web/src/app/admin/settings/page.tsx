@@ -37,24 +37,21 @@ export default function AdminSettingsPage() {
       }
       setUser(user);
 
-      // Verify if user is admin
-      const role = user.user_metadata?.role ?? 'usuario_comum';
-      if (role !== 'master' && role !== 'socio_admin') {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role, tenant_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError || !profile || !['master', 'socio_admin'].includes(profile.role)) {
         router.push('/');
         return;
       }
 
-      // Resolve tenant_id
-      let tenantId = user.user_metadata?.tenant_id;
-      if (!tenantId) {
-        const { data: tenantList } = await supabase.from('tenants').select('id').limit(1);
-        if (tenantList && tenantList.length > 0) {
-          tenantId = tenantList[0]?.id;
-        }
-      }
+      const tenantId = profile.tenant_id;
 
       if (!tenantId) {
-        setErrorMsg('Nenhum inquilino (tenant) ativo encontrado para gerenciar.');
+        setErrorMsg('Nenhum tenant autorizado foi associado a este administrador.');
         setLoading(false);
         return;
       }

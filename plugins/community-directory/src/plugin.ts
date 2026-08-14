@@ -1,12 +1,13 @@
 import { communityDirectoryConfig } from './manifest';
-import { demoTenant, churchTenant, CommunityDirectoryTenantConfig } from './domain/tenant-config';
+import type { CommunityDirectoryTenantConfig } from './domain/tenant-config';
 
-// The application layer resolves tenant configuration
-export function resolveDirectoryConfig(tenantId: string): CommunityDirectoryTenantConfig {
-  if (tenantId === 'tenant-church') {
-    return churchTenant;
-  }
-  return demoTenant;
+// Fase 1 containment: no tenant gets demonstrative data as a runtime fallback.
+// The application layer must supply a persisted, tenant-scoped configuration.
+export function resolveDirectoryConfig(
+  _tenantId: string,
+  persistedConfig?: CommunityDirectoryTenantConfig | null,
+): CommunityDirectoryTenantConfig | null {
+  return persistedConfig ?? null;
 }
 
 // The plugin simply exports its configuration for the SDK/Kernel

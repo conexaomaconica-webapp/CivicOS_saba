@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-13",
+  "title": "Design System: CivicOS",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Índigo de Tinta",
+        "canonical": "oklch(0.58 0.2 260)",
+        "tonalRamp": ["oklch(0.12 0.05 260)", "oklch(0.2 0.09 260)", "oklch(0.3 0.13 260)", "oklch(0.43 0.18 260)", "oklch(0.5 0.2 260)", "oklch(0.58 0.2 260)", "oklch(0.68 0.16 260)", "oklch(0.78 0.12 260)", "oklch(0.87 0.08 260)", "oklch(0.93 0.04 260)"]
+      },
+      "workbench": {
+        "role": "neutral",
+        "displayName": "Grafite Noite",
+        "canonical": "oklch(0.13 0.006 250)",
+        "tonalRamp": ["oklch(0.13 0.006 250)", "oklch(0.2 0.008 250)", "oklch(0.28 0.01 250)", "oklch(0.37 0.012 250)", "oklch(0.44 0.014 250)", "oklch(0.55 0.012 250)", "oklch(0.7 0.01 250)", "oklch(0.82 0.008 250)", "oklch(0.9 0.006 250)", "oklch(0.98 0.002 250)"]
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Grafite Painel",
+        "canonical": "oklch(0.2 0.008 250)",
+        "tonalRamp": ["oklch(0.15 0.006 250)", "oklch(0.18 0.008 250)", "oklch(0.2 0.008 250)", "oklch(0.24 0.01 250)", "oklch(0.28 0.01 250)", "oklch(0.33 0.011 250)", "oklch(0.37 0.012 250)", "oklch(0.44 0.014 250)"]
+      },
+      "rail": {
+        "role": "neutral",
+        "displayName": "Grafite Trilho",
+        "canonical": "oklch(0.28 0.01 250)",
+        "tonalRamp": ["oklch(0.24 0.01 250)", "oklch(0.26 0.01 250)", "oklch(0.28 0.01 250)", "oklch(0.31 0.011 250)", "oklch(0.34 0.011 250)", "oklch(0.37 0.012 250)", "oklch(0.44 0.014 250)", "oklch(0.55 0.012 250)"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Tinta Alta",
+        "canonical": "oklch(0.2 0.008 250)",
+        "tonalRamp": ["oklch(0.13 0.006 250)", "oklch(0.2 0.008 250)", "oklch(0.28 0.01 250)", "oklch(0.37 0.012 250)", "oklch(0.44 0.014 250)", "oklch(0.55 0.012 250)", "oklch(0.7 0.01 250)", "oklch(0.82 0.008 250)"]
+      },
+      "success": {
+        "role": "status",
+        "displayName": "Verde Selo",
+        "canonical": "oklch(0.65 0.18 145)",
+        "tonalRamp": ["oklch(0.35 0.16 145)", "oklch(0.42 0.17 145)", "oklch(0.5 0.18 145)", "oklch(0.58 0.18 145)", "oklch(0.65 0.18 145)", "oklch(0.75 0.13 145)", "oklch(0.85 0.07 145)", "oklch(0.95 0.03 145)"]
+      },
+      "warning": {
+        "role": "status",
+        "displayName": "Âmbar de Sinal",
+        "canonical": "oklch(0.75 0.16 80)",
+        "tonalRamp": ["oklch(0.4 0.16 80)", "oklch(0.48 0.17 80)", "oklch(0.57 0.17 80)", "oklch(0.66 0.17 80)", "oklch(0.75 0.16 80)", "oklch(0.84 0.12 80)", "oklch(0.92 0.07 80)", "oklch(0.96 0.04 80)"]
+      },
+      "danger": {
+        "role": "status",
+        "displayName": "Vermelho Perigo",
+        "canonical": "oklch(0.6 0.22 25)",
+        "tonalRamp": ["oklch(0.35 0.2 25)", "oklch(0.42 0.21 25)", "oklch(0.5 0.22 25)", "oklch(0.58 0.22 25)", "oklch(0.6 0.22 25)", "oklch(0.68 0.18 25)", "oklch(0.8 0.1 25)", "oklch(0.95 0.04 25)"]
+      },
+      "info": {
+        "role": "status",
+        "displayName": "Azul Navegação",
+        "canonical": "oklch(0.65 0.15 230)",
+        "tonalRamp": ["oklch(0.4 0.15 230)", "oklch(0.48 0.16 230)", "oklch(0.56 0.16 230)", "oklch(0.63 0.15 230)", "oklch(0.65 0.15 230)", "oklch(0.74 0.11 230)", "oklch(0.85 0.06 230)", "oklch(0.95 0.03 230)"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Landings e cabeçalhos de página de destino; raro no produto." },
+      "headline": { "displayName": "Headline", "purpose": "Títulos de página internos." },
+      "title": { "displayName": "Title", "purpose": "Títulos de seção e cabeçalhos de painéis." },
+      "body": { "displayName": "Body", "purpose": "Texto corrente, 65–75ch." },
+      "label": { "displayName": "Label", "purpose": "Rótulos de campo, helper, botões small; grupos de nav em 10px bold uppercase tracking-widest." },
+      "mono": { "displayName": "Mono", "purpose": "Identidade técnica: IDs, hashes, timestamps." }
+    },
+    "shadows": [
+      { "name": "xs", "value": "0 1px 2px oklch(0 0 0 / 0.05)", "purpose": "Separador de linha; raro." },
+      { "name": "sm", "value": "0 1px 3px oklch(0 0 0 / 0.10), 0 1px 2px oklch(0 0 0 / 0.06)", "purpose": "Hover sutil de itens clicáveis." },
+      { "name": "md", "value": "0 4px 6px oklch(0 0 0 / 0.10), 0 2px 4px oklch(0 0 0 / 0.06)", "purpose": "Sombra de suporte em botões primários/perigosos (shadow-{cor}/20)." },
+      { "name": "lg", "value": "0 10px 15px oklch(0 0 0 / 0.10), 0 4px 6px oklch(0 0 0 / 0.05)", "purpose": "Dropdowns, popovers, toasts." },
+      { "name": "xl", "value": "0 20px 25px oklch(0 0 0 / 0.10), 0 8px 10px oklch(0 0 0 / 0.04)", "purpose": "Dialogs e cartões elevados (shadow-black/40 no escuro)." }
+    ],
+    "motion": [
+      { "name": "duration-fast", "value": "100ms", "purpose": "Micro-respostas (cor, cor de borda)." },
+      { "name": "duration-normal", "value": "200ms", "purpose": "Transições padrão de estado (fundo, transform, opacidade)." },
+      { "name": "duration-slow", "value": "300ms", "purpose": "Rails, overlays e entradas de painel." },
+      { "name": "duration-slower", "value": "500ms", "purpose": "Movimentos amplos excepcionais." },
+      { "name": "ease-default", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Easing padrão de transições de estado." },
+      { "name": "ease-out", "value": "cubic-bezier(0, 0, 0.2, 1)", "purpose": "Entradas." },
+      { "name": "ease-spring", "value": "cubic-bezier(0.175, 0.885, 0.32, 1.275)", "purpose": "Ressaltos de deleite, uso raro." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" },
+      { "name": "2xl", "value": "1536px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "A ação que assina a planta: índigo de tinta, texto pérola, canto de 8px, micro-pressão.",
+      "html": "<button class=\"ds-btn-primary\">Salvar alterações</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500; color: oklch(0.98 0.002 250); background: oklch(0.58 0.2 260); padding: 8px 16px; min-height: 40px; border: none; border-radius: 8px; box-shadow: 0 4px 6px oklch(0 0 0 / 0.10), 0 2px 4px oklch(0 0 0 / 0.06); transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s; cursor: pointer; } .ds-btn-primary:hover { background: oklch(0.5 0.2 260); } .ds-btn-primary:active { background: oklch(0.43 0.18 260); transform: scale(0.98); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px oklch(0.13 0.006 250), 0 0 0 4px oklch(0.58 0.2 260); } .ds-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Ação alternativa: trilho grafite com borda de aço.",
+      "html": "<button class=\"ds-btn-secondary\">Rascunhar</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500; color: oklch(0.98 0.002 250); background: oklch(0.28 0.01 250); padding: 8px 16px; min-height: 40px; border: 1px solid oklch(0.37 0.012 250); border-radius: 8px; transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s; cursor: pointer; } .ds-btn-secondary:hover { background: oklch(0.34 0.011 250); } .ds-btn-secondary:active { transform: scale(0.98); } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 2px oklch(0.13 0.006 250), 0 0 0 4px oklch(0.58 0.2 260); } .ds-btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Ação destrutiva: vermelho perigo, única exceção ao índigo como ação.",
+      "html": "<button class=\"ds-btn-danger\">Revogar vínculo</button>",
+      "css": ".ds-btn-danger { display: inline-flex; align-items: center; justify-content: center; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500; color: oklch(0.98 0.002 250); background: oklch(0.6 0.22 25); padding: 8px 16px; min-height: 40px; border: none; border-radius: 8px; box-shadow: 0 4px 6px oklch(0.4 0.2 25 / 0.30), 0 2px 4px oklch(0 0 0 / 0.10); transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s; cursor: pointer; } .ds-btn-danger:hover { background: oklch(0.52 0.22 25); } .ds-btn-danger:active { transform: scale(0.98); } .ds-btn-danger:focus-visible { outline: none; box-shadow: 0 0 0 2px oklch(0.13 0.006 250), 0 0 0 4px oklch(0.6 0.22 25); } .ds-btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Campo calmo: painel grafite, borda de 1px, foco em anel índigo, erro em vermelho.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-label\">Nome da loja</span><span class=\"ds-input-wrap\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"7\"></circle><path d=\"m21 21-4.3-4.3\"></path></svg><input class=\"ds-input\" type=\"text\" placeholder=\"Buscar irmão ou loja\" /></span><span class=\"ds-helper\">Resultados de lojas verificadas.</span></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; font-family: 'Inter', sans-serif; } .ds-label { font-size: 12px; font-weight: 500; color: oklch(0.82 0.008 250); } .ds-input-wrap { position: relative; display: flex; align-items: center; } .ds-icon { position: absolute; left: 10px; width: 16px; height: 16px; color: oklch(0.7 0.01 250); pointer-events: none; } .ds-input { width: 100%; min-height: 40px; padding: 10px 12px 10px 34px; font-size: 14px; color: oklch(0.98 0.002 250); background: oklch(0.2 0.008 250); border: 1px solid oklch(0.44 0.014 250); border-radius: 8px; box-sizing: border-box; transition: border-color 0.15s, box-shadow 0.15s; } .ds-input::placeholder { color: oklch(0.7 0.01 250); } .ds-input:hover { border-color: oklch(0.37 0.012 250); } .ds-input:focus { outline: none; border-color: oklch(0.58 0.2 260); box-shadow: 0 0 0 2px oklch(0.58 0.2 260 / 0.35); } .ds-input:disabled { opacity: 0.5; cursor: not-allowed; background: oklch(0.13 0.006 250); } .ds-helper { font-size: 12px; color: oklch(0.7 0.01 250); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Painel de grafite com canto de 12px; plano em repouso, profundidade por layering tonal.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-head\"><h3 class=\"ds-card-title\">Moderação de vínculo</h3><p class=\"ds-card-desc\">Revisa a afiliação antes da aprovação.</p></div><div class=\"ds-card-body\"><p>O vínculo segue o ciclo de 10 estados com trilha de auditoria completa.</p></div></div>",
+      "css": ".ds-card { font-family: 'Inter', sans-serif; background: oklch(0.2 0.008 250); color: oklch(0.98 0.002 250); border: 1px solid oklch(0.28 0.01 250); border-radius: 12px; overflow: hidden; max-width: 420px; } .ds-card-head { padding: 20px 20px 12px; display: flex; flex-direction: column; gap: 6px; } .ds-card-title { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.025em; color: #fff; } .ds-card-desc { margin: 0; font-size: 12px; line-height: 1.75; color: oklch(0.7 0.01 250); } .ds-card-body { padding: 0 20px 20px; font-size: 14px; line-height: 1.5; color: oklch(0.9 0.006 250); }"
+    },
+    {
+      "name": "Success Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Selo de status em pill; os selos são blindados contra branding de tenant.",
+      "html": "<span class=\"ds-badge\"><svg class=\"ds-badge-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"></path></svg>Vínculo ativo</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; gap: 6px; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500; color: oklch(0.82 0.12 145); background: oklch(0.22 0.05 145); border: 1px solid oklch(0.35 0.08 145); border-radius: 9999px; padding: 4px 10px; } .ds-badge-icon { width: 12px; height: 12px; }"
+    },
+    {
+      "name": "Nav Item",
+      "kind": "nav",
+      "refersTo": "nav-active",
+      "description": "Item de navegação: ativo em índigo sólido, inativo em tinta média com hover de trilho.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item is-active\" href=\"#\"><svg class=\"ds-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"></path></svg>Moderação</a><a class=\"ds-nav-item\" href=\"#\"><svg class=\"ds-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"></path></svg>Loja</a></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 2px; font-family: 'Inter', sans-serif; } .ds-nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; min-height: 40px; font-size: 14px; font-weight: 500; color: oklch(0.7 0.01 250); text-decoration: none; border-radius: 8px; transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s, transform 0.2s; box-sizing: border-box; } .ds-nav-item:hover { background: oklch(0.24 0.01 250); color: oklch(0.98 0.002 250); } .ds-nav-item .ds-nav-icon { width: 16px; height: 16px; } .ds-nav-item.is-active { background: oklch(0.58 0.2 260); color: oklch(0.98 0.002 250); } .ds-nav-item.is-active:hover { background: oklch(0.5 0.2 260); } .ds-nav-item:focus-visible { outline: none; box-shadow: 0 0 0 2px oklch(0.2 0.008 250), 0 0 0 4px oklch(0.58 0.2 260); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "A Oficina de Arquitetura",
+    "overview": "O CivicOS é uma oficina de arquitetura em funcionamento: uma mesa de trabalho escura onde cada medida é verificada antes de ser carimbada. A superfície padrão é grafite frio (quase preto, com entonação azulada de luz de luminária), os painéis repousam um degrau acima, e as ações que avançam o trabalho são desenhadas com um único índigo institucional — a tinta da caneta que assina a planta. Nada aqui é decorativo ou clamoroso: a credibilidade vem da precisão, da moderação cromática e da repetição exata das regras. A densidade é confortável por padrão (alturas mínimas de 40px em controles, ritmo de 16–24px entre blocos), com compact disponível para tenants que precisam de mais informação por tela. O modo escuro é a identidade da oficina; o modo claro (\"papel\") existe e é igualmente suportado pelos tokens, mas o desenho de referência — a mesa à noite — é o que distingue a plataforma. Status são carimbos: verde, âmbar, vermelho e azul em tintas pastéis de fundo, sempre com texto em contraste AA; eles informam, nunca decoram. Movimento é discreto e físico: 100–300ms, easing padrão, e uma micro-pressão (escala 0.98) nos cliques — o gesto de quem confere um ponto de projeto. Tenants têm um guarda-roupa próprio (camada de marca Layer 1: cor primária, acento, raio, densidade, fonte) injetado em runtime via #tenant-brand; esse guarda-roupa pode re-colorir a oficina, mas o piso de contraste e os selos de status são intocáveis.",
+    "keyCharacteristics": [
+      "Mesa de trabalho escura: fundo grafite (oklch 0.13 hue 250), painéis e trilhos em grafites frios de baixa saturação.",
+      "Um único índigo de ação (\"The One Ink\"), usado com parcimônia (≤10% da tela).",
+      "Tipo única: Inter em toda a hierarquia; JetBrains Mono exclusivo para identidade técnica (IDs, hashes, selos de tempo).",
+      "Cantos medidos, nunca caricaturais: 6/8/12/16px; pills (9999px) reservadas a badges, perfis e scrollbars.",
+      "Elevação híbrida: cartões planos por padrão; sombras aparecem como resposta a estado, não como decoração.",
+      "Selos de status pastéis com piso AA 4.5:1; acessibilidade é regra de obra, não revisão.",
+      "Ritmo de 4px; motion 100–300ms com easing padrão e micro-pressão em ações.",
+      "Guarda-roupa do tenant: re-colorir primário/acento/raio/densidade/fonte via CSS vars — nunca o contraste, nunca os selos."
+    ],
+    "rules": [
+      { "name": "The One Ink Rule", "body": "O índigo primário ocupa ≤10% de qualquer tela. Sua raridade é o ponto: quando o azul aparece, é porque algo pede ação.", "section": "colors" },
+      { "name": "The Status Shield Rule", "body": "Selos de status são blindados contra branding de tenant — jamais re-coloridos ou re-iluminados; o AA 4.5:1 é o piso de obra.", "section": "colors" },
+      { "name": "The AA Floor Rule", "body": "Todo texto — inclusive o inverso, o de selo e o de placeholder — respeita contraste ≥4.5:1 contra o fundo. Não se \"afina\" tinta para efeito.", "section": "colors" },
+      { "name": "The Single Voice Rule", "body": "Inter em tudo. Não há display serifada, não há fonte de créditos; distinção é peso, nunca família.", "section": "typography" },
+      { "name": "The Mono-For-Identity Rule", "body": "Se é um identificador (ID, hash, timestamp), é JetBrains Mono. Se é prosa, é Inter.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "Superfícies são planas em repouso. Sombra aparece como resposta a estado (hover, foco, diálogo, elevação explícita) — nunca como decoração permanente.", "section": "elevation" },
+      { "name": "The Measured Corner Rule", "body": "Botão nunca é pill. Se um canto vira pill fora de badge/avatar, a peça saiu da oficina.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do manter o corpo da tela no grafite frio (hue 250–264, saturação baixa) e o azul de ação na família índigo — verde, rosa ou violeta nunca são ação.",
+      "Do usar o degrau de tinta (High/Média/Baixa) para hierarquia de texto; cor para texto é reservada a links e erros.",
+      "Do entregar contraste AA 4.5:1 em todo texto, inclusive placeholder, helper, selo e texto em botão.",
+      "Do usar os tokens semânticos (--bg-*, --text-*, --border-*, --accent-*, --status-*) e a escala --color-primary-*; não introduzir famílias de cor novas.",
+      "Do tratar o guarda-roupa do tenant como camada: re-colorir primário/acento/raio/densidade/fonte via #tenant-brand sem tocar selos, foco AA e mono.",
+      "Do micro-pressão (scale 0.98) e transições de 200ms como gramática de clique padrão."
+    ],
+    "donts": [
+      "Don't usar pill em botões ou cantos maiores que 16px em controles de 40px de altura.",
+      "Don't re-colorir selos de status por tenant, tema ou humor de página — eles são o piso informacional.",
+      "Don't adicionar fontes decorativas; se não é Inter (ou mono para identidade), não é do sistema.",
+      "Don't criar profundidade com sombras permanentes; superfícies planas em repouso, layering tonal como meio de contraste.",
+      "Don't reintroduzir classes legadas shadcn (bg-primary, text-muted-foreground, bg-card sem definição); resolver contra o config atual.",
+      "Don't deixar placeholder, disabled ou helper abaixo de AA \"porque é secundário\"."
+    ]
+  }
+}

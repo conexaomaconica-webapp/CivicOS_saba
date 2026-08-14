@@ -73,6 +73,7 @@ export default function CommunityLinks() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  const [consentByLink, setConsentByLink] = useState<Record<string, boolean>>({});
 
   const load = async () => {
     setLoading(true);
@@ -117,8 +118,24 @@ export default function CommunityLinks() {
   };
 
   const handleSubmitForReview = async (linkId: string) => {
+    setFormError(null);
+    if (consentByLink[linkId] !== true) {
+      setFormError(
+        'Autorize a publicação dos dados do vínculo (consentimento LGPD destacado) antes de enviar para análise.',
+      );
+      return;
+    }
+    const { error: consentError } = await supabase.rpc('upsert_publication_consent', {
+      p_link_id: linkId,
+      p_visibility_scope: 'authenticated_members',
+    });
+    if (consentError) {
+      setFormError(`Não foi possível registrar o consentimento de publicação: ${consentError.message}`);
+      return;
+    }
     const result = await submitLinkForReview(supabase, linkId);
     if (result.ok) {
+      setConsentByLink((prev) => ({ ...prev, [linkId]: false }));
       await load();
     } else {
       setFormError(result.error ?? 'Erro ao enviar para análise.');
@@ -302,25 +319,59 @@ export default function CommunityLinks() {
             </div>
 
             {link.status === 'draft' && (
-              <button
-                type="button"
-                onClick={() => {
-                  void handleSubmitForReview(link.id);
-                }}
+              <div
                 style={{
-                  padding: 'var(--space-2) var(--space-3)',
-                  borderRadius: 'var(--radius-md)',
-                  backgroundColor: 'var(--bg-tertiary)',
-                  color: 'var(--text-primary)',
-                  fontWeight: 'var(--font-weight-semibold)',
-                  fontSize: 'var(--text-xs)',
-                  border: '1px solid var(--border-default)',
-                  cursor: 'pointer',
-                  alignSelf: 'flex-start',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--space-2)',
+                  alignItems: 'flex-start',
                 }}
               >
-                Enviar para Análise
-              </button>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 'var(--space-2)',
+                    fontSize: 'var(--text-xs)',
+                    color: 'var(--text-primary)',
+                    lineHeight: 1.5,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={consentByLink[link.id] === true}
+                    onChange={(e) =>
+                      setConsentByLink((prev) => ({ ...prev, [link.id]: e.target.checked }))
+                    }
+                    style={{ marginTop: 'var(--space-1)' }}
+                  />
+                  <span>
+                    Autorizo a publicação dos dados deste vínculo maçônico (dado pessoal sensível)
+                    para membros autenticados do guia, conforme a Política de Privacidade v1.0.
+                    Revogável a qualquer momento.
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleSubmitForReview(link.id);
+                  }}
+                  style={{
+                    padding: 'var(--space-2) var(--space-3)',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    color: 'var(--text-primary)',
+                    fontWeight: 'var(--font-weight-semibold)',
+                    fontSize: 'var(--text-xs)',
+                    border: '1px solid var(--border-default)',
+                    cursor: 'pointer',
+                    alignSelf: 'flex-start',
+                  }}
+                >
+                  Enviar para Análise
+                </button>
+              </div>
             )}
           </div>
         ))}

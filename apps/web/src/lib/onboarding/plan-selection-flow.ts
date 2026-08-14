@@ -1,13 +1,21 @@
 import type { PlanTier, BillingCycle } from '@/lib/billing/plans-service';
 
-export const PLAN_DRAFT_KEY = 'civicos_onboarding_plan_draft';
+export function buildPlanDraftKey(tenantId: string, userId: string): string {
+  return `civicos_plan_draft_${tenantId}_${userId}`;
+}
 
 export interface PlanDraft {
+  tenantId: string;
+  userId: string;
   planId: string;
   tier: PlanTier;
   tierName: string;
   billingCycle: BillingCycle;
-  price: number;
+  originalPriceCents: number;
+  discountCents: number;
+  finalPriceCents: number;
+  couponCode?: string;
+  badgeOffer?: string;
   savedAt: string;
 }
 
@@ -38,26 +46,32 @@ export function savePlanDraft(
   };
 
   try {
-    storage.setItem(PLAN_DRAFT_KEY, JSON.stringify(fullDraft));
+    const key = buildPlanDraftKey(draft.tenantId, draft.userId);
+    storage.setItem(key, JSON.stringify(fullDraft));
     return fullDraft;
   } catch {
     return null;
   }
 }
 
-export function loadPlanDraft(customStorage?: StorageLike): PlanDraft | null {
+export function loadPlanDraft(
+  tenantId: string = 'default',
+  userId: string = 'anonymous',
+  customStorage?: StorageLike
+): PlanDraft | null {
   const storage = resolveStorage(customStorage);
   if (!storage) return null;
 
   try {
-    const raw = storage.getItem(PLAN_DRAFT_KEY);
+    const key = buildPlanDraftKey(tenantId, userId);
+    const raw = storage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PlanDraft>;
 
     if (
       typeof parsed.planId === 'string' &&
       typeof parsed.tier === 'string' &&
-      typeof parsed.price === 'number' &&
+      typeof parsed.finalPriceCents === 'number' &&
       (parsed.billingCycle === 'annual' || parsed.billingCycle === 'monthly')
     ) {
       return parsed as PlanDraft;
@@ -68,9 +82,14 @@ export function loadPlanDraft(customStorage?: StorageLike): PlanDraft | null {
   }
 }
 
-export function clearPlanDraft(customStorage?: StorageLike): void {
+export function clearPlanDraft(
+  tenantId: string = 'default',
+  userId: string = 'anonymous',
+  customStorage?: StorageLike
+): void {
   const storage = resolveStorage(customStorage);
   if (storage) {
-    storage.removeItem(PLAN_DRAFT_KEY);
+    const key = buildPlanDraftKey(tenantId, userId);
+    storage.removeItem(key);
   }
 }

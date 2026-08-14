@@ -7,6 +7,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export default tseslint.config(
+  {
+    // Generated mechanically from the local PostgreSQL schema. Lint the
+    // generator inputs and consumers, not Supabase's emitted helper types.
+    ignores: ['apps/web/src/types/database.types.ts'],
+  },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {

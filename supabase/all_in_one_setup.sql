@@ -96,17 +96,13 @@ ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tenant_plugins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tenant_members ENABLE ROW LEVEL SECURITY;
 
--- Tenants: users can only see tenants they are members of
+-- Tenants: public read (portals are resolved by slug for anyone); previously
+-- member-only, which also caused infinite recursion via tenant_members (42P17).
 DROP POLICY IF EXISTS "Users can view own tenants" ON public.tenants;
-CREATE POLICY "Users can view own tenants"
+CREATE POLICY "Public can read tenants"
   ON public.tenants
   FOR SELECT
-  USING (
-    id IN (
-      SELECT tenant_id FROM public.tenant_members
-      WHERE user_id = auth.uid()
-    )
-  );
+  USING (true);
 
 -- Tenant plugins: viewable by tenant members
 DROP POLICY IF EXISTS "Members can view tenant plugins" ON public.tenant_plugins;
@@ -439,10 +435,10 @@ ALTER TABLE public.business_favorites ENABLE ROW LEVEL SECURITY;
 
 -- --- Businesses (Empresas) Policies ---
 DROP POLICY IF EXISTS "Anyone can view businesses within active tenant" ON public.businesses;
-CREATE POLICY "Anyone can view businesses within active tenant"
+CREATE POLICY "Public can read active businesses"
   ON public.businesses
   FOR SELECT
-  USING (tenant_id = public.current_tenant_id() OR public.get_current_user_role() = 'master');
+  USING (is_active = true);
 
 DROP POLICY IF EXISTS "Owners can manage own businesses" ON public.businesses;
 CREATE POLICY "Owners can manage own businesses"
@@ -452,10 +448,10 @@ CREATE POLICY "Owners can manage own businesses"
 
 -- --- Banners Policies ---
 DROP POLICY IF EXISTS "Anyone can view active banners in active tenant" ON public.business_banners;
-CREATE POLICY "Anyone can view active banners in active tenant"
+CREATE POLICY "Public can read active banners"
   ON public.business_banners
   FOR SELECT
-  USING (tenant_id = public.current_tenant_id() AND is_active = true OR public.get_current_user_role() = 'master');
+  USING (is_active = true);
 
 DROP POLICY IF EXISTS "Owners can manage banners of their own businesses" ON public.business_banners;
 CREATE POLICY "Owners can manage banners of their own businesses"
@@ -468,10 +464,10 @@ CREATE POLICY "Owners can manage banners of their own businesses"
 
 -- --- Reviews (Avaliações) Policies ---
 DROP POLICY IF EXISTS "Anyone can view reviews in active tenant" ON public.business_reviews;
-CREATE POLICY "Anyone can view reviews in active tenant"
+CREATE POLICY "Public can read reviews"
   ON public.business_reviews
   FOR SELECT
-  USING (tenant_id = public.current_tenant_id() OR public.get_current_user_role() = 'master');
+  USING (true);
 
 DROP POLICY IF EXISTS "Logged in users can post reviews" ON public.business_reviews;
 CREATE POLICY "Logged in users can post reviews"

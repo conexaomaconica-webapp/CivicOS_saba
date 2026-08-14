@@ -30,10 +30,24 @@ export interface TenantSettings {
 }
 
 export interface TenantBranding {
+  /** Primary brand color (hex, e.g. `#1E3A8A`). Generates the full OKLCH scale. */
   readonly primaryColor?: string;
+  /** Optional accent color (hex). Falls back to the primary scale when absent. */
+  readonly accentColor?: string;
+  /** Brand logo URL. */
   readonly logoUrl?: string;
+  /** Favicon URL. */
   readonly faviconUrl?: string;
+  /** Brand app/product name. */
   readonly appName?: string;
+  /** Brand font family stack, overrides `--font-sans`. */
+  readonly fontFamily?: string;
+  /** Border radius scale preset. */
+  readonly radius?: 'sm' | 'md' | 'lg' | 'xl';
+  /** UI density preset. */
+  readonly density?: 'comfortable' | 'compact';
+  /** Color mode applied at the root element. `auto` defers to the visitor. */
+  readonly colorMode?: 'light' | 'dark' | 'auto';
 }
 
 // ---------------------------------------------------------------------------

@@ -26,10 +26,10 @@ export function ShellWrapper({ children }: ShellWrapperProps) {
 
   if (!snapshot && !boot?.error) {
     return (
-      <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+      <div className="flex h-screen w-full overflow-hidden bg-primary text-primary">
         {/* Fake Sidebar (Desktop) */}
-        <aside className="hidden w-64 flex-col border-r border-border bg-card p-4 md:flex shrink-0">
-          <div className="flex h-12 items-center px-2 mb-6 gap-2 border-b border-border/40 pb-4">
+        <aside className="hidden w-64 flex-col border-r border-default bg-secondary p-4 md:flex shrink-0">
+          <div className="flex h-12 items-center px-2 mb-6 gap-2 border-b border-default/40 pb-4">
             <Skeleton className="h-5 w-5 rounded-full" />
             <Skeleton className="h-4 w-20" />
           </div>
@@ -51,7 +51,7 @@ export function ShellWrapper({ children }: ShellWrapperProps) {
         {/* Fake Main View */}
         <div className="flex flex-col flex-1 min-w-0">
           {/* Fake Header */}
-          <header className="flex h-16 w-full items-center justify-between border-b border-border px-4 md:px-6">
+          <header className="flex h-16 w-full items-center justify-between border-b border-default px-4 md:px-6">
             <div className="flex flex-col gap-1.5">
               <Skeleton className="h-3 w-20" />
               <Skeleton className="h-4 w-32" />
@@ -60,7 +60,7 @@ export function ShellWrapper({ children }: ShellWrapperProps) {
               <Skeleton className="h-9 w-9 rounded-full" />
               <Skeleton className="h-9 w-9 rounded-full" />
               <Skeleton className="h-9 w-9 rounded-full" />
-              <div className="h-6 w-px bg-border mx-1" />
+              <div className="h-6 w-px bg-[var(--border-default)] mx-1" />
               <Skeleton className="h-8 w-8 rounded-full" />
             </div>
           </header>
@@ -85,7 +85,7 @@ export function ShellWrapper({ children }: ShellWrapperProps) {
 
   if (boot?.error) {
     return (
-      <div className="flex h-screen w-full items-center justify-center text-destructive">
+      <div className="flex h-screen w-full items-center justify-center text-[var(--color-error-500)]">
         Error loading CivicOS: {boot.error}
       </div>
     );
@@ -130,7 +130,6 @@ export function ShellWrapper({ children }: ShellWrapperProps) {
   // Placeholder context until we have page-specific contexts
   const contextHeader: ContextHeader = {
     title: 'CivicOS',
-    community: 'Comunidade Default'
   };
 
   return (

@@ -53,6 +53,22 @@ export type ElevatedAccessScope =
   | 'privacy:restricted_data:view'
   | 'financial:cross_tenant:view';
 
+// -- Permission catalog (aligned with migration 036 — seed LGPD/moderation) ---
+
+export type PermissionCode =
+  | 'business:moderate'
+  | 'legal_docs:accept'
+  | 'legal_docs:manage'
+  | 'masonic_link:approve'
+  | 'masonic_link:evidence:view'
+  | 'masonic_link:reject'
+  | 'masonic_link:review'
+  | 'masonic_link:revoke'
+  | 'masonic_link:suspend'
+  | 'privacy:export_own'
+  | 'privacy:restricted_data:view'
+  | 'privacy:revoke_consent';
+
 export type ElevatedAccessStatus = 'active' | 'expired' | 'revoked';
 
 /** A row of `public.elevated_access_sessions`. */

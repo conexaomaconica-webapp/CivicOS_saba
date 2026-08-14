@@ -1,28 +1,12 @@
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import { Providers } from './Providers';
 import { ShellWrapper } from '../components/shell/ShellWrapper';
 import { getBootData } from '../runtime/server-kernel';
+import { generateRootMetadata } from '@/lib/seo/root-metadata';
+import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
+import '@saas/ui/tokens.css';
 import './globals.css';
 
-const inter = Inter({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-inter',
-});
-
-export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://conexaomaconica.com.br'),
-  title: {
-    default: 'CivicOS — Plataforma SaaS Multi-Tenant',
-    template: '%s | CivicOS',
-  },
-  description: 'Plataforma SaaS modular de utilidade pública e ecossistemas comunitários.',
-  robots: {
-    index: true,
-    follow: true,
-  },
-};
+export const generateMetadata = generateRootMetadata;
 
 export default async function RootLayout({
   children,
@@ -30,10 +14,29 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const bootData = await getBootData();
+  const brand = await resolveTenantBrandContext();
 
   return (
-    <html lang="pt-BR" className={inter.variable} suppressHydrationWarning>
-      <body className={inter.className}>
+    <html
+      lang="pt-BR"
+      data-theme={brand.colorMode === 'dark' ? 'dark' : undefined}
+      suppressHydrationWarning
+    >
+      <head>
+        {brand.css ? (
+          <style id="tenant-brand" data-tenant={brand.tenantSlug ?? undefined}>
+            {brand.css}
+          </style>
+        ) : null}
+        {brand.followsSystem ? (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `(function(){var m=window.matchMedia('(prefers-color-scheme: dark)');function a(){document.documentElement.setAttribute('data-theme',m.matches?'dark':'light')}a();m.addEventListener('change',a)})()`,
+            }}
+          />
+        ) : null}
+      </head>
+      <body>
         <Providers bootData={bootData}>
           <ShellWrapper>
             {children}

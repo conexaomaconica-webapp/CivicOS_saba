@@ -1,5 +1,12 @@
 # Conexão Maçônica Theme
 
+> **Registro histórico de paleta.** O contrato normativo atual é
+> [`FASE_1B_DESIGN_SYSTEM_WHITE_LABEL.md`](../../products/conexao-maconica/engineering/FASE_1B_DESIGN_SYSTEM_WHITE_LABEL.md).
+> O preset v1 usa `#7A1F2E` como primária, `#C9A227` como acento e
+> `#F3EEDD` como fundo. Esses valores pertencem ao tenant/produto, nunca aos
+> componentes compartilhados. As escalas e o ciclo descritos abaixo ainda não
+> representam integralmente o runtime e precisam ser conciliados na Fase 3.
+
 **Plataforma:** CivicOS / Community Framework  
 **Produto Vertical:** Conexão Maçônica  
 **Escopo:** Tema visual específico do produto piloto Conexão Maçônica, incluindo paleta de cores institucional com luminância progressiva (escalas 50–900), suporte nativo a Dark e Light Mode com validação de contraste WCAG 2.1 AA, ciclado de publicação do tema e governança em Tenant Admin (`ADM-021`).

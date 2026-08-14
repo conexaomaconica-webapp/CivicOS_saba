@@ -13,7 +13,7 @@
     "dev:web": "turbo run dev --filter=@saas/web",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test && node architecture-tests.js",
+    "test": "turbo run test --concurrency=1 && node architecture-tests.js",
     "clean": "rimraf --glob packages/*/dist packages/*/*.tsbuildinfo plugins/*/dist plugins/*/*.tsbuildinfo apps/*/.next apps/*/*.tsbuildinfo",
     "supabase:start": "node scripts/db-migrate-test.cjs",
     "db:migrate:test": "node scripts/db-migrate-test.cjs",

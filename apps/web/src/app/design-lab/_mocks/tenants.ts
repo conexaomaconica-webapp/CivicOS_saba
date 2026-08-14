@@ -6,9 +6,9 @@ export const MOCK_TENANTS: MockTenant[] = [
     name: 'Conexão Maçônica',
     slug: 'conexao-maconica',
     themePreset: 'conexao-maconica',
-    primaryColor: '#1E3A8A', // Rich Masonic Navy Blue
-    accentColor: '#D97706', // Warm Gold / Amber Accent
-    surfaceColor: '#0F172A', // Dark Slate Surface
+    primaryColor: '#4A0E1A', // Bordô Profundo
+    accentColor: '#C9A227', // Dourado de Insígnia
+    surfaceColor: '#F3EEDD', // Marfim (papel claro)
     isOfficial: true,
     labelBadge: 'Vertical Oficial'
   },

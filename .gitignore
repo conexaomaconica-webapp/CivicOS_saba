@@ -38,9 +38,13 @@ next-env.d.ts
 
 # supabase binaries
 supabase.exe
+supabase-go
 supabase-go.exe
 supabase.zip
 supabase_cli/
+
+# local PowerShell analysis cache
+/Microsoft/
 
 # session logs and scratch temp files
 session-ses_*.md

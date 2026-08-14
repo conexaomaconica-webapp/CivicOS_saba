@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { EmptyState } from '@/components/aux/EmptyState';
+import { EmptyState } from '@/components/ui-states/EmptyState';
 
 export default function NotFound() {
   return (

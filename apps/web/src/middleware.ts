@@ -16,15 +16,8 @@ export async function middleware(request: NextRequest) {
   // ---------------------------------------------------------------------------
   const host = request.headers.get('host') ?? '';
   const subdomain = extractSubdomain(host);
-  const tenantId =
-    subdomain ??
-    request.headers.get('x-tenant-id') ??
-    request.cookies.get('tenant_id')?.value ??
-    null;
-
-  if (tenantId) {
-    response.headers.set('x-tenant-id', tenantId);
-  }
+  // Public resolution never trusts x-tenant-id or tenant_id cookies. Server
+  // components pass this original Host to the verified-domain RPC.
 
   // ---------------------------------------------------------------------------
   // 2. Auth & RBAC Check
@@ -55,14 +48,15 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
 
-    // Resolve user details and roles
-    interface UserMetadata {
-      role?: string;
-      tenant_id?: string;
-    }
-    const metadata = (user?.user_metadata ?? {}) as UserMetadata;
-    const userRole = metadata.role ?? 'usuario_comum';
-    const userTenantId = metadata.tenant_id ?? null;
+    // Authorization data must come from the protected profile, never from
+    // raw_user_meta_data, which the end user can modify.
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, tenant_id')
+      .eq('id', user.id)
+      .maybeSingle();
+    const userRole = profile?.role ?? 'usuario_comum';
+    const userTenantId = profile?.tenant_id ?? null;
 
     // RBAC: Admin Routes (/admin/*)
     if (isAdminRoute) {
@@ -86,19 +80,14 @@ export async function middleware(request: NextRequest) {
 
       // If user is a socio_admin or anunciante, check if they match the tenant
       let resolvedTenantId = null;
-      if (tenantId) {
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId);
-        if (isUUID) {
-          resolvedTenantId = tenantId;
-        } else {
-          const { data: tenantData } = await supabase
-            .from('tenants')
-            .select('id')
-            .eq('slug', tenantId)
-            .maybeSingle();
-          if (tenantData) {
-            resolvedTenantId = tenantData.id;
-          }
+      if (subdomain) {
+        const { data: tenantData } = await supabase
+          .from('tenants')
+          .select('id')
+          .eq('slug', subdomain)
+          .maybeSingle();
+        if (tenantData) {
+          resolvedTenantId = tenantData.id;
         }
       }
 
