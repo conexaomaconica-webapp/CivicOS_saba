@@ -745,16 +745,9 @@ DROP POLICY IF EXISTS "Public can view active banners in tenant" ON public.banne
 
 -- A antiga RPC confundia vinculo comunitario com verificacao cadastral e nao
 -- recebia contexto de tenant. Removida para impedir uso acidental.
--- Alguns ambientes anteriores registraram a migration 036 sem conservar esta
--- RPC. REVOKE nao possui IF EXISTS, portanto a revogacao precisa ser
--- condicionada para que a 040 continue idempotente diante dessa divergencia.
-DO $$
-BEGIN
-  IF pg_catalog.to_regprocedure('public.get_verified_business_ids()') IS NOT NULL THEN
-    EXECUTE 'REVOKE ALL ON FUNCTION public.get_verified_business_ids() FROM PUBLIC, anon, authenticated, service_role';
-  END IF;
-END;
-$$;
+-- DROP remove tambem a ACL existente. Nao ha REVOKE separado porque REVOKE
+-- nao aceita IF EXISTS e a RPC pode legitimamente estar ausente em ambientes
+-- que executaram uma versao intermediaria da migration 036.
 DROP FUNCTION IF EXISTS public.get_verified_business_ids();
 
 -- Restaura leitura autenticada de tenant sem a recursao da policy original de

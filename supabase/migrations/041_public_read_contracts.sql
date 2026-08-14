@@ -118,6 +118,17 @@ GRANT EXECUTE ON FUNCTION public._normalize_public_host(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION public._resolve_public_tenant_id(TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION public._safe_public_url(TEXT) TO service_role;
 
+-- As RPCs publicas podem existir em ambientes que receberam uma versao
+-- intermediaria dos contratos. PostgreSQL nao permite CREATE OR REPLACE quando
+-- o row type de parametros OUT muda. Removemos somente as seis assinaturas
+-- exatas, sem CASCADE; qualquer dependencia inesperada bloqueia a migration.
+DROP FUNCTION IF EXISTS public.public_tenant_branding(TEXT);
+DROP FUNCTION IF EXISTS public.public_home_content(TEXT);
+DROP FUNCTION IF EXISTS public.public_directory_search(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER);
+DROP FUNCTION IF EXISTS public.public_business_detail(TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.public_business_reviews(TEXT, TEXT, TIMESTAMPTZ, UUID, INTEGER);
+DROP FUNCTION IF EXISTS public.public_masonic_lodges(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER);
+
 -- ---------------------------------------------------------------------------
 -- 2. Branding publico do tenant
 -- ---------------------------------------------------------------------------
