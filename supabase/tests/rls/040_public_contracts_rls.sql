@@ -552,6 +552,10 @@ SELECT extensions.ok(
   AND has_function_privilege('service_role', 'public._business_is_founder(uuid,uuid)', 'EXECUTE'),
   'RPC-005 helper de autoridade e interno e restrito a service_role'
 );
+SELECT extensions.ok(
+  pg_catalog.to_regprocedure('public.get_verified_business_ids()') IS NULL,
+  'RPC-006 RPC legada de verificacao por vinculo comunitario foi removida'
+);
 
 -- ---------------------------------------------------------------------------
 -- Anonymous visitor
