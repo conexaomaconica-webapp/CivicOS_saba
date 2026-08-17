@@ -16,12 +16,11 @@ export default defineConfig({
     channel: 'chrome',
     launchOptions: { args: ['--font-render-hinting=none'] },
   },
-  // Connect directly to active dev server on port 3000
-  // webServer: {
-  //   command: 'pnpm.cmd dev',
-  //   url: 'http://localhost:3000',
-  //   timeout: 120_000,
-  //   reuseExistingServer: true,
-  //   env: { ...process.env, VISUAL_LAB_ENABLED: 'true' },
-  // },
+  webServer: {
+    command: 'pnpm.cmd --filter @saas/web dev',
+    url: 'http://127.0.0.1:3000',
+    timeout: 120_000,
+    reuseExistingServer: true,
+  },
 });
+

@@ -1,6 +1,7 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { createServerSideClient } from '@/lib/supabase/server';
+
 import { ratingSummarySchema, businessReviewSchema } from '@saas/core';
 
 export interface SubmitReviewInput {
@@ -20,7 +21,7 @@ export async function submitBusinessReviewAction(
   input: SubmitReviewInput
 ): Promise<ReviewActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerSideClient();
     const {
       data: { user },
       error: authError,
@@ -101,7 +102,7 @@ export async function getBusinessRatingSummaryAction(
   businessId: string
 ): Promise<ReviewActionResult<{ averageRating: number; totalApprovedReviews: number }>> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerSideClient();
     const { data, error } = await supabase.rpc('get_business_rating_summary', {
       p_tenant_id: tenantId,
       p_business_id: businessId,
@@ -131,7 +132,7 @@ export async function getApprovedBusinessReviewsAction(
   businessId: string
 ): Promise<ReviewActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerSideClient();
     const { data, error } = await supabase
       .from('business_reviews')
       .select('id, rating, comment, created_at, author_id')

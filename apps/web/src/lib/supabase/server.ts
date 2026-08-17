@@ -31,3 +31,6 @@ export async function createServerSideClient() {
     },
   });
 }
+
+export { createServerSideClient as createClient };
+

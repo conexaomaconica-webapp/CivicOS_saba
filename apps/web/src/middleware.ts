@@ -39,6 +39,12 @@ export async function middleware(request: NextRequest) {
 
   // If trying to access protected routes
   if (isAdminRoute || isDashboardRoute || isProfileRoute || isUserAreaRoute) {
+    const mockRole = process.env.NODE_ENV !== 'production' ? request.cookies.get('e2e-mock-role')?.value : null;
+
+    if (mockRole === 'master' || mockRole === 'socio_admin') {
+      return response; // Authorized E2E mock admin context
+    }
+
     const isMockDevRoute = process.env.NODE_ENV !== 'production' && (
       path.includes('/empresa-') || path.includes('/bronze') || path.includes('/prata') || path.includes('/ouro')
     );
@@ -46,6 +52,7 @@ export async function middleware(request: NextRequest) {
     if (isMockDevRoute) {
       return response;
     }
+
 
     if (!user) {
       // Not authenticated, redirect to login

@@ -1,6 +1,7 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { createServerSideClient } from '@/lib/supabase/server';
+
 
 export interface AdminActionResult<T = unknown> {
   success: boolean;
@@ -17,7 +18,7 @@ export async function updatePlanQuotaAction(input: {
   reason?: string;
 }): Promise<AdminActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerSideClient();
     const {
       data: { user },
       error: authError,
@@ -57,7 +58,7 @@ export async function moderatePublicationStatusAction(input: {
   reason?: string;
 }): Promise<AdminActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerSideClient();
     const { data, error } = await supabase.rpc('moderate_business_publication_status', {
       p_tenant_id: input.tenantId,
       p_business_id: input.businessId,
@@ -85,7 +86,7 @@ export async function allocateFounderStatusAction(input: {
   reason?: string;
 }): Promise<AdminActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerSideClient();
     const { data, error } = await supabase.rpc('allocate_founder_status', {
       p_tenant_id: input.tenantId,
       p_business_id: input.businessId,
@@ -112,7 +113,7 @@ export async function moderateReviewAction(input: {
   rejectionReason?: string;
 }): Promise<AdminActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerSideClient();
     const {
       data: { user },
       error: authError,
@@ -153,7 +154,7 @@ export async function fetchAdminAuditLogsAction(
   tenantId?: string
 ): Promise<AdminActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = await createServerSideClient();
     let query = supabase
       .from('admin_audit_logs')
       .select('*')
