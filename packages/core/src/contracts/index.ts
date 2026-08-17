@@ -132,3 +132,6 @@ export type {
   AIPromptDefinition,
   MetadataRegistryService,
 } from './metadata-registry.contract';
+
+export * from './reviews-and-audit.contract';
+

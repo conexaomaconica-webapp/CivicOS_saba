@@ -270,6 +270,23 @@ export type {
   MetadataRegistryService,
 } from './contracts';
 
+export {
+  reviewStatusSchema,
+  businessReviewSchema,
+  ratingSummarySchema,
+  adminAuditLogSchema,
+  searchPublicBusinessesQuerySchema,
+} from './contracts/reviews-and-audit.contract';
+export type {
+  ReviewStatus,
+  BusinessReview,
+  RatingSummary,
+  AdminAuditLog,
+  SearchPublicBusinessesQuery,
+} from './contracts/reviews-and-audit.contract';
+
+
+
 // -- Presentation Engine ----------------------------------------------------
 export type {
   PresentationContext,
