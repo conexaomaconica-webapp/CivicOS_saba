@@ -48,14 +48,14 @@ export function Drawer({
   if (!isOpen) return null;
 
   const positionClasses = {
-    right: 'inset-y-0 right-0 h-full w-full max-w-md border-l border-slate-800 animate-in slide-in-from-right duration-300',
-    left: 'inset-y-0 left-0 h-full w-full max-w-md border-r border-slate-800 animate-in slide-in-from-left duration-300',
-    bottom: 'inset-x-0 bottom-0 max-h-[85vh] w-full border-t border-slate-800 rounded-t-2xl animate-in slide-in-from-bottom duration-300'
+    right: 'inset-y-0 right-0 h-full w-full max-w-md border-l border-border animate-in slide-in-from-right duration-300 motion-reduce:animate-none',
+    left: 'inset-y-0 left-0 h-full w-full max-w-md border-r border-border animate-in slide-in-from-left duration-300 motion-reduce:animate-none',
+    bottom: 'inset-x-0 bottom-0 max-h-[85vh] w-full border-t border-border rounded-t-2xl animate-in slide-in-from-bottom duration-300 motion-reduce:animate-none'
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm"
+      className="fixed inset-0 z-50 bg-overlay backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? 'drawer-title' : undefined}
@@ -66,12 +66,12 @@ export function Drawer({
       <div
         ref={drawerRef}
         tabIndex={-1}
-        className={`absolute bg-slate-900 shadow-2xl flex flex-col focus:outline-none ${positionClasses[position]}`}
+        className={`absolute bg-surface-elevated text-foreground shadow-semanticMd flex flex-col focus:outline-none ${positionClasses[position]}`}
       >
         {/* Header */}
-        <div className="p-5 border-b border-slate-800 flex items-center justify-between gap-4 shrink-0">
+        <div className="p-5 border-b border-border flex items-center justify-between gap-4 shrink-0">
           {title ? (
-            <h2 id="drawer-title" className="text-base font-bold text-white tracking-tight">
+            <h2 id="drawer-title" className="text-base font-bold font-heading text-foreground tracking-tight">
               {title}
             </h2>
           ) : (
@@ -79,7 +79,7 @@ export function Drawer({
           )}
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+            className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted transition-colors focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Fechar Gaveta"
           >
             ✕
@@ -87,13 +87,13 @@ export function Drawer({
         </div>
 
         {/* Content Scrollable Area */}
-        <div className="p-6 flex-1 overflow-y-auto space-y-4 text-sm text-slate-200">
+        <div className="p-6 flex-1 overflow-y-auto space-y-4 text-sm text-foreground">
           {children}
         </div>
 
         {/* Footer */}
         {footer && (
-          <div className="p-4 bg-slate-950/60 border-t border-slate-800 shrink-0 flex items-center justify-end gap-3">
+          <div className="p-4 bg-muted border-t border-border shrink-0 flex items-center justify-end gap-3">
             {footer}
           </div>
         )}

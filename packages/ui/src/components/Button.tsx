@@ -29,7 +29,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     // Base classes
     const baseClasses =
-      'inline-flex items-center justify-center font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:opacity-50 disabled:cursor-not-allowed select-none active:scale-[0.98]';
+      'inline-flex items-center justify-center font-medium font-interface transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed select-none active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100';
 
     // Size variants
     const sizeClasses = {
@@ -42,15 +42,15 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     // Style variants using semantic tokens
     const variantClasses = {
       primary:
-        'bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20 active:bg-blue-700',
+        'bg-primary text-primary-foreground shadow-semanticSm hover:brightness-110 active:brightness-90',
       secondary:
-        'bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 active:bg-slate-850',
+        'bg-secondary text-secondary-foreground border border-border hover:brightness-95 active:brightness-90',
       outline:
-        'bg-transparent hover:bg-slate-800/60 text-slate-200 border border-slate-700 active:bg-slate-800',
+        'bg-transparent text-foreground border border-border hover:bg-muted active:brightness-95',
       ghost:
-        'bg-transparent hover:bg-slate-800/50 text-slate-300 hover:text-white active:bg-slate-800',
+        'bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground active:brightness-95',
       danger:
-        'bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/20 active:bg-rose-700'
+        'bg-destructive text-destructive-foreground shadow-semanticSm hover:brightness-110 active:brightness-90'
     };
 
     const isDisabled = disabled || loading;

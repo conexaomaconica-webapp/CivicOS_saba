@@ -1,0 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --color-burgundy-900: #4A0E0E;
+  --color-burgundy-800: #6B1414;
+  --color-burgundy-700: #7B1D1D;
+  --color-burgundy-600: #8B2020;
+  --color-burgundy-500: #9B2C2C;
+  --color-burgundy-100: #FEF2F2;
+  --color-burgundy-50: #FFF5F5;
+  --color-gold-700: #92690A;
+  --color-gold-600: #A67C0F;
+  --color-gold-500: #C9A227;
+  --color-gold-400: #D4AF37;
+  --color-gold-300: #E8CA65;
+  --color-gold-100: #FEF9E7;
+  --color-gold-50: #FFFDF0;
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #FFFFFF;
+  color: #1C1C1C;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+/* Admin dark theme */
+.admin-layout {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #0F1520;
+  color: #E8E4D8;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #F3F4F6; }
+::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
+
+a { text-decoration: none; color: inherit; }
+
+input, select, button { font-family: inherit; }

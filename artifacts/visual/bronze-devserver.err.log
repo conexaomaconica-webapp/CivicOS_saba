@@ -1,0 +1,91 @@
+ ⚠ Cross origin request detected from 127.0.0.1 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+ ⨯ Error: Cannot find module './8961.js'
+Require stack:
+- F:\projetos\saas-platform\apps\web\.next\server\webpack-runtime.js
+- F:\projetos\saas-platform\apps\web\.next\server\app\visual-lab\bronze\page.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\require.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\load-components.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\build\utils.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\build\swc\options.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\build\swc\index.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\config.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\next.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\lib\start-server.js
+    at <unknown> (F:\projetos\saas-platform\apps\web\.next\server\app\visual-lab\bronze\page.js:2:12326)
+    at Object.<anonymous> (F:\projetos\saas-platform\apps\web\.next\server\app\visual-lab\bronze\page.js:2:12401) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/visual-lab/bronze'
+}
+ ⨯ Failed to generate static paths for /guia/[slug]:
+[Error: Cannot find module './vendor-chunks/tr46@0.0.3.js'
+Require stack:
+- F:\projetos\saas-platform\apps\web\.next\server\webpack-runtime.js
+- F:\projetos\saas-platform\apps\web\.next\server\app\(public)\guia\[slug]\page.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\require.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\load-components.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\build\utils.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\dev\static-paths-worker.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
+ ⨯ [Error: Cannot find module './vendor-chunks/tr46@0.0.3.js'
+Require stack:
+- F:\projetos\saas-platform\apps\web\.next\server\webpack-runtime.js
+- F:\projetos\saas-platform\apps\web\.next\server\app\[...slug]\page.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\require.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\load-components.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\build\utils.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\dev\static-paths-worker.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/_next/static/css/app/layout.css'
+}
+ ⨯ [Error: Cannot find module './vendor-chunks/tr46@0.0.3.js'
+Require stack:
+- F:\projetos\saas-platform\apps\web\.next\server\webpack-runtime.js
+- F:\projetos\saas-platform\apps\web\.next\server\app\[...slug]\page.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\require.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\load-components.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\build\utils.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\dev\static-paths-worker.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/_next/static/css/app/layout.css'
+}
+ ⨯ [Error: Cannot find module './vendor-chunks/tr46@0.0.3.js'
+Require stack:
+- F:\projetos\saas-platform\apps\web\.next\server\webpack-runtime.js
+- F:\projetos\saas-platform\apps\web\.next\server\app\[...slug]\page.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\require.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\load-components.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\build\utils.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\dev\static-paths-worker.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/_next/static/css/app/layout.css'
+}
+ ⨯ [Error: Cannot find module './vendor-chunks/tr46@0.0.3.js'
+Require stack:
+- F:\projetos\saas-platform\apps\web\.next\server\webpack-runtime.js
+- F:\projetos\saas-platform\apps\web\.next\server\app\[...slug]\page.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\require.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\load-components.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\build\utils.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\server\dev\static-paths-worker.js
+- F:\projetos\saas-platform\node_modules\.pnpm\next@15.5.20_@playwright+test@1.62.1_react-dom@19.2.7_react@19.2.7__react@19.2.7\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/_next/static/css/app/layout.css'
+}

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   canPublishTenantTheme,
+  evaluateTenantThemeContrast,
   migrateLegacyTenantBranding,
   publicTenantThemeSchema,
+  resolveEffectiveTenantModules,
   tenantModuleSelectionSchema,
   tenantThemeConfigSchema,
   WHITE_LABEL_DEFAULT_THEME,
@@ -77,6 +79,27 @@ describe('white-label tenant theme contract', () => {
     expect(canPublishTenantTheme(unsafe)).toBe(false);
   });
 
+  it('checks focus and status indicators as non-text UI at 3:1', () => {
+    const unsafe = tenantThemeConfigSchema.parse({
+      ...WHITE_LABEL_DEFAULT_THEME,
+      colors: {
+        ...WHITE_LABEL_DEFAULT_THEME.colors,
+        ring: '#f8fafc',
+        warning: '#ffffff',
+      },
+    });
+    const checks = evaluateTenantThemeContrast(unsafe);
+
+    expect(checks.find((check) => check.pair === 'focus-ring')).toMatchObject({
+      minimum: 3,
+      passes: false,
+    });
+    expect(
+      checks.find((check) => check.pair === 'warning-indicator'),
+    ).toMatchObject({ minimum: 3, passes: false });
+    expect(canPublishTenantTheme(unsafe)).toBe(false);
+  });
+
   it('rejects duplicate modules and validates the public projection', () => {
     expect(
       tenantModuleSelectionSchema.safeParse({
@@ -121,5 +144,52 @@ describe('white-label tenant theme contract', () => {
     expect(second.tenantSlug).toBe('tenant-b');
     expect(first.colors.primary).not.toBe(second.colors.primary);
     expect(WHITE_LABEL_DEFAULT_THEME.colors.primary).toBe('#334155');
+  });
+
+  it('resolves modules only from installation, capabilities and dependencies', () => {
+    const catalog = [
+      {
+        id: 'directory.businesses',
+        pluginId: 'business-directory',
+        capabilities: ['business-directory'],
+        dependencies: [],
+        public: true,
+      },
+      {
+        id: 'masonic.organizations',
+        pluginId: 'conexao-maconica',
+        capabilities: ['masonic-organization'],
+        dependencies: ['directory.businesses'],
+        public: true,
+      },
+    ];
+    const selection = tenantModuleSelectionSchema.parse({
+      schemaVersion: 1,
+      productId: 'community-product',
+      enabledModules: ['directory.businesses', 'masonic.organizations'],
+    });
+
+    const effective = resolveEffectiveTenantModules(catalog, selection, {
+      installedPluginIds: ['business-directory', 'conexao-maconica'],
+      grantedCapabilities: ['business-directory'],
+      featureOverrides: { 'masonic.organizations': true },
+    });
+
+    expect(effective.map((module) => module.id)).toEqual(['directory.businesses']);
+  });
+
+  it('fails closed for an unknown selected module', () => {
+    const selection = tenantModuleSelectionSchema.parse({
+      schemaVersion: 1,
+      productId: 'generic-product',
+      enabledModules: ['unknown.module'],
+    });
+
+    expect(() =>
+      resolveEffectiveTenantModules([], selection, {
+        installedPluginIds: [],
+        grantedCapabilities: [],
+      }),
+    ).toThrow('Unknown product module');
   });
 });

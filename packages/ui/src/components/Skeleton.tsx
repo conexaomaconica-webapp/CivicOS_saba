@@ -15,7 +15,7 @@ export function Skeleton({
   ...props
 }: SkeletonProps) {
   const baseClasses =
-    'bg-slate-800/80 animate-pulse rounded select-none pointer-events-none motion-reduce:animate-none';
+    'bg-muted animate-pulse rounded select-none pointer-events-none motion-reduce:animate-none';
 
   const variantClasses = {
     text: 'h-4 w-full rounded',

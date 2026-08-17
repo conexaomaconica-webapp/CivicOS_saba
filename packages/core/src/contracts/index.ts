@@ -59,6 +59,7 @@ export {
   productModuleDefinitionSchema,
   publicTenantThemeSchema,
   publicThemeAssetUrlSchema,
+  resolveEffectiveTenantModules,
   tenantModuleSelectionSchema,
   tenantThemeColorsSchema,
   tenantThemeConfigSchema,
@@ -74,6 +75,7 @@ export type {
   TenantThemeColors,
   TenantThemeConfig,
   ThemeContrastCheck,
+  TenantModuleAuthority,
 } from './tenant-theme.contract';
 
 export type {

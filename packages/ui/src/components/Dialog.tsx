@@ -65,7 +65,7 @@ export function Dialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay backdrop-blur-sm animate-in fade-in duration-200 motion-reduce:animate-none"
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? 'dialog-title' : undefined}
@@ -77,26 +77,26 @@ export function Dialog({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className={`w-full bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden focus:outline-none ${sizeClasses[size]} animate-in zoom-in-95 duration-200`}
+        className={`w-full bg-surface-elevated text-foreground border border-border rounded-2xl shadow-semanticMd overflow-hidden focus:outline-none ${sizeClasses[size]} animate-in zoom-in-95 duration-200 motion-reduce:animate-none`}
       >
         {/* Header */}
         {(title || description) && (
-          <div className="p-6 pb-4 border-b border-slate-800 flex items-start justify-between gap-4">
+          <div className="p-6 pb-4 border-b border-border flex items-start justify-between gap-4">
             <div className="space-y-1">
               {title && (
-                <h2 id="dialog-title" className="text-lg font-bold text-white tracking-tight">
+                <h2 id="dialog-title" className="text-lg font-bold font-heading text-foreground tracking-tight">
                   {title}
                 </h2>
               )}
               {description && (
-                <p id="dialog-desc" className="text-xs text-slate-400">
+                <p id="dialog-desc" className="text-xs text-muted-foreground">
                   {description}
                 </p>
               )}
             </div>
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+              className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted transition-colors focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Fechar Modal"
             >
               ✕
@@ -105,11 +105,11 @@ export function Dialog({
         )}
 
         {/* Content Body */}
-        <div className="p-6 text-sm text-slate-200 space-y-4">{children}</div>
+        <div className="p-6 text-sm text-foreground space-y-4">{children}</div>
 
         {/* Footer */}
         {footer && (
-          <div className="p-4 bg-slate-950/60 border-t border-slate-800 flex items-center justify-end gap-3">
+          <div className="p-4 bg-muted border-t border-border flex items-center justify-end gap-3">
             {footer}
           </div>
         )}

@@ -1,5 +1,4 @@
 import { Providers } from './Providers';
-import { ShellWrapper } from '../components/shell/ShellWrapper';
 import { getBootData } from '../runtime/server-kernel';
 import { generateRootMetadata } from '@/lib/seo/root-metadata';
 import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
@@ -37,11 +36,7 @@ export default async function RootLayout({
         ) : null}
       </head>
       <body>
-        <Providers bootData={bootData}>
-          <ShellWrapper>
-            {children}
-          </ShellWrapper>
-        </Providers>
+        <Providers bootData={bootData}>{children}</Providers>
       </body>
     </html>
   );

@@ -13,6 +13,7 @@ export default defineConfig({
       '**/architecture.test.ts',
       '**/shell-boundary.test.ts',
       '**/navigation-renderer.test.tsx',
+      'e2e/**',
       'node_modules/**',
     ],
   },

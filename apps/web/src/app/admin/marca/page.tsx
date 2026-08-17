@@ -6,11 +6,13 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Database, Json } from '@/types/database.types';
 import {
-  brandAccentContrast,
+  APPROVED_FONT_STACKS,
   brandCssVarsToStyle,
   brandToCssVars,
+  contrastRatio,
   generatePrimaryScale,
   oklchToHex,
+  type ApprovedFontToken,
   type BrandRadiusPreset,
 } from '@/lib/tenant/brand-tokens';
 
@@ -19,14 +21,31 @@ import {
 // ---------------------------------------------------------------------------
 
 const HEX_RE = /^#[0-9a-f]{6}$/i;
-const URL_RE = /^https?:\/\/\S+$/i;
-
 const FONT_OPTIONS = [
   { label: 'Padrão da plataforma', value: '' },
-  { label: 'Serifa clássica', value: "'Iowan Old Style', 'Palatino Linotype', Georgia, serif" },
-  { label: 'Sem serifa de sistema', value: "'Segoe UI', ui-sans-serif, system-ui, -apple-system, sans-serif" },
-  { label: 'Personalizada…', value: 'custom' },
+  { label: 'Sans-serif da plataforma', value: 'platform-sans' },
+  { label: 'Editorial com serifa', value: 'editorial-serif' },
+  { label: 'Sans-serif humanista', value: 'humanist-sans' },
 ] as const;
+
+function isSafeAssetUrl(value: string): boolean {
+  if (value.startsWith('/') && !value.startsWith('//')) return true;
+  try {
+    const parsed = new URL(value);
+    return (
+      parsed.protocol === 'https:' &&
+      parsed.hostname.length > 0 &&
+      parsed.username.length === 0 &&
+      parsed.password.length === 0
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isApprovedFontToken(value: string): value is ApprovedFontToken {
+  return Object.hasOwn(APPROVED_FONT_STACKS, value);
+}
 
 const RADIUS_PRESETS: { id: BrandRadiusPreset; label: string; radius: string }[] = [
   { id: 'sm', label: 'Discreto', radius: '4px' },
@@ -70,16 +89,19 @@ const EMPTY_FORM: BrandForm = {
   colorMode: 'light',
 };
 
-type TenantRow = Database['public']['Tables']['tenants']['Row'];
+type TenantRow = Pick<
+  Database['public']['Tables']['tenants']['Row'],
+  'id' | 'name' | 'slug' | 'settings'
+>;
 
 function normalizeBranding(form: BrandForm): Record<string, unknown> | null {
   const branding: Record<string, unknown> = {};
 
   if (form.appName.trim()) branding.appName = form.appName.trim().slice(0, 64);
-  if (form.logoUrl.trim() && URL_RE.test(form.logoUrl.trim())) {
+  if (form.logoUrl.trim() && isSafeAssetUrl(form.logoUrl.trim())) {
     branding.logoUrl = form.logoUrl.trim().slice(0, 512);
   }
-  if (form.faviconUrl.trim() && URL_RE.test(form.faviconUrl.trim())) {
+  if (form.faviconUrl.trim() && isSafeAssetUrl(form.faviconUrl.trim())) {
     branding.faviconUrl = form.faviconUrl.trim().slice(0, 512);
   }
   if (form.primaryColor && HEX_RE.test(form.primaryColor)) {
@@ -88,7 +110,7 @@ function normalizeBranding(form: BrandForm): Record<string, unknown> | null {
   if (form.accentColor && HEX_RE.test(form.accentColor)) {
     branding.accentColor = form.accentColor.toLowerCase();
   }
-  if (form.fontFamily.trim()) branding.fontFamily = form.fontFamily.trim().slice(0, 256);
+  if (isApprovedFontToken(form.fontFamily)) branding.fontFamily = form.fontFamily;
 
   branding.radius = form.radius;
   branding.density = form.density;
@@ -105,7 +127,6 @@ export default function BrandStudioPage() {
   const [saving, setSaving] = useState(false);
   const [tenant, setTenant] = useState<TenantRow | null>(null);
   const [form, setForm] = useState<BrandForm>(EMPTY_FORM);
-  const [customFont, setCustomFont] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -151,7 +172,7 @@ export default function BrandStudioPage() {
 
       const { data: dbTenant, error } = await supabase
         .from('tenants')
-        .select('*')
+        .select('id, name, slug, settings')
         .eq('id', tenantId)
         .single();
 
@@ -179,10 +200,9 @@ export default function BrandStudioPage() {
         primaryColor: typeof branding.primaryColor === 'string' ? branding.primaryColor : '',
         accentColor: typeof branding.accentColor === 'string' ? branding.accentColor : '',
         fontFamily:
-          typeof branding.fontFamily === 'string'
-            ? FONT_OPTIONS.some((o) => o.value !== 'custom' && o.value === branding.fontFamily)
-              ? branding.fontFamily
-              : 'custom'
+          typeof branding.fontFamily === 'string' &&
+          isApprovedFontToken(branding.fontFamily)
+            ? branding.fontFamily
             : '',
         radius:
           branding.radius === 'sm' || branding.radius === 'md' || branding.radius === 'lg' || branding.radius === 'xl'
@@ -194,10 +214,6 @@ export default function BrandStudioPage() {
             ? branding.colorMode
             : 'light',
       });
-
-      if (typeof branding.fontFamily === 'string') {
-        setCustomFont(branding.fontFamily);
-      }
 
       previousThemeRef.current = document.documentElement.getAttribute('data-theme');
       previousDarkModeRef.current = document.documentElement.className.includes('dark') ? 'dark' : null;
@@ -214,18 +230,16 @@ export default function BrandStudioPage() {
   const brandInput = useMemo(() => {
     const primaryColor = HEX_RE.test(form.primaryColor) ? form.primaryColor : undefined;
     const accentColor = HEX_RE.test(form.accentColor) ? form.accentColor : undefined;
-    const fontFamily =
-      form.fontFamily === 'custom'
-        ? customFont.trim() || undefined
-        : form.fontFamily.trim() || undefined;
     return {
       primaryColor,
       accentColor,
-      fontFamily,
+      fontToken: isApprovedFontToken(form.fontFamily)
+        ? form.fontFamily
+        : undefined,
       radius: form.radius,
       density: form.density,
     };
-  }, [form, customFont]);
+  }, [form]);
 
   const cssOutput = useMemo(() => brandToCssVars(brandInput), [brandInput]);
 
@@ -277,7 +291,10 @@ export default function BrandStudioPage() {
 
   const contrast = useMemo(() => {
     if (!brandInput.primaryColor) return null;
-    return brandAccentContrast(brandInput.primaryColor);
+    return Math.max(
+      contrastRatio(brandInput.primaryColor, '#ffffff') ?? 0,
+      contrastRatio(brandInput.primaryColor, '#000000') ?? 0,
+    );
   }, [brandInput]);
 
   const primaryScaleHexes = useMemo(() => {
@@ -303,8 +320,12 @@ export default function BrandStudioPage() {
       setErrorMsg('Use códigos hex válidos (ex.: #4A0E1A) nas cores.');
       return;
     }
-    if (form.logoUrl && !URL_RE.test(form.logoUrl)) {
-      setErrorMsg('O endereço do logotipo precisa começar com http:// ou https://.');
+    if (form.logoUrl && !isSafeAssetUrl(form.logoUrl)) {
+      setErrorMsg('O logotipo deve usar HTTPS ou um caminho seguro do próprio portal.');
+      return;
+    }
+    if (form.faviconUrl && !isSafeAssetUrl(form.faviconUrl)) {
+      setErrorMsg('O favicon deve usar HTTPS ou um caminho seguro do próprio portal.');
       return;
     }
 
@@ -369,7 +390,6 @@ export default function BrandStudioPage() {
       if (error) throw error;
 
       setForm(EMPTY_FORM);
-      setCustomFont('');
       setTenant({ ...tenant, settings: nextSettings as unknown as Json });
       setDirty(false);
       setSuccessMsg('Identidade restaurada para o padrão da plataforma.');
@@ -557,18 +577,6 @@ export default function BrandStudioPage() {
                   ))}
                 </select>
               </Field>
-
-              {form.fontFamily === 'custom' && (
-                <Field label="Família personalizada">
-                  <input
-                    type="text"
-                    value={customFont}
-                    placeholder="'Playfair Display', Georgia, serif"
-                    onChange={(e) => setCustomFont(e.target.value)}
-                    style={inputStyle}
-                  />
-                </Field>
-              )}
 
               <Field label="Cantos (raio)">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-2)' }}>

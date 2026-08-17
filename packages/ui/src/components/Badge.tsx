@@ -50,9 +50,9 @@ export function Badge({
       borderColor: 'var(--status-danger-border)'
     },
     accent: {
-      backgroundColor: 'var(--accent-subtle)',
-      color: 'var(--accent)',
-      borderColor: 'var(--border-focus)'
+      backgroundColor: 'var(--color-accent-subtle)',
+      color: 'var(--color-accent-subtle-foreground)',
+      borderColor: 'var(--color-accent)'
     }
   };
 

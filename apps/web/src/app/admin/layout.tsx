@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
+import { ShellWrapper } from '@/components/shell/ShellWrapper';
 
 export const metadata: Metadata = {
   title: 'Administração',
@@ -11,5 +12,5 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return <ShellWrapper>{children}</ShellWrapper>;
 }

@@ -181,6 +181,7 @@ export {
   productModuleDefinitionSchema,
   publicTenantThemeSchema,
   publicThemeAssetUrlSchema,
+  resolveEffectiveTenantModules,
   tenantModuleSelectionSchema,
   tenantThemeColorsSchema,
   tenantThemeConfigSchema,
@@ -196,6 +197,7 @@ export type {
   TenantThemeColors,
   TenantThemeConfig,
   ThemeContrastCheck,
+  TenantModuleAuthority,
 } from './contracts/tenant-theme.contract';
 
 export type {

@@ -37,36 +37,76 @@
   --color-error-500: oklch(0.60 0.22 25);
   --color-info-500: oklch(0.65 0.15 230);
 
-  /* -- Semantic Tokens (Light Mode) --------------------------------------- */
-  --bg-primary: var(--color-gray-50);
-  --bg-secondary: white;
-  --bg-tertiary: var(--color-gray-100);
-  --bg-inverse: var(--color-gray-900);
-  --bg-overlay: oklch(0 0 0 / 0.5);
+  /* -- Canonical Semantic Tokens (Light Mode) -----------------------------
+     White Label Core consumes this vocabulary. Product presets only replace
+     these values; shared components never depend on a product palette.
+     --------------------------------------------------------------------- */
+  --color-primary: var(--color-primary-600);
+  --color-primary-foreground: white;
+  --color-secondary: var(--color-gray-100);
+  --color-secondary-foreground: var(--color-gray-900);
+  --color-accent: var(--color-primary-500);
+  --color-accent-foreground: white;
+  --color-accent-subtle: var(--color-primary-100);
+  --color-accent-subtle-foreground: var(--color-primary-800);
+  --color-background: var(--color-gray-50);
+  --color-surface: white;
+  --color-surface-elevated: white;
+  --color-foreground: var(--color-gray-900);
+  --color-muted: var(--color-gray-100);
+  --color-muted-foreground: var(--color-gray-600);
+  --color-border: var(--color-gray-200);
+  --color-border-strong: var(--color-gray-300);
+  --color-ring: var(--color-primary-500);
+  --color-success: var(--color-success-500);
+  --color-success-foreground: white;
+  --color-warning: var(--color-warning-500);
+  --color-warning-foreground: var(--color-gray-950);
+  --color-destructive: var(--color-error-500);
+  --color-destructive-foreground: white;
+  --color-info: var(--color-info-500);
+  --color-info-foreground: white;
+  --color-overlay: oklch(0 0 0 / 0.5);
 
-  --text-primary: var(--color-gray-900);
-  --text-secondary: var(--color-gray-600);
+  /* Compatibility aliases. They point to the canonical vocabulary and are
+     not a second theme system. Remove only after all legacy consumers move. */
+  --bg-primary: var(--color-background);
+  --bg-secondary: var(--color-surface);
+  --bg-tertiary: var(--color-muted);
+  --bg-inverse: var(--color-foreground);
+  --bg-overlay: var(--color-overlay);
+
+  --text-primary: var(--color-foreground);
+  --text-secondary: var(--color-muted-foreground);
   --text-tertiary: var(--color-gray-400);
-  --text-inverse: white;
-  --text-link: var(--color-primary-600);
+  --text-inverse: var(--color-primary-foreground);
+  --text-link: var(--color-primary);
 
-  --border-default: var(--color-gray-200);
-  --border-strong: var(--color-gray-300);
-  --border-focus: var(--color-primary-500);
+  --border-default: var(--color-border);
+  --border-strong: var(--color-border-strong);
+  --border-focus: var(--color-ring);
 
-  --accent: var(--color-primary-500);
-  --accent-hover: var(--color-primary-600);
+  --accent: var(--color-primary);
+  --accent-hover: var(--color-primary-500);
   --accent-active: var(--color-primary-700);
-  --accent-subtle: var(--color-primary-100);
+  --accent-subtle: var(--color-accent-subtle);
 
   /* -- Highlight Semantic Tokens (Light Mode) -----------------------------
      Realce/ouro do tenant: selos, badges e detalhes finos. Cai na escala
      primária por padrão; o tema do tenant pode sobrescrever (ex.: dourado).
      ---------------------------------------------------------------- */
-  --highlight: var(--color-primary-500);
+  --highlight: var(--color-accent);
   --highlight-hover: var(--color-primary-600);
   --highlight-active: var(--color-primary-700);
-  --highlight-subtle: var(--color-primary-100);
+  --highlight-subtle: var(--color-accent-subtle);
+
+  /* Commercial/trust semantics are intentionally independent from tenant
+     identity. Changing --color-primary must not erase these distinctions. */
+  --plan-bronze: oklch(0.58 0.10 55);
+  --plan-silver: oklch(0.72 0.02 250);
+  --plan-gold: oklch(0.72 0.14 85);
+  --trust-verified: oklch(0.58 0.16 230);
+  --trust-founder: oklch(0.62 0.14 85);
 
   /* -- Status Semantic Tokens (Light Mode) ------------------------------- */
   --status-neutral-bg: oklch(0.95 0.004 250);
@@ -90,8 +130,13 @@
   --status-danger-border: oklch(0.82 0.12 25);
 
   /* -- Typography --------------------------------------------------------- */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+  --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     Oxygen, Ubuntu, Cantarell, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Oxygen, Ubuntu, Cantarell, sans-serif;
+  --font-interface: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Oxygen, Ubuntu, Cantarell, sans-serif;
+  --font-sans: var(--font-body);
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
 
   --text-xs: 0.75rem;     /* 12px */
@@ -173,29 +218,44 @@
 /* -- Dark Mode ------------------------------------------------------------ */
 [data-theme='dark'],
 .dark {
-  --bg-primary: var(--color-gray-950);
-  --bg-secondary: var(--color-gray-900);
-  --bg-tertiary: var(--color-gray-800);
-  --bg-inverse: white;
+  --color-primary: var(--color-primary-400);
+  --color-primary-foreground: var(--color-gray-950);
+  --color-secondary: var(--color-gray-800);
+  --color-secondary-foreground: var(--color-gray-50);
+  --color-accent: var(--color-primary-400);
+  --color-accent-foreground: var(--color-gray-950);
+  --color-accent-subtle: oklch(0.25 0.06 260);
+  --color-accent-subtle-foreground: var(--color-primary-100);
+  --color-background: var(--color-gray-950);
+  --color-surface: var(--color-gray-900);
+  --color-surface-elevated: var(--color-gray-800);
+  --color-foreground: var(--color-gray-50);
+  --color-muted: var(--color-gray-800);
+  --color-muted-foreground: var(--color-gray-400);
+  --color-border: var(--color-gray-800);
+  --color-border-strong: var(--color-gray-700);
+  --color-ring: var(--color-primary-400);
 
-  --text-primary: var(--color-gray-50);
-  --text-secondary: var(--color-gray-400);
+  --bg-primary: var(--color-background);
+  --bg-secondary: var(--color-surface);
+  --bg-tertiary: var(--color-muted);
+  --bg-inverse: var(--color-foreground);
+  --text-primary: var(--color-foreground);
+  --text-secondary: var(--color-muted-foreground);
   --text-tertiary: var(--color-gray-500);
-  --text-inverse: var(--color-gray-900);
-  --text-link: var(--color-primary-400);
-
-  --border-default: var(--color-gray-800);
-  --border-strong: var(--color-gray-700);
-
-  --accent: var(--color-primary-400);
+  --text-inverse: var(--color-primary-foreground);
+  --text-link: var(--color-primary);
+  --border-default: var(--color-border);
+  --border-strong: var(--color-border-strong);
+  --border-focus: var(--color-ring);
+  --accent: var(--color-primary);
   --accent-hover: var(--color-primary-300);
   --accent-active: var(--color-primary-500);
-  --accent-subtle: oklch(0.25 0.06 260);
-
-  --highlight: var(--color-primary-400);
+  --accent-subtle: var(--color-accent-subtle);
+  --highlight: var(--color-accent);
   --highlight-hover: var(--color-primary-300);
   --highlight-active: var(--color-primary-500);
-  --highlight-subtle: oklch(0.25 0.06 260);
+  --highlight-subtle: var(--color-accent-subtle);
 
   /* -- Status Semantic Tokens (Dark Mode) -------------------------------- */
   --status-neutral-bg: oklch(0.22 0.008 250);

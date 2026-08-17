@@ -64,7 +64,7 @@ export function Header({ context }: HeaderProps) {
           {theme === 'light' ? (
             <Moon className="h-4 w-4 text-secondary hover:text-primary transition-all duration-300 rotate-0" />
           ) : (
-            <Sun className="h-4 w-4 text-yellow-500 hover:text-yellow-400 transition-all duration-300 rotate-180 scale-110" />
+            <Sun className="h-4 w-4 text-muted-foreground hover:text-foreground transition-all duration-300 rotate-180 scale-110" />
           )}
         </Button>
 

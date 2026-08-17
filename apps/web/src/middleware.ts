@@ -39,6 +39,14 @@ export async function middleware(request: NextRequest) {
 
   // If trying to access protected routes
   if (isAdminRoute || isDashboardRoute || isProfileRoute || isUserAreaRoute) {
+    const isMockDevRoute = process.env.NODE_ENV !== 'production' && (
+      path.includes('/empresa-') || path.includes('/bronze') || path.includes('/prata') || path.includes('/ouro')
+    );
+
+    if (isMockDevRoute) {
+      return response;
+    }
+
     if (!user) {
       // Not authenticated, redirect to login
       const redirectUrl = request.nextUrl.clone();

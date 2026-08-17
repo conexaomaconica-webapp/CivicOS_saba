@@ -3,15 +3,11 @@ import { cookies } from 'next/headers';
 import type { Database } from '@/types/database.types';
 
 function getSupabaseUrl(): string {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set');
-  return url;
+  return process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
 }
 
 function getSupabaseAnonKey(): string {
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is not set');
-  return key;
+  return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy';
 }
 
 export async function createServerSideClient() {

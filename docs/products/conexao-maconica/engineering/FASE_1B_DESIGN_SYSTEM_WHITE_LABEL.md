@@ -25,12 +25,12 @@ Este documento é normativo para a fundação visual da plataforma. O Conexão M
 | Capabilities | registry/licensing e `tenant_features` já existem | licença efetiva concede capacidade; `tenant_features` apenas refina um módulo já autorizado |
 | SSR do tema | `tenant-brand.ts` injeta variáveis no layout inicial | usa o `Host` original no servidor e a RPC mínima; falha fechada para o tema neutro |
 | SEO | `root-metadata.ts` consome o mesmo resolvedor cacheado do tema | tema e metadados compartilham uma única autoridade por requisição |
-| Motor de tokens | `brand-tokens.ts` converte cores para OKLCH | hoje força superfícies quentes para qualquer tenant com cor primária; precisa receber todos os tokens do contrato |
-| Tokens | `packages/ui/src/tokens/tokens.css` usa nomes legados; `apps/web/src/styles/tokens.ts` define outro vocabulário | consolidar em uma fonte semântica e fornecer aliases temporários |
-| Tailwind/shadcn | Tailwind mapeia parte dos tokens legados; componentes locais usam variáveis mais semânticas | completar o mapeamento sem manter dois sistemas de cor |
-| Biblioteca UI | `packages/ui/src/components` contém cores `slate`, `blue`, `rose` e superfícies escuras | generalizar antes de tratá-la como Core white label |
+| Motor de tokens | `brand-tokens.ts` converte o formato legado e o contrato v1 em CSS vars | concluído: o legado altera somente a identidade disponível e não força superfícies quentes; `tenantThemeToCssVars` cobre o contrato completo |
+| Tokens | `packages/ui/src/tokens/tokens.css` é a fonte canônica | concluído: vocabulário `--color-*`, tipografia, aparência, planos e confiança; nomes legados são aliases temporários |
+| Tailwind/shadcn | Tailwind e `apps/web/src/styles/tokens.ts` apontam às mesmas variáveis | concluído para a fundação; consumidores legados podem migrar gradualmente sem criar outra paleta |
+| Biblioteca UI | `packages/ui/src/components` usava cores `slate`, `blue`, `rose` e superfícies escuras | componentes básicos generalizados para tokens semânticos e protegidos por teste de arquitetura |
 | UI duplicada | há componentes em `packages/ui` e `apps/web/src/components/ui` | escolher `packages/ui` como catálogo compartilhado e migrar consumidores gradualmente |
-| Tenant Admin | `/admin/marca` já oferece edição e prévia | hoje lê `select('*')`, altera o JSON completo, aceita fonte livre e salva sem rascunho/publicação/auditoria |
+| Tenant Admin | `/admin/marca` já oferece edição e prévia | leitura reduzida a `id/name/slug/settings`, ativos limitados a HTTPS/same-origin e fontes aprovadas; escrita versionada, rascunho/publicação e auditoria continuam para a Fase 1C/5 |
 | Branding público homologado localmente | migration 041 define `public_tenant_branding(p_host)` | domínio verificado e `font_token` aprovado estão contidos; saída ainda representa somente o formato legado mínimo |
 | Ativo global | `apps/web/src/app/icon.svg` contém “C”, bordô e ouro | mover para o preset/asset do produto e servir favicon resolvido por tenant |
 
@@ -38,13 +38,18 @@ Arquivos principais auditados: `apps/web/src/lib/tenant/tenant-brand.ts`, `apps/
 
 ## 3. Hardcodes e componentes a generalizar
 
-Prioridade alta:
+Concluído nesta fundação:
 
-- `Button`, `Card`, `Dialog`, `Drawer`, `Input`, `Select`, `Tabs`, `Toast`, `EmptyState` e `Skeleton` em `packages/ui`: cores e estados Tailwind literais;
-- `Header` e `AppShell`: ícone de tema com `yellow-*`;
-- `brand-tokens.ts`: marfim/superfícies quentes derivados para todos os tenants;
-- `icon.svg`, metadados e fallbacks globais: marca do Conexão Maçônica no shell raiz;
-- `admin/marca`: fonte arbitrária, escrita direta de `settings`, validação parcial de contraste e ausência de ciclo de publicação.
+- `Button`, `Card`, `Dialog`, `Drawer`, `Input`, `Select`, `Tabs`, `Toast`, `EmptyState`, `Skeleton` e `Badge` em `packages/ui` passaram a usar tokens semânticos;
+- `Header`, `AppShell` e `Sidebar` deixaram de usar cores literais de marca/estado;
+- `brand-tokens.ts` não deriva mais marfim para todos os tenants e aceita somente fontes aprovadas;
+- `admin/marca` não aceita fonte livre, URL HTTP ou leitura indiscriminada de colunas.
+
+Pendente para as fases de shell/publicação:
+
+- `icon.svg`, `public/logo.svg`, metadados e fallbacks globais ainda precisam sair do shell e ser resolvidos como ativos do produto/tenant;
+- `admin/marca` ainda escreve o namespace legado em `settings`, sem rascunho, publicação atômica, histórico ou auditoria;
+- componentes locais duplicados em `apps/web/src/components/ui` devem convergir gradualmente para `packages/ui`.
 
 Ocorrências em laboratórios de design e valores primitivos usados para gerar escalas não são automaticamente defeitos. O problema é a cor literal em um componente compartilhado ou a imposição de uma paleta de produto a qualquer tenant.
 
@@ -95,6 +100,8 @@ A fonte única pretendida é:
 
 Durante a migração, shadcn e Tailwind devem apontar para essas mesmas variáveis. Aliases legados são permitidos temporariamente, por exemplo `--bg-primary → --color-background`, `--accent → --color-primary` e `--highlight → --color-accent`; eles não formam um segundo tema.
 
+O mapeamento reutilizável está publicado por `@saas/ui/tailwind-preset`. Cada aplicação informa apenas seus caminhos de conteúdo e plugins; não replica cores ou nomes semânticos. `apps/web/tailwind.config.ts` já consome esse preset.
+
 Tokens de plano e confiança ficam em namespace próprio e não são editáveis como identidade do tenant:
 
 ```text
@@ -107,6 +114,8 @@ A disponibilidade e o significado desses estados vêm dos contratos de autoridad
 ## 6. Contrato de módulos e capabilities
 
 O catálogo inicial está em `plugins/conexao-maconica/src/domain/theme.ts`. Ele descreve dependências e capacidades, sem consultar slug e sem conceder acesso sozinho.
+
+`resolveEffectiveTenantModules`, no contrato do Core, faz a composição fail-closed: seleção configurada + plugin instalado + todas as capabilities concedidas + dependências efetivas + refinamento de feature. Uma feature flag `true` isolada nunca instala plugin nem concede capability.
 
 | Camada existente | Responsabilidade |
 |---|---|
@@ -181,6 +190,10 @@ Implementados agora:
 - bloqueio de publicação por contraste insuficiente;
 - unicidade de módulos;
 - segundo produto fictício sem módulos maçônicos, somente em teste.
+- aplicação de dois temas distintos sobre os mesmos tokens sem alterar componentes;
+- bloqueio arquitetural contra cores de produto/utilitários de paleta em `packages/ui`;
+- resolução fail-closed de módulos desconhecidos, sem capability ou dependência;
+- serialização de CSS rejeita declarações injetadas.
 
 Obrigatórios nas fases de integração:
 
@@ -197,9 +210,9 @@ Obrigatórios nas fases de integração:
 Riscos ainda abertos:
 
 - a projeção 041 ainda não contém versionamento/publicação nem o contrato v1 completo;
-- o motor atual impõe superfícies quentes a outros tenants;
-- o Brand Studio altera o JSON inteiro e não possui publicação/auditoria;
-- componentes compartilhados continuam com cores literais;
+- a projeção pública ainda entrega o formato legado mínimo; o contrato v1 completo depende da persistência/publicação da Fase 1C;
+- o Brand Studio ainda altera o namespace legado no JSON e não possui publicação/auditoria;
+- os componentes básicos de `packages/ui` foram generalizados, mas componentes locais duplicados ainda exigem convergência progressiva;
 - nomes de capabilities existentes usam convenções diferentes e precisam de normalização progressiva;
 - o runtime de plugin ainda precisa receber capabilities efetivas do tenant, não defaults ou flags isoladas.
 - o seed legado ainda diverge do preset v1 e não foi alterado nesta fase para evitar mutação de dados fora da aprovação.

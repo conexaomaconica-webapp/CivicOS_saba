@@ -19,19 +19,19 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div
-      className={`p-8 text-center flex flex-col items-center justify-center space-y-4 bg-slate-900/40 border border-dashed border-slate-800 rounded-2xl ${className}`}
+      className={`p-8 text-center flex flex-col items-center justify-center space-y-4 bg-surface border border-dashed border-border rounded-2xl ${className}`}
       {...props}
     >
       {icon && (
-        <div className="w-12 h-12 rounded-full bg-slate-800/80 border border-slate-700/60 text-slate-400 flex items-center justify-center text-2xl shrink-0">
+        <div className="w-12 h-12 rounded-full bg-muted border border-border text-muted-foreground flex items-center justify-center text-2xl shrink-0">
           {icon}
         </div>
       )}
 
       <div className="space-y-1.5 max-w-sm">
-        <h3 className="text-base font-semibold text-white tracking-tight">{title}</h3>
+        <h3 className="text-base font-semibold font-heading text-foreground tracking-tight">{title}</h3>
         {description && (
-          <p className="text-xs text-slate-400 leading-relaxed">{description}</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
         )}
       </div>
 

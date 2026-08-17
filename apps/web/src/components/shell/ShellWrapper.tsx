@@ -6,7 +6,6 @@ import { useBoot } from '@/app/Providers';
 import { NavigationSnapshot } from '@saas/sdk';
 import { NavigationRenderer } from '../navigation/NavigationRenderer';
 import { ContextHeader } from '../layout/Header';
-import { Skeleton } from '@/components/ui/skeleton';
 
 interface ShellWrapperProps {
   children: React.ReactNode;
@@ -19,68 +18,9 @@ export function ShellWrapper({ children }: ShellWrapperProps) {
   const boot = useBoot();
   const snapshot = boot?.defaultSnapshot ?? null;
 
-  // If rendering inside Design Lab, bypass product shell completely
-  if (isDesignLab) {
-    return <>{children}</>;
-  }
-
-  if (!snapshot && !boot?.error) {
-    return (
-      <div className="flex h-screen w-full overflow-hidden bg-primary text-primary">
-        {/* Fake Sidebar (Desktop) */}
-        <aside className="hidden w-64 flex-col border-r border-default bg-secondary p-4 md:flex shrink-0">
-          <div className="flex h-12 items-center px-2 mb-6 gap-2 border-b border-default/40 pb-4">
-            <Skeleton className="h-5 w-5 rounded-full" />
-            <Skeleton className="h-4 w-20" />
-          </div>
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <Skeleton className="h-3 w-16 ml-2 mb-3" />
-              <Skeleton className="h-9 w-full rounded-lg" />
-              <Skeleton className="h-9 w-full rounded-lg" />
-              <Skeleton className="h-9 w-full rounded-lg" />
-            </div>
-            <div className="space-y-2">
-              <Skeleton className="h-3 w-20 ml-2 mb-3" />
-              <Skeleton className="h-9 w-full rounded-lg" />
-              <Skeleton className="h-9 w-full rounded-lg" />
-            </div>
-          </div>
-        </aside>
-
-        {/* Fake Main View */}
-        <div className="flex flex-col flex-1 min-w-0">
-          {/* Fake Header */}
-          <header className="flex h-16 w-full items-center justify-between border-b border-default px-4 md:px-6">
-            <div className="flex flex-col gap-1.5">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="h-4 w-32" />
-            </div>
-            <div className="flex items-center gap-3">
-              <Skeleton className="h-9 w-9 rounded-full" />
-              <Skeleton className="h-9 w-9 rounded-full" />
-              <Skeleton className="h-9 w-9 rounded-full" />
-              <div className="h-6 w-px bg-[var(--border-default)] mx-1" />
-              <Skeleton className="h-8 w-8 rounded-full" />
-            </div>
-          </header>
-          
-          {/* Fake Main Content */}
-          <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Skeleton className="h-24 w-full rounded-xl" />
-              <Skeleton className="h-24 w-full rounded-xl" />
-              <Skeleton className="h-24 w-full rounded-xl" />
-              <Skeleton className="h-24 w-full rounded-xl" />
-            </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              <Skeleton className="h-[280px] md:col-span-2 rounded-xl" />
-              <Skeleton className="h-[280px] rounded-xl" />
-            </div>
-          </main>
-        </div>
-      </div>
-    );
+  // If rendering inside Design Lab or without navigation snapshot, render children directly
+  if (isDesignLab || !snapshot) {
+    return <div className="min-h-screen bg-slate-50">{children}</div>;
   }
 
   if (boot?.error) {
@@ -89,10 +29,6 @@ export function ShellWrapper({ children }: ShellWrapperProps) {
         Error loading CivicOS: {boot.error}
       </div>
     );
-  }
-
-  if (!snapshot) {
-    return null;
   }
 
   // Mapeia do PresentationSnapshot (Core, com .route) para NavigationSnapshot (SDK/Web, com .path e groups)

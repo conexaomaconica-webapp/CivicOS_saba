@@ -13,11 +13,13 @@ export type { PluginContext, PluginLifecycleHooks, PresentationSnapshot, RouteDe
 // Public white-label contracts exposed through the supported plugin boundary.
 export {
   productModuleDefinitionSchema,
+  resolveEffectiveTenantModules,
   tenantModuleSelectionSchema,
   tenantThemeConfigSchema,
 } from '@saas/core';
 export type {
   ProductModuleDefinition,
+  TenantModuleAuthority,
   TenantModuleSelection,
   TenantThemeConfig,
 } from '@saas/core';

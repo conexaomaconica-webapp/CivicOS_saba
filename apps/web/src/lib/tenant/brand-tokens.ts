@@ -1,19 +1,19 @@
+import type { TenantThemeColors, TenantThemeConfig } from '@saas/core';
+
 // ============================================================================
 // Brand Tokens — white-label engine
 // ============================================================================
-// Pure helpers that turn a tenant brand (one primary color + optional accent,
-// font, radius, density) into CSS custom property overrides for the semantic
-// token system in @saas/ui/tokens.css.
+// Pure helpers that map both the versioned TenantThemeConfig and the legacy
+// branding projection into the semantic token system in @saas/ui/tokens.css.
 //
 // Color contract:
-//   - primaryColor  → --color-primary-* scale, interaction accent (--accent*),
-//     links, focus, and the warm institutional surfaces (marfim in light mode).
-//   - accentColor   → --highlight-* family (gold seals, badges, fine details).
-//     It never replaces the interaction accent.
+//   - primaryColor  → primary interaction and focus tokens only.
+//   - accentColor   → semantic accent/highlight tokens only.
+//   - TenantThemeConfig → the complete validated semantic palette.
 //
-// Status colors (success/warning/danger), typography scale and base spacing
-// are protected: they never change per tenant, keeping contrast (4.5:1) and
-// consistency guarantees intact.
+// The legacy adapter never touches protected commercial/trust states or page
+// surfaces. The versioned contract may configure status colors only after the
+// complete theme passes its publication policy.
 // ============================================================================
 
 export const BRAND_RADIUS_PRESETS = {
@@ -61,10 +61,21 @@ export const BRAND_DENSITY_VARS = {
 export interface BrandVisualInput {
   primaryColor?: string;
   accentColor?: string;
-  fontFamily?: string;
+  fontToken?: ApprovedFontToken;
   radius?: BrandRadiusPreset;
   density?: 'comfortable' | 'compact';
 }
+
+export const APPROVED_FONT_STACKS = {
+  'platform-sans':
+    'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  'editorial-serif':
+    'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
+  'humanist-sans':
+    '"Trebuchet MS", Frutiger, "Frutiger Linotype", ui-sans-serif, sans-serif',
+} as const;
+
+export type ApprovedFontToken = keyof typeof APPROVED_FONT_STACKS;
 
 export interface BrandCssOutput {
   /** Overrides for light mode (and the shared primitive scale). */
@@ -305,6 +316,88 @@ const BRAND_RADIUS_KEYS = Object.keys(
   BRAND_RADIUS_PRESETS.md,
 ) as (keyof (typeof BRAND_RADIUS_PRESETS)['md'])[];
 
+const THEME_RADIUS_PRESETS: Record<
+  TenantThemeConfig['appearance']['radius'],
+  BrandRadiusPreset
+> = {
+  compact: 'sm',
+  standard: 'md',
+  rounded: 'xl',
+};
+
+const THEME_SHADOW_PRESETS: Record<
+  TenantThemeConfig['appearance']['shadow'],
+  Record<'--shadow-sm' | '--shadow-md', string>
+> = {
+  none: { '--shadow-sm': 'none', '--shadow-md': 'none' },
+  subtle: {
+    '--shadow-sm': '0 1px 3px oklch(0 0 0 / 0.10), 0 1px 2px oklch(0 0 0 / 0.06)',
+    '--shadow-md': '0 4px 6px oklch(0 0 0 / 0.10), 0 2px 4px oklch(0 0 0 / 0.06)',
+  },
+  elevated: {
+    '--shadow-sm': '0 4px 10px oklch(0 0 0 / 0.14)',
+    '--shadow-md': '0 12px 28px oklch(0 0 0 / 0.18)',
+  },
+};
+
+function accessibleForeground(background: string): '#000000' | '#ffffff' {
+  const whiteContrast = contrastRatio(background, '#ffffff') ?? 0;
+  const blackContrast = contrastRatio(background, '#000000') ?? 0;
+  return whiteContrast >= blackContrast ? '#ffffff' : '#000000';
+}
+
+function assignThemeColors(
+  target: Record<string, string>,
+  colors: TenantThemeColors,
+): void {
+  target['--color-primary'] = colors.primary;
+  target['--color-primary-foreground'] = colors.primaryForeground;
+  target['--color-secondary'] = colors.secondary;
+  target['--color-secondary-foreground'] = colors.secondaryForeground;
+  target['--color-accent'] = colors.accent;
+  target['--color-accent-foreground'] = colors.accentForeground;
+  target['--color-accent-subtle'] = colors.accentSubtle;
+  target['--color-accent-subtle-foreground'] = colors.accentSubtleForeground;
+  target['--color-background'] = colors.background;
+  target['--color-surface'] = colors.surface;
+  target['--color-surface-elevated'] = colors.surfaceElevated;
+  target['--color-foreground'] = colors.foreground;
+  target['--color-muted'] = colors.muted;
+  target['--color-muted-foreground'] = colors.mutedForeground;
+  target['--color-border'] = colors.border;
+  target['--color-ring'] = colors.ring;
+  target['--color-success'] = colors.success;
+  target['--color-warning'] = colors.warning;
+  target['--color-destructive'] = colors.destructive;
+  target['--color-info'] = colors.info;
+}
+
+/** Map a validated v1 tenant theme to the shared semantic token vocabulary. */
+export function tenantThemeToCssVars(theme: TenantThemeConfig): BrandCssOutput {
+  const root: Record<string, string> = {};
+  const dark: Record<string, string> = {};
+
+  assignThemeColors(root, theme.colors);
+  if (theme.darkColors) assignThemeColors(dark, theme.darkColors);
+
+  root['--font-heading'] = APPROVED_FONT_STACKS[theme.typography.heading];
+  root['--font-body'] = APPROVED_FONT_STACKS[theme.typography.body];
+  root['--font-interface'] = APPROVED_FONT_STACKS[theme.typography.interface];
+  root['--font-sans'] = 'var(--font-body)';
+
+  const radius = BRAND_RADIUS_PRESETS[THEME_RADIUS_PRESETS[theme.appearance.radius]];
+  BRAND_RADIUS_KEYS.forEach((key) => {
+    root[key] = radius[key] ?? '';
+  });
+  Object.assign(root, THEME_SHADOW_PRESETS[theme.appearance.shadow]);
+
+  if (theme.appearance.density === 'compact') {
+    Object.assign(root, BRAND_DENSITY_VARS.compact);
+  }
+
+  return { root, dark };
+}
+
 // ---------------------------------------------------------------------------
 // Brand → CSS vars
 // ---------------------------------------------------------------------------
@@ -323,21 +416,11 @@ export function brandToCssVars(brand: BrandVisualInput): BrandCssOutput {
     });
 
     // Semantic primitives derived from the brand scale (light mode).
-    root['--accent'] = primaryScale['500'] ?? '';
-    root['--accent-hover'] = primaryScale['600'] ?? '';
-    root['--accent-active'] = primaryScale['700'] ?? '';
-    root['--accent-subtle'] = primaryScale['100'] ?? '';
-    root['--border-focus'] = primaryScale['500'] ?? '';
-    root['--text-link'] = primaryScale['600'] ?? '';
-
-    // Warm institutional surfaces (marfim family) so the whole app reads as a
-    // light, warm editorial canvas instead of a cool neutral gray.
-    root['--bg-primary'] = 'oklch(0.965 0.016 88)';
-    root['--bg-secondary'] = 'oklch(0.993 0.006 88)';
-    root['--bg-tertiary'] = 'oklch(0.945 0.014 88)';
-    dark['--bg-primary'] = 'oklch(0.19 0.012 55)';
-    dark['--bg-secondary'] = 'oklch(0.22 0.012 55)';
-    dark['--bg-tertiary'] = 'oklch(0.27 0.014 55)';
+    root['--color-primary'] = brand.primaryColor ?? '';
+    root['--color-primary-foreground'] = accessibleForeground(
+      brand.primaryColor ?? '',
+    );
+    root['--color-ring'] = primaryScale['500'] ?? '';
 
     // Dark mode re-derives semantic tokens from the scale (tokens.css maps
     // them to the lighter end) — only the fixed accent-subtle needs a manual
@@ -347,30 +430,37 @@ export function brandToCssVars(brand: BrandVisualInput): BrandCssOutput {
       brandChroma && Number.isFinite(brandChroma.h) && brandChroma.c >= 0.003
         ? brandChroma.h
         : NEUTRAL_FALLBACK_HUE;
-    dark['--accent-subtle'] = toOklchCss(0.26, 0.065, hue);
+    dark['--color-primary'] = primaryScale['400'] ?? '';
+    dark['--color-primary-foreground'] = '#000000';
+    dark['--color-ring'] = primaryScale['400'] ?? '';
+    dark['--color-accent-subtle'] = toOklchCss(0.26, 0.065, hue);
   }
 
-  // The accent color is the tenant's highlight (gold seals, badges, fine
-  // details) — it never replaces the interaction accent, it lands on the
-  // --highlight-* family so the UI stays led by the primary (bordô).
+  // Legacy accent is mapped to the canonical tenant accent. Commercial plan
+  // and trust tokens remain independent in @saas/ui/tokens.css.
   if (brand.accentColor) {
     const accentScale = generatePrimaryScale(brand.accentColor);
     if (accentScale) {
-      root['--highlight'] = accentScale['500'] ?? '';
-      root['--highlight-hover'] = accentScale['600'] ?? '';
-      root['--highlight-active'] = accentScale['700'] ?? '';
-      root['--highlight-subtle'] = accentScale['100'] ?? '';
+      root['--color-accent'] = brand.accentColor;
+      root['--color-accent-foreground'] = accessibleForeground(brand.accentColor);
+      root['--color-accent-subtle'] = accentScale['100'] ?? '';
       const accentChroma = hexToOklch(brand.accentColor);
       const accentHue =
         accentChroma && Number.isFinite(accentChroma.h) && accentChroma.c >= 0.003
           ? accentChroma.h
           : NEUTRAL_FALLBACK_HUE;
-      dark['--highlight-subtle'] = toOklchCss(0.26, 0.065, accentHue);
+      dark['--color-accent'] = accentScale['400'] ?? '';
+      dark['--color-accent-foreground'] = '#000000';
+      dark['--color-accent-subtle'] = toOklchCss(0.26, 0.065, accentHue);
     }
   }
 
-  if (brand.fontFamily && brand.fontFamily.trim()) {
-    root['--font-sans'] = brand.fontFamily.trim();
+  if (brand.fontToken) {
+    const stack = APPROVED_FONT_STACKS[brand.fontToken];
+    root['--font-heading'] = stack;
+    root['--font-body'] = stack;
+    root['--font-interface'] = stack;
+    root['--font-sans'] = 'var(--font-body)';
   }
 
   if (brand.radius) {
@@ -390,10 +480,15 @@ export function brandToCssVars(brand: BrandVisualInput): BrandCssOutput {
 }
 
 export function brandCssVarsToStyle(output: BrandCssOutput): string {
-  const rootBody = Object.entries(output.root)
+  const safeEntries = (record: Record<string, string>) =>
+    Object.entries(record).filter(
+      ([key, value]) => /^--[a-z0-9-]+$/.test(key) && !/[;{}]/.test(value),
+    );
+
+  const rootBody = safeEntries(output.root)
     .map(([key, value]) => `${key}: ${value};`)
     .join('\n  ');
-  const darkBody = Object.entries(output.dark)
+  const darkBody = safeEntries(output.dark)
     .map(([key, value]) => `${key}: ${value};`)
     .join('\n  ');
 

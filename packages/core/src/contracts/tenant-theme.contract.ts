@@ -153,6 +153,71 @@ export type LegacyTenantBranding = z.infer<typeof legacyTenantBrandingSchema>;
 export type ProductModuleDefinition = z.infer<typeof productModuleDefinitionSchema>;
 export type TenantModuleSelection = z.infer<typeof tenantModuleSelectionSchema>;
 
+export interface TenantModuleAuthority {
+  readonly installedPluginIds: readonly string[];
+  readonly grantedCapabilities: readonly string[];
+  /** A feature flag may refine or disable authority, but never create it. */
+  readonly featureOverrides?: Readonly<Record<string, boolean>>;
+}
+
+/**
+ * Resolves modules fail-closed. A selected module is effective only when its
+ * plugin is installed, every required capability is granted, its dependencies
+ * are effective and no feature refinement explicitly disables it.
+ */
+export function resolveEffectiveTenantModules(
+  rawCatalog: readonly ProductModuleDefinition[],
+  rawSelection: TenantModuleSelection,
+  authority: TenantModuleAuthority,
+): readonly ProductModuleDefinition[] {
+  const selection = tenantModuleSelectionSchema.parse(rawSelection);
+  const catalog = rawCatalog.map((item) => productModuleDefinitionSchema.parse(item));
+  const definitions = new Map<string, ProductModuleDefinition>();
+
+  for (const definition of catalog) {
+    if (definitions.has(definition.id)) {
+      throw new Error(`Duplicate product module definition: ${definition.id}`);
+    }
+    definitions.set(definition.id, definition);
+  }
+
+  const selected = new Set(selection.enabledModules);
+  for (const moduleId of selected) {
+    if (!definitions.has(moduleId)) {
+      throw new Error(`Unknown product module: ${moduleId}`);
+    }
+  }
+
+  const installed = new Set(authority.installedPluginIds);
+  const capabilities = new Set(authority.grantedCapabilities);
+  const effective = new Map<string, ProductModuleDefinition>();
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    for (const moduleId of selection.enabledModules) {
+      if (effective.has(moduleId)) continue;
+      const definition = definitions.get(moduleId);
+      if (!definition) continue;
+      if (!installed.has(definition.pluginId)) continue;
+      if (authority.featureOverrides?.[moduleId] === false) continue;
+      if (!definition.capabilities.every((capability) => capabilities.has(capability))) {
+        continue;
+      }
+      if (!definition.dependencies.every((dependency) => effective.has(dependency))) {
+        continue;
+      }
+      effective.set(moduleId, definition);
+      changed = true;
+    }
+  }
+
+  return selection.enabledModules.flatMap((moduleId) => {
+    const definition = effective.get(moduleId);
+    return definition ? [definition] : [];
+  });
+}
+
 export const WHITE_LABEL_DEFAULT_THEME: TenantThemeConfig = tenantThemeConfigSchema.parse({
   schemaVersion: 1,
   productName: 'Plataforma',
@@ -288,22 +353,29 @@ export function evaluateTenantThemeContrast(theme: TenantThemeConfig): ThemeCont
     prefix: string,
   ): ThemeContrastCheck[] => {
     const pairs = [
-      ['primary', colors.primaryForeground, colors.primary],
-      ['secondary', colors.secondaryForeground, colors.secondary],
-      ['accent', colors.accentForeground, colors.accent],
-      ['accent-subtle', colors.accentSubtleForeground, colors.accentSubtle],
-      ['page', colors.foreground, colors.background],
-      ['surface', colors.foreground, colors.surface],
-      ['muted', colors.mutedForeground, colors.muted],
+      ['primary', colors.primaryForeground, colors.primary, 4.5],
+      ['secondary', colors.secondaryForeground, colors.secondary, 4.5],
+      ['accent', colors.accentForeground, colors.accent, 4.5],
+      ['accent-subtle', colors.accentSubtleForeground, colors.accentSubtle, 4.5],
+      ['page', colors.foreground, colors.background, 4.5],
+      ['surface', colors.foreground, colors.surface, 4.5],
+      ['muted', colors.mutedForeground, colors.muted, 4.5],
+      ['muted-on-page', colors.mutedForeground, colors.background, 4.5],
+      ['muted-on-surface', colors.mutedForeground, colors.surface, 4.5],
+      ['focus-ring', colors.ring, colors.background, 3],
+      ['success-indicator', colors.success, colors.surface, 3],
+      ['warning-indicator', colors.warning, colors.surface, 3],
+      ['destructive-indicator', colors.destructive, colors.surface, 3],
+      ['info-indicator', colors.info, colors.surface, 3],
     ] as const;
 
-    return pairs.map(([pair, foreground, background]) => {
+    return pairs.map(([pair, foreground, background, minimum]) => {
       const ratio = themeContrastRatio(foreground, background);
       return {
         pair: `${prefix}${pair}`,
         ratio,
-        minimum: 4.5,
-        passes: ratio >= 4.5,
+        minimum,
+        passes: ratio >= minimum,
       };
     });
   };

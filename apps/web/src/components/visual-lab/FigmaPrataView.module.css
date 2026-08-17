@@ -1,0 +1,619 @@
+.container {
+  min-height: 100vh;
+  background-color: #ffffff;
+  color: #171717;
+  font-family: Arial, Helvetica, sans-serif;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.container *,
+.container *::before,
+.container *::after {
+  box-sizing: border-box;
+}
+
+.heroGrid {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 24px 0;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+}
+
+.infoLeftCard {
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 20px;
+  align-self: start;
+  background-color: #ffffff;
+  position: relative;
+}
+
+.logoBox {
+  width: 80px;
+  height: 80px;
+  border-radius: 10px;
+  background-color: #7B1D1D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 22px;
+  margin-bottom: 12px;
+}
+
+.companyTitle {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 20px;
+  color: #1C1C1C;
+  margin: 0 0 4px 0;
+}
+
+.categoryText {
+  font-size: 13px;
+  color: #6B7280;
+  margin-bottom: 12px;
+}
+
+.badgesWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.badgeItem {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.badgeVerified {
+  color: #16A34A;
+  background-color: #DCFCE7;
+  border: 1px solid #86EFAC;
+}
+
+.badgePrata {
+  color: #475569;
+  background-color: #F1F5F9;
+  border: 1px solid #CBD5E1;
+}
+
+.infoRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: #4B5563;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.statsRow {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.openStatus {
+  font-size: 12px;
+  color: #16A34A;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* Gallery Right Grid */
+.galleryRightGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 200px 160px;
+  gap: 4px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.mainPhotoWrap {
+  grid-row: 1 / 3;
+  background-color: #F3F4F6;
+  height: 100%;
+}
+
+.mainPhoto {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thumbPhotoWrap {
+  background-color: #F3F4F6;
+  height: 100%;
+}
+
+.thumbPhoto {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Action Bar */
+.actionBar {
+  border-top: 1px solid #E5E7EB;
+  border-bottom: 1px solid #E5E7EB;
+  background-color: #ffffff;
+  margin-top: 24px;
+}
+
+.actionBarInner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 12px 24px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  overflow-x: auto;
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  border: 1px solid #E5E7EB;
+  background-color: #F9FAFB;
+  color: #374151;
+  transition: all 0.2s ease;
+}
+
+.actionBtnWhatsapp {
+  background-color: #25D366;
+  color: #ffffff;
+  border-color: #25D366;
+}
+
+.actionBtnCta {
+  background-color: #7B1D1D;
+  color: #ffffff;
+  border-color: #7B1D1D;
+  margin-left: auto;
+}
+
+/* Sticky Tabs */
+.stickyTabsWrap {
+  border-bottom: 1px solid #E5E7EB;
+  position: sticky;
+  top: 0;
+  background-color: #ffffff;
+  z-index: 20;
+}
+
+.tabsInner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.tabBtn {
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6B7280;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+
+.tabBtnActive {
+  color: #7B1D1D;
+  border-bottom-color: #7B1D1D;
+}
+
+/* Content + Sidebar Layout */
+.contentGrid {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 24px 48px;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 24px;
+}
+
+.mainCol {
+  min-width: 0;
+}
+
+/* About + Special Benefit Gradient Grid */
+.aboutBenefitGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.goldLine {
+  width: 28px;
+  height: 2px;
+  background-color: #C9A227;
+  margin-bottom: 10px;
+}
+
+.aboutText {
+  font-size: 14px;
+  color: #4B5563;
+  line-height: 1.7;
+  margin: 0;
+}
+
+.benefitGradientCard {
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  background: linear-gradient(135deg, #1a1a2e, #7B1D1D);
+  padding: 20px;
+  color: #ffffff;
+}
+
+.benefitTag {
+  font-size: 11px;
+  color: #C9A227;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.benefitDiscount {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: #C9A227;
+}
+
+.benefitDesc {
+  font-size: 13px;
+  color: #E8D5B0;
+  margin-top: 4px;
+}
+
+/* Services Grid */
+.servicesSection {
+  margin-bottom: 28px;
+}
+
+.servicesGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.serviceCard {
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 14px;
+  background-color: #ffffff;
+}
+
+.serviceIconBox {
+  width: 36px;
+  height: 36px;
+  background-color: #F3F4F6;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.serviceName {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.serviceDesc {
+  font-size: 12px;
+  color: #6B7280;
+  line-height: 1.5;
+}
+
+.knowMoreBtn {
+  background: none;
+  border: none;
+  color: #7B1D1D;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 8px;
+}
+
+/* Photos Carousel / Strip */
+.photosSection {
+  margin-bottom: 28px;
+}
+
+.photosFlex {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.photoThumbItem {
+  flex-shrink: 0;
+  width: 140px;
+  height: 100px;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #F3F4F6;
+}
+
+.photoThumbImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.morePhotosBox {
+  flex-shrink: 0;
+  width: 100px;
+  height: 100px;
+  border-radius: 8px;
+  border: 1px solid #E5E7EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-direction: column;
+  gap: 4px;
+  background-color: #FAFAFA;
+}
+
+/* Reviews Section */
+.reviewsSection {
+  margin-bottom: 28px;
+}
+
+.reviewsFlex {
+  display: flex;
+  gap: 24px;
+}
+
+.ratingSummaryBox {
+  text-align: center;
+  min-width: 80px;
+}
+
+.bigRatingNumber {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 52px;
+  color: #7B1D1D;
+  line-height: 1;
+}
+
+.starsRow {
+  color: #F59E0B;
+  font-size: 18px;
+  margin-top: 4px;
+}
+
+.reviewCountLabel {
+  font-size: 11px;
+  color: #6B7280;
+  margin-top: 4px;
+}
+
+.reviewsGrid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.reviewCard {
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 14px;
+  background-color: #ffffff;
+}
+
+.reviewerHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.reviewerAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.reviewerName {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.reviewDate {
+  font-size: 11px;
+  color: #9CA3AF;
+}
+
+.reviewComment {
+  font-size: 12px;
+  color: #4B5563;
+  line-height: 1.6;
+  margin: 6px 0 0;
+}
+
+/* Sidebar */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.shareFavRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.shareFavBtn {
+  padding: 10px;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.sidebarCard {
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  padding: 16px;
+  background-color: #ffffff;
+}
+
+.sidebarCardTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #171717;
+  margin-bottom: 12px;
+}
+
+.responsibleFlex {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.responsibleAvatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.responsibleName {
+  font-weight: 700;
+  font-size: 14px;
+  color: #171717;
+}
+
+.responsibleRole {
+  font-size: 12px;
+  color: #6B7280;
+}
+
+.mapBox {
+  width: 100%;
+  height: 140px;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #E5E7EB;
+  margin-top: 8px;
+}
+
+.quoteCard {
+  border: 1px solid #CBD5E1;
+  background-color: #F8FAFC;
+  border-radius: 10px;
+  padding: 16px;
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+/* Responsividade Adaptativa */
+@media (max-width: 1024px) {
+  .heroGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .contentGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .heroGrid,
+  .actionBarInner,
+  .tabsInner,
+  .contentGrid {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .galleryRightGrid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 180px 120px;
+  }
+
+  .aboutBenefitGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .servicesGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .reviewsFlex {
+    flex-direction: column;
+  }
+
+  .reviewsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .galleryRightGrid {
+    grid-template-columns: 1fr;
+    grid-template-rows: 200px 120px 120px;
+  }
+
+  .servicesGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .actionBtnCta {
+    margin-left: 0;
+  }
+}

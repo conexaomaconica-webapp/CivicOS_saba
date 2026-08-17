@@ -54,10 +54,10 @@ export function Toast({ toast, onDismiss }: ToastProps) {
   };
 
   const typeClasses = {
-    info: 'bg-slate-900 border-blue-500/50 text-slate-100',
-    success: 'bg-slate-900 border-emerald-500/50 text-slate-100',
-    warning: 'bg-slate-900 border-amber-500/50 text-slate-100',
-    danger: 'bg-slate-900 border-rose-500/50 text-slate-100'
+    info: 'bg-surface-elevated border-info text-foreground',
+    success: 'bg-surface-elevated border-success text-foreground',
+    warning: 'bg-surface-elevated border-warning text-foreground',
+    danger: 'bg-surface-elevated border-destructive text-foreground'
   };
 
   const iconMap = {
@@ -83,12 +83,12 @@ export function Toast({ toast, onDismiss }: ToastProps) {
         {iconMap[type]}
       </span>
       <div className="flex-1 space-y-0.5 text-xs">
-        {title && <div className="font-bold text-white tracking-tight">{title}</div>}
-        <div className="text-slate-300 leading-relaxed">{message}</div>
+        {title && <div className="font-bold font-heading text-foreground tracking-tight">{title}</div>}
+        <div className="text-muted-foreground leading-relaxed">{message}</div>
       </div>
       <button
         onClick={() => onDismiss(id)}
-        className="text-slate-400 hover:text-white p-0.5 rounded text-xs transition-colors shrink-0 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        className="text-muted-foreground hover:text-foreground p-0.5 rounded text-xs transition-colors shrink-0 focus:outline-none focus:ring-1 focus:ring-ring"
         aria-label="Fechar Notificação"
       >
         ✕

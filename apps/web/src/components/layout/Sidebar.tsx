@@ -39,7 +39,7 @@ function NavItem({ item, activePath, depth = 0 }: { item: NavigationItem; active
         className={cn(
           "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-out",
           isActive
-            ? "bg-accent text-white shadow-sm shadow-accent/10"
+            ? "bg-primary text-primary-foreground shadow-semanticSm"
             : "text-secondary hover:bg-accent-subtle hover:text-accent",
           depth > 0 && "pl-6"
         )}

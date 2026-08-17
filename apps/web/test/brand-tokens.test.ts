@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { WHITE_LABEL_DEFAULT_THEME } from '@saas/core';
 import {
   brandAccentContrast,
   brandCssVarsToStyle,
@@ -9,6 +10,7 @@ import {
   oklchToHex,
   oklchToRgb,
   relativeLuminance,
+  tenantThemeToCssVars,
 } from '@/lib/tenant/brand-tokens';
 
 describe('hexToOklch', () => {
@@ -101,23 +103,17 @@ describe('brandToCssVars', () => {
   it('maps primary scale + semantic primitives', () => {
     const output = brandToCssVars({ primaryColor: '#1E3A8A' });
     expect(output.root['--color-primary-500']).toBeDefined();
-    expect(output.root['--accent']).toBe(output.root['--color-primary-500']);
-    expect(output.root['--accent-hover']).toBe(output.root['--color-primary-600']);
-    expect(output.root['--accent-active']).toBe(output.root['--color-primary-700']);
-    expect(output.root['--accent-subtle']).toBe(output.root['--color-primary-100']);
-    expect(output.root['--border-focus']).toBe(output.root['--color-primary-500']);
-    expect(output.root['--text-link']).toBe(output.root['--color-primary-600']);
-    expect(output.dark['--accent-subtle']).toContain('oklch(');
+    expect(output.root['--color-primary']).toBe('#1E3A8A');
+    expect(output.root['--color-primary-foreground']).toBe('#ffffff');
+    expect(output.root['--color-ring']).toBe(output.root['--color-primary-500']);
+    expect(output.dark['--color-accent-subtle']).toContain('oklch(');
   });
 
-  it('applies warm institutional surfaces in both modes', () => {
+  it('does not impose product-specific surfaces on a generic legacy tenant', () => {
     const output = brandToCssVars({ primaryColor: '#1E3A8A' });
-    expect(output.root['--bg-primary']).toContain('oklch(');
-    expect(output.root['--bg-secondary']).toContain('oklch(');
-    expect(output.root['--bg-tertiary']).toContain('oklch(');
-    expect(output.dark['--bg-primary']).toContain('oklch(');
-    expect(output.dark['--bg-secondary']).toContain('oklch(');
-    expect(output.dark['--bg-tertiary']).toContain('oklch(');
+    expect(output.root['--color-background']).toBeUndefined();
+    expect(output.root['--color-surface']).toBeUndefined();
+    expect(output.dark['--color-background']).toBeUndefined();
   });
 
   it('accent color feeds the highlight family, never the interaction accent', () => {
@@ -125,19 +121,17 @@ describe('brandToCssVars', () => {
       primaryColor: '#1E3A8A',
       accentColor: '#C2410C',
     });
-    expect(output.root['--accent']).toBe(output.root['--color-primary-500']);
-    expect(output.root['--accent-hover']).toBe(output.root['--color-primary-600']);
-    expect(output.root['--highlight']).not.toBe(output.root['--color-primary-500']);
-    expect(output.root['--highlight']).toContain('oklch(');
-    expect(output.root['--highlight-hover']).toContain('oklch(');
-    expect(output.root['--highlight-active']).toContain('oklch(');
-    expect(output.root['--highlight-subtle']).toContain('oklch(');
-    expect(output.dark['--highlight-subtle']).toContain('oklch(');
+    expect(output.root['--color-primary']).toBe('#1E3A8A');
+    expect(output.root['--color-accent']).toBe('#C2410C');
+    expect(output.root['--color-accent-subtle']).toContain('oklch(');
+    expect(output.dark['--color-accent-subtle']).toContain('oklch(');
   });
 
-  it('overrides the font stack', () => {
-    const output = brandToCssVars({ fontFamily: "'Playfair Display', serif" });
-    expect(output.root['--font-sans']).toBe("'Playfair Display', serif");
+  it('accepts only an approved font token', () => {
+    const output = brandToCssVars({ fontToken: 'editorial-serif' });
+    expect(output.root['--font-heading']).toContain('Georgia');
+    expect(output.root['--font-body']).toContain('Georgia');
+    expect(output.root['--font-sans']).toBe('var(--font-body)');
   });
 
   it('applies radius presets to all four radius tokens', () => {
@@ -169,12 +163,46 @@ describe('brandCssVarsToStyle', () => {
       brandToCssVars({ primaryColor: '#1E3A8A', density: 'compact' }),
     );
     expect(style).toContain(':root {');
-    expect(style).toContain('--accent:');
+    expect(style).toContain('--color-primary:');
     expect(style).toContain("[data-theme='dark'] {");
   });
 
   it('emits nothing for an empty output', () => {
     expect(brandCssVarsToStyle({ root: {}, dark: {} })).toBe('');
+  });
+});
+
+describe('tenantThemeToCssVars', () => {
+  it('maps two tenant configurations to different semantic tokens', () => {
+    const first = tenantThemeToCssVars(WHITE_LABEL_DEFAULT_THEME);
+    const second = tenantThemeToCssVars({
+      ...WHITE_LABEL_DEFAULT_THEME,
+      colors: {
+        ...WHITE_LABEL_DEFAULT_THEME.colors,
+        primary: '#166534',
+        primaryForeground: '#ffffff',
+        background: '#f7fee7',
+      },
+    });
+
+    expect(first.root['--color-primary']).toBe('#334155');
+    expect(second.root['--color-primary']).toBe('#166534');
+    expect(second.root['--color-background']).toBe('#f7fee7');
+    expect(first.root['--plan-gold']).toBeUndefined();
+    expect(second.root['--trust-founder']).toBeUndefined();
+  });
+
+  it('does not serialize injected CSS declarations', () => {
+    const style = brandCssVarsToStyle({
+      root: {
+        '--color-primary': '#334155',
+        '--font-body': 'serif; } body { display: none',
+      },
+      dark: {},
+    });
+
+    expect(style).toContain('--color-primary: #334155');
+    expect(style).not.toContain('display: none');
   });
 });
 

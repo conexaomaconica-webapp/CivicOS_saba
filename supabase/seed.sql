@@ -22,6 +22,12 @@ VALUES
    '{"branding": {"appName": "Luz do Oriente", "primaryColor": "#0F5132", "accentColor": "#F59E0B", "radius": "md", "density": "compact", "colorMode": "light"}}')
 ON CONFLICT (id) DO NOTHING;
 
+INSERT INTO public.tenant_domains (tenant_id, domain, is_primary, is_verified, ssl_status)
+VALUES
+  ('00000000-0000-0000-0000-000000000010', '127.0.0.1', true, true, 'active'),
+  ('00000000-0000-0000-0000-000000000010', 'localhost', false, true, 'active')
+ON CONFLICT (domain) DO UPDATE SET is_verified = true, ssl_status = 'active';
+
 -- ---------------------------------------------------------------------------
 -- 2. Usuários (auth.users) — a trigger cria profiles + tenant_members
 -- ---------------------------------------------------------------------------
@@ -121,9 +127,10 @@ VALUES
 ON CONFLICT (slug) WHERE tenant_id IS NULL DO NOTHING;
 
 -- ---------------------------------------------------------------------------
--- 6. Empresa demo publicada
+-- 6. Empresas de teste publicadas (Bronze, Prata, Ouro, Fundador)
 -- ---------------------------------------------------------------------------
 
+-- 6.1. Empresa Ouro: Padaria Estrela
 INSERT INTO public.businesses (
   id, tenant_id, owner_id, name, description, category,
   logo_url, phone, email, website, address,
@@ -133,25 +140,87 @@ VALUES (
   '00000000-0000-0000-0000-000000000201',
   '00000000-0000-0000-0000-000000000010',
   '00000000-0000-0000-0000-000000000103',
-  'Padaria Estrela', 'Padaria artesanal com tradição familiar.', 'alimentos-e-bebidas',
-  NULL, '+5511988887777', 'contato@padariaestrela.local', 'https://padariaestrela.local', 'Rua das Flores, 123',
-  'ouro', 'padaria-estrela', 'commercial', 'published', true
+  'Padaria & Confeitaria Estrela', 'Padaria artesanal premiada com tradição de 30 anos. Pães de fermentação natural e café colonial.', 'alimentos-e-bebidas',
+  NULL, '+5511988887777', 'contato@padariaestrela.local', 'https://padariaestrela.local', 'Rua das Flores, 123 — Moema, São Paulo, SP',
+  'ouro', 'padaria-estrela-ouro', 'commercial', 'published', true
 )
 ON CONFLICT (id) DO NOTHING;
 
+-- 6.2. Empresa Bronze: Saba Advocacia
+INSERT INTO public.businesses (
+  id, tenant_id, owner_id, name, description, category,
+  logo_url, phone, email, website, address,
+  plan_tier, slug, company_type, publication_status, is_active
+)
+VALUES (
+  '00000000-0000-0000-0000-000000000202',
+  '00000000-0000-0000-0000-000000000010',
+  '00000000-0000-0000-0000-000000000103',
+  'Saba Advocacia', 'Assessoria jurídica empresarial, contratos e consultoria com atendimento próximo e personalizado.', 'servicos',
+  NULL, '+557530254242', 'contato@sabaadvocacia.local', 'https://sabaadvocacia.local', 'Av. Getúlio Vargas, 1240 — Centro, Feira de Santana, BA',
+  'bronze', 'saba-advocacia-bronze', 'commercial', 'published', true
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- 6.3. Empresa Prata: Auto Centro Express
+INSERT INTO public.businesses (
+  id, tenant_id, owner_id, name, description, category,
+  logo_url, phone, email, website, address,
+  plan_tier, slug, company_type, publication_status, is_active
+)
+VALUES (
+  '00000000-0000-0000-0000-000000000203',
+  '00000000-0000-0000-0000-000000000010',
+  '00000000-0000-0000-0000-000000000103',
+  'Auto Centro Express', 'Oficina especializada em mecânica geral, alinhamento 3D, balanceamento, injeção eletrônica e revisão preventiva.', 'servicos',
+  NULL, '+551134567890', 'atendimento@autocentroexpress.local', 'https://autocentroexpress.local', 'Av. Paulista, 1500 — Bela Vista, São Paulo, SP',
+  'prata', 'auto-centro-prata', 'commercial', 'published', true
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- 6.4. Empresa Fundadora (Ouro): Grupo Construtor Alfa
+INSERT INTO public.businesses (
+  id, tenant_id, owner_id, name, description, category,
+  logo_url, phone, email, website, address,
+  plan_tier, slug, company_type, publication_status, is_active
+)
+VALUES (
+  '00000000-0000-0000-0000-000000000204',
+  '00000000-0000-0000-0000-000000000010',
+  '00000000-0000-0000-0000-000000000103',
+  'Grupo Construtor Alfa', 'Engenharia, loteamentos residenciais e empreendimentos imobiliários de alto padrão. Empresa pilar da comunidade.', 'imoveis-e-construcao',
+  NULL, '+551140049000', 'contato@grupoalfa.local', 'https://grupoalfa.local', 'Av. Brigadeiro Faria Lima, 3400 — Itaim Bibi, São Paulo, SP',
+  'ouro', 'grupo-alfa-fundador', 'commercial', 'published', true
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Categorias dos anunciantes
 INSERT INTO public.business_categories (tenant_id, business_id, category_id, is_primary)
-SELECT
-  b.tenant_id, b.id,
-  c.id,
-  true
+SELECT b.tenant_id, b.id, c.id, true
 FROM public.businesses b
 JOIN public.categories c ON c.slug = 'alimentos-e-bebidas' AND c.tenant_id IS NULL
 WHERE b.id = '00000000-0000-0000-0000-000000000201'
 ON CONFLICT (business_id, category_id) DO NOTHING;
 
+INSERT INTO public.business_categories (tenant_id, business_id, category_id, is_primary)
+SELECT b.tenant_id, b.id, c.id, true
+FROM public.businesses b
+JOIN public.categories c ON c.slug = 'servicos' AND c.tenant_id IS NULL
+WHERE b.id IN ('00000000-0000-0000-0000-000000000202', '00000000-0000-0000-0000-000000000203')
+ON CONFLICT (business_id, category_id) DO NOTHING;
+
+INSERT INTO public.business_categories (tenant_id, business_id, category_id, is_primary)
+SELECT b.tenant_id, b.id, c.id, true
+FROM public.businesses b
+JOIN public.categories c ON c.slug = 'imoveis-e-construcao' AND c.tenant_id IS NULL
+WHERE b.id = '00000000-0000-0000-0000-000000000204'
+ON CONFLICT (business_id, category_id) DO NOTHING;
+
+-- Associação aos proprietários
 INSERT INTO public.business_members (tenant_id, business_id, user_id, role, status)
 VALUES
-  ('00000000-0000-0000-0000-000000000010',
-   '00000000-0000-0000-0000-000000000201',
-   '00000000-0000-0000-0000-000000000103', 'owner', 'active')
+  ('00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000201', '00000000-0000-0000-0000-000000000103', 'owner', 'active'),
+  ('00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000202', '00000000-0000-0000-0000-000000000103', 'owner', 'active'),
+  ('00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000203', '00000000-0000-0000-0000-000000000103', 'owner', 'active'),
+  ('00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000204', '00000000-0000-0000-0000-000000000103', 'owner', 'active')
 ON CONFLICT (business_id, user_id) DO NOTHING;

@@ -1,0 +1,263 @@
+
+> @saas/web@0.0.1 dev F:\projetos\saas-platform\apps\web
+> next dev --port 3000
+
+   ▲ Next.js 15.5.20
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.5.179:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 4.8s
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 3s (186 modules)
+ ○ Compiling /visual-lab/bronze ...
+ ✓ Compiled /visual-lab/bronze in 58.6s (932 modules)
+[BOOT:INIT] Kernel boot starting { coreVersion: '1.0.0' }
+[BOOT:DISCOVERY] Scanning plugins directory { dir: './plugins' }
+[BOOT:DISCOVERY] Discovered 0 plugin(s) 
+[BOOT:MANIFEST] Manifests loaded and parsed 
+[BOOT:VALIDATION] Validating plugin manifests 
+[BOOT:VALIDATION] 0 valid, 0 rejected 
+[BOOT:DEPS] Resolving plugin dependencies 
+[BOOT:LIFECYCLE] Transitioning plugins to ACTIVE state 
+[BOOT:LIFECYCLE] 0 plugin(s) activated 
+[BOOT:REGISTRIES] Populating registries from manifests 
+[BOOT:REGISTRIES] All registries populated and frozen { routes: 0, widgets: 0, capabilities: 0, navigation: 0 }
+[BOOT:PRESENTATION] Validating Presentation Integrity (Navigation Graph) 
+[BOOT:CAPABILITIES] Cross-validating capability requirements 
+[BOOT:LICENSING] Licensing resolution is handled dynamically per-tenant at runtime 
+[BOOT:READY] CivicOS boot complete in 2159ms. Score: 100/100 
+RouteResolver context: {
+  tenantId: 'default',
+  userId: 'anonymous',
+  locale: 'pt-BR',
+  capabilities: [],
+  permissions: [],
+  versions: {
+    registryVersion: 1,
+    capabilityVersion: 1,
+    licenseVersion: 1,
+    permissionVersion: 1,
+    policyVersion: 1,
+    layoutVersion: 1
+  }
+}
+RouteResolver raw routes: []
+ GET /visual-lab/bronze 200 in 63106ms
+ GET /visual-lab/bronze 200 in 403ms
+ GET /visual-lab/bronze 200 in 385ms
+ GET /visual-lab/bronze 200 in 539ms
+ ○ Compiling /visual-lab/assets/bronze-reference ...
+ GET /visual-lab/bronze 200 in 4490ms
+ ✓ Compiled /visual-lab/assets/bronze-reference in 6.1s (940 modules)
+ GET /visual-lab/assets/bronze-reference 200 in 7022ms
+ ○ Compiling /icon.svg ...
+ ✓ Compiled /icon.svg in 1137ms (664 modules)
+ GET /icon.svg?994aa6c5a133f593 200 in 1356ms
+ ✓ Compiled in 11.1s (278 modules)
+ ✓ Compiled in 979ms (278 modules)
+ ✓ Compiled in 881ms (278 modules)
+ ✓ Compiled in 2.6s (1106 modules)
+ ✓ Compiled in 1517ms (1091 modules)
+ ✓ Compiled in 3.2s (1091 modules)
+ ✓ Compiled in 2.6s (278 modules)
+ ✓ Compiled in 4.6s (920 modules)
+ ✓ Compiled in 986ms (278 modules)
+ ✓ Compiled in 2.6s (278 modules)
+[BOOT:INIT] Kernel boot starting { coreVersion: '1.0.0' }
+[BOOT:DISCOVERY] Scanning plugins directory { dir: './plugins' }
+[BOOT:DISCOVERY] Discovered 0 plugin(s) 
+[BOOT:MANIFEST] Manifests loaded and parsed 
+[BOOT:VALIDATION] Validating plugin manifests 
+[BOOT:VALIDATION] 0 valid, 0 rejected 
+[BOOT:DEPS] Resolving plugin dependencies 
+[BOOT:LIFECYCLE] Transitioning plugins to ACTIVE state 
+[BOOT:LIFECYCLE] 0 plugin(s) activated 
+[BOOT:REGISTRIES] Populating registries from manifests 
+[BOOT:REGISTRIES] All registries populated and frozen { routes: 0, widgets: 0, capabilities: 0, navigation: 0 }
+[BOOT:PRESENTATION] Validating Presentation Integrity (Navigation Graph) 
+[BOOT:CAPABILITIES] Cross-validating capability requirements 
+[BOOT:LICENSING] Licensing resolution is handled dynamically per-tenant at runtime 
+[BOOT:READY] CivicOS boot complete in 725ms. Score: 100/100 
+RouteResolver context: {
+  tenantId: 'default',
+  userId: 'anonymous',
+  locale: 'pt-BR',
+  capabilities: [],
+  permissions: [],
+  versions: {
+    registryVersion: 1,
+    capabilityVersion: 1,
+    licenseVersion: 1,
+    permissionVersion: 1,
+    policyVersion: 1,
+    layoutVersion: 1
+  }
+}
+RouteResolver raw routes: []
+ GET /visual-lab/bronze 200 in 3401ms
+ GET /visual-lab/bronze 200 in 341ms
+ ○ Compiling /guia/[slug] ...
+ ✓ Compiled /guia/[slug] in 6.1s (917 modules)
+[BOOT:INIT] Kernel boot starting { coreVersion: '1.0.0' }
+[BOOT:DISCOVERY] Scanning plugins directory { dir: './plugins' }
+[BOOT:DISCOVERY] Discovered 0 plugin(s) 
+[BOOT:MANIFEST] Manifests loaded and parsed 
+[BOOT:VALIDATION] Validating plugin manifests 
+[BOOT:VALIDATION] 0 valid, 0 rejected 
+[BOOT:DEPS] Resolving plugin dependencies 
+[BOOT:LIFECYCLE] Transitioning plugins to ACTIVE state 
+[BOOT:LIFECYCLE] 0 plugin(s) activated 
+[BOOT:REGISTRIES] Populating registries from manifests 
+[BOOT:REGISTRIES] All registries populated and frozen { routes: 0, widgets: 0, capabilities: 0, navigation: 0 }
+[BOOT:PRESENTATION] Validating Presentation Integrity (Navigation Graph) 
+[BOOT:CAPABILITIES] Cross-validating capability requirements 
+[BOOT:LICENSING] Licensing resolution is handled dynamically per-tenant at runtime 
+[BOOT:READY] CivicOS boot complete in 307ms. Score: 100/100 
+RouteResolver context: {
+  tenantId: 'default',
+  userId: 'anonymous',
+  locale: 'pt-BR',
+  capabilities: [],
+  permissions: [],
+  versions: {
+    registryVersion: 1,
+    capabilityVersion: 1,
+    licenseVersion: 1,
+    permissionVersion: 1,
+    policyVersion: 1,
+    layoutVersion: 1
+  }
+}
+RouteResolver raw routes: []
+ GET /guia/saba-advocacia-bronze 404 in 12194ms
+ ○ Compiling /icon.svg ...
+ ✓ Compiled /icon.svg in 1705ms (669 modules)
+ GET /icon.svg?994aa6c5a133f593 200 in 2937ms
+ GET /icon.svg?994aa6c5a133f593 200 in 65ms
+ ✓ Compiled in 1898ms (949 modules)
+[BOOT:INIT] Kernel boot starting { coreVersion: '1.0.0' }
+[BOOT:DISCOVERY] Scanning plugins directory { dir: './plugins' }
+[BOOT:DISCOVERY] Discovered 0 plugin(s) 
+[BOOT:MANIFEST] Manifests loaded and parsed 
+[BOOT:VALIDATION] Validating plugin manifests 
+[BOOT:VALIDATION] 0 valid, 0 rejected 
+[BOOT:DEPS] Resolving plugin dependencies 
+[BOOT:LIFECYCLE] Transitioning plugins to ACTIVE state 
+[BOOT:LIFECYCLE] 0 plugin(s) activated 
+[BOOT:REGISTRIES] Populating registries from manifests 
+[BOOT:REGISTRIES] All registries populated and frozen { routes: 0, widgets: 0, capabilities: 0, navigation: 0 }
+[BOOT:PRESENTATION] Validating Presentation Integrity (Navigation Graph) 
+[BOOT:CAPABILITIES] Cross-validating capability requirements 
+[BOOT:LICENSING] Licensing resolution is handled dynamically per-tenant at runtime 
+[BOOT:READY] CivicOS boot complete in 604ms. Score: 100/100 
+RouteResolver context: {
+  tenantId: 'default',
+  userId: 'anonymous',
+  locale: 'pt-BR',
+  capabilities: [],
+  permissions: [],
+  versions: {
+    registryVersion: 1,
+    capabilityVersion: 1,
+    licenseVersion: 1,
+    permissionVersion: 1,
+    policyVersion: 1,
+    layoutVersion: 1
+  }
+}
+RouteResolver raw routes: []
+ GET /visual-lab/bronze 200 in 1662ms
+ GET /visual-lab/bronze 200 in 355ms
+ ○ Compiling /visual-lab/assets/bronze-reference ...
+ GET /visual-lab/bronze 200 in 2194ms
+ ✓ Compiled /visual-lab/assets/bronze-reference in 2.3s (672 modules)
+ GET /visual-lab/assets/bronze-reference 200 in 2784ms
+ ○ Compiling /icon.svg ...
+ ✓ Compiled /icon.svg in 702ms (674 modules)
+ GET /icon.svg?994aa6c5a133f593 200 in 806ms
+[BOOT:INIT] Kernel boot starting { coreVersion: '1.0.0' }
+[BOOT:DISCOVERY] Scanning plugins directory { dir: './plugins' }
+[BOOT:DISCOVERY] Discovered 0 plugin(s) 
+[BOOT:MANIFEST] Manifests loaded and parsed 
+[BOOT:VALIDATION] Validating plugin manifests 
+[BOOT:VALIDATION] 0 valid, 0 rejected 
+[BOOT:DEPS] Resolving plugin dependencies 
+[BOOT:LIFECYCLE] Transitioning plugins to ACTIVE state 
+[BOOT:LIFECYCLE] 0 plugin(s) activated 
+[BOOT:REGISTRIES] Populating registries from manifests 
+[BOOT:REGISTRIES] All registries populated and frozen { routes: 0, widgets: 0, capabilities: 0, navigation: 0 }
+[BOOT:PRESENTATION] Validating Presentation Integrity (Navigation Graph) 
+[BOOT:CAPABILITIES] Cross-validating capability requirements 
+[BOOT:LICENSING] Licensing resolution is handled dynamically per-tenant at runtime 
+[BOOT:READY] CivicOS boot complete in 272ms. Score: 100/100 
+RouteResolver context: {
+  tenantId: 'default',
+  userId: 'anonymous',
+  locale: 'pt-BR',
+  capabilities: [],
+  permissions: [],
+  versions: {
+    registryVersion: 1,
+    capabilityVersion: 1,
+    licenseVersion: 1,
+    permissionVersion: 1,
+    policyVersion: 1,
+    layoutVersion: 1
+  }
+}
+RouteResolver raw routes: []
+ GET /visual-lab/bronze 200 in 955ms
+ GET /visual-lab/bronze 200 in 783ms
+ GET /visual-lab/assets/bronze-reference 200 in 400ms
+ GET /guia/saba-advocacia-bronze 200 in 2879ms
+ GET /icon.svg?994aa6c5a133f593 200 in 86ms
+ ✓ Compiled in 4.9s (932 modules)
+ ✓ Compiled in 3.9s (932 modules)
+ ✓ Compiled in 7.4s (932 modules)
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 15.9s (1279 modules)
+ GET /visual-lab/bronze 500 in 20077ms
+[BOOT:INIT] Kernel boot starting { coreVersion: '1.0.0' }
+[BOOT:DISCOVERY] Scanning plugins directory { dir: './plugins' }
+[BOOT:DISCOVERY] Discovered 0 plugin(s) 
+[BOOT:MANIFEST] Manifests loaded and parsed 
+[BOOT:VALIDATION] Validating plugin manifests 
+[BOOT:VALIDATION] 0 valid, 0 rejected 
+[BOOT:DEPS] Resolving plugin dependencies 
+[BOOT:LIFECYCLE] Transitioning plugins to ACTIVE state 
+[BOOT:LIFECYCLE] 0 plugin(s) activated 
+[BOOT:REGISTRIES] Populating registries from manifests 
+[BOOT:REGISTRIES] All registries populated and frozen { routes: 0, widgets: 0, capabilities: 0, navigation: 0 }
+[BOOT:PRESENTATION] Validating Presentation Integrity (Navigation Graph) 
+[BOOT:CAPABILITIES] Cross-validating capability requirements 
+[BOOT:LICENSING] Licensing resolution is handled dynamically per-tenant at runtime 
+[BOOT:READY] CivicOS boot complete in 649ms. Score: 100/100 
+RouteResolver context: {
+  tenantId: 'default',
+  userId: 'anonymous',
+  locale: 'pt-BR',
+  capabilities: [],
+  permissions: [],
+  versions: {
+    registryVersion: 1,
+    capabilityVersion: 1,
+    licenseVersion: 1,
+    permissionVersion: 1,
+    policyVersion: 1,
+    layoutVersion: 1
+  }
+}
+RouteResolver raw routes: []
+ GET /visual-lab/bronze 200 in 4264ms
+ GET /guia/saba-advocacia-bronze 404 in 2775ms
+ ○ Compiling /[...slug] ...
+ ✓ Compiled /[...slug] in 8.1s (1313 modules)
+ GET /_next/static/chunks/main-app.js 500 in 12019ms
+ GET /_next/static/chunks/app-pages-internals.js 500 in 12024ms
+ GET /_next/static/chunks/app/global-error.js 500 in 12025ms
+ GET /_next/static/css/app/layout.css?v=1786762953747 500 in 12033ms
+ ○ Compiling /icon.svg ...
+ ✓ Compiled /icon.svg in 1318ms (882 modules)
+ GET /icon.svg?994aa6c5a133f593 200 in 2001ms

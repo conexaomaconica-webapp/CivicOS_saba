@@ -3,6 +3,14 @@
 **Plataforma:** CivicOS (Foundation & Community Framework)  
 **Escopo:** Especificação do Design System Neutro da Plataforma CivicOS, Mapeamento de Tokens Primitivos e Semânticos, Abstração Tipográfica, Elevação, Motion, Estados, Densidade Visual, Mapeamento Tailwind CSS, Stack `shadcn/ui` + Radix UI, Governança de Overrides (`ADM-021`), i18n/Labels e Componentes Compostos.
 
+> **Contrato normativo atual:** a implementação canônica está em
+> `packages/ui/src/tokens/tokens.css` e a arquitetura em
+> `docs/products/conexao-maconica/engineering/FASE_1B_DESIGN_SYSTEM_WHITE_LABEL.md`.
+> Exemplos antigos abaixo que usam `--background`, `--primary` ou paletas
+> `slate/blue` são históricos e não devem ser copiados. Componentes novos usam
+> exclusivamente `--color-background`, `--color-primary`, `--color-surface`,
+> seus pares `*-foreground` e os demais tokens semânticos canônicos.
+
 ---
 
 ## 1. Arquitetura de Design Neutra & Temas por Tenant
@@ -76,7 +84,7 @@ O **Design System CivicOS** é a linguagem visual neutra da infraestrutura white
 }
 ```
 
-### 2.2 Contrato Semântico Obligatório Light / Dark
+### 2.2 Exemplo histórico de contrato Light / Dark
 
 ```css
 /* Contrato Semântico Dark Mode (Padrão) */
@@ -153,7 +161,7 @@ A plataforma suporta dois níveis de densidade visual baseados no contexto de us
 }
 ```
 
-### 3.2 Exemplo Conceitual de Mapeamento Tailwind (`tailwind.config.ts`)
+### 3.2 Exemplo histórico de Mapeamento Tailwind (`tailwind.config.ts`)
 
 ```typescript
 // Mapeamento de CSS Custom Properties para Tailwind CSS

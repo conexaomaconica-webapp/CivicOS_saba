@@ -10,13 +10,13 @@ export function Card({
   children,
   ...props
 }: CardProps) {
-  const baseClasses = 'rounded-xl transition-all duration-200 overflow-hidden';
+  const baseClasses = 'rounded-xl transition-all duration-200 overflow-hidden text-foreground';
 
   const variantClasses = {
-    default: 'bg-slate-900 border border-slate-800 text-slate-100',
-    elevated: 'bg-slate-900 border border-slate-800 text-slate-100 shadow-xl shadow-black/40',
-    bordered: 'bg-slate-950 border border-slate-700 text-slate-100',
-    glass: 'bg-slate-900/60 backdrop-blur-md border border-slate-800/80 text-slate-100 shadow-lg'
+    default: 'bg-surface border border-border',
+    elevated: 'bg-surface-elevated border border-border shadow-semanticMd',
+    bordered: 'bg-background border border-border',
+    glass: 'bg-surface backdrop-blur-md border border-border shadow-semanticSm'
   };
 
   return (
@@ -48,7 +48,7 @@ export function CardTitle({
 }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h3
-      className={`text-base font-semibold tracking-tight text-white ${className}`}
+      className={`text-base font-semibold font-heading tracking-tight text-foreground ${className}`}
       {...props}
     >
       {children}
@@ -62,7 +62,7 @@ export function CardDescription({
   ...props
 }: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p className={`text-xs text-slate-400 leading-relaxed ${className}`} {...props}>
+    <p className={`text-xs text-muted-foreground leading-relaxed ${className}`} {...props}>
       {children}
     </p>
   );
@@ -87,7 +87,7 @@ export function CardFooter({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={`p-5 pt-3 border-t border-slate-800/60 bg-slate-950/40 flex items-center justify-between ${className}`}
+      className={`p-5 pt-3 border-t border-border bg-muted flex items-center justify-between ${className}`}
       {...props}
     >
       {children}

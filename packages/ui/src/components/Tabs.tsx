@@ -102,7 +102,7 @@ export function TabsList({
     <div
       role="tablist"
       onKeyDown={handleKeyDown}
-      className={`inline-flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl gap-1 ${className}`}
+      className={`inline-flex items-center p-1 bg-surface border border-border rounded-xl gap-1 ${className}`}
     >
       {children}
     </div>
@@ -138,10 +138,10 @@ export function TabsTrigger({
       aria-selected={isSelected}
       aria-controls={panelId}
       onClick={() => context.setActiveTab(value)}
-      className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all select-none focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
+      className={`px-3 py-1.5 text-xs font-medium font-interface rounded-lg transition-all select-none focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed ${
         isSelected
-          ? 'bg-blue-600 text-white shadow-sm font-semibold'
-          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+          ? 'bg-primary text-primary-foreground shadow-semanticSm font-semibold'
+          : 'text-muted-foreground hover:text-foreground hover:bg-muted'
       } ${className}`}
     >
       {children}

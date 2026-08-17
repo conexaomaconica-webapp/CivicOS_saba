@@ -8,8 +8,10 @@ import { headers } from 'next/headers';
 import { createServerSideClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database.types';
 import {
+  APPROVED_FONT_STACKS,
   brandCssVarsToStyle,
   brandToCssVars,
+  type ApprovedFontToken,
   type BrandCssOutput,
   type BrandVisualInput,
 } from './brand-tokens';
@@ -29,14 +31,6 @@ export interface TenantBrandContext {
 type PublicBrandingRow =
   Database['public']['Functions']['public_tenant_branding']['Returns'][number];
 
-const FONT_TOKENS: Readonly<Record<string, string>> = {
-  'platform-sans':
-    'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  'editorial-serif':
-    'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
-  'humanist-sans':
-    '"Trebuchet MS", Frutiger, "Frutiger Linotype", ui-sans-serif, sans-serif',
-};
 const HEX_RE = /^#[0-9a-f]{6}$/;
 const SAFE_HOST_RE = /^[a-z0-9.-]+(?::[0-9]{1,5})?$/i;
 
@@ -53,7 +47,7 @@ function isPublicBrandingRow(value: unknown): value is PublicBrandingRow {
     stringOrNull(row.tenant_slug, 160) !== null &&
     stringOrNull(row.display_name, 64) !== null &&
     typeof row.font_token === 'string' &&
-    Object.hasOwn(FONT_TOKENS, row.font_token)
+    Object.hasOwn(APPROVED_FONT_STACKS, row.font_token)
   );
 }
 
@@ -76,7 +70,7 @@ function contextFromRow(row: PublicBrandingRow): TenantBrandContext {
       primaryColor && HEX_RE.test(primaryColor) ? primaryColor : undefined,
     accentColor:
       accentColor && HEX_RE.test(accentColor) ? accentColor : undefined,
-    fontFamily: FONT_TOKENS[row.font_token],
+    fontToken: row.font_token as ApprovedFontToken,
     radius,
     density: row.density === 'compact' ? 'compact' : 'comfortable',
   };
