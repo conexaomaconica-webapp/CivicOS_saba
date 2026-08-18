@@ -3,21 +3,10 @@
 -- database-level quota enforcement triggers via _get_plan_entitlement, strict RLS (no direct anon SELECT),
 -- feature_code entitlements in plan_entitlements, and dynamic public RPCs.
 
-CREATE TABLE IF NOT EXISTS public.plan_entitlements (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  plan_code VARCHAR(50) NOT NULL,
-  feature_code VARCHAR(100) NOT NULL,
-  max_limit INT NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT uq_plan_entitlements UNIQUE (tenant_id, plan_code, feature_code)
-);
-
 CREATE TABLE IF NOT EXISTS public.business_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-    business_id UUID NOT NULL REFERENCES public.businesses(id) ON DELETE CASCADE,
+    business_id UUID NOT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT,
     cover_image_url TEXT,
@@ -31,6 +20,7 @@ CREATE TABLE IF NOT EXISTS public.business_events (
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_business_events_multitenant FOREIGN KEY (tenant_id, business_id) REFERENCES public.businesses(tenant_id, id) ON DELETE CASCADE,
     CONSTRAINT check_event_ends_after_starts CHECK (ends_at IS NULL OR ends_at > starts_at)
 );
 
@@ -39,7 +29,7 @@ CREATE INDEX IF NOT EXISTS idx_business_events_business_status ON public.busines
 CREATE TABLE IF NOT EXISTS public.business_posts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-    business_id UUID NOT NULL REFERENCES public.businesses(id) ON DELETE CASCADE,
+    business_id UUID NOT NULL,
     title VARCHAR(255) NOT NULL,
     summary TEXT,
     content TEXT NOT NULL,
@@ -48,7 +38,8 @@ CREATE TABLE IF NOT EXISTS public.business_posts (
     published_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_business_posts_multitenant FOREIGN KEY (tenant_id, business_id) REFERENCES public.businesses(tenant_id, id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_business_posts_business_status ON public.business_posts (tenant_id, business_id, publication_status, is_active, published_at);
@@ -87,7 +78,7 @@ USING (
     )
 );
 
--- Seed feature_code entitlements into existing plan_entitlements structure
+-- Seed feature_code entitlements into existing plan_entitlements structure (depends on migration 044)
 INSERT INTO public.plan_entitlements (tenant_id, plan_code, feature_code, max_limit)
 SELECT t.id, 'bronze', 'events_limit', 0 FROM public.tenants t
 ON CONFLICT (tenant_id, plan_code, feature_code) DO NOTHING;
