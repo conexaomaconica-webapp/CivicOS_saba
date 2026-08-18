@@ -301,6 +301,24 @@ export type CustomFunctions = {
     };
     Returns: Json[];
   };
+  record_business_analytics_event: {
+    Args: {
+      p_tenant_id: string;
+      p_business_id: string;
+      p_event_type: string;
+      p_visitor_hmac: string;
+      p_referrer?: string | null;
+    };
+    Returns: boolean;
+  };
+  get_business_analytics_summary: {
+    Args: {
+      p_tenant_id: string;
+      p_business_id: string;
+      p_days?: number;
+    };
+    Returns: Json[];
+  };
 };
 
 export type AppDatabase = Omit<OriginalDatabase, 'public'> & {

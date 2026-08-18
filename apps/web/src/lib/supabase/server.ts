@@ -32,5 +32,9 @@ export async function createServerSideClient() {
   });
 }
 
+export async function resolveTenantIdServer(): Promise<string> {
+  return process.env.NEXT_PUBLIC_TENANT_ID || 'default-tenant-id';
+}
+
 export { createServerSideClient as createClient };
 

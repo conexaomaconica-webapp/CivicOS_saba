@@ -1,19 +1,28 @@
 import React from 'react';
 
 export interface StructuredDataProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  schema: Record<string, any>;
+  data?: Record<string, unknown> | Array<Record<string, unknown>>;
+  schema?: Record<string, unknown> | Array<Record<string, unknown>>;
 }
 
-/**
- * Reusable JSON-LD Structured Data component for SEO (SABA-seo.md Section 4).
- * Supports SoftwareApplication, Product, Service, FAQPage, BreadcrumbList, etc.
- */
-export function StructuredData({ schema }: StructuredDataProps) {
+export function sanitizeJsonLd(data: unknown): string {
+  const jsonString = JSON.stringify(data);
+  return jsonString
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026');
+}
+
+export function StructuredData({ data, schema }: StructuredDataProps) {
+  const content = data || schema;
+  if (!content) return null;
+
+  const sanitizedJson = sanitizeJsonLd(content);
+
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+      dangerouslySetInnerHTML={{ __html: sanitizedJson }}
     />
   );
 }

@@ -135,4 +135,5 @@ export type {
 
 export * from './reviews-and-audit.contract';
 export * from './events-and-posts.contract';
+export * from './analytics.contract';
 

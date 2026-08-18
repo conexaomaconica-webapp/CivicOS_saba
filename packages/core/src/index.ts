@@ -283,6 +283,11 @@ export {
   businessEventSchema,
   businessPostSchema,
 } from './contracts/events-and-posts.contract';
+export {
+  analyticsEventTypeSchema,
+  recordAnalyticsEventSchema,
+  analyticsSummaryItemSchema,
+} from './contracts/analytics.contract';
 export type {
   ReviewStatus,
   BusinessReview,
@@ -296,6 +301,11 @@ export type {
   BusinessEvent,
   BusinessPost,
 } from './contracts/events-and-posts.contract';
+export type {
+  AnalyticsEventType,
+  RecordAnalyticsEventInput,
+  AnalyticsSummaryItem,
+} from './contracts/analytics.contract';
 
 
 
