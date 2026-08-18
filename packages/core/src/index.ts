@@ -277,6 +277,12 @@ export {
   adminAuditLogSchema,
   searchPublicBusinessesQuerySchema,
 } from './contracts/reviews-and-audit.contract';
+export {
+  eventPublicationStatusSchema,
+  postPublicationStatusSchema,
+  businessEventSchema,
+  businessPostSchema,
+} from './contracts/events-and-posts.contract';
 export type {
   ReviewStatus,
   BusinessReview,
@@ -284,6 +290,13 @@ export type {
   AdminAuditLog,
   SearchPublicBusinessesQuery,
 } from './contracts/reviews-and-audit.contract';
+export type {
+  EventPublicationStatus,
+  PostPublicationStatus,
+  BusinessEvent,
+  BusinessPost,
+} from './contracts/events-and-posts.contract';
+
 
 
 

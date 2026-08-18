@@ -107,7 +107,7 @@ export function PublicReviewForm({ tenantId, businessId }: PublicReviewFormProps
           />
         </div>
 
-        <Button type="submit" variant="default" size="sm" disabled={loading}>
+        <Button variant="primary" type="submit" size="sm" disabled={loading || rating === 0}>
           {loading ? 'Enviando...' : 'Enviar Avaliação (Pendente de Moderação)'}
         </Button>
       </form>

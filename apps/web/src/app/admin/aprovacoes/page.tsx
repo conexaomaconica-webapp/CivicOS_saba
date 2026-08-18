@@ -139,13 +139,13 @@ export default function AdminAprovacoesPage() {
                       ? 'success'
                       : biz.publication_status === 'pending_review'
                       ? 'warning'
-                      : 'destructive'
+                      : 'danger'
                   }
                 >
                   {biz.publication_status}
                 </Badge>
                 {biz.is_founder && (
-                  <Badge variant="secondary" className="bg-amber-100 text-amber-900 border-amber-300">
+                  <Badge variant="info" className="bg-amber-100 text-amber-900 border-amber-300">
                     Selo Founder Ativo
                   </Badge>
                 )}
@@ -163,7 +163,7 @@ export default function AdminAprovacoesPage() {
               </Button>
               {biz.publication_status !== 'published' && (
                 <Button
-                  variant="default"
+                  variant="primary"
                   size="sm"
                   onClick={() => handleOpenDialog(biz, 'publish')}
                 >
@@ -172,7 +172,7 @@ export default function AdminAprovacoesPage() {
               )}
               {biz.publication_status === 'published' && (
                 <Button
-                  variant="destructive"
+                  variant="danger"
                   size="sm"
                   onClick={() => handleOpenDialog(biz, 'suspend')}
                 >
@@ -181,7 +181,7 @@ export default function AdminAprovacoesPage() {
               )}
               {biz.publication_status === 'pending_review' && (
                 <Button
-                  variant="destructive"
+                  variant="danger"
                   size="sm"
                   onClick={() => handleOpenDialog(biz, 'reject')}
                 >
@@ -239,7 +239,7 @@ export default function AdminAprovacoesPage() {
               </Button>
 
               <Button
-                variant={actionType === 'publish' ? 'default' : 'destructive'}
+                variant={actionType === 'publish' ? 'primary' : 'danger'}
                 onClick={handleConfirmAction}
                 disabled={loading}
               >

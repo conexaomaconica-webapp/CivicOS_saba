@@ -108,7 +108,7 @@ export default function AdminReviewsPage() {
           <Card key={rev.id} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-2 max-w-2xl">
               <div className="flex items-center gap-2">
-                <Badge variant={rev.status === 'approved' ? 'success' : rev.status === 'pending' ? 'warning' : 'destructive'}>
+                <Badge variant={rev.status === 'approved' ? 'success' : rev.status === 'pending' ? 'warning' : 'danger'}>
                   {rev.status}
                 </Badge>
                 <span className="text-sm font-bold text-amber-500">
@@ -126,10 +126,10 @@ export default function AdminReviewsPage() {
 
             {rev.status === 'pending' && (
               <div className="flex items-center gap-2">
-                <Button variant="default" size="sm" onClick={() => handleOpenDialog(rev, 'approved')}>
+                <Button variant="primary" size="sm" onClick={() => handleOpenDialog(rev, 'approved')}>
                   Aprovar Review
                 </Button>
-                <Button variant="destructive" size="sm" onClick={() => handleOpenDialog(rev, 'rejected')}>
+                <Button variant="danger" size="sm" onClick={() => handleOpenDialog(rev, 'rejected')}>
                   Rejeitar
                 </Button>
               </div>
@@ -146,7 +146,7 @@ export default function AdminReviewsPage() {
         >
           <div className="space-y-4 py-2">
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              Você está modenrando a avaliação de <strong className="font-semibold">{selectedReview.author_name}</strong> para a empresa <strong>{selectedReview.business_name}</strong>.
+              Você está moderando a avaliação de <strong className="font-semibold">{selectedReview.author_name}</strong> para a empresa <strong>{selectedReview.business_name}</strong>.
             </p>
 
             {targetStatus === 'rejected' && (
@@ -167,7 +167,7 @@ export default function AdminReviewsPage() {
                 Cancelar
               </Button>
               <Button
-                variant={targetStatus === 'approved' ? 'default' : 'destructive'}
+                variant={targetStatus === 'approved' ? 'primary' : 'danger'}
                 onClick={handleModerate}
                 disabled={loading}
               >

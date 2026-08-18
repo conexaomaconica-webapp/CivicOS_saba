@@ -11,7 +11,7 @@ async function applyMigration() {
 
   const sqlPath = path.resolve(__dirname, '../../../../supabase/migrations/045_billing_webhooks_and_lifecycle.sql');
   console.log('Reading migration file:', sqlPath);
-  const _sql = fs.readFileSync(sqlPath, 'utf8');
+  fs.readFileSync(sqlPath, 'utf8');
 
   // Test RPC process_billing_webhook idempotency check
   const { data, error } = await supabase.rpc('process_billing_webhook', {

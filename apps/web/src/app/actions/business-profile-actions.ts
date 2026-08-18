@@ -326,13 +326,6 @@ export async function deleteGalleryMediaAction(businessId: string, mediaId: stri
   await verifyBusinessOwnership(supabase, tenantId, businessId);
 
   try {
-    const { data: member } = await supabase
-      .from('business_members')
-      .select('role')
-      .eq('tenant_id', tenantId)
-      .eq('business_id', businessId)
-      .eq('user_id', user.id)
-      .maybeSingle();
 
     const { error } = await supabase
       .from('business_media')

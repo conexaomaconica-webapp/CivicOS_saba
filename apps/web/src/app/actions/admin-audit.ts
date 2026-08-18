@@ -32,9 +32,9 @@ export async function updatePlanQuotaAction(input: {
     const { data, error } = await supabase.rpc('update_plan_entitlement_quota', {
       p_tenant_id: input.tenantId,
       p_entitlement_id: input.entitlementId,
-      p_services_limit: input.servicesLimit,
-      p_benefits_limit: input.benefitsLimit,
-      p_gallery_limit: input.galleryLimit,
+      p_services_limit: input.servicesLimit ?? 0,
+      p_benefits_limit: input.benefitsLimit ?? 0,
+      p_gallery_limit: input.galleryLimit ?? 0,
       p_reason: input.reason || 'Alteração manual de cota via painel admin',
     });
 

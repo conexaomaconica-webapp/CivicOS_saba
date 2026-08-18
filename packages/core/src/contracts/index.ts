@@ -134,4 +134,5 @@ export type {
 } from './metadata-registry.contract';
 
 export * from './reviews-and-audit.contract';
+export * from './events-and-posts.contract';
 

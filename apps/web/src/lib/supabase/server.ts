@@ -1,6 +1,6 @@
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import type { Database } from '@/types/database.types';
+import type { AppDatabase } from '@/types/database-extensions';
 
 function getSupabaseUrl(): string {
   return process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -13,7 +13,7 @@ function getSupabaseAnonKey(): string {
 export async function createServerSideClient() {
   const cookieStore = await cookies();
   
-  return createServerClient<Database>(getSupabaseUrl(), getSupabaseAnonKey(), {
+  return createServerClient<AppDatabase>(getSupabaseUrl(), getSupabaseAnonKey(), {
     cookies: {
       getAll() {
         return cookieStore.getAll();

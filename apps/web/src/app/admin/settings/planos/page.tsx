@@ -141,16 +141,17 @@ export default function AdminPlanQuotasPage() {
         {quotas.map((q) => (
           <Card key={q.id} className="p-5 flex flex-col justify-between space-y-4">
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-lg capitalize text-slate-900 dark:text-white">
-                  Plano {q.plan_code}
-                </h3>
-                <Badge variant={q.plan_code === 'ouro' ? 'warning' : 'outline'}>
-                  {q.plan_code.toUpperCase()}
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-slate-900 dark:text-white uppercase">{q.plan_code}</h3>
+                <Badge variant={q.plan_code === 'ouro' ? 'warning' : 'neutral'}>
+                  Cota Atual: {q.services_limit} serviços
                 </Badge>
               </div>
+              <p className="text-xs text-slate-500 mt-1">
+                ID do Entitlement: <code className="text-slate-400">{q.id}</code>
+              </p>
 
-              <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+              <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300 mt-4">
                 <div className="flex justify-between border-b pb-1">
                   <span>Limite de Serviços:</span>
                   <strong className="font-semibold text-slate-900 dark:text-white">{q.services_limit}</strong>
@@ -236,7 +237,7 @@ export default function AdminPlanQuotasPage() {
                   <Button variant="outline" onClick={() => setEditingQuota(null)}>
                     Cancelar
                   </Button>
-                  <Button variant="default" onClick={handleReviewImpact}>
+                  <Button variant="primary" onClick={handleReviewImpact}>
                     Revisar Impacto (Before → After)
                   </Button>
                 </div>
@@ -272,7 +273,7 @@ export default function AdminPlanQuotasPage() {
                   <Button variant="outline" onClick={() => setShowConfirm(false)}>
                     Voltar
                   </Button>
-                  <Button variant="default" onClick={handleSaveQuota} disabled={loading}>
+                  <Button variant="primary" onClick={handleSaveQuota} disabled={loading}>
                     {loading ? 'Gravando Audit Log...' : 'Confirmar e Salvar no Audit Log'}
                   </Button>
                 </div>

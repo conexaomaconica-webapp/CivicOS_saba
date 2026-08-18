@@ -65,7 +65,7 @@ export function BusinessProfileTabs({
   const [neighborhood, setNeighborhood] = useState(initialData.neighborhood || '');
   const [city, setCity] = useState(initialData.city || '');
   const [state, setState] = useState(initialData.state || '');
-  const [zipCode, setZipCode] = useState(initialData.zipCode || '');
+  const [zipCode, _setZipCode] = useState(initialData.zipCode || '');
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();

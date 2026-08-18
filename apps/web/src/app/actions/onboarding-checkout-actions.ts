@@ -119,7 +119,7 @@ export async function selectPlanAndGenerateCheckoutAction(
   rawPlanCode: string,
   provider: 'asaas' | 'stripe' | 'mercadopago' = 'asaas'
 ) {
-  const _tenantId = await resolveTenantIdServer();
+  await resolveTenantIdServer();
 
   // Normalização estrita: Founder NUNCA é plan_code. É um plano Ouro + modificador Founder se alocado.
   const isFounderRequested = rawPlanCode === 'ouro_founder';

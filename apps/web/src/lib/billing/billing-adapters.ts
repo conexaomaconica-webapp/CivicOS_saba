@@ -30,7 +30,7 @@ export class AsaasBillingAdapter {
     return accessTokenHeader === secretToken;
   }
 
-  static parseEvent(headers: Headers, payload: Record<string, unknown>): CanonicalBillingEvent {
+  static parseEvent(_headers: Headers, payload: Record<string, unknown>): CanonicalBillingEvent {
     const rawEvent = (payload.event as string) || 'PAYMENT_RECEIVED';
     const eventId = (payload.id as string) || `asaas_evt_${Date.now()}`;
 
@@ -72,7 +72,7 @@ export class StripeBillingAdapter {
     return Boolean(signatureHeader && signatureHeader.length > 0);
   }
 
-  static parseEvent(headers: Headers, payload: Record<string, unknown>): CanonicalBillingEvent {
+  static parseEvent(_headers: Headers, payload: Record<string, unknown>): CanonicalBillingEvent {
     const rawType = (payload.type as string) || 'invoice.paid';
     const eventId = (payload.id as string) || `stripe_evt_${Date.now()}`;
 
@@ -114,7 +114,7 @@ export class MercadoPagoBillingAdapter {
     return Boolean(signatureHeader && signatureHeader.length > 0);
   }
 
-  static parseEvent(headers: Headers, payload: Record<string, unknown>): CanonicalBillingEvent {
+  static parseEvent(_headers: Headers, payload: Record<string, unknown>): CanonicalBillingEvent {
     const action = (payload.action as string) || (payload.type as string) || 'payment.updated';
     const dataObj = (payload.data as Record<string, unknown>) || {};
     const eventId = (payload.id as string) || (dataObj.id as string) || `mp_evt_${Date.now()}`;

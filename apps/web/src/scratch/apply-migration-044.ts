@@ -11,7 +11,7 @@ async function applyMigration() {
 
   const sqlPath = path.resolve(__dirname, '../../../../supabase/migrations/044_media_storage_and_plan_entitlements.sql');
   console.log('Reading migration file:', sqlPath);
-  const sql = fs.readFileSync(sqlPath, 'utf8');
+  fs.readFileSync(sqlPath, 'utf8');
 
   // Executa SQL raw via rpc se disponível ou valida Supabase
   const { data, error } = await supabase.rpc('_get_plan_entitlement', {

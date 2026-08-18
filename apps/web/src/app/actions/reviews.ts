@@ -2,7 +2,7 @@
 
 import { createServerSideClient } from '@/lib/supabase/server';
 
-import { ratingSummarySchema, businessReviewSchema } from '@saas/core';
+import { ratingSummarySchema } from '@saas/core';
 
 export interface SubmitReviewInput {
   tenantId: string;
@@ -112,7 +112,7 @@ export async function getBusinessRatingSummaryAction(
       return { success: false, error: error.message };
     }
 
-    const row = Array.isArray(data) ? data[0] : data;
+    const row = (Array.isArray(data) ? data[0] : data) as Record<string, any> | null;
     const summary = ratingSummarySchema.parse({
       averageRating: Number(row?.average_rating ?? 0),
       totalApprovedReviews: Number(row?.total_approved_reviews ?? 0),
