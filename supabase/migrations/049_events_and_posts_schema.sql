@@ -1,7 +1,7 @@
 -- Migration 049: Business Events & News/Posts Schema with Feature-Code Entitlements & DB Quota Enforcers
 -- Implements business_events and business_posts with explicit IANA timezones (no hardcoded default),
 -- database-level quota enforcement triggers via _get_plan_entitlement, strict RLS (no direct anon SELECT),
--- feature_code entitlements in plan_entitlements, and dynamic public RPCs.
+-- feature_code entitlements in plan_entitlements, dynamic public RPCs, and SET search_path = '' for SECURITY DEFINER.
 
 CREATE TABLE IF NOT EXISTS public.business_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -105,7 +105,11 @@ ON CONFLICT (tenant_id, plan_code, feature_code) DO NOTHING;
 
 -- Database-Level Quota Enforcer Triggers (Final Authority Against Race Conditions)
 CREATE OR REPLACE FUNCTION public.check_business_event_quota()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 DECLARE
     v_plan_code VARCHAR(50);
     v_max_limit INT;
@@ -135,7 +139,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 DROP TRIGGER IF EXISTS trg_check_business_event_quota ON public.business_events;
 CREATE TRIGGER trg_check_business_event_quota
@@ -144,7 +148,11 @@ FOR EACH ROW
 EXECUTE FUNCTION public.check_business_event_quota();
 
 CREATE OR REPLACE FUNCTION public.check_business_post_quota()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 DECLARE
     v_plan_code VARCHAR(50);
     v_max_limit INT;
@@ -174,7 +182,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 DROP TRIGGER IF EXISTS trg_check_business_post_quota ON public.business_posts;
 CREATE TRIGGER trg_check_business_post_quota
@@ -200,7 +208,12 @@ RETURNS TABLE (
     location_name VARCHAR(255),
     address TEXT,
     external_ticket_url TEXT
-) AS $$
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 DECLARE
     v_plan_code VARCHAR(50);
     v_events_limit INT;
@@ -245,7 +258,7 @@ BEGIN
     LIMIT LEAST(GREATEST(p_limit, 1), v_events_limit)
     OFFSET GREATEST(p_offset, 0);
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$$;
 
 -- RPC: Get Public Business Posts (Sanitised, filtered by dynamic plan entitlement)
 CREATE OR REPLACE FUNCTION public.get_public_business_posts(
@@ -261,7 +274,12 @@ RETURNS TABLE (
     content TEXT,
     cover_image_url TEXT,
     published_at TIMESTAMPTZ
-) AS $$
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 DECLARE
     v_plan_code VARCHAR(50);
     v_posts_limit INT;
@@ -301,4 +319,4 @@ BEGIN
     LIMIT LEAST(GREATEST(p_limit, 1), v_posts_limit)
     OFFSET GREATEST(p_offset, 0);
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$$;

@@ -1,10 +1,10 @@
--- Migration 047: Admin Audit Log, Quota Management & Independent Publication/Founder Status
--- Implements privileged administrative audit log (admin_audit_logs) and RPCs for quota changes,
--- business publication moderation, and founder allocation with strict before/after auditing.
+-- Migration 047: Admin Audit Log & Quota Management with Explicit SET search_path = ''
+-- Implements admin_audit_logs table, strict SECURITY DEFINER RPCs for plan entitlement updates,
+-- business publication status moderation, and founder allocation with mandatory audit logging.
 
 CREATE TABLE IF NOT EXISTS public.admin_audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
     actor_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     entity_type VARCHAR(50) NOT NULL,
     entity_id UUID NOT NULL,
@@ -15,13 +15,13 @@ CREATE TABLE IF NOT EXISTS public.admin_audit_logs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_actor ON public.admin_audit_logs (actor_id);
-CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_entity ON public.admin_audit_logs (entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_tenant_actor ON public.admin_audit_logs (tenant_id, actor_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_entity ON public.admin_audit_logs (tenant_id, entity_type, entity_id);
 
 ALTER TABLE public.admin_audit_logs ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Admins can view audit logs" ON public.admin_audit_logs;
-CREATE POLICY "Admins can view audit logs"
+DROP POLICY IF EXISTS "Platform admins can view audit logs" ON public.admin_audit_logs;
+CREATE POLICY "Platform admins can view audit logs"
 ON public.admin_audit_logs FOR SELECT
 USING (
     EXISTS (
@@ -31,23 +31,26 @@ USING (
     )
 );
 
--- RPC: Update Plan Entitlements / Quotas with Audit Logging
+-- RPC: Update Plan Entitlement Quota with Audit Log
 CREATE OR REPLACE FUNCTION public.update_plan_entitlement_quota(
     p_tenant_id UUID,
     p_entitlement_id UUID,
-    p_services_limit INT,
-    p_benefits_limit INT,
-    p_gallery_limit INT,
+    p_services_limit INT DEFAULT NULL,
+    p_benefits_limit INT DEFAULT NULL,
+    p_gallery_limit INT DEFAULT NULL,
     p_reason TEXT DEFAULT NULL
 )
-RETURNS JSONB AS $$
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 DECLARE
     v_actor_id UUID := auth.uid();
     v_is_platform_admin BOOLEAN;
     v_before JSONB;
     v_after JSONB;
 BEGIN
-    -- Enforce platform_admin privilege
     SELECT EXISTS (
         SELECT 1 FROM public.user_roles ur
         JOIN public.roles r ON ur.role_id = r.id
@@ -58,7 +61,6 @@ BEGIN
         RAISE EXCEPTION 'Acesso negado: Apenas platform_admin pode alterar cotas de planos.' USING ERRCODE = '42501';
     END IF;
 
-    -- Capture state before change
     SELECT to_jsonb(e.*) INTO v_before
     FROM public.plan_entitlements e
     WHERE e.id = p_entitlement_id;
@@ -67,7 +69,6 @@ BEGIN
         RAISE EXCEPTION 'Registro de cota não encontrado para o ID %', p_entitlement_id USING ERRCODE = 'P0002';
     END IF;
 
-    -- Perform update
     UPDATE public.plan_entitlements
     SET services_limit = COALESCE(p_services_limit, services_limit),
         benefits_limit = COALESCE(p_benefits_limit, benefits_limit),
@@ -75,12 +76,10 @@ BEGIN
         updated_at = NOW()
     WHERE id = p_entitlement_id;
 
-    -- Capture state after change
     SELECT to_jsonb(e.*) INTO v_after
     FROM public.plan_entitlements e
     WHERE e.id = p_entitlement_id;
 
-    -- Insert Audit Log
     INSERT INTO public.admin_audit_logs (
         tenant_id,
         actor_id,
@@ -103,16 +102,20 @@ BEGIN
 
     RETURN v_after;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
--- RPC: Moderate Business Publication Status (Independent of Founder status)
+-- RPC: Moderate Business Publication Status
 CREATE OR REPLACE FUNCTION public.moderate_business_publication_status(
     p_tenant_id UUID,
     p_business_id UUID,
     p_new_status VARCHAR(30),
     p_reason TEXT DEFAULT NULL
 )
-RETURNS JSONB AS $$
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 DECLARE
     v_actor_id UUID := auth.uid();
     v_is_admin BOOLEAN;
@@ -126,36 +129,24 @@ BEGIN
     ) INTO v_is_admin;
 
     IF NOT v_is_admin THEN
-        RAISE EXCEPTION 'Acesso negado: Requer permissão administrativa.' USING ERRCODE = '42501';
+        RAISE EXCEPTION 'Acesso negado: Apenas administradores podem moderar empresas.' USING ERRCODE = '42501';
     END IF;
 
-    IF p_new_status NOT IN ('draft', 'pending_review', 'published', 'rejected', 'suspended') THEN
-        RAISE EXCEPTION 'Status de publicação inválido: %', p_new_status USING ERRCODE = '22023';
-    END IF;
-
-    SELECT jsonb_build_object(
-        'id', b.id,
-        'publication_status', b.publication_status,
-        'is_active', b.is_active
-    ) INTO v_before
-    FROM public.business_profiles b
+    SELECT to_jsonb(b.*) INTO v_before
+    FROM public.businesses b
     WHERE b.id = p_business_id AND b.tenant_id = p_tenant_id;
 
     IF v_before IS NULL THEN
         RAISE EXCEPTION 'Empresa não encontrada para moderação.' USING ERRCODE = 'P0002';
     END IF;
 
-    UPDATE public.business_profiles
+    UPDATE public.businesses
     SET publication_status = p_new_status,
         updated_at = NOW()
     WHERE id = p_business_id AND tenant_id = p_tenant_id;
 
-    SELECT jsonb_build_object(
-        'id', b.id,
-        'publication_status', b.publication_status,
-        'is_active', b.is_active
-    ) INTO v_after
-    FROM public.business_profiles b
+    SELECT to_jsonb(b.*) INTO v_after
+    FROM public.businesses b
     WHERE b.id = p_business_id AND b.tenant_id = p_tenant_id;
 
     INSERT INTO public.admin_audit_logs (
@@ -170,9 +161,9 @@ BEGIN
     ) VALUES (
         p_tenant_id,
         v_actor_id,
-        'business_profile',
+        'businesses',
         p_business_id,
-        'MODERATE_PUBLICATION_STATUS',
+        'MODERATE_STATUS',
         v_before,
         v_after,
         p_reason
@@ -180,16 +171,20 @@ BEGIN
 
     RETURN v_after;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
--- RPC: Allocate Founder Status (Does NOT alter publication_status)
+-- RPC: Allocate Founder Status
 CREATE OR REPLACE FUNCTION public.allocate_founder_status(
     p_tenant_id UUID,
     p_business_id UUID,
     p_is_founder BOOLEAN,
     p_reason TEXT DEFAULT NULL
 )
-RETURNS JSONB AS $$
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 DECLARE
     v_actor_id UUID := auth.uid();
     v_is_admin BOOLEAN;
@@ -203,31 +198,25 @@ BEGIN
     ) INTO v_is_admin;
 
     IF NOT v_is_admin THEN
-        RAISE EXCEPTION 'Acesso negado: Requer permissão administrativa.' USING ERRCODE = '42501';
+        RAISE EXCEPTION 'Acesso negado: Apenas administradores podem alterar status Founder.' USING ERRCODE = '42501';
     END IF;
 
-    SELECT jsonb_build_object(
-        'id', b.id,
-        'is_founder', COALESCE(b.is_founder, false)
-    ) INTO v_before
-    FROM public.business_profiles b
+    SELECT to_jsonb(b.*) INTO v_before
+    FROM public.businesses b
     WHERE b.id = p_business_id AND b.tenant_id = p_tenant_id;
 
     IF v_before IS NULL THEN
         RAISE EXCEPTION 'Empresa não encontrada para alocação Founder.' USING ERRCODE = 'P0002';
     END IF;
 
-    UPDATE public.business_profiles
+    UPDATE public.businesses
     SET is_founder = p_is_founder,
         updated_at = NOW()
     WHERE id = p_business_id AND tenant_id = p_tenant_id;
 
-    SELECT jsonb_build_object(
-        'id', b.id,
-        'is_founder', b.is_founder
-    ) INTO v_after
-    FROM public.business_profiles b
-    WHERE b.id = p_business_id AND tenant_id = p_tenant_id;
+    SELECT to_jsonb(b.*) INTO v_after
+    FROM public.businesses b
+    WHERE b.id = p_business_id AND b.tenant_id = p_tenant_id;
 
     INSERT INTO public.admin_audit_logs (
         tenant_id,
@@ -241,9 +230,9 @@ BEGIN
     ) VALUES (
         p_tenant_id,
         v_actor_id,
-        'business_profile',
+        'businesses',
         p_business_id,
-        'ALLOCATE_FOUNDER_STATUS',
+        'ALLOCATE_FOUNDER',
         v_before,
         v_after,
         p_reason
@@ -251,4 +240,4 @@ BEGIN
 
     RETURN v_after;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
