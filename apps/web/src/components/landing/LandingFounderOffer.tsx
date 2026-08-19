@@ -40,7 +40,7 @@ export function LandingFounderOffer() {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#C9A227] font-bold">✓</span>
-              <span>Selo <strong>Selo Founder Ativo</strong> visível no perfil da empresa</span>
+              <span>Selo <strong>Empresa Fundadora</strong> visível no perfil da empresa</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#C9A227] font-bold">✓</span>

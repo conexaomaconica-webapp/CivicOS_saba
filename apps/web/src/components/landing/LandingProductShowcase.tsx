@@ -33,7 +33,7 @@ export function LandingProductShowcase() {
             <div className="h-48 rounded-xl bg-slate-950 border border-amber-500/20 flex items-center justify-center p-4 text-center">
               <div className="space-y-2">
                 <span className="text-3xl">📱</span>
-                <p className="text-xs font-bold text-amber-300">Selo Founder em Mobile</p>
+                <p className="text-xs font-bold text-amber-300">Selo Empresa Fundadora em Mobile</p>
                 <p className="text-[10px] text-slate-500">Exibição rápida com WhatsApp Direto</p>
               </div>
             </div>

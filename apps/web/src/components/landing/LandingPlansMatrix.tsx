@@ -48,7 +48,7 @@ export function LandingPlansMatrix() {
       events: 'Até 5 Eventos',
       posts: 'Até 10 Posts',
       highlight: 'Máximo com Destaque Especial',
-      founderBadge: '✓ Selo Founder Ativo',
+      founderBadge: '✓ Selo Empresa Fundadora',
       border: 'border-amber-500 bg-amber-500/10 shadow-xl shadow-amber-500/10',
       isPopular: true,
     },
