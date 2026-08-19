@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
 import { Button, Badge } from '@saas/ui';
 
 export function LandingHero() {
@@ -14,19 +13,6 @@ export function LandingHero() {
       <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#C9A227_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none" />
       
       <div className="container mx-auto px-4 max-w-6xl relative z-10 text-center space-y-8">
-        {/* Official Vertical Logo Display */}
-        <div className="flex justify-center mb-2">
-          <div className="relative w-40 h-28 md:w-52 md:h-36 filter drop-shadow-lg">
-            <Image
-              src="/logoconexao_red_vert.png"
-              alt="Conexão Maçônica"
-              fill
-              className="object-contain"
-              priority
-            />
-          </div>
-        </div>
-
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#C9A227]/10 border border-[#C9A227]/30 text-[#C9A227] text-xs font-semibold uppercase tracking-wider">
           <Badge variant="warning">LANÇAMENTO 2026</Badge>
           <span>CONDIÇÕES ESPECIAIS PARA EMPRESAS FUNDADORAS</span>

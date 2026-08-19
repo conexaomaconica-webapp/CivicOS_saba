@@ -51,7 +51,7 @@ export function LandingPlansMatrix() {
     {
       code: 'ouro_founder',
       name: 'OURO FUNDADOR',
-      tagline: 'Faça parte desde o começo',
+      tagline: 'Faça parte da história',
       priceText: 'R$ 599 / ano¹',
       priceSubtext: 'Garantido nos 2 primeiros anos (100 Vagas)',
       services: 'Até 25 Serviços / Produtos',

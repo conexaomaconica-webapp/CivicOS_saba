@@ -10,11 +10,11 @@ export function LandingHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-[#4B161B]/95 backdrop-blur-md border-b border-[#C9A227]/40 text-white shadow-xl">
-      <div className="container mx-auto px-4 max-w-6xl h-20 flex items-center justify-between">
-        {/* Vertical Brand Logo */}
+    <header className="sticky top-0 z-50 bg-[#4B161B]/95 backdrop-blur-md border-b border-[#C9A227]/40 text-white shadow-2xl">
+      <div className="container mx-auto px-4 max-w-6xl h-24 flex items-center justify-between">
+        {/* Prominent Vertical Brand Logo in Header */}
         <div className="flex items-center cursor-pointer py-1" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          <div className="relative w-28 h-14 md:w-36 md:h-16">
+          <div className="relative w-36 h-16 md:w-48 md:h-20">
             <Image
               src="/logoconexao_red_vert.png"
               alt="Conexão Maçônica"

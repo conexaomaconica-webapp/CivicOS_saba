@@ -41,7 +41,7 @@ export function LandingFounderOffer() {
           </div>
 
           <div className="bg-[#C9A227]/10 p-3 rounded-lg border border-[#C9A227]/30 text-center text-xs font-semibold text-[#C9A227]">
-            💡 Economia de R$ 401/ano em relação ao preço atual do Plano Ouro!
+            💡 Economia de R$ 401/ano (R$ 802,00 no período de 2 anos) em relação ao preço atual do Plano Ouro!
           </div>
 
           <ul className="space-y-3 text-sm text-slate-200">
