@@ -27,6 +27,10 @@
   z-index: 20;
 }
 
+body:has(#captacao-lead) .cm-public-header {
+  display: none !important;
+}
+
 .cm-public-header__inner {
   width: 100%;
   height: 100%;

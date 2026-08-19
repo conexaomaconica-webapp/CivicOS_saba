@@ -29,7 +29,7 @@ export function LandingFaq() {
   ];
 
   return (
-    <section className="py-20 bg-slate-900 text-white">
+    <section className="py-20 bg-slate-900 text-white" id="faq">
       <div className="container mx-auto px-4 max-w-4xl space-y-12">
         <div className="text-center space-y-4">
           <h2 className="text-xs font-bold text-amber-400 tracking-widest uppercase">

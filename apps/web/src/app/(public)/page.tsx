@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import React from 'react';
 import { StructuredData } from '@/components/seo/StructuredData';
 import { appUrl } from '@/lib/seo/app-url';
+import { LandingHeader } from '@/components/landing/LandingHeader';
 import { LandingHero } from '@/components/landing/LandingHero';
 import { LandingEcosystem } from '@/components/landing/LandingEcosystem';
 import { LandingAudience } from '@/components/landing/LandingAudience';
@@ -14,9 +15,9 @@ import { LandingFaq } from '@/components/landing/LandingFaq';
 import { LandingLeadCapture } from '@/components/landing/LandingLeadCapture';
 
 export const metadata: Metadata = {
-  title: 'Conexão Maçônica | A Comunidade Conectada a Quem Valoriza essa Conexão',
+  title: 'Conexão Maçônica | Conexões que Fortalecem Negócios e Aproximam a Comunidade',
   description:
-    'O Conexão Maçônica aproxima maçons, famílias, lojas, profissionais e empresas em um ambiente organizado e confiável pensado para fortalecer relacionamentos e negócios.',
+    'O Conexão Maçônica é um guia criado para aproximar pessoas, profissionais, empresas e serviços em um ambiente organizado, confiável e pensado para gerar novas conexões.',
   alternates: { canonical: appUrl('/') },
   openGraph: {
     title: 'Conexão Maçônica | Lançamento 2026',
@@ -32,7 +33,7 @@ const organizationSchema = {
   '@type': 'Organization',
   name: 'Conexão Maçônica',
   url: appUrl('/'),
-  logo: appUrl('/logo.svg'),
+  logo: appUrl('/logoconexao_red.png'),
   description:
     'Plataforma de descoberta e networking comercial para a comunidade maçônica com selo de reconhecimento e apoio mútuo.',
 };
@@ -62,7 +63,7 @@ const faqSchema = {
       name: 'Qual a diferença entre os planos Bronze, Prata, Ouro e Fundador?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'O plano Bronze oferece presença básica. O Prata inclui galeria de fotos. O Ouro adiciona eventos, novidades/posts e destaque comercial máximo. O Ouro Fundador traz todas as vantagens do Ouro acrescido do Selo de Fundador.',
+        text: 'O plano Bronze oferece presença básica. O Prata inclui galeria de fotos. O Ouro adiciona eventos, novidades/posts e destaque comercial máximo. O Ouro Fundador traz todas as vantagens do Ouro acrescido do Selo Empresa Fundadora.',
       },
     },
   ],
@@ -74,6 +75,7 @@ export default function HomePage() {
       <StructuredData schema={organizationSchema} />
       <StructuredData schema={faqSchema} />
       <div className="w-full">
+        <LandingHeader />
         <LandingHero />
         <LandingEcosystem />
         <LandingAudience />

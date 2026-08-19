@@ -25,7 +25,7 @@ export function LandingEcosystem() {
   ];
 
   return (
-    <section className="py-20 bg-slate-950 text-white border-t border-slate-800/60">
+    <section className="py-20 bg-slate-950 text-white border-t border-slate-800/60" id="como-funciona">
       <div className="container mx-auto px-4 max-w-6xl space-y-12">
         <div className="text-center space-y-4 max-w-3xl mx-auto">
           <h2 className="text-xs font-bold text-amber-400 tracking-widest uppercase">
