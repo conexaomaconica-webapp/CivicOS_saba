@@ -15,7 +15,11 @@ export async function generateRootMetadata(): Promise<Metadata> {
     metadataBase: new URL(APP_URL),
     title: { default: appName, template: `%s | ${appName}` },
     description: PLATFORM_DESCRIPTION,
-    icons: brand.faviconUrl ? { icon: brand.faviconUrl } : undefined,
+    icons: {
+      icon: brand.faviconUrl ?? '/icone.png',
+      shortcut: brand.faviconUrl ?? '/icone.png',
+      apple: brand.faviconUrl ?? '/icone.png',
+    },
     ...(brand.primaryColor ? { themeColor: brand.primaryColor } : {}),
     robots: { index: true, follow: true },
   };

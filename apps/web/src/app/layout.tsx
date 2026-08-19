@@ -22,6 +22,8 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <link rel="icon" href="/icone.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/icone.png" />
         {brand.css ? (
           <style id="tenant-brand" data-tenant={brand.tenantSlug ?? undefined}>
             {brand.css}
