@@ -6,50 +6,62 @@ export function LandingPlansMatrix() {
     {
       code: 'bronze',
       name: 'BRONZE',
-      tagline: 'Presença básica no Guia',
-      services: '1 Serviço',
-      gallery: '—',
+      tagline: 'Esteja presente',
+      priceText: 'R$ 500 / ano',
+      priceSubtext: 'Presença essencial no Guia',
+      services: '3 Serviços / Produtos',
+      gallery: '— (Apenas Foto Principal)',
+      benefits: '—',
       events: '—',
       posts: '—',
-      highlight: 'Padrão',
+      highlight: 'Padrão nas buscas',
       founderBadge: '—',
       border: 'border-slate-800',
     },
     {
       code: 'prata',
       name: 'PRATA',
-      tagline: 'Para pequenas empresas',
-      services: 'Até 5 Serviços',
-      gallery: 'Até 3 Fotos',
+      tagline: 'Mostre melhor sua empresa',
+      priceText: 'R$ 800 / ano',
+      priceSubtext: 'Mais conteúdo e galeria de fotos',
+      services: 'Até 10 Serviços / Produtos',
+      gallery: 'Até 3 Fotos na Galeria',
+      benefits: '1 Oferta / Benefício Ativo',
       events: '—',
       posts: '—',
-      highlight: 'Moderado',
+      highlight: 'Intermediário',
       founderBadge: '—',
       border: 'border-slate-700',
     },
     {
       code: 'ouro',
       name: 'OURO',
-      tagline: 'Presença comercial completa',
-      services: 'Até 15 Serviços',
-      gallery: 'Até 10 Fotos',
-      events: 'Até 5 Eventos',
-      posts: 'Até 10 Posts',
+      tagline: 'Amplie sua presença e gere oportunidades',
+      priceText: 'R$ 1.000 / ano',
+      priceSubtext: 'Recursos completos + Eventos e Posts',
+      services: 'Até 25 Serviços / Produtos',
+      gallery: 'Até 10 Fotos na Galeria',
+      benefits: 'Até 3 Ofertas / Benefícios',
+      events: 'Até 5 Eventos no Guia',
+      posts: 'Até 10 Posts / Novidades',
       highlight: 'Máximo na Busca',
       founderBadge: '—',
-      border: 'border-amber-500/50',
+      border: 'border-[#C9A227]/50',
     },
     {
       code: 'ouro_founder',
       name: 'OURO FUNDADOR',
-      tagline: 'Condição Especial de Lançamento',
-      services: 'Até 15 Serviços',
-      gallery: 'Até 10 Fotos',
-      events: 'Até 5 Eventos',
-      posts: 'Até 10 Posts',
-      highlight: 'Máximo com Destaque Especial',
+      tagline: 'Faça parte desde o começo',
+      priceText: 'R$ 599 / ano¹',
+      priceSubtext: 'Garantido nos 2 primeiros anos (100 Vagas)',
+      services: 'Até 25 Serviços / Produtos',
+      gallery: 'Até 10 Fotos na Galeria',
+      benefits: 'Até 3 Ofertas / Benefícios',
+      events: 'Até 5 Eventos no Guia',
+      posts: 'Até 10 Posts / Novidades',
+      highlight: 'Máximo na Busca (Igual ao Ouro)',
       founderBadge: '✓ Selo Empresa Fundadora',
-      border: 'border-amber-500 bg-amber-500/10 shadow-xl shadow-amber-500/10',
+      border: 'border-[#C9A227] bg-[#C9A227]/10 shadow-xl shadow-[#C9A227]/10',
       isPopular: true,
     },
   ];
@@ -58,14 +70,14 @@ export function LandingPlansMatrix() {
     <section className="py-20 bg-slate-900 text-white" id="planos">
       <div className="container mx-auto px-4 max-w-6xl space-y-12">
         <div className="text-center space-y-4 max-w-3xl mx-auto">
-          <h2 className="text-xs font-bold text-amber-400 tracking-widest uppercase">
+          <h2 className="text-xs font-bold text-[#C9A227] tracking-widest uppercase">
             Transparência e Recursos
           </h2>
           <h3 className="text-3xl md:text-4xl font-extrabold text-white">
-            Matriz Comparativa dos Planos
+            Matriz Comercial dos Planos
           </h3>
           <p className="text-slate-400 text-base">
-            Escolha a modalidade de anúncio ideal para o tamanho e a necessidade da sua empresa.
+            Escolha o plano ideal para a necessidade do seu negócio e o nível de presença desejado na comunidade.
           </p>
         </div>
 
@@ -84,7 +96,12 @@ export function LandingPlansMatrix() {
               <div className="space-y-4">
                 <div>
                   <h4 className="text-xl font-bold text-white uppercase">{p.name}</h4>
-                  <p className="text-xs text-slate-400 mt-1">{p.tagline}</p>
+                  <p className="text-xs text-[#C9A227] font-semibold mt-1">{p.tagline}</p>
+                </div>
+
+                <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800 text-center">
+                  <div className="text-xl font-extrabold text-white">{p.priceText}</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">{p.priceSubtext}</div>
                 </div>
 
                 <div className="space-y-2 text-xs border-t border-slate-800 pt-4 text-slate-300">
@@ -93,7 +110,11 @@ export function LandingPlansMatrix() {
                     <strong className="text-emerald-400">✓ Sim</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span>Limite de Serviços:</span>
+                    <span>Vínculo Verificado:</span>
+                    <strong className="text-emerald-400">✓ Sim</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Serviços / Produtos:</span>
                     <strong>{p.services}</strong>
                   </div>
                   <div className="flex justify-between">
@@ -101,20 +122,24 @@ export function LandingPlansMatrix() {
                     <strong>{p.gallery}</strong>
                   </div>
                   <div className="flex justify-between">
+                    <span>Ofertas / Benefícios:</span>
+                    <strong>{p.benefits}</strong>
+                  </div>
+                  <div className="flex justify-between">
                     <span>Eventos no Guia:</span>
                     <strong>{p.events}</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span>Novidades / Posts:</span>
+                    <span>Posts / Novidades:</span>
                     <strong>{p.posts}</strong>
                   </div>
                   <div className="flex justify-between">
                     <span>Destaque na Busca:</span>
-                    <strong className="text-amber-400">{p.highlight}</strong>
+                    <strong className="text-[#C9A227]">{p.highlight}</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span>Selo Founder:</span>
-                    <strong className={p.founderBadge.includes('✓') ? 'text-amber-300' : 'text-slate-500'}>
+                    <span>Selo Fundadora:</span>
+                    <strong className={p.founderBadge.includes('✓') ? 'text-[#C9A227]' : 'text-slate-500'}>
                       {p.founderBadge}
                     </strong>
                   </div>
@@ -122,6 +147,10 @@ export function LandingPlansMatrix() {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="text-center text-xs text-slate-400 max-w-3xl mx-auto pt-4 leading-relaxed">
+          ¹ <strong>Condição do Plano Ouro Fundador:</strong> R$ 599/ano garantidos durante os 2 primeiros anos para as 100 primeiras empresas cadastradas. A partir do 3º ano, a renovação passa a seguir o valor vigente do Plano Ouro, mantendo permanentemente o selo Empresa Fundadora.
         </div>
       </div>
     </section>

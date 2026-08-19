@@ -10,13 +10,13 @@ export function LandingHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-[#4B161B]/95 backdrop-blur-md border-b border-[#C9A227]/30 text-white shadow-lg">
+    <header className="sticky top-0 z-50 bg-[#4B161B]/95 backdrop-blur-md border-b border-[#C9A227]/40 text-white shadow-xl">
       <div className="container mx-auto px-4 max-w-6xl h-20 flex items-center justify-between">
-        {/* Brand Logo */}
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          <div className="relative w-36 h-12 md:w-44 md:h-14">
+        {/* Vertical Brand Logo */}
+        <div className="flex items-center cursor-pointer py-1" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+          <div className="relative w-28 h-14 md:w-36 md:h-16">
             <Image
-              src="/logoconexao_red.png"
+              src="/logoconexao_red_vert.png"
               alt="Conexão Maçônica"
               fill
               className="object-contain"
@@ -36,7 +36,7 @@ export function LandingHeader() {
           <button onClick={() => scrollTo('planos')} className="hover:text-[#C9A227] transition-colors">
             Planos
           </button>
-          <button onClick={() => scrollTo('oferta-fundador')} className="hover:text-[#C9A227] transition-colors text-[#C9A227]">
+          <button onClick={() => scrollTo('oferta-fundador')} className="hover:text-[#C9A227] transition-colors text-[#C9A227] font-bold">
             Empresa Fundadora
           </button>
           <button onClick={() => scrollTo('faq')} className="hover:text-[#C9A227] transition-colors">
@@ -44,12 +44,12 @@ export function LandingHeader() {
           </button>
         </nav>
 
-        {/* CTA */}
+        {/* Gold/Champagne CTA Button */}
         <div>
           <Button
             variant="primary"
             size="sm"
-            className="bg-[#C9A227] hover:bg-[#b08c1e] text-[#4B161B] font-extrabold px-5 py-2.5 rounded-lg text-xs tracking-wider shadow-md"
+            className="bg-[#C9A227] hover:bg-[#B89628] text-[#4B161B] font-extrabold px-6 py-2.5 rounded-lg text-xs tracking-wider shadow-lg shadow-[#C9A227]/20 transition-transform active:scale-95"
             onClick={() => scrollTo('captacao-lead')}
           >
             QUERO FAZER PARTE

@@ -14,10 +14,11 @@ export function LandingHero() {
       <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#C9A227_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none" />
       
       <div className="container mx-auto px-4 max-w-6xl relative z-10 text-center space-y-8">
-        <div className="flex justify-center mb-4">
-          <div className="relative w-48 h-20 md:w-60 md:h-24 filter drop-shadow-md">
+        {/* Official Vertical Logo Display */}
+        <div className="flex justify-center mb-2">
+          <div className="relative w-40 h-28 md:w-52 md:h-36 filter drop-shadow-lg">
             <Image
-              src="/logoconexao_red.png"
+              src="/logoconexao_red_vert.png"
               alt="Conexão Maçônica"
               fill
               className="object-contain"
@@ -46,7 +47,7 @@ export function LandingHero() {
           <Button
             variant="primary"
             size="lg"
-            className="w-full sm:w-auto px-8 py-4 bg-[#C9A227] hover:bg-[#b08c1e] text-[#4B161B] font-extrabold shadow-lg shadow-[#C9A227]/20 rounded-lg text-base"
+            className="w-full sm:w-auto px-8 py-4 bg-[#C9A227] hover:bg-[#B89628] text-[#4B161B] font-extrabold shadow-lg shadow-[#C9A227]/20 rounded-lg text-base"
             onClick={() => scrollTo('captacao-lead')}
           >
             QUERO FAZER PARTE
@@ -55,7 +56,7 @@ export function LandingHero() {
           <Button
             variant="outline"
             size="lg"
-            className="w-full sm:w-auto border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white px-8 py-4 rounded-lg text-base"
+            className="w-full sm:w-auto border-[#C9A227]/40 text-slate-200 hover:bg-slate-800 hover:text-white px-8 py-4 rounded-lg text-base"
             onClick={() => scrollTo('como-funciona')}
           >
             VEJA COMO VAI FUNCIONAR
