@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Button, Badge } from '@saas/ui';
+import { Sparkles, Lightbulb, CheckCircle2 } from 'lucide-react';
 
 export function LandingFounderOffer() {
   const scrollTo = (id: string) => {
@@ -16,6 +17,7 @@ export function LandingFounderOffer() {
       <div className="container mx-auto px-4 max-w-4xl text-center space-y-8">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#C9A227]/20 border border-[#C9A227]/40 text-[#C9A227] text-xs font-bold uppercase">
           <Badge variant="warning">OFERTA DE LANÇAMENTO</Badge>
+          <Sparkles className="w-3.5 h-3.5" />
           <span>EXCLUSIVA PARA AS 100 PRIMEIRAS EMPRESAS</span>
         </div>
 
@@ -40,25 +42,26 @@ export function LandingFounderOffer() {
             </div>
           </div>
 
-          <div className="bg-[#C9A227]/10 p-3 rounded-lg border border-[#C9A227]/30 text-center text-xs font-semibold text-[#C9A227]">
-            💡 Economia de R$ 401/ano (R$ 802,00 no período de 2 anos) em relação ao preço atual do Plano Ouro!
+          <div className="bg-[#C9A227]/10 p-3 rounded-lg border border-[#C9A227]/30 flex items-center justify-center gap-2 text-xs font-semibold text-[#C9A227]">
+            <Lightbulb className="w-4 h-4 shrink-0 text-[#C9A227]" />
+            <span>Economia de R$ 401/ano (R$ 802,00 no período de 2 anos) em relação ao preço atual do Plano Ouro!</span>
           </div>
 
           <ul className="space-y-3 text-sm text-slate-200">
-            <li className="flex items-start gap-2">
-              <span className="text-[#C9A227] font-bold">✓</span>
+            <li className="flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-[#C9A227] shrink-0 mt-0.5" />
               <span><strong>Todos os benefícios do Plano Ouro</strong> (25 Serviços, 10 Fotos, 3 Ofertas, 5 Eventos e 10 Posts)</span>
             </li>
-            <li className="flex items-start gap-2">
-              <span className="text-[#C9A227] font-bold">✓</span>
+            <li className="flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-[#C9A227] shrink-0 mt-0.5" />
               <span><strong>Selo Empresa Fundadora</strong> de exibição permanente no perfil</span>
             </li>
-            <li className="flex items-start gap-2">
-              <span className="text-[#C9A227] font-bold">✓</span>
+            <li className="flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-[#C9A227] shrink-0 mt-0.5" />
               <span>Condição especial de <strong>R$ 599/ano garantida pelos 2 primeiros anos</strong></span>
             </li>
-            <li className="flex items-start gap-2">
-              <span className="text-[#C9A227] font-bold">✓</span>
+            <li className="flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-[#C9A227] shrink-0 mt-0.5" />
               <span>Destaque de busca máximo equivalente ao Plano Ouro</span>
             </li>
           </ul>
@@ -67,7 +70,7 @@ export function LandingFounderOffer() {
             <Button
               variant="primary"
               size="lg"
-              className="w-full py-4 bg-[#C9A227] hover:bg-[#B89628] text-[#4B161B] font-extrabold shadow-lg shadow-[#C9A227]/20 rounded-lg text-base"
+              className="w-full py-4 bg-[#C9A227] hover:bg-[#B89628] text-[#4B161B] font-extrabold shadow-lg shadow-[#C9A227]/20 rounded-lg text-base uppercase"
               onClick={() => scrollTo('captacao-lead')}
             >
               GARANTIR MINHA VAGA DE FUNDADOR

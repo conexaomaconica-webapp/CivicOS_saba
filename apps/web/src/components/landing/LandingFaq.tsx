@@ -1,4 +1,5 @@
 import React from 'react';
+import { HelpCircle } from 'lucide-react';
 
 export function LandingFaq() {
   const faqs = [
@@ -43,8 +44,11 @@ export function LandingFaq() {
         <div className="space-y-4">
           {faqs.map((f, i) => (
             <div key={i} className="p-6 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-              <h4 className="text-base font-bold text-[#C9A227]">{f.q}</h4>
-              <p className="text-sm text-slate-300 leading-relaxed">{f.a}</p>
+              <h4 className="text-base font-bold text-[#C9A227] flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-[#C9A227] shrink-0" />
+                <span>{f.q}</span>
+              </h4>
+              <p className="text-sm text-slate-300 leading-relaxed pl-6">{f.a}</p>
             </div>
           ))}
         </div>

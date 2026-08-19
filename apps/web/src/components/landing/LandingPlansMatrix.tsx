@@ -1,7 +1,14 @@
+'use client';
+
 import React from 'react';
-import { Badge } from '@saas/ui';
+import { Badge, Button } from '@saas/ui';
+import { Check } from 'lucide-react';
 
 export function LandingPlansMatrix() {
+  const scrollToForm = () => {
+    document.getElementById('captacao-lead')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   const plans = [
     {
       code: 'bronze',
@@ -60,7 +67,8 @@ export function LandingPlansMatrix() {
       events: 'Até 5 Eventos no Guia',
       posts: 'Até 10 Posts / Novidades',
       highlight: 'Máximo na Busca (Igual ao Ouro)',
-      founderBadge: '✓ Selo Empresa Fundadora',
+      founderBadge: 'Selo Empresa Fundadora',
+      hasFounderBadge: true,
       border: 'border-[#C9A227] bg-[#C9A227]/10 shadow-xl shadow-[#C9A227]/10',
       isPopular: true,
     },
@@ -77,7 +85,7 @@ export function LandingPlansMatrix() {
             Matriz Comercial dos Planos
           </h3>
           <p className="text-slate-400 text-base">
-            Escolha o plano ideal para a necessidade do seu negócio e o nível de presença desejado na comunidade.
+            Escolha o plano ideal para a necessidade do seu negócio e garanta sua vaga como Empresa Fundadora.
           </p>
         </div>
 
@@ -105,13 +113,17 @@ export function LandingPlansMatrix() {
                 </div>
 
                 <div className="space-y-2 text-xs border-t border-slate-800 pt-4 text-slate-300">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span>Presença no Guia:</span>
-                    <strong className="text-emerald-400">✓ Sim</strong>
+                    <span className="inline-flex items-center gap-1 text-emerald-400 font-bold">
+                      <Check className="w-3.5 h-3.5" /> Sim
+                    </span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span>Vínculo Verificado:</span>
-                    <strong className="text-emerald-400">✓ Sim</strong>
+                    <span className="inline-flex items-center gap-1 text-emerald-400 font-bold">
+                      <Check className="w-3.5 h-3.5" /> Sim
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Serviços / Produtos:</span>
@@ -137,13 +149,26 @@ export function LandingPlansMatrix() {
                     <span>Destaque na Busca:</span>
                     <strong className="text-[#C9A227]">{p.highlight}</strong>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span>Selo Fundadora:</span>
-                    <strong className={p.founderBadge.includes('✓') ? 'text-[#C9A227]' : 'text-slate-500'}>
+                    <strong className={p.hasFounderBadge ? 'text-[#C9A227] inline-flex items-center gap-1' : 'text-slate-500'}>
+                      {p.hasFounderBadge && <Check className="w-3.5 h-3.5 text-[#C9A227]" />}
                       {p.founderBadge}
                     </strong>
                   </div>
                 </div>
+              </div>
+
+              {/* Action Button for Every Plan */}
+              <div className="pt-4 border-t border-slate-800">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="w-full py-3 bg-[#C9A227] hover:bg-[#B89628] text-[#4B161B] font-extrabold rounded-lg text-xs tracking-wider shadow-md uppercase"
+                  onClick={scrollToForm}
+                >
+                  QUERO SER EMPRESA FUNDADORA
+                </Button>
               </div>
             </div>
           ))}

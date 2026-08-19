@@ -36,45 +36,58 @@ export async function createLeadCaptureAction(input: LeadCaptureInput): Promise<
     const planCode = input.interestedPlan || 'ouro_founder';
     const tenantId = await resolveTenantIdServer();
 
-    // Rate limiting check
+    // Protection check against spam
     const rateCheck = await checkRateLimit('auth', input.phone, tenantId);
     if (!rateCheck.allowed) {
       return { success: false, error: 'Muitas solicitações recentes. Por favor, tente novamente em instantes.' };
     }
 
     const supabase = await createServerSideClient();
-    
-    // Store lead record in admin_audit_logs table
-    const { error: insertError } = await supabase.from('admin_audit_logs').insert({
+
+    // 1. Insert record into canonical landing_leads table
+    const { error: insertError } = await (supabase.from as any)('landing_leads').insert({
       tenant_id: tenantId,
-      admin_user_id: '00000000-0000-0000-0000-000000000000',
-      action_type: 'LEAD_CAPTURE',
-      entity_type: 'commercial_lead',
-      entity_id: '00000000-0000-0000-0000-000000000000',
-      before_state: {},
-      after_state: {
-        fullName: input.fullName,
-        companyName: input.companyName,
-        phone: input.phone,
-        cityState: input.cityState,
-        interestedPlan: planCode,
-      },
-      justification: `Captação de Lead comercial para o plano ${planCode.toUpperCase()}`,
+      full_name: input.fullName.trim(),
+      company_name: input.companyName.trim(),
+      phone: input.phone.trim(),
+      city_state: input.cityState.trim(),
+      interested_plan: planCode,
+      status: 'new',
     });
 
     if (insertError) {
-      console.warn('[LeadCapture] Warning recording lead to audit logs:', insertError.message);
+      console.warn('[LeadCapture] Warning inserting to landing_leads, attempting fallback:', insertError.message);
+      
+      // Fallback insert to admin_audit_logs if landing_leads table is pending migration
+      await supabase.from('admin_audit_logs').insert({
+        tenant_id: tenantId,
+        admin_user_id: '00000000-0000-0000-0000-000000000000',
+        action_type: 'LEAD_CAPTURE',
+        entity_type: 'commercial_lead',
+        entity_id: '00000000-0000-0000-0000-000000000000',
+        before_state: {},
+        after_state: {
+          fullName: input.fullName,
+          companyName: input.companyName,
+          phone: input.phone,
+          cityState: input.cityState,
+          interestedPlan: planCode,
+        },
+        justification: `Captação de Lead comercial para o plano ${planCode.toUpperCase()}`,
+      });
     }
 
-    // Format WhatsApp message URL
-    const message = encodeURIComponent(
-      `Olá! Me chamo ${input.fullName}, da empresa ${input.companyName} (${input.cityState}). Tenho interesse na proposta de pré-lançamento do Conexão Maçônica (Plano: ${planCode.toUpperCase()}).`
+    // 2. Official WhatsApp contact number: (75) 98127-2323 -> 5575981272323
+    const OFFICIAL_WHATSAPP_NUMBER = '5575981272323';
+    
+    const whatsappMessage = encodeURIComponent(
+      `Olá! Me chamo ${input.fullName.trim()}, da empresa ${input.companyName.trim()} (${input.cityState.trim()}). Quero ser Empresa Fundadora no Conexão Maçônica!`
     );
-    const whatsappUrl = `https://wa.me/5575999999999?text=${message}`;
+    const whatsappUrl = `https://wa.me/${OFFICIAL_WHATSAPP_NUMBER}?text=${whatsappMessage}`;
 
     return {
       success: true,
-      message: 'Solicitação registrada com sucesso! Entraremos em contato em breve.',
+      message: 'Cadastro de Empresa Fundadora registrado com sucesso! Redirecionando para o WhatsApp...',
       whatsappUrl,
     };
   } catch (err) {
