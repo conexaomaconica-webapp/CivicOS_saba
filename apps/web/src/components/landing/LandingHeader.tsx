@@ -10,7 +10,7 @@ export function LandingHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-[#4B161B]/95 backdrop-blur-md border-b border-[#C9A227]/40 text-white shadow-2xl">
+    <header className="sticky top-0 z-50 bg-[#4b161a] border-b border-[#C9A227]/40 text-white shadow-2xl">
       <div className="container mx-auto px-4 max-w-6xl h-24 flex items-center justify-between">
         {/* Prominent Vertical Brand Logo in Header */}
         <div className="flex items-center cursor-pointer py-1" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
