@@ -10,7 +10,7 @@ export function LandingHeroV2() {
   };
 
   return (
-    <section className="relative flex min-h-[100svh] items-center justify-center overflow-hidden" id="home">
+    <section className="relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden pt-28" id="home">
       {/* Animated CSS Background */}
       <div className="absolute inset-0 overflow-hidden bg-[#140305] z-0">
         {/* Animated glowing blobs */}
@@ -28,7 +28,7 @@ export function LandingHeroV2() {
       <div className="container mx-auto px-4 max-w-5xl relative z-[10] flex flex-col items-center text-center mt-16 space-y-8">
         
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#C9A227]/10 border border-[#C9A227]/30 text-[#C9A227] text-xs font-semibold uppercase tracking-wider backdrop-blur-sm">
-          <Badge variant="warning">LANÇAMENTO 2026</Badge>
+          <Badge variant="warning">NOVEMBRO / 2026</Badge>
           <Sparkles className="w-3.5 h-3.5 text-[#C9A227]" />
           <span>CONDIÇÕES ESPECIAIS PARA FUNDADORAS</span>
         </div>
