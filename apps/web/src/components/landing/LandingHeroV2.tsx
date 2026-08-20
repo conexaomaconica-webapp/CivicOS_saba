@@ -28,9 +28,9 @@ export function LandingHeroV2() {
       <div className="container mx-auto px-4 max-w-5xl relative z-[10] flex flex-col items-center text-center mt-16 space-y-8">
         
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#C9A227]/10 border border-[#C9A227]/30 text-[#C9A227] text-xs font-semibold uppercase tracking-wider backdrop-blur-sm">
-          <Badge variant="warning">NOVEMBRO / 2026</Badge>
+          <Badge variant="warning">LANÇAMENTO: NOV/2026</Badge>
           <Sparkles className="w-3.5 h-3.5 text-[#C9A227]" />
-          <span>EXCLUSIVO PARA AS 100 PRIMEIRAS EMPRESAS</span>
+          <span>PLANO FUNDADOR EXCLUSIVO PARA AS 100 PRIMEIRAS EMPRESAS</span>
         </div>
 
         <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.1] text-white max-w-4xl mx-auto drop-shadow-lg">
