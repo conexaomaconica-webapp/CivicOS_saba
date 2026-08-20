@@ -49,7 +49,7 @@ export function LandingHeader() {
           <Button
             variant="primary"
             size="sm"
-            className="bg-[#C9A227] hover:bg-[#B89628] text-[#4B161B] font-extrabold px-6 py-2.5 rounded-lg text-xs tracking-wider shadow-lg shadow-[#C9A227]/20 transition-transform active:scale-95"
+            className="!bg-[#C9A227] hover:!bg-[#B89628] !text-[#4B161B] font-extrabold px-6 py-2.5 rounded-lg text-xs tracking-wider shadow-lg shadow-[#C9A227]/20 transition-transform active:scale-95"
             onClick={() => scrollTo('captacao-lead')}
           >
             QUERO FAZER PARTE

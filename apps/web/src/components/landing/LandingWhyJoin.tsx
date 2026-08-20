@@ -24,7 +24,7 @@ export function LandingWhyJoin() {
   ];
 
   return (
-    <section className="py-20 bg-slate-900 text-white">
+    <section className="py-20 bg-[#300d11] text-white">
       <div className="container mx-auto px-4 max-w-6xl space-y-12">
         <div className="text-center space-y-4 max-w-3xl mx-auto">
           <h2 className="text-xs font-bold text-[#C9A227] tracking-widest uppercase">
@@ -42,9 +42,9 @@ export function LandingWhyJoin() {
           {reasons.map((r) => {
             const IconComponent = r.icon;
             return (
-              <div key={r.num} className="p-6 rounded-2xl bg-slate-950 border border-slate-800 hover:border-[#C9A227]/40 transition-all duration-200 space-y-4">
+              <div key={r.num} className="p-6 rounded-2xl bg-[#20080a] border border-[#4B161B] hover:border-[#C9A227]/40 transition-all duration-200 space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="w-10 h-10 rounded-lg bg-[#C9A227]/10 border border-[#C9A227]/30 flex items-center justify-center text-[#C9A227]">
+                  <div className="w-10 h-10 rounded-lg !bg-[#C9A227]/10 border border-[#C9A227]/30 flex items-center justify-center text-[#C9A227]">
                     <IconComponent className="w-5 h-5" />
                   </div>
                   <span className="text-2xl font-extrabold text-[#C9A227] font-mono">{r.num}</span>

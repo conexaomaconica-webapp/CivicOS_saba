@@ -23,7 +23,7 @@ export function LandingPlansMatrix() {
       posts: '—',
       highlight: 'Padrão nas buscas',
       founderBadge: '—',
-      border: 'border-slate-800',
+      border: 'border-[#4B161B]',
     },
     {
       code: 'prata',
@@ -52,7 +52,8 @@ export function LandingPlansMatrix() {
       events: 'Até 5 Eventos no Guia',
       posts: 'Até 10 Posts / Novidades',
       highlight: 'Máximo na Busca',
-      founderBadge: '—',
+      founderBadge: 'Selo Ouro',
+      hasFounderBadge: true,
       border: 'border-[#C9A227]/50',
     },
     {
@@ -69,13 +70,13 @@ export function LandingPlansMatrix() {
       highlight: 'Máximo na Busca (Igual ao Ouro)',
       founderBadge: 'Selo Empresa Fundadora',
       hasFounderBadge: true,
-      border: 'border-[#C9A227] bg-[#C9A227]/10 shadow-xl shadow-[#C9A227]/10',
+      border: 'border-[#C9A227] !bg-[#C9A227]/10 shadow-xl shadow-[#C9A227]/10',
       isPopular: true,
     },
   ];
 
   return (
-    <section className="py-20 bg-slate-900 text-white" id="planos">
+    <section className="py-20 bg-[#300d11] text-white" id="planos">
       <div className="container mx-auto px-4 max-w-6xl space-y-12">
         <div className="text-center space-y-4 max-w-3xl mx-auto">
           <h2 className="text-xs font-bold text-[#C9A227] tracking-widest uppercase">
@@ -93,10 +94,10 @@ export function LandingPlansMatrix() {
           {plans.map((p) => (
             <div
               key={p.code}
-              className={`p-6 rounded-2xl bg-slate-950 border ${p.border} flex flex-col justify-between space-y-6 relative`}
+              className={`p-6 rounded-2xl bg-[#20080a] border ${p.border} flex flex-col justify-between space-y-6 relative transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02] hover:shadow-2xl hover:shadow-[#C9A227]/10`}
             >
               {p.isPopular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap z-10">
                   <Badge variant="warning">OFERTA DE LANÇAMENTO</Badge>
                 </div>
               )}
@@ -107,12 +108,12 @@ export function LandingPlansMatrix() {
                   <p className="text-xs text-[#C9A227] font-semibold mt-1">{p.tagline}</p>
                 </div>
 
-                <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800 text-center">
+                <div className="bg-[#300d11]/80 p-3 rounded-lg border border-[#4B161B] text-center">
                   <div className="text-xl font-extrabold text-white">{p.priceText}</div>
                   <div className="text-[10px] text-slate-400 mt-0.5">{p.priceSubtext}</div>
                 </div>
 
-                <div className="space-y-2 text-xs border-t border-slate-800 pt-4 text-slate-300">
+                <div className="space-y-2 text-xs border-t border-[#4B161B] pt-4 text-slate-300">
                   <div className="flex justify-between items-center">
                     <span>Presença no Guia:</span>
                     <span className="inline-flex items-center gap-1 text-emerald-400 font-bold">
@@ -150,7 +151,7 @@ export function LandingPlansMatrix() {
                     <strong className="text-[#C9A227]">{p.highlight}</strong>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span>Selo Fundadora:</span>
+                    <span>Selo Especial:</span>
                     <strong className={p.hasFounderBadge ? 'text-[#C9A227] inline-flex items-center gap-1' : 'text-slate-500'}>
                       {p.hasFounderBadge && <Check className="w-3.5 h-3.5 text-[#C9A227]" />}
                       {p.founderBadge}
@@ -160,14 +161,14 @@ export function LandingPlansMatrix() {
               </div>
 
               {/* Action Button for Every Plan */}
-              <div className="pt-4 border-t border-slate-800">
+              <div className="pt-4 border-t border-[#4B161B]">
                 <Button
                   variant="primary"
                   size="sm"
-                  className="w-full py-3 bg-[#C9A227] hover:bg-[#B89628] text-[#4B161B] font-extrabold rounded-lg text-xs tracking-wider shadow-md uppercase"
+                  className="w-full py-3 !bg-[#C9A227] hover:!bg-[#B89628] !text-[#4B161B] font-extrabold rounded-lg text-xs tracking-wider shadow-md uppercase"
                   onClick={scrollToForm}
                 >
-                  QUERO SER EMPRESA FUNDADORA
+                  ESCOLHER PLANO
                 </Button>
               </div>
             </div>

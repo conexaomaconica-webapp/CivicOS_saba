@@ -10,11 +10,11 @@ export function LandingHero() {
   };
 
   return (
-    <section className="relative py-20 md:py-28 overflow-hidden bg-gradient-to-b from-[#4B161B] via-slate-900 to-slate-950 text-white">
+    <section className="relative py-20 md:py-28 overflow-hidden bg-gradient-to-b from-[#4B161B] via-[#300d11] to-[#20080a] text-white">
       <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#C9A227_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none" />
       
       <div className="container mx-auto px-4 max-w-6xl relative z-10 text-center space-y-8">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#C9A227]/10 border border-[#C9A227]/30 text-[#C9A227] text-xs font-semibold uppercase tracking-wider">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full !bg-[#C9A227]/10 border border-[#C9A227]/30 text-[#C9A227] text-xs font-semibold uppercase tracking-wider">
           <Badge variant="warning">LANÇAMENTO 2026</Badge>
           <Sparkles className="w-3.5 h-3.5 text-[#C9A227]" />
           <span>CONDIÇÕES ESPECIAIS PARA EMPRESAS FUNDADORAS</span>
@@ -35,7 +35,7 @@ export function LandingHero() {
           <Button
             variant="primary"
             size="lg"
-            className="w-full sm:w-auto px-8 py-4 bg-[#C9A227] hover:bg-[#B89628] text-[#4B161B] font-extrabold shadow-lg shadow-[#C9A227]/20 rounded-lg text-base uppercase"
+            className="w-full sm:w-auto px-8 py-4 !bg-[#C9A227] hover:!bg-[#B89628] !text-[#4B161B] font-extrabold shadow-lg shadow-[#C9A227]/20 rounded-lg text-base uppercase"
             onClick={() => scrollTo('captacao-lead')}
           >
             QUERO FAZER PARTE
@@ -51,7 +51,7 @@ export function LandingHero() {
           </Button>
         </div>
 
-        <div className="pt-12 grid grid-cols-2 md:grid-cols-4 gap-6 text-center border-t border-slate-800/80 max-w-4xl mx-auto text-xs text-slate-400 uppercase tracking-widest font-semibold">
+        <div className="pt-12 grid grid-cols-2 md:grid-cols-4 gap-6 text-center border-t border-[#4B161B]/80 max-w-4xl mx-auto text-xs text-slate-400 uppercase tracking-widest font-semibold">
           <div className="flex items-center justify-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-[#C9A227]" />
             <span>Diretório Organizado</span>

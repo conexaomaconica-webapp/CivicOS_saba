@@ -26,7 +26,7 @@ export function LandingEcosystem() {
   ];
 
   return (
-    <section className="py-20 bg-slate-950 text-white border-t border-slate-800/60" id="como-funciona">
+    <section className="py-20 bg-[#20080a] text-white border-t border-[#4B161B]/60" id="como-funciona">
       <div className="container mx-auto px-4 max-w-6xl space-y-12">
         <div className="text-center space-y-4 max-w-3xl mx-auto">
           <h2 className="text-xs font-bold text-[#C9A227] tracking-widest uppercase">
@@ -46,9 +46,9 @@ export function LandingEcosystem() {
             return (
               <div
                 key={idx}
-                className="p-6 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-[#C9A227]/40 transition-all duration-200 flex flex-col space-y-3"
+                className="p-6 rounded-xl bg-[#300d11]/80 border border-[#4B161B] hover:border-[#C9A227]/40 transition-all duration-200 flex flex-col space-y-3"
               >
-                <div className="w-10 h-10 rounded-lg bg-[#C9A227]/10 border border-[#C9A227]/30 flex items-center justify-center text-[#C9A227]">
+                <div className="w-10 h-10 rounded-lg !bg-[#C9A227]/10 border border-[#C9A227]/30 flex items-center justify-center text-[#C9A227]">
                   <IconComponent className="w-5 h-5" />
                 </div>
                 <h4 className="text-lg font-bold text-white">{item.title}</h4>

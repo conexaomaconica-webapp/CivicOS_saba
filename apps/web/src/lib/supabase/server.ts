@@ -33,7 +33,22 @@ export async function createServerSideClient() {
 }
 
 export async function resolveTenantIdServer(): Promise<string> {
-  return process.env.NEXT_PUBLIC_TENANT_ID || 'default-tenant-id';
+  if (process.env.NEXT_PUBLIC_TENANT_ID) {
+    return process.env.NEXT_PUBLIC_TENANT_ID;
+  }
+  
+  try {
+    const supabase = await createServerSideClient();
+    const { data } = await supabase.from('tenants').select('id').limit(1).single();
+    if (data && data.id) {
+      return data.id;
+    }
+  } catch (e) {
+    console.error('[TenantResolver] Erro ao buscar tenant no banco:', e);
+  }
+  
+  // UUID válido de fallback (embora vá falhar restrição de chave estrangeira se não existir)
+  return '00000000-0000-0000-0000-000000000000';
 }
 
 export { createServerSideClient as createClient };

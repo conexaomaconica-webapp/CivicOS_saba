@@ -11,11 +11,11 @@ export function LandingFounderOffer() {
 
   return (
     <section
-      className="py-20 bg-gradient-to-b from-slate-950 via-[#4B161B]/30 to-slate-950 text-white border-y border-[#C9A227]/40 relative"
+      className="py-20 bg-gradient-to-b from-[#20080a] via-[#4B161B]/30 to-[#20080a] text-white border-y border-[#C9A227]/40 relative"
       id="oferta-fundador"
     >
       <div className="container mx-auto px-4 max-w-4xl text-center space-y-8">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#C9A227]/20 border border-[#C9A227]/40 text-[#C9A227] text-xs font-bold uppercase">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full !bg-[#C9A227]/20 border border-[#C9A227]/40 text-[#C9A227] text-xs font-bold uppercase">
           <Badge variant="warning">OFERTA DE LANÇAMENTO</Badge>
           <Sparkles className="w-3.5 h-3.5" />
           <span>EXCLUSIVA PARA AS 100 PRIMEIRAS EMPRESAS</span>
@@ -30,8 +30,8 @@ export function LandingFounderOffer() {
           Seja uma das <strong>100 primeiras Empresas Fundadoras</strong> do Conexão Maçônica. Tenha acesso a todos os recursos do Plano Ouro por uma condição histórica de lançamento.
         </p>
 
-        <div className="p-8 rounded-2xl bg-slate-900/90 border border-[#C9A227]/40 shadow-2xl max-w-xl mx-auto space-y-6 text-left relative">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="p-8 rounded-2xl bg-[#300d11]/90 border border-[#C9A227]/40 shadow-2xl max-w-xl mx-auto space-y-6 text-left relative">
+          <div className="flex items-center justify-between border-b border-[#4B161B] pb-4">
             <div>
               <h3 className="text-2xl font-extrabold text-[#C9A227]">Plano Ouro Fundador</h3>
               <p className="text-xs text-slate-400">Oferta Especial Reservada a 100 Empresas</p>
@@ -42,7 +42,7 @@ export function LandingFounderOffer() {
             </div>
           </div>
 
-          <div className="bg-[#C9A227]/10 p-3 rounded-lg border border-[#C9A227]/30 flex items-center justify-center gap-2 text-xs font-semibold text-[#C9A227]">
+          <div className="!bg-[#C9A227]/10 p-3 rounded-lg border border-[#C9A227]/30 flex items-center justify-center gap-2 text-xs font-semibold text-[#C9A227]">
             <Lightbulb className="w-4 h-4 shrink-0 text-[#C9A227]" />
             <span>Economia de R$ 401/ano (R$ 802,00 no período de 2 anos) em relação ao preço atual do Plano Ouro!</span>
           </div>
@@ -66,11 +66,11 @@ export function LandingFounderOffer() {
             </li>
           </ul>
 
-          <div className="pt-4 border-t border-slate-800 flex flex-col gap-3">
+          <div className="pt-4 border-t border-[#4B161B] flex flex-col gap-3">
             <Button
               variant="primary"
               size="lg"
-              className="w-full py-4 bg-[#C9A227] hover:bg-[#B89628] text-[#4B161B] font-extrabold shadow-lg shadow-[#C9A227]/20 rounded-lg text-base uppercase"
+              className="w-full py-4 !bg-[#C9A227] hover:!bg-[#B89628] !text-[#4B161B] font-extrabold shadow-lg shadow-[#C9A227]/20 rounded-lg text-base uppercase"
               onClick={() => scrollTo('captacao-lead')}
             >
               GARANTIR MINHA VAGA DE FUNDADOR

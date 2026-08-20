@@ -3,7 +3,7 @@ import { CheckCircle2, Search, Building2 } from 'lucide-react';
 
 export function LandingAudience() {
   return (
-    <section className="py-20 bg-slate-900 text-white" id="para-quem">
+    <section className="py-20 bg-[#300d11] text-white" id="para-quem">
       <div className="container mx-auto px-4 max-w-6xl space-y-12">
         <div className="text-center space-y-4 max-w-3xl mx-auto">
           <h2 className="text-xs font-bold text-[#C9A227] tracking-widest uppercase">
@@ -19,8 +19,8 @@ export function LandingAudience() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Para Quem Procura */}
-          <div className="p-8 rounded-2xl bg-gradient-to-br from-slate-950 to-slate-900 border border-slate-800 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#C9A227]/10 border border-[#C9A227]/30 text-[#C9A227] text-xs font-bold uppercase">
+          <div className="p-8 rounded-2xl bg-gradient-to-br from-[#20080a] to-[#300d11] border border-[#4B161B] space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded !bg-[#C9A227]/10 border border-[#C9A227]/30 text-[#C9A227] text-xs font-bold uppercase">
               <Search className="w-3.5 h-3.5" />
               <span>Para Quem Procura</span>
             </div>
@@ -42,8 +42,8 @@ export function LandingAudience() {
           </div>
 
           {/* Para Quem Anuncia & Elegibilidade */}
-          <div className="p-8 rounded-2xl bg-gradient-to-br from-slate-950 to-slate-900 border border-[#C9A227]/30 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#C9A227]/10 border border-[#C9A227]/30 text-[#C9A227] text-xs font-bold uppercase">
+          <div className="p-8 rounded-2xl bg-gradient-to-br from-[#20080a] to-[#300d11] border border-[#C9A227]/30 space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded !bg-[#C9A227]/10 border border-[#C9A227]/30 text-[#C9A227] text-xs font-bold uppercase">
               <Building2 className="w-3.5 h-3.5" />
               <span>Para Quem Anuncia — Critérios de Vínculo</span>
             </div>

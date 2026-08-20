@@ -2,15 +2,14 @@ import type { Metadata } from 'next';
 import React from 'react';
 import { StructuredData } from '@/components/seo/StructuredData';
 import { appUrl } from '@/lib/seo/app-url';
-import { LandingHeader } from '@/components/landing/LandingHeader';
-import { LandingHero } from '@/components/landing/LandingHero';
+import { LandingHeaderV2 } from '@/components/landing/LandingHeaderV2';
+import { LandingHeroV2 } from '@/components/landing/LandingHeroV2';
 import { LandingEcosystem } from '@/components/landing/LandingEcosystem';
 import { LandingAudience } from '@/components/landing/LandingAudience';
 import { LandingVisibility } from '@/components/landing/LandingVisibility';
 import { LandingPlansMatrix } from '@/components/landing/LandingPlansMatrix';
 import { LandingFounderOffer } from '@/components/landing/LandingFounderOffer';
 import { LandingWhyJoin } from '@/components/landing/LandingWhyJoin';
-import { LandingProductShowcase } from '@/components/landing/LandingProductShowcase';
 import { LandingFaq } from '@/components/landing/LandingFaq';
 import { LandingLeadCapture } from '@/components/landing/LandingLeadCapture';
 
@@ -75,15 +74,14 @@ export default function HomePage() {
       <StructuredData schema={organizationSchema} />
       <StructuredData schema={faqSchema} />
       <div className="w-full">
-        <LandingHeader />
-        <LandingHero />
+        <LandingHeaderV2 />
+        <LandingHeroV2 />
         <LandingEcosystem />
         <LandingAudience />
         <LandingVisibility />
         <LandingPlansMatrix />
         <LandingFounderOffer />
         <LandingWhyJoin />
-        <LandingProductShowcase />
         <LandingFaq />
         <LandingLeadCapture />
       </div>

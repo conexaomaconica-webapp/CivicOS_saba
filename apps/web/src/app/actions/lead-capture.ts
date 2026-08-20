@@ -8,6 +8,7 @@ export interface LeadCaptureInput {
   companyName: string;
   phone: string;
   cityState: string;
+  lodgeName?: string;
   interestedPlan?: 'bronze' | 'prata' | 'ouro' | 'ouro_founder';
 }
 
@@ -51,15 +52,16 @@ export async function createLeadCaptureAction(input: LeadCaptureInput): Promise<
       company_name: input.companyName.trim(),
       phone: input.phone.trim(),
       city_state: input.cityState.trim(),
+      lodge_name: input.lodgeName?.trim(),
       interested_plan: planCode,
       status: 'new',
     });
 
     if (insertError) {
-      console.warn('[LeadCapture] Warning inserting to landing_leads, attempting fallback:', insertError.message);
+      console.error('[LeadCapture] FALHA FATAL AO INSERIR NO SUPABASE (landing_leads):', insertError);
       
       // Fallback insert to admin_audit_logs if landing_leads table is pending migration
-      await supabase.from('admin_audit_logs').insert({
+      const { error: fallbackError } = await supabase.from('admin_audit_logs').insert({
         tenant_id: tenantId,
         admin_user_id: '00000000-0000-0000-0000-000000000000',
         action_type: 'LEAD_CAPTURE',
@@ -71,26 +73,32 @@ export async function createLeadCaptureAction(input: LeadCaptureInput): Promise<
           companyName: input.companyName,
           phone: input.phone,
           cityState: input.cityState,
+          lodgeName: input.lodgeName,
           interestedPlan: planCode,
         },
         justification: `Captação de Lead comercial para o plano ${planCode.toUpperCase()}`,
       });
+      if (fallbackError) {
+        console.error('[LeadCapture] FALHA AO INSERIR NO FALLBACK:', fallbackError);
+      }
     }
 
     // 2. Official WhatsApp contact number: (75) 98127-2323 -> 5575981272323
     const OFFICIAL_WHATSAPP_NUMBER = '5575981272323';
     
+    const lodgeText = input.lodgeName ? ` (Loja: ${input.lodgeName.trim()})` : '';
     const whatsappMessage = encodeURIComponent(
-      `Olá! Me chamo ${input.fullName.trim()}, da empresa ${input.companyName.trim()} (${input.cityState.trim()}). Quero ser Empresa Fundadora no Conexão Maçônica!`
+      `Olá! Me chamo ${input.fullName.trim()}, da empresa ${input.companyName.trim()} (${input.cityState.trim()})${lodgeText}. Quero informações sobre o Conexão Maçônica!`
     );
     const whatsappUrl = `https://wa.me/${OFFICIAL_WHATSAPP_NUMBER}?text=${whatsappMessage}`;
 
     return {
       success: true,
-      message: 'Cadastro de Empresa Fundadora registrado com sucesso! Redirecionando para o WhatsApp...',
+      message: 'Cadastro recebido com sucesso!',
       whatsappUrl,
     };
   } catch (err) {
+    console.error('[LeadCapture] ERRO CATCH:', err);
     return {
       success: false,
       error: err instanceof Error ? err.message : 'Erro ao registrar solicitação.',

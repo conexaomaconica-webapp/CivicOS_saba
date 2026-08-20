@@ -129,7 +129,7 @@ body:has(#captacao-lead) .cm-public-header {
 .cm-public-profile > svg { width: 17px; }
 .cm-public-login { color: var(--cm-wine); font-weight: 700; padding: 10px 14px; text-decoration: none; }
 
-.cm-public-footer { background: var(--cm-wine-dark); color: white; padding: 22px; }
+.cm-public-footer { background: #20080a; color: white; padding: 22px; }
 .cm-public-footer > div { max-width: 1180px; margin: auto; display: flex; justify-content: space-around; }
 /* ────── FIGMA BRONZE TEMPLATE STYLES ────── */
 .cm-bronze-page-container {

@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS public.landing_leads (
   company_name TEXT NOT NULL,
   phone TEXT NOT NULL,
   city_state TEXT NOT NULL,
+  lodge_name TEXT,
   interested_plan TEXT NOT NULL DEFAULT 'ouro_founder',
   status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'contacted', 'converted', 'archived')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -33,7 +34,6 @@ DROP POLICY IF EXISTS "Members and admins can view landing leads" ON public.land
 CREATE POLICY "Members and admins can view landing leads"
   ON public.landing_leads FOR SELECT
   USING (
-    public._is_platform_admin(auth.uid()) OR
     EXISTS (
       SELECT 1 FROM public.tenant_members tm
       WHERE tm.tenant_id = landing_leads.tenant_id
@@ -45,7 +45,6 @@ DROP POLICY IF EXISTS "Admins can manage landing leads" ON public.landing_leads;
 CREATE POLICY "Admins can manage landing leads"
   ON public.landing_leads FOR ALL
   USING (
-    public._is_platform_admin(auth.uid()) OR
     EXISTS (
       SELECT 1 FROM public.tenant_members tm
       WHERE tm.tenant_id = landing_leads.tenant_id
