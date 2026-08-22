@@ -13,6 +13,7 @@ import { createBusinessDraft, type BusinessCategoryOption } from '@/lib/business
 import { loadResponsibleDraft, clearResponsibleDraft } from '@/lib/onboarding/responsible-flow';
 import { upsertMasonicAffiliation } from '@/lib/masonic/masonic-affiliation-service';
 import { MASONIC_STATUS_LABELS } from '@/lib/masonic/masonic-affiliation';
+import { MasonicLinkAuthorizationModal } from '@/components/onboarding/MasonicLinkAuthorizationModal';
 
 const FIELD_ERROR_STYLE = {
   marginTop: 'var(--space-1)',
@@ -51,9 +52,20 @@ export default function BusinessForm({ categories, tenantId }: BusinessFormProps
   const [tradingName, setTradingName] = useState('');
   const [phone, setPhone] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [isMasonicConnectionPublic, setIsMasonicConnectionPublic] = useState(true);
   const [errors, setErrors] = useState<BusinessStepErrors>({});
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Modal State para Autorização Empresarial (ADV-007b)
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authorizationData, setAuthorizationData] = useState<{
+    authorizationTermAccepted: boolean;
+    representationScope: string;
+    termHash: string;
+  } | null>(null);
+
+  const isRepresentativeRole = responsibleDraft?.relationship === 'representative';
 
   const updateField = (field: keyof BusinessStepErrors, value: string) => {
     const next = { cnpj, legalName, tradingName, phone, categoryId };
@@ -69,8 +81,7 @@ export default function BusinessForm({ categories, tenantId }: BusinessFormProps
     setErrors((prev) => ({ ...prev, [field]: nextErrors[field] }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const processSubmission = async (authData = authorizationData) => {
     setLoading(true);
     setErrorMsg(null);
 
@@ -86,9 +97,14 @@ export default function BusinessForm({ categories, tenantId }: BusinessFormProps
       return;
     }
 
-    // LGPD (CRIT-TRN-012): antes de persistir qualquer dado sensível de vínculo,
-    // registra o consentimento destacado + aceite da Política de Privacidade
-    // versionada (com hash SHA-256 da minuta).
+    // Gate: Se for representante/procurador e ainda não preencheu autorização, abre o modal ADV-007b
+    if (isRepresentativeRole && !authData?.authorizationTermAccepted) {
+      setIsAuthModalOpen(true);
+      setLoading(false);
+      return;
+    }
+
+    // LGPD (CRIT-TRN-012): registra consentimento para dados sensíveis
     const hasMasonicDeclaration =
       responsibleDraft?.masonic && responsibleDraft.masonic.status !== 'none';
     if (hasMasonicDeclaration) {
@@ -124,9 +140,13 @@ export default function BusinessForm({ categories, tenantId }: BusinessFormProps
       phone,
       categoryId,
     });
+
     if (result.ok) {
       if (hasMasonicDeclaration && responsibleDraft?.masonic) {
-        await upsertMasonicAffiliation(supabase, responsibleDraft.masonic);
+        await upsertMasonicAffiliation(supabase, {
+          ...responsibleDraft.masonic,
+          masonicConsent: isMasonicConnectionPublic,
+        });
       }
       clearResponsibleDraft();
       router.push('/anunciar/passo-3');
@@ -134,6 +154,11 @@ export default function BusinessForm({ categories, tenantId }: BusinessFormProps
       setErrorMsg(result.error ?? 'Erro ao salvar a empresa.');
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await processSubmission();
   };
 
   return (
@@ -279,6 +304,21 @@ export default function BusinessForm({ categories, tenantId }: BusinessFormProps
         <FieldError message={errors.categoryId} />
       </div>
 
+      {responsibleDraft?.masonic && responsibleDraft.masonic.status !== 'none' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+          <input
+            id="masonic-public-consent"
+            type="checkbox"
+            checked={isMasonicConnectionPublic}
+            onChange={(e) => setIsMasonicConnectionPublic(e.target.checked)}
+            style={{ cursor: 'pointer', width: 16, height: 16 }}
+          />
+          <label htmlFor="masonic-public-consent" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+            Autorizo exibir publicamente o vínculo fraterno no perfil do Guia (ex: "Empresa de Irmão/Cunhada").
+          </label>
+        </div>
+      )}
+
       <button
         type="submit"
         disabled={loading}
@@ -294,8 +334,21 @@ export default function BusinessForm({ categories, tenantId }: BusinessFormProps
           cursor: loading ? 'not-allowed' : 'pointer',
         }}
       >
-        {loading ? 'Salvando...' : 'Continuar · Seleção do Plano'}
+        {loading ? 'Salvando...' : isRepresentativeRole ? 'Autorizar & Continuar · Seleção do Plano' : 'Continuar · Seleção do Plano'}
       </button>
+
+      <MasonicLinkAuthorizationModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        companyName={tradingName || legalName || 'Sua Empresa'}
+        applicantName={responsibleDraft?.name || 'Solicitante'}
+        businessRole={responsibleDraft?.relationship === 'representative' ? 'authorized_representative' : 'owner'}
+        onConfirmAuthorization={(data) => {
+          setAuthorizationData(data);
+          setIsAuthModalOpen(false);
+          void processSubmission(data);
+        }}
+      />
     </form>
   );
 }

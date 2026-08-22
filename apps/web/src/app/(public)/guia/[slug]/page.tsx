@@ -66,6 +66,18 @@ const getPublicBusiness = cache(async (slug: string) => {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
+  if (slug === 'empresas') {
+    return {
+      title: 'Empresas e Serviços Maçônicos | Conexão Maçônica',
+      description: 'Diretório completo de empresas, profissionais e serviços de confiança dentro da rede Conexão Maçônica.',
+    };
+  }
+  if (slug === 'lojas') {
+    return {
+      title: 'Lojas Maçônicas | Conexão Maçônica',
+      description: 'Diretório completo de Lojas Maçônicas, horários de reunião e informações institucionais.',
+    };
+  }
   const business = await getPublicBusiness(slug);
   if (!business || !business.authority.effectivePlan) return { title: 'Empresa não encontrada', robots: { index: false, follow: false } };
 
@@ -87,8 +99,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function CompanyDetailsPage({ params }: Props) {
-  const { slug } = await params;
+import BusinessDirectoryPage from '../empresas/page';
+import MasonicLodgesDirectoryPage from '../lojas/page';
+
+export default async function CompanyDetailsPage(props: Props & { searchParams?: any }) {
+  const { slug } = await props.params;
+  if (slug === 'empresas') {
+    return await BusinessDirectoryPage({ searchParams: props.searchParams });
+  }
+  if (slug === 'lojas') {
+    return await MasonicLodgesDirectoryPage({ searchParams: props.searchParams });
+  }
   const business = await getPublicBusiness(slug);
   if (!business || !business.authority.effectivePlan) notFound();
 

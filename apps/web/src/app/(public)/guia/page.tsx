@@ -1,373 +1,215 @@
 import React from 'react';
-import Link from 'next/link';
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
-import type { LucideIcon } from 'lucide-react';
-import {
-  Briefcase,
-  Building2,
-  Hand,
-  Heart,
-  Search,
-  SearchX,
-  ShieldCheck,
-  ShoppingBasket,
-  Store,
-  Tags,
-  Utensils,
-} from 'lucide-react';
 import { createServerSideClient } from '@/lib/supabase/server';
+import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { StructuredData } from '@/components/seo/StructuredData';
 import { appUrl } from '@/lib/seo/app-url';
-import { BusinessCard, type GuiaBusiness } from '@/components/guia/BusinessCard';
-import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
-import type { Database } from '@/types/database.types';
+import '@/styles/directory-home.css';
+
+// Directory Components
+import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
+import { DirectoryHero } from '@/components/public/directory/DirectoryHero';
+import { DirectoryCarousel, type DirectoryBannerItem } from '@/components/public/directory/DirectoryCarousel';
+import { DirectoryCategories, type DirectoryCategoryItem } from '@/components/public/directory/DirectoryCategories';
+import { DirectorySponsored, type DirectorySponsoredItem } from '@/components/public/directory/DirectorySponsored';
+import { DirectoryAllBusinesses, type PublicSearchResultItem } from '@/components/public/directory/DirectoryAllBusinesses';
+import { DirectoryMapExplore } from '@/components/public/directory/DirectoryMapExplore';
+import { DirectoryLodgesGuide, type PublicMasonicLodgeItem } from '@/components/public/directory/DirectoryLodgesGuide';
+import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
+import { FavoritesProvider } from '@/lib/directory/favorites-context';
+import { DirectoryFavoritesModal } from '@/components/public/directory/DirectoryFavoritesModal';
 
 type Props = {
-  searchParams: Promise<{ q?: string; cat?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    city?: string;
+    cat?: string;
+    verified?: string;
+    benefits?: string;
+    sort?: string;
+    page?: string;
+    potency?: string;
+    rite?: string;
+  }>;
 };
 
 export const metadata: Metadata = {
-  title: 'Guia Comercial — Empresas e serviços de irmãos verificados',
+  title: 'Guia Comercial e Maçônico — Conexão Maçônica',
   description:
-    'Diretório de empresas e serviços de irmãos maçons verificados: busque por categoria, veja selos de confiança e apoie a comunidade.',
+    'Encontre empresas, serviços, benefícios e Lojas Maçônicas de irmãos verificados dentro de uma rede de credibilidade.',
   alternates: { canonical: '/guia' },
   openGraph: {
-    title: 'Guia Comercial de Irmãos — Conexão Maçônica',
-    description:
-      'Busque empresas e serviços de irmãos maçons, filtre por categoria e descubra negócios verificados.',
+    title: 'Guia Comercial e Maçônico — Conexão Maçônica',
+    description: 'Busque empresas, serviços e Lojas Maçônicas na rede Conexão Maçônica.',
     url: appUrl('/guia'),
     type: 'website',
   },
 };
 
-const breadcrumbSchema = (tenantName: string) => ({
-  '@context': 'https://schema.org',
-  '@type': 'BreadcrumbList',
-  itemListElement: [
-    { '@type': 'ListItem', position: 1, name: 'Início', item: appUrl('/') },
-    { '@type': 'ListItem', position: 2, name: tenantName },
-  ],
-});
-
-const itemListSchema = (businesses: GuiaBusiness[]) => ({
-  '@context': 'https://schema.org',
-  '@type': 'ItemList',
-  itemListElement: businesses.slice(0, 20).map((business, index) => ({
-    '@type': 'ListItem',
-    position: index + 1,
-    name: business.name,
-    url: appUrl(`/guia/${business.slug ?? business.id}`),
-  })),
-});
-
-const CATEGORY_ICONS: Record<string, LucideIcon> = {
-  utensils: Utensils,
-  hand: Hand,
-  building: Building2,
-  heart: Heart,
-  briefcase: Briefcase,
-  store: Store,
-  shopping: ShoppingBasket,
-};
-
-function formatCategoryFallback(slug: string): string {
-  return slug
-    .split('-')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
-type PublicDirectoryRow =
-  Database['public']['Functions']['public_directory_search']['Returns'][number];
-
 export default async function GuiaPage({ searchParams }: Props) {
-  const { q = '', cat = 'all' } = await searchParams;
+  const params = await searchParams;
+  const q = params.q || '';
+  const city = params.city || '';
+  const cat = params.cat || '';
+  const verified = params.verified === 'true';
+  const benefits = params.benefits === 'true';
+  const sort = params.sort || 'relevance';
+  const page = parseInt(params.page || '1', 10) || 1;
+  const potency = params.potency || '';
+  const rite = params.rite || '';
 
   const headersList = await headers();
-  const host = headersList.get('host') ?? '';
+  const host = headersList.get('host') ?? 'localhost:3000';
   const supabase = await createServerSideClient();
   const brand = await resolveTenantBrandContext();
-  const rpcArgs = {
-    p_host: host,
-    p_query: q.trim() || undefined,
-    p_category_slug: cat === 'all' ? undefined : cat,
-    p_city: undefined,
-    p_state: undefined,
-    p_after_name: undefined,
-    p_after_slug: undefined,
-    p_limit: 50,
-  };
-  const [allResult, filteredResult] = await Promise.all([
-    supabase.rpc('public_directory_search', {
-      ...rpcArgs,
-      p_query: undefined,
-      p_category_slug: undefined,
+
+  // Parallel RPC execution
+  const [homeDataRes, searchRes, lodgesRes] = await Promise.all([
+    (supabase as any).rpc('public_directory_home_data', {
+      p_host: host,
+      p_city: city || null,
     }),
-    supabase.rpc('public_directory_search', rpcArgs),
+    (supabase as any).rpc('public_businesses_search', {
+      p_host: host,
+      p_query: q || null,
+      p_city: city || null,
+      p_category_slug: cat || null,
+      p_verified: verified || null,
+      p_has_benefits: benefits || null,
+      p_sort: sort,
+      p_page: page,
+      p_page_size: 12,
+    }),
+    (supabase as any).rpc('public_organizations_search', {
+      p_host: host,
+      p_city: city || null,
+      p_potency: potency || null,
+      p_rite: rite || null,
+      p_page: 1,
+      p_page_size: 12,
+    }),
   ]);
-  const allRows = Array.isArray(allResult.data)
-    ? allResult.data satisfies PublicDirectoryRow[]
-    : [];
-  const rows = Array.isArray(filteredResult.data)
-    ? filteredResult.data satisfies PublicDirectoryRow[]
-    : [];
-  const tenant = brand.tenantSlug
-    ? { name: brand.appName ?? brand.tenantSlug }
-    : null;
 
-  if (!tenant || allResult.error || filteredResult.error) {
-    return (
-      <main className="flex min-h-[60vh] w-full items-center justify-center">
-        <div className="max-w-md rounded-xl border border-default bg-secondary p-8 text-center">
-          <h1 className="text-2xl font-bold text-primary">Portal não encontrado</h1>
-          <p className="mt-3 text-sm text-secondary">
-            O domínio informado é inválido, não verificado ou está desativado.
-          </p>
-          <Link
-            href="/"
-            className="mt-5 inline-flex items-center justify-center rounded-lg bg-accent px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-hover"
-          >
-            Voltar ao Início
-          </Link>
-        </div>
-      </main>
-    );
-  }
+  const homeData: any = homeDataRes.data || {
+    settings: {
+      hero_title: 'Encontre empresas, serviços e conexões de confiança',
+      hero_subtitle: 'Descubra oportunidades dentro de uma rede que valoriza relacionamento, credibilidade e propósito.',
+      hero_search_placeholder: 'Pergunte à busca inteligente...',
+      default_page_size: 12,
+      sections_config: [
+        { id: 'hero', enabled: true, order: 1 },
+        { id: 'carousel', enabled: true, order: 2 },
+        { id: 'categories', enabled: true, order: 3 },
+        { id: 'sponsored', enabled: true, order: 4 },
+        { id: 'all_businesses', enabled: true, order: 5 },
+        { id: 'map', enabled: true, order: 6 },
+        { id: 'lodges', enabled: true, order: 7 },
+      ],
+    },
+    banners: [],
+    categories: [],
+    sponsored: [],
+    available_cities: [],
+  };
 
-  const categories = allRows
-    .filter(
-      (row): row is PublicDirectoryRow & {
-        primary_category_slug: string;
-        primary_category_name: string;
-      } => Boolean(row.primary_category_slug && row.primary_category_name),
-    )
-    .map((row) => ({
-      slug: row.primary_category_slug,
-      name: row.primary_category_name,
-      icon: null as string | null,
-    }))
-    .filter(
-    (category, index, all) =>
-      all.findIndex((other) => other.slug === category.slug) === index,
-  );
+  const searchData: any = searchRes.data || {
+    items: [],
+    total: 0,
+    page: 1,
+    page_size: 12,
+    total_pages: 1,
+    has_next_page: false,
+    has_previous_page: false,
+  };
 
-  const categoryNames = new Map(
-    categories.map((category) => [category.slug, category.name]),
-  );
+  const lodgesData: any = lodgesRes.data || {
+    items: [],
+    total: 0,
+    page: 1,
+    page_size: 12,
+    total_pages: 1,
+    has_next_page: false,
+    has_previous_page: false,
+  };
 
-  type CategoryOption = { slug: string; name: string; icon?: string | null };
-  const categoryOptions: CategoryOption[] = [
-    { slug: 'all', name: 'Todas' },
-    ...categories,
-  ];
+  const settings = homeData.settings || {};
+  const banners = (homeData.banners as DirectoryBannerItem[]) || [];
+  const categories = (homeData.categories as DirectoryCategoryItem[]) || [];
+  const sponsored = (homeData.sponsored as DirectorySponsoredItem[]) || [];
+  const availableCities = (homeData.available_cities as string[]) || [];
 
-  // 3. Fetch published listings for this tenant, then filter in memory.
-  // Presentation is intentionally not ordered by configured plan_tier: the
-  // anonymous schema does not expose an authoritative effective plan yet.
-  const toBusiness = (row: PublicDirectoryRow): GuiaBusiness => ({
-    id: row.business_slug,
-    name: row.business_name,
-    slug: row.business_slug,
-    category: row.primary_category_slug,
-    description: row.description,
-    address: [row.city, row.state].filter(Boolean).join(' - ') || null,
-    plan_tier: row.effective_plan_code,
-  });
-  const dbBusinesses = allRows.map(toBusiness);
-  const sorted = rows.map(toBusiness);
-  const verifiedSet = new Set(
-    allRows.filter((row) => row.is_verified).map((row) => row.business_slug),
-  );
-  const verifiedCount = sorted.filter((business) => verifiedSet.has(business.id)).length;
-  const tenantVerifiedCount = dbBusinesses.filter((business) =>
-    verifiedSet.has(business.id),
-  ).length;
-
-  const heroStats = [
-    { value: String(tenantVerifiedCount), label: 'empresas verificadas' },
-    { value: String(categories.length), label: 'categorias' },
-    { value: String(dbBusinesses.length), label: 'empresas publicadas' },
-  ];
-
-  const buildUrl = (nextCat: string, nextQuery: string) =>
-    `/guia?${new URLSearchParams({
-      cat: nextCat,
-      ...(nextQuery ? { q: nextQuery } : {}),
-    }).toString()}`;
+  const businessItems = (searchData.items as PublicSearchResultItem[]) || [];
+  const lodgeItems = (lodgesData.items as PublicMasonicLodgeItem[]) || [];
 
   return (
-    <>
-      <StructuredData schema={breadcrumbSchema(tenant.name)} />
-      <StructuredData schema={itemListSchema(sorted)} />
+    <FavoritesProvider>
+      <div className="min-h-screen bg-[#faf7f2] text-[#1f1914] font-sans antialiased relative">
+        <StructuredData
+          schema={{
+            '@context': 'https://schema.org',
+            '@type': 'WebSite',
+            name: brand.appName || 'Conexão Maçônica',
+            url: appUrl('/guia'),
+          }}
+        />
 
-      <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-4 pb-16 sm:px-6">
-        {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="mt-6 text-xs text-secondary">
-          <ol className="flex flex-wrap items-center gap-1.5">
-            <li>
-              <Link href="/" className="transition-colors hover:text-primary">
-                Início
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li className="font-medium text-primary">{tenant.name}</li>
-          </ol>
-        </nav>
+        {/* Top Navigation Header */}
+        <DirectoryHeader
+          appName={brand.appName || 'Conexão Maçônica'}
+          logoUrl={brand.logoUrl}
+          selectedCity={city}
+          availableCities={availableCities}
+        />
 
-        {/* Hero institucional */}
-        <section className="flex flex-col items-center gap-6 text-center">
-          <div className="flex flex-col items-center gap-3">
-            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-highlight">
-              <span className="inline-block h-1.5 w-1.5 rotate-45 bg-highlight" aria-hidden="true" />
-              Guia Comercial da Comunidade
-              <span className="inline-block h-1.5 w-1.5 rotate-45 bg-highlight" aria-hidden="true" />
-            </span>
-            <h1 className="text-4xl font-bold tracking-tight text-primary md:text-5xl">
-              {tenant.name}
-            </h1>
-            <p className="max-w-2xl text-lg text-secondary">
-              Empresas e serviços de irmãos maçons, verificados e recomendados
-              pela comunidade. Filtre por categoria, confira os selos de
-              confiança e apoie quem apoia você.
-            </p>
-          </div>
+        {/* Hero Section */}
+        <DirectoryHero
+          title={settings.hero_title}
+          subtitle={settings.hero_subtitle}
+          searchPlaceholder={settings.hero_search_placeholder}
+          selectedCity={city}
+        />
 
-          <dl className="grid w-full max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
-            {heroStats.map((stat) => (
-              <div
-                key={stat.label}
-                className="flex flex-col rounded-xl border border-default bg-secondary px-4 py-3"
-              >
-                <dt className="order-2 text-xs text-secondary">{stat.label}</dt>
-                <dd className="order-1 text-2xl font-bold text-highlight-active">
-                  {stat.value}
-                </dd>
-              </div>
-            ))}
-          </dl>
+        {/* Carrossel Destaque da Semana */}
+        <DirectoryCarousel banners={banners} />
 
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <a
-              href="#busca"
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-accent-hover"
-            >
-              <Search className="h-4 w-4" aria-hidden="true" />
-              Buscar no guia
-            </a>
-            <Link
-              href="/anunciar/passo-1"
-              className="inline-flex items-center justify-center rounded-lg border border-default bg-secondary px-6 py-3 text-sm font-semibold text-primary transition-colors hover:bg-tertiary"
-            >
-              Anunciar minha empresa
-            </Link>
-          </div>
-        </section>
+        {/* Categorias em Destaque */}
+        <DirectoryCategories categories={categories} />
 
-        {/* Busca + filtros */}
-        <section
-          id="busca"
-          className="scroll-mt-6 rounded-2xl border border-default bg-secondary p-6 shadow-sm"
-        >
-          <form action="/guia" method="GET" className="flex flex-col gap-3 sm:flex-row">
-            <input type="hidden" name="cat" value={cat} />
-            <label htmlFor="guia-busca" className="sr-only">
-              Buscar no guia
-            </label>
-            <input
-              id="guia-busca"
-              type="text"
-              name="q"
-              defaultValue={q}
-              placeholder="O que você está procurando? Ex.: padaria, advogado, contador..."
-              className="flex-1 rounded-lg border border-default bg-primary px-4 py-3 text-sm text-primary outline-none transition-colors focus:border-accent"
-            />
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-accent-hover"
-            >
-              <Search className="h-4 w-4" aria-hidden="true" />
-              Pesquisar
-            </button>
-          </form>
+        {/* Empresas Patrocinadas */}
+        <DirectorySponsored items={sponsored} />
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            {categoryOptions.map((category) => {
-              const isSelected = cat === category.slug;
-              const Icon = CATEGORY_ICONS[category.icon ?? ''] ?? Tags;
-              return (
-                <Link
-                  key={category.slug}
-                  href={buildUrl(category.slug, q)}
-                  aria-current={isSelected ? 'page' : undefined}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                    isSelected
-                      ? 'border border-accent bg-accent text-white'
-                      : 'border border-default bg-tertiary text-secondary hover:bg-secondary hover:text-primary'
-                  }`}
-                >
-                  {category.slug !== 'all' && (
-                    <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                  )}
-                  {category.name}
-                </Link>
-              );
-            })}
-          </div>
-        </section>
+        {/* Diretório Completo "Todas as Empresas" */}
+        <DirectoryAllBusinesses
+          items={businessItems}
+          total={searchData.total}
+          page={searchData.page}
+          pageSize={searchData.page_size}
+          totalPages={searchData.total_pages}
+          hasNextPage={searchData.has_next_page}
+          hasPreviousPage={searchData.has_previous_page}
+          availableCities={availableCities}
+          categories={categories}
+          searchQuery={q}
+          selectedCity={city}
+          selectedCategory={cat}
+          verifiedOnly={verified}
+          hasBenefitsOnly={benefits}
+          sortBy={sort}
+        />
 
-        {/* Resultado */}
-        {sorted.length > 0 ? (
-          <>
-            <section className="flex flex-col gap-5">
-              <div className="flex flex-wrap items-baseline gap-2">
-                <h2 className="text-xl font-semibold tracking-tight text-primary">
-                  Todos os anúncios
-                </h2>
-                <span className="inline-flex items-center gap-1.5 text-xs text-secondary">
-                  <ShieldCheck className="h-3.5 w-3.5 text-highlight-active" aria-hidden="true" />
-                  {verifiedCount} {verifiedCount === 1 ? 'empresa' : 'empresas'} verificadas
-                </span>
-              </div>
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {sorted.map((business) => (
-                  <BusinessCard
-                    key={business.id}
-                    business={business}
-                    categoryName={categoryNames.get(business.category ?? '') ?? formatCategoryFallback(business.category ?? '')}
-                    verified={verifiedSet.has(business.id)}
-                  />
-                ))}
-              </div>
-            </section>
-          </>
-        ) : (
-          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-strong bg-secondary px-6 py-14 text-center">
-            <SearchX className="h-10 w-10 text-secondary" aria-hidden="true" />
-            <h2 className="text-lg font-bold text-primary">
-              Nenhuma empresa localizada
-            </h2>
-            <p className="max-w-md text-sm text-secondary">
-              Não encontramos resultados para
-              {q.trim() ? (
-                <>
-                  {' '}
-                  &quot;<span className="font-medium text-primary">{q}</span>&quot;
-                </>
-              ) : (
-                ' o filtro selecionado'
-              )}
-              {cat !== 'all' ? ' nesta categoria' : ''}.
-            </p>
-            <Link
-              href="/guia"
-              className="mt-2 inline-flex items-center justify-center rounded-lg border border-accent px-5 py-2.5 text-sm font-bold text-accent transition-colors hover:bg-accent-subtle"
-            >
-              Limpar filtros de busca
-            </Link>
-          </div>
-        )}
-      </main>
-    </>
+        {/* Explore perto de você (Mapa) */}
+        <DirectoryMapExplore businesses={businessItems} selectedCity={city} />
+
+        {/* Guia de Lojas Maçônicas */}
+        <DirectoryLodgesGuide lodges={lodgeItems} availableCities={availableCities} />
+
+        {/* Footer */}
+        <DirectoryFooter />
+
+        {/* Favoritos Drawer/Modal */}
+        <DirectoryFavoritesModal />
+      </div>
+    </FavoritesProvider>
   );
 }
