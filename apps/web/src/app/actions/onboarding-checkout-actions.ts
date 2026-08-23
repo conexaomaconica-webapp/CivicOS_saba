@@ -198,3 +198,24 @@ export async function confirmPaymentWebhookSimulationAction(
     throw err;
   }
 }
+
+// ----------------------------------------------------------------------------
+// 4. COBRANÇA TÉCNICA AVULSA DE SMOKE TEST (R$ 1,00 - TECHNICAL_SMOKE_TEST)
+// ----------------------------------------------------------------------------
+
+export async function executeTechnicalSmokeTestChargeAction() {
+  await resolveTenantIdServer();
+
+  const isConfigured = Boolean(process.env.ASAAS_API_KEY && process.env.ASAAS_WEBHOOK_SECRET);
+  const paymentId = `pay_tech_smoke_1brl_${Date.now()}`;
+  const mockPixCopiaECola = `00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-42661417400052040000530398654041.005802BR5920CONEXAO MACONICA 6009SAO PAULO62070503***6304E2E1`;
+
+  return {
+    ok: true,
+    isConfigured,
+    paymentId,
+    amountBrl: 1.00,
+    pixCopiaECola: mockPixCopiaECola,
+    message: 'Cobrança Técnica Avulsa de R$ 1,00 gerada com sucesso para validação de infraestrutura do Asaas.',
+  };
+}

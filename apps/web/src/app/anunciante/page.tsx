@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
-import { ShieldCheck, Award, Building2, Store, CreditCard, ChevronRight, CheckCircle2, Eye, Star } from 'lucide-react';
+import { ShieldCheck, Award, Store, ChevronRight, CheckCircle2, Eye, Star } from 'lucide-react';
 
 export const metadata = {
   title: 'Painel do Anunciante · Conexão Maçônica',

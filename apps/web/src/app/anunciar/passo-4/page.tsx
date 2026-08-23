@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
-import { ShieldCheck, ArrowRight, CheckCircle } from 'lucide-react';
+import { ShieldCheck, ArrowRight } from 'lucide-react';
 
 export const metadata = {
   title: 'Onboarding Anunciante · Passo 4 — Resumo Comercial',

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { CreditCard, QrCode, FileText, CheckCircle2, ShieldCheck, Loader2 } from 'lucide-react';
 import { confirmPaymentWebhookSimulationAction } from '@/app/actions/onboarding-checkout-actions';
 
-export default function CheckoutPaymentClient({ userEmail }: { userEmail: string }) {
+export default function CheckoutPaymentClient({ userEmail: _userEmail }: { userEmail: string }) {
   const router = useRouter();
   const [method, setMethod] = useState<'pix' | 'credit_card' | 'boleto'>('pix');
   const [simulatingWebhook, setSimulatingWebhook] = useState(false);
@@ -24,7 +24,7 @@ export default function CheckoutPaymentClient({ userEmail }: { userEmail: string
         'asaas'
       );
 
-      if (res.ok) {
+      if (res.success) {
         setStatusMsg('Pagamento confirmado via Webhook Asaas! Ativando assinatura...');
         setTimeout(() => {
           router.push('/anunciante');

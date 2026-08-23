@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, FileCheck, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
+import { FileCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function ContractSigningClient({ userEmail }: { userEmail: string }) {
   const router = useRouter();

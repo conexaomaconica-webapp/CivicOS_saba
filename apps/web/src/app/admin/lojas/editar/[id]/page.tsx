@@ -85,10 +85,9 @@ export default function AdminEditarLojaPage({ params }: Props) {
           setShowWorshipfulMaster(lodgeData.show_worshipful_master ?? true);
           setShowAddress(lodgeData.show_address ?? true);
 
-          // Carregar reunião principal e contatos
-          const [{ data: meetingData }, { data: contactsData }] = await Promise.all([
+          // Carregar reunião principal
+          const [{ data: meetingData }] = await Promise.all([
             (supabase as any).from('organization_meetings').select('*').eq('organization_id', id).limit(1),
-            (supabase as any).from('organization_contacts').select('*').eq('organization_id', id),
           ]);
 
           if (meetingData && meetingData[0]) {
