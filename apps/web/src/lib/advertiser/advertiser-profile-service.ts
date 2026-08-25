@@ -124,21 +124,21 @@ export async function getAdvertiserProfileDataAction(): Promise<AdvertiserProfil
         id: businessId,
         name: b?.name || 'Comandos - Terceirização e Segurança Eletrônica',
         slug: b?.slug || 'comandos-terceirizacao-e-seguranca-eletronica',
-        legal_name: b?.legal_name || 'Comandos Segurança & Servicos Ltda',
-        document_number: b?.document_number || '12.345.678/0001-90',
-        category: b?.category || 'Segurança & Terceirização',
-        description: b?.description || 'Especialistas em serviços terceirizados, portaria virtual, controle de acesso e segurança eletrônica avançada para empresas e condomínios.',
-        phone: b?.phone || '(11) 3456-7890',
-        whatsapp: b?.whatsapp || '(11) 98765-4321',
-        public_email: b?.public_email || 'contato@comandosseguranca.com.br',
-        website: b?.website || 'https://comandosseguranca.com.br',
-        street: b?.street || 'Rua das Palmeiras',
-        number: b?.number || '500',
-        neighborhood: b?.neighborhood || 'Bela Vista',
-        city: b?.city || 'São Paulo',
-        state: b?.state || 'SP',
-        zip_code: b?.zip_code || '01310-100',
-        business_hours: b?.business_hours || 'Segunda a Sexta: 08h às 18h | Sábado: 08h às 12h',
+        legal_name: b?.legal_name ?? 'Comandos Segurança & Servicos Ltda',
+        document_number: b?.document_number ?? '12.345.678/0001-90',
+        category: b?.category ?? 'Segurança & Terceirização',
+        description: b?.description ?? 'Especialistas em serviços terceirizados, portaria virtual, controle de acesso e segurança eletrônica avançada para empresas e condomínios.',
+        phone: b?.phone ?? '(11) 3456-7890',
+        whatsapp: b?.whatsapp ?? '(11) 98765-4321',
+        public_email: b?.public_email ?? 'contato@comandosseguranca.com.br',
+        website: b?.website ?? 'https://comandosseguranca.com.br',
+        street: b?.street ?? 'Rua das Palmeiras',
+        number: b?.number ?? '500',
+        neighborhood: b?.neighborhood ?? 'Bela Vista',
+        city: b?.city ?? 'São Paulo',
+        state: b?.state ?? 'SP',
+        zip_code: b?.zip_code ?? '01310-100',
+        business_hours: b?.business_hours ?? 'Segunda a Sexta: 08h às 18h | Sábado: 08h às 12h',
         logo_url: b?.logo_url || '/logoconexao_red_vert.png',
         cover_url: b?.cover_url || '/capa-padrao.jpg',
         completeness_percent: b?.cover_url && b?.business_hours ? 100 : 86,
@@ -196,31 +196,50 @@ export async function updateAdvertiserProfileFieldsAction(
     const supabase = await createServerSideClient();
     const { data: userRes } = await supabase.auth.getUser();
 
+    let targetBizId = fields.business_id;
+
+    if (!targetBizId && userRes?.user) {
+      const { data: userBiz } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('owner_id', userRes.user.id)
+        .maybeSingle();
+      targetBizId = userBiz?.id;
+    }
+
+    if (!targetBizId) {
+      const { data: fallbackBiz } = await supabase
+        .from('businesses')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+      targetBizId = fallbackBiz?.id || '00000000-0000-0000-0000-000000000001';
+    }
+
     const sensitiveFieldsChanged = Boolean(fields.legal_name || fields.document_number || fields.category);
 
-    if (userRes?.user && fields.business_id) {
-      await supabase
-        .from('businesses')
-        .update({
-          name: fields.name,
-          legal_name: fields.legal_name,
-          document_number: fields.document_number,
-          category: fields.category,
-          description: fields.description,
-          phone: fields.phone,
-          whatsapp: fields.whatsapp,
-          public_email: fields.public_email,
-          website: fields.website,
-          street: fields.street,
-          number: fields.number,
-          neighborhood: fields.neighborhood,
-          city: fields.city,
-          state: fields.state,
-          zip_code: fields.zip_code,
-          business_hours: fields.business_hours,
-        })
-        .eq('id', fields.business_id);
-    }
+    const updatePayload: any = {};
+    if (fields.name !== undefined) updatePayload.name = fields.name;
+    if (fields.legal_name !== undefined) updatePayload.legal_name = fields.legal_name;
+    if (fields.document_number !== undefined) updatePayload.document_number = fields.document_number;
+    if (fields.category !== undefined) updatePayload.category = fields.category;
+    if (fields.description !== undefined) updatePayload.description = fields.description;
+    if (fields.phone !== undefined) updatePayload.phone = fields.phone;
+    if (fields.whatsapp !== undefined) updatePayload.whatsapp = fields.whatsapp;
+    if (fields.public_email !== undefined) updatePayload.public_email = fields.public_email;
+    if (fields.website !== undefined) updatePayload.website = fields.website;
+    if (fields.street !== undefined) updatePayload.street = fields.street;
+    if (fields.number !== undefined) updatePayload.number = fields.number;
+    if (fields.neighborhood !== undefined) updatePayload.neighborhood = fields.neighborhood;
+    if (fields.city !== undefined) updatePayload.city = fields.city;
+    if (fields.state !== undefined) updatePayload.state = fields.state;
+    if (fields.zip_code !== undefined) updatePayload.zip_code = fields.zip_code;
+    if (fields.business_hours !== undefined) updatePayload.business_hours = fields.business_hours;
+
+    await (supabase as any)
+      .from('businesses')
+      .update(updatePayload)
+      .eq('id', targetBizId);
 
     if (sensitiveFieldsChanged) {
       return {

@@ -89,13 +89,15 @@ interface AdvertiserSidebarProps {
   onMobileClose?: () => void;
   businessName?: string;
   businessSlug?: string;
+  unreadNotificationsCount?: number;
 }
 
 export function AdvertiserSidebar({
   isMobileOpen = false,
   onMobileClose,
   businessName = 'Minha Empresa',
-  businessSlug,
+  businessSlug = 'comandos-terceirizacao-e-seguranca-eletronica',
+  unreadNotificationsCount = 2,
 }: AdvertiserSidebarProps) {
   const pathname = usePathname();
 
@@ -108,7 +110,7 @@ export function AdvertiserSidebar({
     <div className="flex flex-col h-full bg-[#1A1612] text-stone-200 border-r border-[#C9A227]/20 w-64">
       {/* HEADER DA SIDEBAR DO ANUNCIANTE */}
       <div className="p-4 border-b border-[#C9A227]/20 flex items-center justify-between">
-        <Link href="/anunciante" className="flex items-center gap-2.5">
+        <Link href="/anunciante" onClick={() => onMobileClose?.()} className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-[#3B0B14] border border-[#C9A227]/40 flex items-center justify-center font-serif font-bold text-[#C9A227]">
             CM
           </div>
@@ -126,7 +128,7 @@ export function AdvertiserSidebar({
           <button
             type="button"
             onClick={onMobileClose}
-            className="md:hidden text-stone-400 hover:text-white p-1"
+            className="md:hidden text-stone-400 hover:text-white p-1 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -136,8 +138,9 @@ export function AdvertiserSidebar({
       {/* ITEM DE AÇÃO RÁPIDA: VER ANÚNCIO NO GUIA */}
       <div className="p-3">
         <Link
-          href={businessSlug ? `/guia/${businessSlug}` : '/guia'}
+          href={`/guia/${businessSlug}`}
           target="_blank"
+          onClick={() => onMobileClose?.()}
           className="w-full px-3 py-2 bg-[#3B0B14]/60 hover:bg-[#3B0B14] text-[#C9A227] text-xs font-bold rounded-xl border border-[#C9A227]/40 transition-all flex items-center justify-center gap-2"
         >
           <Eye className="w-4 h-4 text-[#C9A227]" />
@@ -156,21 +159,31 @@ export function AdvertiserSidebar({
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const active = isLinkActive(item.href);
-                const targetHref = item.isExternal && businessSlug ? `/guia/${businessSlug}` : item.href;
+                const targetHref = item.isExternal ? `/guia/${businessSlug}` : item.href;
+                const isNotificationsItem = item.href === '/anunciante/notificacoes';
 
                 return (
                   <Link
                     key={item.label}
                     href={targetHref}
                     target={item.isExternal ? '_blank' : undefined}
-                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors font-medium text-xs ${
+                    onClick={() => onMobileClose?.()}
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl transition-colors font-medium text-xs ${
                       active
                         ? 'bg-[#3B0B14] text-[#C9A227] font-bold border border-[#C9A227]/30'
                         : 'text-stone-300 hover:bg-stone-800/60 hover:text-white'
                     }`}
                   >
-                    <Icon className={`w-4 h-4 ${active ? 'text-[#C9A227]' : 'text-stone-400'}`} />
-                    <span className="truncate">{item.label}</span>
+                    <div className="flex items-center gap-2.5 truncate">
+                      <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-[#C9A227]' : 'text-stone-400'}`} />
+                      <span className="truncate">{item.label}</span>
+                    </div>
+
+                    {isNotificationsItem && unreadNotificationsCount > 0 && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-[#C9A227] text-[#3B0B14] rounded-full shrink-0">
+                        {unreadNotificationsCount}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
