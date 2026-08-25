@@ -7,12 +7,17 @@ export const metadata = {
 };
 
 export default async function AdminPaymentsPage() {
-  const supabase = await createServerSideClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let isUserAuthenticated = false;
 
-  if (!user) {
+  try {
+    const supabase = await createServerSideClient();
+    const { data } = await supabase.auth.getUser();
+    isUserAuthenticated = Boolean(data?.user);
+  } catch (_e) {
+    isUserAuthenticated = false;
+  }
+
+  if (!isUserAuthenticated) {
     redirect('/login?redirect=%2Fadmin%2Fpagamentos');
   }
 
@@ -21,14 +26,14 @@ export default async function AdminPaymentsPage() {
   const asaasEnvironment = process.env.ASAAS_ENVIRONMENT || 'sandbox';
 
   return (
-    <main className="min-h-screen bg-stone-950 text-stone-100 p-6 max-w-6xl mx-auto space-y-8">
-      <div className="border-b border-stone-800 pb-4">
-        <span className="bg-amber-500/20 text-amber-300 font-bold text-xs px-2.5 py-0.5 rounded-full border border-amber-500/30">
-          Painel de Administração · Pagamentos (CRIT-PAY-001)
+    <div className="space-y-6">
+      <div className="border-b border-[#C9A227]/30 pb-4">
+        <span className="bg-[#3B0B14] text-[#C9A227] font-bold text-xs px-2.5 py-0.5 rounded-full border border-[#C9A227]/40">
+          Painel de Administração · Pagamentos & Condições
         </span>
-        <h1 className="text-3xl font-serif font-bold text-white mt-2">Central de Gateways & Transações</h1>
-        <p className="text-xs text-stone-400 mt-1">
-          Gerencie os provedores de cobrança, métodos aceitos e teste de cobrança técnica avulsa.
+        <h1 className="text-2xl font-serif font-bold text-[#1f1914] mt-2">Central de Gateways & Parcelamento</h1>
+        <p className="text-xs text-stone-500 mt-1">
+          Gerencie os provedores de cobrança, métodos aceitos e regras de parcelamento por plano.
         </p>
       </div>
 
@@ -36,6 +41,6 @@ export default async function AdminPaymentsPage() {
         isAsaasConfigured={isAsaasConfigured}
         asaasEnvironment={asaasEnvironment}
       />
-    </main>
+    </div>
   );
 }

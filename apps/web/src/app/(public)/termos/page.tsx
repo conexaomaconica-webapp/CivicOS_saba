@@ -43,8 +43,14 @@ export default function TermosPage() {
             exclusiva da plataforma e estão protegidos pelas leis de direitos autorais.
           </p>
 
-          <p className="pt-8 text-xs text-slate-500 italic">
-            Última atualização: 20 de Agosto de 2026. Este é um texto provisório e deverá ser revisado por equipe jurídica competente.
+          <h2 className="text-xl font-semibold text-[#C9A227] mt-8 mb-4">5. Atendimento e Suporte</h2>
+          <p>
+            Para dúvidas relativas a estes Termos de Uso, solicitação de suporte ou comunicações institucionais,
+            entre em contato através do e-mail oficial: <a href="mailto:contato@conexaomaconica.com.br" className="text-[#C9A227] underline">contato@conexaomaconica.com.br</a>.
+          </p>
+
+          <p className="pt-8 text-xs text-slate-500 italic border-t border-[#4B161B] mt-8">
+            Versão 1.0 — Publicada em Agosto de 2026. Plataforma Conexão Maçônica.
           </p>
         </div>
       </div>

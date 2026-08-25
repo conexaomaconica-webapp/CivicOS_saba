@@ -1,9 +1,9 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { ShellWrapper } from '@/components/shell/ShellWrapper';
+import { AdminShell } from '@/components/admin/AdminShell';
 
 export const metadata: Metadata = {
-  title: 'Administração',
+  title: 'Painel Administrativo · Conexão Maçônica',
   robots: { index: false, follow: false },
 };
 
@@ -12,5 +12,5 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <ShellWrapper>{children}</ShellWrapper>;
+  return <AdminShell>{children}</AdminShell>;
 }

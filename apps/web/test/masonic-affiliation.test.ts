@@ -74,7 +74,7 @@ describe('validateMasonicStep · ADV-001b (DOMÍNIO MAÇÔNICO)', () => {
     expect(hasMasonicStepErrors(errors)).toBe(true);
   });
 
-  it('valida irmão maçom: CIMB e situação de atividade obrigatórios', () => {
+  it('valida irmão maçom: situação de atividade (CIMB opcional)', () => {
     const errors = validateMasonicStep({
       ...emptyMasonicAffiliation(),
       status: 'mason',
@@ -82,7 +82,16 @@ describe('validateMasonicStep · ADV-001b (DOMÍNIO MAÇÔNICO)', () => {
       cimbCode: '',
     });
     expect(errors.isActive).toBeTruthy();
-    expect(errors.cimbCode).toContain('CIMB');
+    expect(errors.cimbCode).toBeUndefined();
+
+    const shortCimb = validateMasonicStep({
+      ...emptyMasonicAffiliation(),
+      status: 'mason',
+      isActive: true,
+      cimbCode: '12',
+      masonicConsent: true,
+    });
+    expect(shortCimb.cimbCode).toContain('curto');
 
     const ok = validateMasonicStep({
       ...emptyMasonicAffiliation(),

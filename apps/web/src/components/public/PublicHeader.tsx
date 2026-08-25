@@ -59,7 +59,7 @@ export function PublicHeader({ productName, logoUrl, viewer }: PublicHeaderProps
               </span>
               <ChevronDown />
             </button>
-          ) : <Link href="/auth/login" className="cm-public-login">Entrar</Link>}
+          ) : <Link href="/login" className="cm-public-login">Entrar</Link>}
         </div>
       </div>
     </header>

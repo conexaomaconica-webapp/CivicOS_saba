@@ -66,12 +66,23 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
   const supabase = await createServerSideClient();
   const tenantBrand = await resolveTenantBrandContext();
 
-  // Fetch cities, potencies and rites
-  const [{ data: potenciesData }, { data: ritesData }, { data: homeData }] = await Promise.all([
-    (supabase as any).from('masonic_potencies').select('id, slug, name, abbreviation').eq('is_active', true),
-    (supabase as any).from('masonic_rites').select('id, slug, name').eq('is_active', true),
-    (supabase as any).rpc('public_directory_home_data', { p_host: host, p_city: city || null }).catch(() => ({ data: null })),
-  ]);
+  // Fetch cities, potencies and rites safely
+  let homeData: any = null;
+  let potenciesData: any = null;
+  let ritesData: any = null;
+
+  try {
+    const [potRes, riteRes, homeRes] = await Promise.all([
+      (supabase as any).from('masonic_potencies').select('id, slug, name, abbreviation').eq('is_active', true),
+      (supabase as any).from('masonic_rites').select('id, slug, name').eq('is_active', true),
+      (supabase as any).rpc('public_directory_home_data', { p_host: host, p_city: city || null }),
+    ]);
+    potenciesData = potRes?.data;
+    ritesData = riteRes?.data;
+    homeData = homeRes?.data;
+  } catch (err) {
+    console.error('Error fetching initial lodges page data:', err);
+  }
 
   const availableCities: string[] = homeData?.available_cities || [];
   const potencies = (potenciesData as any[]) || [];

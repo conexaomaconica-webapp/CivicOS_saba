@@ -18,11 +18,12 @@ export interface CommercialPlan {
   monthlyPriceCents: number;
   badge?: string;
   isPopular?: boolean;
+  installmentsMax?: number;
   features: PlanFeature[];
 }
 
 export function computeMonthlyEquivalenceText(annualPriceCents: number): string {
-  if (annualPriceCents === 0) return 'Grátis';
+  if (annualPriceCents === 0) return 'Gratuito';
   const monthlyEquivalenceInReais = Math.round(annualPriceCents / 12) / 100;
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -31,7 +32,7 @@ export function computeMonthlyEquivalenceText(annualPriceCents: number): string 
 }
 
 export function formatCentsToReais(amountCents: number): string {
-  if (amountCents === 0) return 'Grátis';
+  if (amountCents === 0) return 'Gratuito';
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
@@ -42,56 +43,62 @@ export const CANONICAL_PLANS: Record<PlanTier, Omit<CommercialPlan, 'id'>> = {
   bronze: {
     tier: 'bronze',
     name: 'Plano Bronze',
-    tagline: 'Perfil completo + geolocalização e 1 foto',
+    tagline: 'Entrada gratuita no Guia Maçônico',
     currency: 'BRL',
-    annualPriceCents: 50000,   // R$ 500,00
-    monthlyPriceCents: 5000,   // R$ 50,00
+    annualPriceCents: 0,
+    monthlyPriceCents: 0,
+    installmentsMax: 3,
     features: [
-      { text: 'Perfil completo + geolocalização, 1 foto, bio, contato', included: true },
-      { text: 'Catálogo: até 5 itens (marketplace)', included: true },
-      { text: 'Posicionamento padrão nas buscas', included: true },
-      { text: 'Mídia (vídeos / PDF) e cupons', included: false },
-      { text: 'Selo de verificação Ouro', included: false },
+      { text: 'Presença básica no Guia Comercial', included: true },
+      { text: 'Até 3 Fotos na Galeria', included: true },
+      { text: 'Até 2 Serviços cadastrados', included: true },
+      { text: '1 Oferta/Benefício ativo', included: true },
+      { text: 'Parcelamento em até 3x sem juros', included: true },
     ],
   },
   prata: {
     tier: 'prata',
     name: 'Plano Prata',
-    tagline: 'Visibilidade destacada, mídia, vídeos e cupons',
+    tagline: 'Excelente visibilidade comercial e mídias',
     currency: 'BRL',
-    annualPriceCents: 80000,   // R$ 800,00
-    monthlyPriceCents: 8000,   // R$ 80,00
+    annualPriceCents: 178800,
+    monthlyPriceCents: 14900,
     badge: 'Mais Escolhido',
     isPopular: true,
+    installmentsMax: 6,
     features: [
-      { text: 'Tudo do Bronze + 3 fotos', included: true },
-      { text: 'Catálogo: até 20 itens (marketplace)', included: true },
-      { text: 'Mídia (vídeos / PDF) e cupons', included: true },
-      { text: 'Posicionamento relevante nas buscas', included: true },
-      { text: 'Selo de verificação Ouro', included: false },
+      { text: 'Destaque no Guia Comercial', included: true },
+      { text: 'Até 6 Fotos na Galeria', included: true },
+      { text: 'Até 5 Serviços cadastrados', included: true },
+      { text: 'Até 3 Ofertas/Benefícios ativos', included: true },
+      { text: 'Publicação de Eventos e Comunicados', included: true },
+      { text: 'Parcelamento em até 6x sem juros', included: true },
     ],
   },
   ouro: {
     tier: 'ouro',
     name: 'Plano Ouro',
-    tagline: 'Topo das buscas, banner rotativo e prioridade máxima',
+    tagline: 'Máxima presença, topo do guia e analytics',
     currency: 'BRL',
-    annualPriceCents: 100000,  // R$ 1.000,00
-    monthlyPriceCents: 10000,  // R$ 100,00
+    annualPriceCents: 238800,
+    monthlyPriceCents: 19900,
     badge: 'Máxima Visibilidade',
+    installmentsMax: 12,
     features: [
-      { text: 'Tudo do Prata + 5 fotos / vídeo', included: true },
-      { text: 'Catálogo ilimitado (marketplace)', included: true },
-      { text: 'Banner rotativo na home', included: true },
-      { text: 'Prioridade máxima + leads prioritários', included: true },
-      { text: 'Selo de verificação Ouro', included: true },
+      { text: 'Topo das Buscas e Maior Destaque', included: true },
+      { text: 'Até 10 Fotos na Galeria', included: true },
+      { text: 'Até 10 Serviços cadastrados', included: true },
+      { text: 'Até 5 Ofertas/Benefícios ativos', included: true },
+      { text: 'Publicação Ilimitada de Eventos', included: true },
+      { text: 'Analytics Avançado (7, 30 e 90 dias)', included: true },
+      { text: 'Parcelamento em até 12x sem juros', included: true },
     ],
   },
 };
 
 export async function fetchTenantPlans(
   supabase: SupabaseClient,
-  tenantId?: string | null
+  _tenantId?: string | null
 ): Promise<CommercialPlan[]> {
   const defaultList: CommercialPlan[] = [
     { id: 'plan-bronze', ...CANONICAL_PLANS.bronze },
@@ -99,36 +106,40 @@ export async function fetchTenantPlans(
     { id: 'plan-ouro', ...CANONICAL_PLANS.ouro },
   ];
 
-  if (!tenantId) {
+  // Busca regras financeiras e apresentação comercial da fonte única (plan_payment_rules)
+  const { data: rulesData, error } = await supabase
+    .from('plan_payment_rules')
+    .select('plan_code, amount_cents, installments_max, interest_free_installments, title, slogan, is_popular, commercial_features')
+    .in('plan_code', ['bronze', 'prata', 'ouro']);
+
+  if (error) {
+    // Retorna defaults se tabela ainda não tiver dados
     return defaultList;
   }
 
-  // Consulta ao Supabase
-  const { data: tenantPlansData, error } = await supabase
-    .from('tenant_plans')
-    .select('id, tier, price_annual')
-    .eq('tenant_id', tenantId);
-
-  // Erro de infraestrutura/banco ➔ lança exceção (NÃO esconde falha com fallback silencioso)
-  if (error) {
-    throw new Error(`INFRASTRUCTURE_ERROR: Falha ao carregar planos do banco de dados: ${error.message}`);
-  }
-
-  // Ausência legítima de customização do tenant ➔ retorna catálogo canônico
-  if (!tenantPlansData || tenantPlansData.length === 0) {
+  if (!rulesData || rulesData.length === 0) {
     return defaultList;
   }
 
   return defaultList.map((plan) => {
-    const dbPlan = tenantPlansData.find((tp) => tp.tier === plan.tier);
-    if (dbPlan && typeof dbPlan.price_annual === 'number') {
-      const annualCents = Math.round(dbPlan.price_annual * 100);
-      const monthlyCents = Math.round(annualCents / 10);
+    const dbRule = rulesData.find((r) => r.plan_code === plan.tier);
+    if (dbRule) {
+      const annualCents = dbRule.amount_cents ?? plan.annualPriceCents;
+      const monthlyCents = Math.round(annualCents / 12);
+      const customFeatures: PlanFeature[] =
+        dbRule.commercial_features && dbRule.commercial_features.length > 0
+          ? dbRule.commercial_features.map((f: string) => ({ text: f, included: true }))
+          : plan.features;
+
       return {
         ...plan,
-        id: typeof dbPlan.id === 'string' ? dbPlan.id : plan.id,
+        name: dbRule.title || plan.name,
+        tagline: dbRule.slogan || plan.tagline,
         annualPriceCents: annualCents,
         monthlyPriceCents: monthlyCents,
+        isPopular: dbRule.is_popular ?? plan.isPopular,
+        installmentsMax: dbRule.installments_max ?? plan.installmentsMax,
+        features: customFeatures,
       };
     }
     return plan;

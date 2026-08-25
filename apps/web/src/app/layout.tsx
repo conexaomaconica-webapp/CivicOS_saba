@@ -1,9 +1,16 @@
+import { Inter } from 'next/font/google';
 import { Providers } from './Providers';
 import { getBootData } from '../runtime/server-kernel';
 import { generateRootMetadata } from '@/lib/seo/root-metadata';
 import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import '@saas/ui/tokens.css';
 import './globals.css';
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-sans',
+});
 
 export const generateMetadata = generateRootMetadata;
 
@@ -18,6 +25,7 @@ export default async function RootLayout({
   return (
     <html
       lang="pt-BR"
+      className={inter.variable}
       data-theme={brand.colorMode === 'dark' ? 'dark' : undefined}
       suppressHydrationWarning
     >
@@ -37,7 +45,7 @@ export default async function RootLayout({
           />
         ) : null}
       </head>
-      <body>
+      <body className="min-h-screen font-sans antialiased">
         <Providers bootData={bootData}>{children}</Providers>
       </body>
     </html>

@@ -9,14 +9,29 @@ CREATE TABLE IF NOT EXISTS public.business_reviews (
     author_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
     comment TEXT,
-    status VARCHAR(30) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'hidden')),
-    moderated_at TIMESTAMPTZ,
-    moderator_id UUID REFERENCES public.profiles(id),
-    rejection_reason TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT unique_review_per_author_business UNIQUE (tenant_id, business_id, author_id)
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Rename user_id to author_id if it was created from earlier migrations (like 003)
+DO $$ 
+BEGIN 
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name = 'business_reviews' AND column_name = 'user_id') THEN 
+    ALTER TABLE public.business_reviews RENAME COLUMN user_id TO author_id; 
+  END IF; 
+END $$;
+
+-- Ensure the table has the required moderation columns (in case it was created in 003)
+ALTER TABLE public.business_reviews 
+    ADD COLUMN IF NOT EXISTS status VARCHAR(30) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'hidden')),
+    ADD COLUMN IF NOT EXISTS moderated_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS moderator_id UUID REFERENCES public.profiles(id),
+    ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+
+-- Drop existing unique constraints if they differ, then add the correct one
+ALTER TABLE public.business_reviews DROP CONSTRAINT IF EXISTS unique_review_per_author_business;
+ALTER TABLE public.business_reviews ADD CONSTRAINT unique_review_per_author_business UNIQUE (tenant_id, business_id, author_id);
+
 
 CREATE INDEX IF NOT EXISTS idx_business_reviews_business_status ON public.business_reviews (tenant_id, business_id, status);
 CREATE INDEX IF NOT EXISTS idx_business_reviews_author ON public.business_reviews (tenant_id, author_id);

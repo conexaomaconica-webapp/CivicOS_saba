@@ -4,7 +4,7 @@ import { PlanEntitlementsManager } from '@/components/admin/PlanEntitlementsMana
 import { redirect } from 'next/navigation';
 
 export const metadata = {
-  title: 'Gestão de Planos - Admin | Conexão Maçônica',
+  title: 'Central Comercial de Planos — Admin | Conexão Maçônica',
 };
 
 export default async function AdminPlanosPage() {
@@ -14,10 +14,10 @@ export default async function AdminPlanosPage() {
     if (result.error?.includes('não autenticado')) {
       redirect('/login');
     }
-    
+
     return (
       <div className="p-8 max-w-5xl mx-auto">
-        <div className="bg-rose-50 text-rose-800 p-6 rounded-lg border border-rose-200">
+        <div className="bg-rose-50 text-rose-800 p-6 rounded-2xl border border-rose-200">
           <h2 className="text-lg font-bold mb-2">Erro de Acesso</h2>
           <p>{result.error}</p>
         </div>
@@ -26,13 +26,22 @@ export default async function AdminPlanosPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-          Planos e limites
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <div className="border-b border-stone-200 pb-4">
+        <div className="flex items-center gap-2">
+          <span className="px-2.5 py-0.5 rounded-full bg-[#3B0B14] text-[#C9A227] font-bold text-[10px] uppercase tracking-wider">
+            Gestão Comercial
+          </span>
+          <span className="text-xs text-stone-500 font-semibold">
+            Fonte Única de Dados dos Planos
+          </span>
+        </div>
+
+        <h1 className="text-2xl font-serif font-bold text-stone-900 mt-1">
+          Central Comercial de Planos & Benefícios
         </h1>
-        <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 max-w-3xl">
-          Configure os limites de recursos disponibilizados para cada plano. Alterações passam a valer imediatamente para todos os anunciantes vinculados ao respectivo plano.
+        <p className="text-xs text-stone-600 mt-1 max-w-3xl leading-relaxed">
+          Configure a identidade comercial, slogans, preços anuais em BRL, regras de parcelamento Asaas e cotas numéricas dos planos <strong>Bronze, Prata e Ouro</strong>. As alterações alimentam diretamente o onboarding dos novos anunciantes.
         </p>
       </div>
 

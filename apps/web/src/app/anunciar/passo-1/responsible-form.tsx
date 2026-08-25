@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { ArrowRight, Loader2 } from 'lucide-react';
 import {
   validateResponsibleStep,
   hasResponsibleStepErrors,
@@ -24,66 +25,9 @@ import {
   loadResponsibleDraft,
 } from '@/lib/onboarding/responsible-flow';
 
-const FIELD_ERROR_STYLE = {
-  marginTop: 'var(--space-1)',
-  fontSize: 'var(--text-xs)',
-  color: 'var(--color-error-500)',
-  fontWeight: 'var(--font-weight-medium)',
-} as const;
-
-const INPUT_STYLE = {
-  padding: 'var(--space-3)',
-  borderRadius: 'var(--radius-md)',
-  border: '1px solid var(--border-default)',
-  backgroundColor: 'var(--bg-tertiary)',
-  color: 'var(--text-primary)',
-  fontSize: 'var(--text-sm)',
-  outline: 'none',
-} as const;
-
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
-  return <span style={FIELD_ERROR_STYLE}>{message}</span>;
-}
-
-function RadioOption({
-  name,
-  value,
-  checked,
-  label,
-  onChange,
-}: {
-  name: string;
-  value: string;
-  checked: boolean;
-  label: string;
-  onChange: () => void;
-}) {
-  return (
-    <label
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--space-2)',
-        padding: 'var(--space-3)',
-        backgroundColor: checked ? 'var(--accent-subtle)' : 'var(--bg-tertiary)',
-        border: `1px solid ${checked ? 'var(--accent)' : 'var(--border-default)'}`,
-        borderRadius: 'var(--radius-md)',
-        cursor: 'pointer',
-        fontSize: 'var(--text-sm)',
-        color: 'var(--text-primary)',
-      }}
-    >
-      <input
-        type="radio"
-        name={name}
-        value={value}
-        checked={checked}
-        onChange={onChange}
-      />
-      <span>{label}</span>
-    </label>
-  );
+  return <span className="text-[11px] font-bold text-red-400 mt-1 block">{message}</span>;
 }
 
 export interface ResponsibleFormProps {
@@ -124,11 +68,7 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
   }, []);
 
   const updateField = (field: 'name' | 'email' | 'relationship', value: string) => {
-    const next: {
-      name: string;
-      email: string;
-      relationship: ResponsibleRelationship | '';
-    } = { name, email, relationship };
+    const next = { name, email, relationship };
     if (field === 'name') {
       next.name = value;
       setName(value);
@@ -197,37 +137,17 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--space-4)',
-        padding: 'var(--space-5)',
-        backgroundColor: 'var(--bg-secondary)',
-        border: '1px solid var(--border-default)',
-        borderRadius: 'var(--radius-lg)',
-      }}
-    >
+    <form onSubmit={handleSubmit} className="space-y-5 text-left">
       {errorMsg && (
-        <div
-          role="alert"
-          style={{
-            padding: 'var(--space-3)',
-            backgroundColor: 'oklch(0.95 0.05 25 / 0.1)',
-            border: '1px solid var(--color-error-500)',
-            borderRadius: 'var(--radius-md)',
-            color: 'var(--color-error-500)',
-            fontSize: 'var(--text-sm)',
-          }}
-        >
+        <div className="p-3 bg-red-950/80 border border-red-500/50 rounded-xl text-red-200 text-xs font-semibold">
           {errorMsg}
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-        <label htmlFor="name" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-secondary)' }}>
-          Nome Completo
+      {/* Nome Completo */}
+      <div className="space-y-1">
+        <label htmlFor="name" className="block text-xs font-bold text-stone-200">
+          Nome Completo do Responsável Legal
         </label>
         <input
           id="name"
@@ -235,171 +155,198 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
           value={name}
           onChange={(e) => updateField('name', e.target.value)}
           placeholder="Seu nome completo"
-          style={INPUT_STYLE}
+          className="w-full px-3 py-2.5 bg-[#1f0509]/80 border border-[#C9A227]/40 rounded-xl text-xs text-white placeholder-stone-500 outline-none focus:border-[#C9A227] focus:ring-1 focus:ring-[#C9A227]"
         />
         <FieldError message={errors.name} />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-        <label htmlFor="email" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-secondary)' }}>
-          E-mail
+      {/* E-mail */}
+      <div className="space-y-1">
+        <label htmlFor="email" className="block text-xs font-bold text-stone-200">
+          E-mail de Contato Comercial
         </label>
         <input
           id="email"
           type="email"
           value={email}
           onChange={(e) => updateField('email', e.target.value)}
-          placeholder="voce@exemplo.com"
-          style={INPUT_STYLE}
+          placeholder="voce@exemplo.com.br"
+          className="w-full px-3 py-2.5 bg-[#1f0509]/80 border border-[#C9A227]/40 rounded-xl text-xs text-white placeholder-stone-500 outline-none focus:border-[#C9A227] focus:ring-1 focus:ring-[#C9A227]"
         />
         <FieldError message={errors.email} />
       </div>
 
-      <fieldset style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', border: 'none', padding: 0 }}>
-        <legend style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-secondary)', marginBottom: 'var(--space-2)' }}>
-          Qual sua relação com a empresa?
+      {/* Relação com a Empresa */}
+      <fieldset className="space-y-2 border-0 p-0 m-0">
+        <legend className="text-xs font-bold text-stone-200 mb-1">
+          Qual sua relação com a empresa comercial?
         </legend>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-          {(Object.keys(RESPONSIBLE_RELATIONSHIP_LABELS) as ResponsibleRelationship[]).map((value) => (
-            <RadioOption
-              key={value}
-              name="relationship"
-              value={value}
-              checked={relationship === value}
-              label={RESPONSIBLE_RELATIONSHIP_LABELS[value]}
-              onChange={() => updateField('relationship', value)}
-            />
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {(Object.keys(RESPONSIBLE_RELATIONSHIP_LABELS) as ResponsibleRelationship[]).map((value) => {
+            const isChecked = relationship === value;
+            return (
+              <label
+                key={value}
+                className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                  isChecked
+                    ? 'bg-[#3B0B14] text-[#C9A227] border-[#C9A227] shadow-sm'
+                    : 'bg-[#1f0509]/60 text-stone-300 border-stone-800 hover:border-stone-700'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="relationship"
+                  value={value}
+                  checked={isChecked}
+                  onChange={() => updateField('relationship', value)}
+                  className="accent-[#C9A227]"
+                />
+                <span>{RESPONSIBLE_RELATIONSHIP_LABELS[value]}</span>
+              </label>
+            );
+          })}
         </div>
         <FieldError message={errors.relationship} />
       </fieldset>
 
-      <fieldset style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', border: 'none', padding: 0 }}>
-        <legend
-          style={{
-            fontSize: 'var(--text-xs)',
-            fontWeight: 'var(--font-weight-bold)',
-            color: 'var(--text-secondary)',
-            marginBottom: 'var(--space-1)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-          }}
-        >
-          Vínculo com a Maçonaria
-        </legend>
-        <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
-          Sua declaração é usada para habilitar o Selo de Membro Maçônico e validar
-          o vínculo fraterno da empresa (CRIT-VSC-003).
-        </p>
+      {/* Vínculo com a Maçonaria */}
+      <fieldset className="space-y-3 pt-3 border-t border-[#C9A227]/20 m-0">
+        <div>
+          <legend className="text-xs font-bold text-[#C9A227] uppercase tracking-wider block">
+            Vínculo com a Comunidade Maçônica
+          </legend>
+          <p className="text-[11px] text-stone-400 mt-0.5">
+            Sua declaração habilita os selos de credibilidade e a validação do anúncio no Guia Comercial.
+          </p>
+        </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-          {MASONIC_STATUS_OPTIONS.map((status) => (
-            <RadioOption
-              key={status}
-              name="masonicStatus"
-              value={status}
-              checked={masonic.status === status}
-              label={MASONIC_STATUS_LABELS[status]}
-              onChange={() => updateMasonic({ status })}
-            />
-          ))}
+        <div className="space-y-2">
+          {MASONIC_STATUS_OPTIONS.map((statusOption) => {
+            const isChecked = masonic.status === statusOption;
+            return (
+              <label
+                key={statusOption}
+                className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                  isChecked
+                    ? 'bg-[#3B0B14] text-[#C9A227] border-[#C9A227] shadow-sm'
+                    : 'bg-[#1f0509]/60 text-stone-300 border-stone-800 hover:border-stone-700'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="masonicStatus"
+                  value={statusOption}
+                  checked={isChecked}
+                  onChange={() => updateMasonic({ status: statusOption })}
+                  className="accent-[#C9A227]"
+                />
+                <span>{MASONIC_STATUS_LABELS[statusOption]}</span>
+              </label>
+            );
+          })}
         </div>
         <FieldError message={masonicErrors.status} />
 
+        {/* Autorização LGPD Maçônica */}
         {masonic.status && masonic.status !== 'none' && (
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 'var(--space-2)',
-              padding: 'var(--space-3)',
-              backgroundColor: masonic.masonicConsent ? 'var(--accent-subtle)' : 'var(--bg-tertiary)',
-              border: `1px solid ${masonic.masonicConsent ? 'var(--accent)' : 'var(--border-default)'}`,
-              borderRadius: 'var(--radius-md)',
-              cursor: 'pointer',
-              fontSize: 'var(--text-xs)',
-              color: 'var(--text-primary)',
-              lineHeight: 1.5,
-            }}
-          >
+          <label className="flex items-start gap-2.5 p-3 bg-stone-900/90 border border-stone-700 rounded-xl text-xs text-stone-300 cursor-pointer">
             <input
               type="checkbox"
               name="masonicConsent"
               checked={masonic.masonicConsent === true}
               onChange={(e) => updateMasonic({ masonicConsent: e.target.checked })}
-              style={{ marginTop: 'var(--space-1)' }}
+              className="accent-[#C9A227] mt-0.5"
             />
-            <span>
-              Autorizo o tratamento dos meus dados maçônicos (vínculo, loja, CIMB e status de
-              membro — dado pessoal sensível) pela Conexão Maçônica para verificação fraterna,
-              emissão do selo e operação do guia, conforme a{' '}
-              <strong>Política de Privacidade v1.0</strong>. Entendo que posso revogar este
-              consentimento a qualquer momento na tela de Privacidade do meu perfil.
+            <span className="text-[11px] leading-relaxed">
+              Autorizo o tratamento dos meus dados maçônicos (vínculo, loja e status de membro) pela Conexão Maçônica para verificação fraterna e emissão dos selos do guia comercial, conforme a{' '}
+              <strong className="text-[#C9A227]">Política de Privacidade v1.0</strong>.
             </span>
           </label>
         )}
         <FieldError message={masonicErrors.consent} />
 
+        {/* Detalhes para Irmão Maçom */}
         {masonic.status === 'mason' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-              <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-secondary)' }}>
-                Você está ativo na Ordem?
-              </span>
-              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                <RadioOption
-                  name="masonicActive"
-                  value="true"
-                  checked={masonic.isActive === true}
-                  label="Sim, ativo"
-                  onChange={() => updateMasonic({ isActive: true })}
-                />
-                <RadioOption
-                  name="masonicActive"
-                  value="false"
-                  checked={masonic.isActive === false}
-                  label="Não ativo / pendente"
-                  onChange={() => updateMasonic({ isActive: false })}
-                />
+          <div className="space-y-3 p-3.5 bg-stone-950/80 border border-stone-800 rounded-2xl">
+            <div className="space-y-1">
+              <span className="block text-xs font-bold text-stone-300">Você está ativo na Ordem?</span>
+              <div className="flex gap-2">
+                <label
+                  className={`flex-1 flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                    masonic.isActive === true
+                      ? 'bg-[#3B0B14] text-[#C9A227] border-[#C9A227]'
+                      : 'bg-stone-900 text-stone-400 border-stone-800'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="masonicActive"
+                    value="true"
+                    checked={masonic.isActive === true}
+                    onChange={() => updateMasonic({ isActive: true })}
+                    className="hidden"
+                  />
+                  <span>Sim, ativo</span>
+                </label>
+
+                <label
+                  className={`flex-1 flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                    masonic.isActive === false
+                      ? 'bg-[#3B0B14] text-[#C9A227] border-[#C9A227]'
+                      : 'bg-stone-900 text-stone-400 border-stone-800'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="masonicActive"
+                    value="false"
+                    checked={masonic.isActive === false}
+                    onChange={() => updateMasonic({ isActive: false })}
+                    className="hidden"
+                  />
+                  <span>Não ativo / pendente</span>
+                </label>
               </div>
               <FieldError message={masonicErrors.isActive} />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-              <label htmlFor="cimb" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-secondary)' }}>
-                CIMB — Carteira de Identificação Maçônica
+            {/* CIMB (OPCIONAL) */}
+            <div className="space-y-1">
+              <label htmlFor="cimb" className="block text-xs font-bold text-stone-300">
+                CIMB — Carteira de Identificação Maçônica <span className="text-amber-400 font-normal">(Opcional)</span>
               </label>
               <input
                 id="cimb"
                 type="text"
-                inputMode="numeric"
                 value={masonic.cimbCode}
                 onChange={(e) => updateMasonic({ cimbCode: e.target.value })}
-                placeholder="Número do CIMB"
-                style={INPUT_STYLE}
+                placeholder="Número do CIMB (opcional)"
+                className="w-full px-3 py-2.5 bg-[#1f0509] border border-stone-700 rounded-xl text-xs text-white placeholder-stone-500 outline-none focus:border-[#C9A227]"
               />
               <FieldError message={masonicErrors.cimbCode} />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-              <label htmlFor="lodge" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-secondary)' }}>
-                Loja Maçônica (opcional)
+            {/* Loja Maçônica */}
+            <div className="space-y-1">
+              <label htmlFor="lodge" className="block text-xs font-bold text-stone-300">
+                Loja Maçônica Simbólica (opcional)
               </label>
               <input
                 id="lodge"
                 type="text"
                 value={masonic.lodgeName}
                 onChange={(e) => updateMasonic({ lodgeName: e.target.value })}
-                placeholder="Nome da Loja"
-                style={INPUT_STYLE}
+                placeholder="Ex: Loja Simbólica 13 de Maio (Nº 450)"
+                className="w-full px-3 py-2.5 bg-[#1f0509] border border-stone-700 rounded-xl text-xs text-white placeholder-stone-500 outline-none focus:border-[#C9A227]"
               />
             </div>
           </div>
         )}
 
+        {/* Detalhes para Cunhada */}
         {masonic.status === 'mason_wife' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-            <label htmlFor="spouse" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-secondary)' }}>
+          <div className="space-y-1 p-3.5 bg-stone-950/80 border border-stone-800 rounded-2xl">
+            <label htmlFor="spouse" className="block text-xs font-bold text-stone-300">
               Nome do marido maçom
             </label>
             <input
@@ -408,15 +355,16 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
               value={masonic.spouseMasonName}
               onChange={(e) => updateMasonic({ spouseMasonName: e.target.value })}
               placeholder="Nome completo do marido maçom"
-              style={INPUT_STYLE}
+              className="w-full px-3 py-2.5 bg-[#1f0509] border border-stone-700 rounded-xl text-xs text-white placeholder-stone-500 outline-none focus:border-[#C9A227]"
             />
             <FieldError message={masonicErrors.spouseMasonName} />
           </div>
         )}
 
+        {/* Detalhes para DeMolay / Filha de Jó */}
         {(masonic.status === 'demolay' || masonic.status === 'job_daughter') && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-            <label htmlFor="chapter" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-secondary)' }}>
+          <div className="space-y-1 p-3.5 bg-stone-950/80 border border-stone-800 rounded-2xl">
+            <label htmlFor="chapter" className="block text-xs font-bold text-stone-300">
               {masonic.status === 'demolay' ? 'Capítulo DeMolay' : 'Capítulo / Beth-El (Filha de Jó)'}
             </label>
             <input
@@ -425,35 +373,35 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
               value={masonic.chapterName}
               onChange={(e) => updateMasonic({ chapterName: e.target.value })}
               placeholder="Nome do Capítulo"
-              style={INPUT_STYLE}
+              className="w-full px-3 py-2.5 bg-[#1f0509] border border-stone-700 rounded-xl text-xs text-white placeholder-stone-500 outline-none focus:border-[#C9A227]"
             />
             <FieldError message={masonicErrors.chapterName} />
           </div>
         )}
       </fieldset>
 
+      {/* Botão de Continuar */}
       <button
         type="submit"
         disabled={loading}
-        style={{
-          marginTop: 'var(--space-2)',
-          padding: 'var(--space-3)',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: loading ? 'var(--accent-subtle)' : 'var(--accent)',
-          color: 'var(--text-inverse)',
-          fontWeight: 'var(--font-weight-semibold)',
-          fontSize: 'var(--text-sm)',
-          border: 'none',
-          cursor: loading ? 'not-allowed' : 'pointer',
-          transition: 'background-color var(--duration-fast) var(--ease-default)',
-        }}
+        className="w-full py-3 bg-gradient-to-r from-[#3B0B14] to-[#4B161B] hover:from-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl border border-[#C9A227]/60 shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer mt-3"
       >
-        {loading ? 'Salvando...' : authenticated ? 'Continuar · Dados da Empresa' : 'Continuar · Criar minha conta'}
+        {loading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin text-[#C9A227]" />
+            <span>Salvando dados...</span>
+          </>
+        ) : (
+          <>
+            <span>{authenticated ? 'Continuar · Dados da Empresa' : 'Continuar · Criar minha conta'}</span>
+            <ArrowRight className="w-4 h-4" />
+          </>
+        )}
       </button>
 
-      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+      <p className="text-[11px] text-stone-400 text-center">
         {authenticated
-          ? 'Seus dados serão vinculados como responsáveis pelo anúncio (titular da empresa).'
+          ? 'Seus dados serão vinculados como responsável legal pelo anúncio da empresa.'
           : 'Ao continuar você criará sua conta e retornará para esta etapa automaticamente.'}
       </p>
     </form>

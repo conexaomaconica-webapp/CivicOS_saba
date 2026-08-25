@@ -1,8 +1,9 @@
 import React from 'react';
 import type { Metadata } from 'next';
+import Image from 'next/image';
 
 export const metadata: Metadata = {
-  title: 'Entrar na Plataforma',
+  title: 'Entrar · Conexão Maçônica',
   robots: { index: false, follow: false },
 };
 
@@ -12,112 +13,30 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        minHeight: '100vh',
-        width: '100%',
-        backgroundColor: 'var(--bg-primary)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-        overflow: 'hidden',
-        padding: 'var(--space-4)',
-      }}
-    >
-      {/* Background soft glowing ambient shapes */}
-      <div
-        style={{
-          position: 'absolute',
-          width: '40vw',
-          height: '40vw',
-          borderRadius: 'var(--radius-full)',
-          background: 'radial-gradient(circle, var(--color-primary-200) 0%, transparent 70%)',
-          top: '-10%',
-          left: '-10%',
-          opacity: 0.3,
-          zIndex: 1,
-          pointerEvents: 'none',
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          width: '50vw',
-          height: '50vw',
-          borderRadius: 'var(--radius-full)',
-          background: 'radial-gradient(circle, var(--color-primary-300) 0%, transparent 80%)',
-          bottom: '-15%',
-          right: '-15%',
-          opacity: 0.25,
-          zIndex: 1,
-          pointerEvents: 'none',
-        }}
-      />
+    <div className="min-h-screen w-full bg-[#1f0509] flex items-center justify-center p-4 relative overflow-hidden font-sans">
+      {/* Luzes de fundo com brilho sutil em Bordô e Dourado */}
+      <div className="absolute w-[50vw] h-[50vw] rounded-full bg-gradient-to-r from-[#4B161B]/40 to-transparent top-[-10%] left-[-10%] blur-3xl pointer-events-none" />
+      <div className="absolute w-[50vw] h-[50vw] rounded-full bg-gradient-to-l from-[#C9A227]/15 to-transparent bottom-[-10%] right-[-10%] blur-3xl pointer-events-none" />
 
-      {/* Main glassmorphism card container */}
-      <div
-        style={{
-          width: '100%',
-          maxWidth: '28rem',
-          backgroundColor: 'var(--bg-secondary)',
-          border: '1px solid var(--border-default)',
-          borderRadius: 'var(--radius-xl)',
-          boxShadow: 'var(--shadow-xl)',
-          padding: 'var(--space-8) var(--space-6)',
-          zIndex: 10,
-          position: 'relative',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--space-6)',
-          backdropFilter: 'blur(8px)',
-        }}
-      >
-        {/* White-label Logo header placeholder */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 'var(--space-2)',
-            textAlign: 'center',
-          }}
-        >
-          <div
-            style={{
-              width: '3.5rem',
-              height: '3.5rem',
-              background: 'linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700))',
-              borderRadius: 'var(--radius-lg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-inverse)',
-              fontWeight: 'var(--font-weight-bold)',
-              fontSize: 'var(--text-2xl)',
-              boxShadow: 'var(--shadow-md)',
-            }}
-          >
-            C
+      {/* Card Principal em Glassmorphism da Conexão Maçônica */}
+      <div className="w-full max-w-md bg-[#2b060d]/90 border border-[#C9A227]/30 rounded-3xl shadow-2xl p-6 sm:p-8 relative z-10 backdrop-blur-md flex flex-col gap-6 text-white">
+        {/* Cabeçalho de Identidade da Marca Conexão Maçônica */}
+        <div className="flex flex-col items-center text-center gap-2">
+          <div className="w-16 h-16 rounded-2xl bg-[#3B0B14] border border-[#C9A227]/50 flex items-center justify-center p-2 shadow-lg mb-1">
+            <Image
+              src="/logoconexao_red_vert.png"
+              alt="Conexão Maçônica Logo"
+              width={48}
+              height={48}
+              className="object-contain"
+              priority
+            />
           </div>
-          <h2
-            style={{
-              fontSize: 'var(--text-2xl)',
-              fontWeight: 'var(--font-weight-bold)',
-              color: 'var(--text-primary)',
-              letterSpacing: 'var(--tracking-tight)',
-              marginTop: 'var(--space-2)',
-            }}
-          >
-            CivicOS
-          </h2>
-          <p
-            style={{
-              fontSize: 'var(--text-sm)',
-              color: 'var(--text-secondary)',
-            }}
-          >
-            Sua comunidade, seu ecossistema.
+          <h1 className="font-serif font-bold text-2xl tracking-tight text-[#FAF7F2]">
+            Conexão Maçônica
+          </h1>
+          <p className="text-xs text-amber-200/80 font-medium">
+            Portal de Negócios & Governança da Plataforma
           </p>
         </div>
 

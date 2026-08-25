@@ -48,10 +48,10 @@ export function DirectoryHeader({
           <Link href="/guia/empresas" className="dh-header__link">
             Empresas
           </Link>
-          <Link href="/guia#beneficios" className="dh-header__link">
+          <Link href="/guia/beneficios" className="dh-header__link">
             Benefícios
           </Link>
-          <Link href="/guia#eventos" className="dh-header__link">
+          <Link href="/guia/eventos" className="dh-header__link">
             Eventos
           </Link>
           <Link href="/guia/lojas" className="dh-header__link">
@@ -98,7 +98,7 @@ export function DirectoryHeader({
           </button>
           
           <Link
-            href="/auth/login"
+            href="/login"
             className="flex items-center gap-2 bg-amber-600/30 hover:bg-amber-600/50 text-white text-xs font-semibold px-3.5 py-1.5 rounded-full border border-amber-500/40 shadow-sm backdrop-blur-sm transition-colors"
           >
             <User className="w-4 h-4 text-amber-400" />

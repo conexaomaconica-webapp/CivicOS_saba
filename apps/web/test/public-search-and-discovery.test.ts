@@ -88,4 +88,51 @@ describe('BLOCO 3: Public Search & Discovery RPC', () => {
     expect(scored[0].score).toBe(90);
     expect(scored[1].score).toBe(75);
   });
+
+  it('filters businesses by p_slugs in batch query for favorites', () => {
+    const candidates = [
+      { id: '1', slug: 'empresa-a', name: 'Empresa A', publication_status: 'published', is_active: true },
+      { id: '2', slug: 'empresa-b', name: 'Empresa B', publication_status: 'published', is_active: true },
+      { id: '3', slug: 'empresa-c', name: 'Empresa C', publication_status: 'published', is_active: true },
+    ];
+
+    const pSlugs = ['empresa-a', 'EMPRESA-B'];
+    const pSlugsLower = pSlugs.map((s) => s.toLowerCase());
+
+    const result = candidates.filter(
+      (c) => c.is_active && c.publication_status === 'published' && pSlugsLower.includes(c.slug.toLowerCase())
+    );
+
+    expect(result).toHaveLength(2);
+    expect(result.map((r) => r.slug)).toEqual(['empresa-a', 'empresa-b']);
+  });
+
+  it('handles mixed p_slugs lookup with valid and unavailable/deleted slugs', () => {
+    const publishedBusinesses = [
+      { id: '1', slug: 'empresa-a', name: 'Empresa A', category_name: 'Serviços', city: 'São Paulo' },
+    ];
+
+    const favoriteSlugs = ['empresa-a', 'slug-inexistente-ou-despublicado'];
+
+    const itemMap = new Map<string, typeof publishedBusinesses[number]>();
+    publishedBusinesses.forEach((b) => itemMap.set(b.slug.toLowerCase(), b));
+
+    const modalItems = favoriteSlugs.map((slug) => {
+      const found = itemMap.get(slug.toLowerCase());
+      if (found) return { ...found, isUnavailable: false };
+      return {
+        id: slug,
+        slug: slug,
+        name: slug.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+        category_name: 'Empresa indisponível',
+        isUnavailable: true,
+      };
+    });
+
+    expect(modalItems).toHaveLength(2);
+    expect(modalItems[0].isUnavailable).toBe(false);
+    expect(modalItems[0].name).toBe('Empresa A');
+    expect(modalItems[1].isUnavailable).toBe(true);
+    expect(modalItems[1].category_name).toBe('Empresa indisponível');
+  });
 });

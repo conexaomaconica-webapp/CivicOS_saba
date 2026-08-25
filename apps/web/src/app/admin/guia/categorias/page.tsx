@@ -46,7 +46,7 @@ export default function AdminGuiaCategoriasPage() {
   const fetchData = async () => {
     try {
       const supabase = createClient();
-      const { data: profileData } = await (supabase as any).from('user_profiles').select('tenant_id').maybeSingle();
+      const { data: profileData } = await (supabase as any).from('profiles').select('tenant_id').maybeSingle();
       const tid = profileData?.tenant_id || '00000000-0000-0000-0000-000000000010';
       setTenantId(tid);
 

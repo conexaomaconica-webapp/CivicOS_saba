@@ -1,237 +1,342 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
-import { Landmark, Plus, Upload, Search, Edit, Trash2, Eye, EyeOff, Loader2, Scroll } from 'lucide-react';
+import {
+  Compass,
+  Search,
+  Filter,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
+import { getAdminLodgesListAction } from '@/lib/admin/admin-lodges-service';
 
-type LodgeItem = {
-  id: string;
-  slug?: string | null;
-  name: string;
-  code_number?: number | null;
-  potency?: string | null;
-  rite?: string | null;
-  city?: string | null;
-  state?: string | null;
-  worshipful_master_name?: string | null;
-  is_published: boolean;
-  is_featured: boolean;
-  created_at: string;
+export const metadata = {
+  title: 'Diretório de Lojas Maçônicas · Admin CM',
 };
 
-export default function AdminLojasPage() {
-  const [loading, setLoading] = useState(true);
-  const [lodges, setLodges] = useState<LodgeItem[]>([]);
-  const [search, setSearch] = useState('');
+type AdminLojasPageProps = {
+  searchParams: Promise<{
+    q?: string;
+    state?: string;
+    potency?: string;
+    status?: string;
+    missingCoords?: string;
+    missingEmblem?: string;
+    page?: string;
+  }>;
+};
 
-  const fetchLodges = async () => {
-    try {
-      const supabase = createClient();
-      const { data: profileData } = await (supabase as any).from('user_profiles').select('tenant_id').maybeSingle();
-      const tid = profileData?.tenant_id || '00000000-0000-0000-0000-000000000010';
+export default async function AdminLojasPage({ searchParams }: AdminLojasPageProps) {
+  const resolvedParams = await searchParams;
+  const q = resolvedParams.q || '';
+  const state = resolvedParams.state || 'all';
+  const potency = resolvedParams.potency || 'all';
+  const status = resolvedParams.status || 'all';
+  const missingCoords = resolvedParams.missingCoords === 'true';
+  const missingEmblem = resolvedParams.missingEmblem === 'true';
+  const page = parseInt(resolvedParams.page || '1', 10);
 
-      const { data, error } = await (supabase as any)
-        .from('organizations')
-        .select('*')
-        .eq('tenant_id', tid)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setLodges((data as LodgeItem[]) || []);
-    } catch (err) {
-      console.error('Erro ao buscar lojas:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchLodges();
-  }, []);
-
-  const handleTogglePublished = async (id: string, currentStatus: boolean) => {
-    try {
-      const supabase = createClient();
-      await (supabase as any).from('organizations').update({ is_published: !currentStatus }).eq('id', id);
-      fetchLodges();
-    } catch (err) {
-      console.error('Erro ao alterar status:', err);
-    }
-  };
-
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Deseja excluir a loja "${name}"? Esta ação removerá a loja, contatos e reuniões associados.`)) return;
-    try {
-      const supabase = createClient();
-      await (supabase as any).from('organizations').delete().eq('id', id);
-      fetchLodges();
-    } catch (err) {
-      console.error('Erro ao excluir loja:', err);
-    }
-  };
-
-  const filteredLodges = lodges.filter((l) => {
-    const matchSearch =
-      !search ||
-      l.name.toLowerCase().includes(search.toLowerCase()) ||
-      (l.code_number && l.code_number.toString().includes(search)) ||
-      (l.city && l.city.toLowerCase().includes(search.toLowerCase()));
-    return matchSearch;
+  const { items, total, kpis } = await getAdminLodgesListAction({
+    query: q,
+    state: state !== 'all' ? state : undefined,
+    potency: potency !== 'all' ? potency : undefined,
+    status: status !== 'all' ? status : undefined,
+    missingCoords,
+    missingEmblem,
+    page,
+    pageSize: 10,
   });
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-12 text-gray-500">
-        <Loader2 className="w-6 h-6 animate-spin mr-2" /> Carregando lojas maçônicas...
-      </div>
-    );
-  }
+  const totalPages = Math.max(1, Math.ceil(total / 10));
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border shadow-2xs">
+      {/* Cabeçalho */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#C9A227]/30 pb-4">
         <div>
-          <h1 className="text-2xl font-serif font-bold text-gray-900 flex items-center gap-2">
-            <Landmark className="w-6 h-6 text-amber-900" />
-            <span>Lojas Maçônicas</span>
+          <span className="bg-[#3B0B14] text-[#C9A227] font-bold text-xs px-2.5 py-0.5 rounded-full border border-[#C9A227]/40">
+            Organizações Maçônicas · Conexão Maçônica
+          </span>
+          <h1 className="text-2xl font-serif font-bold text-[#1f1914] mt-2 flex items-center gap-2">
+            <Compass className="w-6 h-6 text-[#4B161B]" /> Gestão 360º de Lojas Maçônicas & Potências
           </h1>
           <p className="text-xs text-stone-500 mt-1">
-            Gerenciamento de oficinas, potências, ritos, reuniões e importação por planilha Excel.
+            Central operacional de qualificação da base de Lojas: auditoria de endereço, reuniões, brasão e geolocalização.
           </p>
         </div>
+      </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <Link
-            href="/admin/lojas/importar"
-            className="flex items-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-200 px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-amber-100 transition-colors"
-          >
-            <Upload className="w-4 h-4" />
-            <span>Importar Excel</span>
-          </Link>
+      {/* SUPERIOR KPI CARDS (DADOS REAIS DE QUALIDADE DA BASE) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="bg-white border border-stone-300 rounded-2xl p-4 space-y-1 shadow-xs">
+          <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Total Lojas</span>
+          <p className="text-2xl font-serif font-bold text-[#1f1914]">{kpis.total}</p>
+          <span className="text-[10px] text-stone-400">Cadastradas</span>
+        </div>
 
-          <Link
-            href="/admin/lojas/potencias"
-            className="flex items-center gap-1.5 bg-stone-100 text-stone-800 border border-stone-200 px-3.5 py-2.5 rounded-xl font-bold text-xs hover:bg-stone-200 transition-colors"
-          >
-            <Scroll className="w-4 h-4 text-amber-900" />
-            <span>Potências</span>
-          </Link>
+        <div className="bg-white border border-stone-300 rounded-2xl p-4 space-y-1 shadow-xs">
+          <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Publicadas</span>
+          <p className="text-2xl font-serif font-bold text-emerald-800">{kpis.published}</p>
+          <span className="text-[10px] text-emerald-600 font-semibold">Ativas no Guia</span>
+        </div>
 
-          <Link
-            href="/admin/lojas/nova"
-            className="flex items-center gap-1.5 bg-[#3b0b14] text-white px-4 py-2.5 rounded-xl font-bold text-xs hover:bg-[#5d1523] transition-colors shadow-2xs"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nova Loja</span>
-          </Link>
+        <div className="bg-white border border-stone-300 rounded-2xl p-4 space-y-1 shadow-xs">
+          <span className="text-[10px] font-bold text-stone-600 uppercase tracking-wider">Inativas</span>
+          <p className="text-2xl font-serif font-bold text-stone-700">{kpis.inactive}</p>
+          <span className="text-[10px] text-stone-500">Desativadas</span>
+        </div>
+
+        <div className="bg-white border border-stone-300 rounded-2xl p-4 space-y-1 shadow-xs">
+          <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Sem Coordenadas</span>
+          <p className="text-2xl font-serif font-bold text-amber-900">{kpis.missing_coords}</p>
+          <span className="text-[10px] text-amber-700 font-semibold">Sem GPS</span>
+        </div>
+
+        <div className="bg-white border border-stone-300 rounded-2xl p-4 space-y-1 shadow-xs">
+          <span className="text-[10px] font-bold text-purple-800 uppercase tracking-wider">Sem Brasão</span>
+          <p className="text-2xl font-serif font-bold text-purple-900">{kpis.missing_emblem}</p>
+          <span className="text-[10px] text-purple-700">Logo ausente</span>
+        </div>
+
+        <div className="bg-[#3B0B14] text-white border border-[#C9A227]/40 rounded-2xl p-4 space-y-1 shadow-md">
+          <span className="text-[10px] font-bold text-[#C9A227] uppercase tracking-wider">Duplicidades</span>
+          <p className="text-2xl font-serif font-bold text-white">{kpis.possible_duplicates}</p>
+          <span className="text-[10px] text-amber-200/80">Para revisão</span>
         </div>
       </div>
 
-      {/* Toolbar & Filtros */}
-      <div className="bg-white p-4 rounded-2xl border shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-stone-400 absolute left-3 top-3" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nome, número ou cidade..."
-            className="w-full pl-9 pr-4 py-2 border rounded-xl text-xs text-gray-900 outline-none focus:ring-2 focus:ring-amber-900 bg-stone-50"
-          />
+      {/* FILTROS E BUSCA DE QUALIDADE */}
+      <form className="bg-stone-900 text-white p-4 rounded-2xl border border-stone-800 space-y-3 shadow-md">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          {/* Busca por Nome/Número/Oriente */}
+          <div className="md:col-span-1 space-y-1">
+            <label className="text-[11px] font-bold text-stone-300">Buscar Nome, Número ou Cidade:</label>
+            <div className="relative">
+              <Search className="w-4 h-4 text-stone-400 absolute left-3 top-3" />
+              <input
+                type="text"
+                name="q"
+                defaultValue={q}
+                placeholder="Ex: 13 de Maio, 450, São Paulo..."
+                className="w-full pl-9 pr-3 py-2 bg-stone-950 border border-stone-700 rounded-xl text-xs text-white placeholder-stone-500 outline-none focus:border-[#C9A227]"
+              />
+            </div>
+          </div>
+
+          {/* Filtro Potência */}
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-stone-300">Potência Maçônica:</label>
+            <select
+              name="potency"
+              defaultValue={potency}
+              className="w-full px-3 py-2 bg-stone-950 border border-stone-700 rounded-xl text-xs text-white outline-none focus:border-[#C9A227]"
+            >
+              <option value="all">Todas as Potências</option>
+              <option value="GLESP">GLESP</option>
+              <option value="GOB">GOB</option>
+              <option value="GOSP">GOSP</option>
+              <option value="COMAB">COMAB</option>
+            </select>
+          </div>
+
+          {/* Filtro Status */}
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-stone-300">Status de Publicação:</label>
+            <select
+              name="status"
+              defaultValue={status}
+              className="w-full px-3 py-2 bg-stone-950 border border-stone-700 rounded-xl text-xs text-white outline-none focus:border-[#C9A227]"
+            >
+              <option value="all">Todos os Status</option>
+              <option value="published">Publicada</option>
+              <option value="inactive">Inativa</option>
+            </select>
+          </div>
+
+          {/* Qualidade da Base (Coordenadas / Brasão) */}
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-stone-300">Auditoria de Qualidade:</label>
+            <div className="flex items-center gap-3 pt-1">
+              <label className="flex items-center gap-1.5 text-xs text-stone-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="missingCoords"
+                  value="true"
+                  defaultChecked={missingCoords}
+                  className="accent-[#C9A227]"
+                />
+                <span>Sem Coordenadas</span>
+              </label>
+
+              <label className="flex items-center gap-1.5 text-xs text-stone-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="missingEmblem"
+                  value="true"
+                  defaultChecked={missingEmblem}
+                  className="accent-[#C9A227]"
+                />
+                <span>Sem Brasão</span>
+              </label>
+            </div>
+          </div>
         </div>
 
-        <div className="text-xs font-semibold text-stone-500">
-          Mostrando <strong className="text-gray-900">{filteredLodges.length}</strong> de <strong>{lodges.length}</strong> lojas
+        <div className="flex justify-end gap-2 pt-2 border-t border-stone-800">
+          <Link
+            href="/admin/lojas"
+            className="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-bold rounded-xl transition-colors"
+          >
+            Limpar Filtros
+          </Link>
+          <button
+            type="submit"
+            className="px-4 py-1.5 bg-[#C9A227] hover:bg-amber-400 text-[#3B0B14] font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+          >
+            <Filter className="w-3.5 h-3.5" />
+            <span>Filtrar Lojas</span>
+          </button>
         </div>
-      </div>
+      </form>
 
-      {/* Tabela de Lojas */}
-      <div className="bg-white border rounded-2xl overflow-hidden shadow-2xs">
-        <table className="w-full text-left border-collapse text-xs">
-          <thead>
-            <tr className="bg-stone-50 border-b text-stone-700 font-bold uppercase tracking-wider">
-              <th className="p-4">Loja / Número</th>
-              <th className="p-4">Potência & Rito</th>
-              <th className="p-4">Oriente / Cidade</th>
-              <th className="p-4">Venerável</th>
-              <th className="p-4">Publicada</th>
-              <th className="p-4 text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {filteredLodges.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="p-8 text-center text-stone-500">
-                  Nenhuma loja maçônica cadastrada. Clique em "Nova Loja" ou "Importar Excel" para começar.
-                </td>
+      {/* TABELA DE LOJAS */}
+      <div className="bg-white border border-stone-300 rounded-2xl shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[700px]">
+            <thead>
+              <tr className="bg-stone-100 border-b border-stone-300 text-[11px] font-bold text-stone-600 uppercase tracking-wider">
+                <th className="py-3 px-4">Loja / Número</th>
+                <th className="py-3 px-4">Oriente / UF</th>
+                <th className="py-3 px-4">Potência & Rito</th>
+                <th className="py-3 px-4">Reunião</th>
+                <th className="py-3 px-4">Completude %</th>
+                <th className="py-3 px-4">Origem</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Prontuário 360º</th>
               </tr>
-            ) : (
-              filteredLodges.map((lodge) => (
-                <tr key={lodge.id} className="hover:bg-stone-50 transition-colors">
-                  <td className="p-4 font-bold text-gray-900">
-                    <div className="flex items-center gap-2">
-                      <Landmark className="w-4 h-4 text-amber-900 shrink-0" />
-                      <span>{lodge.name} {lodge.code_number ? `nº ${lodge.code_number}` : ''}</span>
+            </thead>
+            <tbody className="divide-y divide-stone-200 text-xs">
+              {items.map((lodge) => (
+                <tr key={lodge.id} className="hover:bg-stone-50/80 transition-colors">
+                  {/* Loja & Número */}
+                  <td className="py-3.5 px-4">
+                    <div className="space-y-0.5">
+                      <p className="font-serif font-bold text-stone-900 text-sm">{lodge.name}</p>
+                      <p className="text-[11px] text-stone-500 font-mono">Nº {lodge.code_number || 'S/N'}</p>
                     </div>
                   </td>
-                  <td className="p-4 text-stone-600">
-                    <div className="flex items-center gap-1.5 flex-wrap font-semibold">
-                      {lodge.potency && <span className="bg-amber-50 border border-amber-200 text-amber-900 px-2 py-0.5 rounded text-[11px]">{lodge.potency}</span>}
-                      {lodge.rite && <span className="bg-stone-100 border border-stone-200 text-stone-700 px-2 py-0.5 rounded text-[11px]">{lodge.rite}</span>}
+
+                  {/* Cidade & Estado */}
+                  <td className="py-3.5 px-4">
+                    <p className="font-semibold text-stone-800">
+                      {lodge.city} - {lodge.state}
+                    </p>
+                  </td>
+
+                  {/* Potência & Rito */}
+                  <td className="py-3.5 px-4">
+                    <div className="space-y-0.5">
+                      <span className="font-bold text-[#4B161B] text-[11px]">{lodge.potency}</span>
+                      <p className="text-[10px] text-stone-500">{lodge.rite || 'R.E.A.A.'}</p>
                     </div>
                   </td>
-                  <td className="p-4 text-stone-700">
-                    {lodge.city}{lodge.state ? `, ${lodge.state}` : ''}
+
+                  {/* Reunião */}
+                  <td className="py-3.5 px-4">
+                    <p className="text-stone-700 font-medium">{lodge.meeting_schedule || 'Não informada'}</p>
                   </td>
-                  <td className="p-4 text-stone-700 font-medium">
-                    {lodge.worshipful_master_name || '-'}
+
+                  {/* Indicador de Completude % */}
+                  <td className="py-3.5 px-4">
+                    <div className="space-y-1">
+                      <span
+                        className={`font-mono font-bold text-xs ${
+                          lodge.completeness_percent >= 80
+                            ? 'text-emerald-700'
+                            : lodge.completeness_percent >= 50
+                            ? 'text-amber-700'
+                            : 'text-red-700'
+                        }`}
+                      >
+                        {lodge.completeness_percent}%
+                      </span>
+                      <div className="w-16 h-1.5 bg-stone-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${
+                            lodge.completeness_percent >= 80
+                              ? 'bg-emerald-600'
+                              : lodge.completeness_percent >= 50
+                              ? 'bg-amber-500'
+                              : 'bg-red-500'
+                          }`}
+                          style={{ width: `${lodge.completeness_percent}%` }}
+                        />
+                      </div>
+                    </div>
                   </td>
-                  <td className="p-4">
-                    <button
-                      onClick={() => handleTogglePublished(lodge.id, lodge.is_published)}
-                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 transition-colors ${
-                        lodge.is_published ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+
+                  {/* Origem dos Dados (Excel / Manual) */}
+                  <td className="py-3.5 px-4">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-300">
+                      {lodge.provenance}
+                    </span>
+                  </td>
+
+                  {/* Status */}
+                  <td className="py-3.5 px-4">
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                        lodge.is_active
+                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                          : 'bg-stone-100 text-stone-600 border border-stone-300'
                       }`}
                     >
-                      {lodge.is_published ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                      <span>{lodge.is_published ? 'Publicada' : 'Oculta'}</span>
-                    </button>
+                      {lodge.is_active ? 'Publicada' : 'Inativa'}
+                    </span>
                   </td>
-                  <td className="p-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      {lodge.slug && (
-                        <Link
-                          href={`/guia/lojas/${lodge.slug}`}
-                          target="_blank"
-                          className="p-1.5 text-amber-900 hover:bg-amber-50 rounded-lg transition-colors"
-                          title="Visualizar página institucional pública"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Link>
-                      )}
-                      <Link
-                        href={`/admin/lojas/editar/${lodge.id}`}
-                        className="p-1.5 text-stone-600 hover:text-amber-900 hover:bg-stone-100 rounded-lg transition-colors"
-                        title="Editar loja"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(lodge.id, lodge.name)}
-                        className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Excluir loja"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+
+                  {/* Prontuário 360º */}
+                  <td className="py-3.5 px-4 text-right">
+                    <Link
+                      href={`/admin/lojas/${lodge.id}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs transition-all cursor-pointer shadow-xs"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Visão 360º</span>
+                    </Link>
                   </td>
                 </tr>
-              ))
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Paginação */}
+        <div className="p-4 bg-stone-50 border-t border-stone-200 flex items-center justify-between text-xs text-stone-600">
+          <span>
+            Página <strong className="text-stone-900">{page}</strong> de{' '}
+            <strong className="text-stone-900">{totalPages}</strong> ({total} lojas no total)
+          </span>
+
+          <div className="flex items-center gap-1">
+            {page > 1 && (
+              <Link
+                href={`/admin/lojas?page=${page - 1}&q=${q}&state=${state}&potency=${potency}&status=${status}`}
+                className="p-1.5 rounded-lg border border-stone-300 hover:bg-stone-200 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Link>
             )}
-          </tbody>
-        </table>
+            {page < totalPages && (
+              <Link
+                href={`/admin/lojas?page=${page + 1}&q=${q}&state=${state}&potency=${potency}&status=${status}`}
+                className="p-1.5 rounded-lg border border-stone-300 hover:bg-stone-200 transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

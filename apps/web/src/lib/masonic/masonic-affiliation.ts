@@ -86,10 +86,10 @@ export function validateMasonicStep(
       if (input.isActive == null) {
         errors.isActive = 'Informe se você está ativo na Ordem.';
       }
-      if (!sanitizeCimb(input.cimbCode)) {
-        errors.cimbCode = 'Informe o número do CIMB (Carteira de Identificação Maçônica).';
-      } else if (sanitizeCimb(input.cimbCode).length < 4) {
-        errors.cimbCode = 'CIMB inválido — confira o número informado.';
+      // CIMB é Opcional. Valida formato somente se informado.
+      const sanitizedCimb = sanitizeCimb(input.cimbCode);
+      if (sanitizedCimb && sanitizedCimb.length < 3) {
+        errors.cimbCode = 'CIMB informado é muito curto — confira o número.';
       }
       break;
     }

@@ -13,13 +13,11 @@
 -- 1. Tenants
 -- ---------------------------------------------------------------------------
 
-INSERT INTO public.tenants (id, name, slug, settings)
+INSERT INTO public.tenants (id, name, slug, public_access_status, settings)
 VALUES
-  ('00000000-0000-0000-0000-000000000001', 'CivicOS Master', 'civicos-master', '{"is_platform_root": true}'),
-  ('00000000-0000-0000-0000-000000000010', 'Grande Oriente de SP', 'grande-oriente-sp',
-   '{"branding": {"appName": "Conexão Maçônica", "primaryColor": "#4A0E1A", "accentColor": "#C9A227", "radius": "lg", "density": "comfortable", "colorMode": "light"}}'),
-  ('00000000-0000-0000-0000-000000000011', 'Loja Luz do Oriente', 'luz-do-oriente',
-   '{"branding": {"appName": "Luz do Oriente", "primaryColor": "#0F5132", "accentColor": "#F59E0B", "radius": "md", "density": "compact", "colorMode": "light"}}')
+  ('00000000-0000-0000-0000-000000000001', 'CivicOS Master', 'civicos-master', 'enabled', '{"is_platform_root": true}'),
+  ('00000000-0000-0000-0000-000000000010', 'Grande Oriente de SP', 'grande-oriente-sp', 'enabled', '{"branding": {"appName": "Conexão Maçônica", "primaryColor": "#4A0E1A", "accentColor": "#C9A227", "radius": "lg", "density": "comfortable", "colorMode": "light"}}'),
+  ('00000000-0000-0000-0000-000000000011', 'Loja Luz do Oriente', 'luz-do-oriente', 'enabled', '{"branding": {"appName": "Luz do Oriente", "primaryColor": "#0F5132", "accentColor": "#F59E0B", "radius": "md", "density": "compact", "colorMode": "light"}}')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.tenant_domains (tenant_id, domain, is_primary, is_verified, ssl_status)
@@ -224,3 +222,83 @@ VALUES
   ('00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000203', '00000000-0000-0000-0000-000000000103', 'owner', 'active'),
   ('00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000204', '00000000-0000-0000-0000-000000000103', 'owner', 'active')
 ON CONFLICT (business_id, user_id) DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+-- 7. Planos, Versões e Assinaturas Ativas (Subscriptions)
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_tenant_id UUID := '00000000-0000-0000-0000-000000000010';
+  v_user_id UUID := '00000000-0000-0000-0000-000000000103';
+  v_plan_ouro UUID := '00000000-0000-0000-0000-000000000051';
+  v_plan_prata UUID := '00000000-0000-0000-0000-000000000052';
+  v_plan_bronze UUID := '00000000-0000-0000-0000-000000000053';
+  v_version_ouro UUID := '00000000-0000-0000-0000-000000000061';
+  v_version_prata UUID := '00000000-0000-0000-0000-000000000062';
+  v_version_bronze UUID := '00000000-0000-0000-0000-000000000063';
+BEGIN
+  -- Inserir Planos base
+  INSERT INTO public.plans (id, tenant_id, code, name, is_active) VALUES
+  (v_plan_ouro, v_tenant_id, 'ouro', 'Plano Ouro', true),
+  (v_plan_prata, v_tenant_id, 'prata', 'Plano Prata', true),
+  (v_plan_bronze, v_tenant_id, 'bronze', 'Plano Bronze', true)
+  ON CONFLICT (id) DO NOTHING;
+
+  -- Inserir Versoes
+  INSERT INTO public.plan_versions (id, plan_id, version, price_annual, currency, effective_from) VALUES
+  (v_version_ouro, v_plan_ouro, 1, 499.00, 'BRL', now()),
+  (v_version_prata, v_plan_prata, 1, 299.00, 'BRL', now()),
+  (v_version_bronze, v_plan_bronze, 1, 99.00, 'BRL', now())
+  ON CONFLICT (id) DO NOTHING;
+
+  -- Inserir Assinaturas para os 4 negócios canônicos se não existirem
+  IF NOT EXISTS (SELECT 1 FROM public.subscriptions WHERE business_id = '00000000-0000-0000-0000-000000000201') THEN
+    INSERT INTO public.subscriptions (tenant_id, business_id, status, plan_version_id, contract_term, payment_schedule, current_period_start, current_period_end)
+    VALUES (v_tenant_id, '00000000-0000-0000-0000-000000000201', 'active', v_version_ouro, 'annual', 'installments', now(), now() + interval '10 years');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM public.subscriptions WHERE business_id = '00000000-0000-0000-0000-000000000202') THEN
+    INSERT INTO public.subscriptions (tenant_id, business_id, status, plan_version_id, contract_term, payment_schedule, current_period_start, current_period_end)
+    VALUES (v_tenant_id, '00000000-0000-0000-0000-000000000202', 'active', v_version_bronze, 'annual', 'installments', now(), now() + interval '10 years');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM public.subscriptions WHERE business_id = '00000000-0000-0000-0000-000000000203') THEN
+    INSERT INTO public.subscriptions (tenant_id, business_id, status, plan_version_id, contract_term, payment_schedule, current_period_start, current_period_end)
+    VALUES (v_tenant_id, '00000000-0000-0000-0000-000000000203', 'active', v_version_prata, 'annual', 'installments', now(), now() + interval '10 years');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM public.subscriptions WHERE business_id = '00000000-0000-0000-0000-000000000204') THEN
+    INSERT INTO public.subscriptions (tenant_id, business_id, status, plan_version_id, contract_term, payment_schedule, current_period_start, current_period_end)
+    VALUES (v_tenant_id, '00000000-0000-0000-0000-000000000204', 'active', v_version_ouro, 'annual', 'installments', now(), now() + interval '10 years');
+  END IF;
+END $$;
+
+-- ---------------------------------------------------------------------------
+-- 8. Contatos, Locais e Mídia para Bronze (Saba Advocacia)
+-- ---------------------------------------------------------------------------
+INSERT INTO public.business_contacts (id, tenant_id, business_id, type, value)
+VALUES
+  (gen_random_uuid(), '00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000202', 'phone', '(75) 3025-4242'),
+  (gen_random_uuid(), '00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000202', 'whatsapp', '5575999881122'),
+  (gen_random_uuid(), '00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000202', 'email', 'contato@sabaadvocacia.com.br'),
+  (gen_random_uuid(), '00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000202', 'website', 'https://sabaadvocacia.com.br')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.business_locations (id, tenant_id, business_id, title, street, number, neighborhood, city, state, postal_code, is_headquarters)
+VALUES
+  (gen_random_uuid(), '00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000202', 'Sede Principal', 'Av. Getúlio Vargas', '1240', 'Centro', 'Feira de Santana', 'BA', '44001-075', true)
+ON CONFLICT DO NOTHING;
+
+UPDATE public.businesses 
+SET logo_url = '/visual-lab/assets/bronze-reference'
+WHERE id = '00000000-0000-0000-0000-000000000202';
+
+-- ---------------------------------------------------------------------------
+-- 9. Lojas Maçônicas de Exemplo (Organizations)
+-- ---------------------------------------------------------------------------
+INSERT INTO public.organizations (id, tenant_id, name, code_number, potency, rite, foundation_date, meeting_schedule, contact_email, is_active)
+VALUES
+  ('00000000-0000-0000-0000-000000000301', '00000000-0000-0000-0000-000000000010', 'Augusta e Respeitável Loja Luz do Sertão', 104, 'GLEB', 'Rito Escocês Antigo e Aceito', '1975-06-15', 'Quinta-feira • 20h', 'contato@luzdosertao.org.br', true),
+  ('00000000-0000-0000-0000-000000000302', '00000000-0000-0000-0000-000000000010', 'Loja Maçônica União e Fraternidade', 42, 'GOB', 'Rito Moderno', '1982-11-20', 'Terça-feira • 20h', 'contato@uniaoefraternidade.org.br', true),
+  ('00000000-0000-0000-0000-000000000303', '00000000-0000-0000-0000-000000000010', 'Loja Maçônica Cavaleiros da Justiça', 88, 'GOB', 'Rito Brasileiro', '1990-03-10', 'Sexta-feira • 19h30', 'contato@cavaleirosdajustica.org.br', true)
+ON CONFLICT (id) DO NOTHING;

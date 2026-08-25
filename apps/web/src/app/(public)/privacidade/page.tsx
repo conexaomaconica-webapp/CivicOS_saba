@@ -40,14 +40,15 @@ export default function PrivacidadePage() {
             exceto provedores essenciais para o funcionamento do sistema (ex: gateways de pagamento seguro).
           </p>
 
-          <h2 className="text-xl font-semibold text-[#C9A227] mt-8 mb-4">4. Seus Direitos</h2>
+          <h2 className="text-xl font-semibold text-[#C9A227] mt-8 mb-4">4. Seus Direitos e Canais de Encarregado (DPO)</h2>
           <p>
-            De acordo com a LGPD, você tem o direito de solicitar o acesso, correção, atualização ou exclusão
-            dos seus dados pessoais a qualquer momento, através dos canais de atendimento da plataforma.
+            De acordo com a LGPD, você tem o direito de solicitar o acesso, correção, atualização, portabilidade ou exclusão
+            dos seus dados pessoais a qualquer momento. Para exercer seus direitos de titular, envie um e-mail para o nosso
+            canal oficial de privacidade: <a href="mailto:contato@conexaomaconica.com.br" className="text-[#C9A227] underline">contato@conexaomaconica.com.br</a>.
           </p>
 
-          <p className="pt-8 text-xs text-slate-500 italic">
-            Última atualização: 20 de Agosto de 2026. Este é um texto provisório e deverá ser revisado por equipe jurídica competente.
+          <p className="pt-8 text-xs text-slate-500 italic border-t border-[#4B161B] mt-8">
+            Versão 1.0 — Publicada em Agosto de 2026. Plataforma Conexão Maçônica.
           </p>
         </div>
       </div>

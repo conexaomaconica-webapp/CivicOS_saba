@@ -252,7 +252,7 @@ export default function AdminImportarLojasPage() {
     setImporting(true);
     try {
       const supabase = createClient();
-      const { data: profileData } = await (supabase as any).from('user_profiles').select('tenant_id').maybeSingle();
+      const { data: profileData } = await (supabase as any).from('profiles').select('tenant_id').maybeSingle();
       const tid = profileData?.tenant_id || '00000000-0000-0000-0000-000000000010';
 
       for (const row of validRows) {
@@ -326,6 +326,28 @@ export default function AdminImportarLojasPage() {
     } finally {
       setImporting(false);
     }
+  };
+
+  // Download Analysis Report (.xlsx)
+  const handleDownloadAnalysisReport = () => {
+    if (parsedRows.length === 0) return;
+    const reportData = parsedRows.map((r) => ({
+      status: r.status.toUpperCase(),
+      observacao: r.reason || '',
+      nome: r.name,
+      numero: r.code_number || '',
+      potencia: r.potency,
+      rito: r.rite || '',
+      cidade: r.city || '',
+      estado: r.state || '',
+      veneravel: r.worshipful_master_name || '',
+      dia_reuniao: r.meeting_day || '',
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(reportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Analise_Importacao');
+    XLSX.writeFile(workbook, `relatorio_analise_importacao_${Date.now()}.xlsx`);
   };
 
   return (
@@ -418,16 +440,26 @@ export default function AdminImportarLojasPage() {
 
           {/* Tabela da Prévia */}
           <div className="bg-white border rounded-2xl overflow-hidden shadow-2xs">
-            <div className="p-4 bg-stone-50 border-b flex items-center justify-between">
-              <h3 className="font-serif font-bold text-sm text-gray-900">Prévia da Análise dos Registros</h3>
-              <button
-                onClick={handleConfirmImport}
-                disabled={importing || (summary.newCount === 0 && summary.updateCount === 0)}
-                className="bg-[#3b0b14] text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-[#5d1523] disabled:opacity-50 transition-colors flex items-center gap-1.5 shadow-2xs"
-              >
-                {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                <span>Confirmar Importação de {summary.newCount + summary.updateCount} Lojas</span>
-              </button>
+            <div className="p-4 bg-stone-50 border-b flex flex-wrap items-center justify-between gap-3">
+              <h3 className="font-serif font-bold text-sm text-gray-900">Prévia da Análise dos Registros ({parsedRows.length} linhas)</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDownloadAnalysisReport}
+                  className="bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 px-4 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+                >
+                  <Download className="w-4 h-4 text-stone-600" />
+                  <span>Baixar Relatório de Análise (.xlsx)</span>
+                </button>
+
+                <button
+                  onClick={handleConfirmImport}
+                  disabled={importing || (summary.newCount === 0 && summary.updateCount === 0)}
+                  className="bg-[#3b0b14] text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-[#5d1523] disabled:opacity-50 transition-colors flex items-center gap-1.5 shadow-2xs"
+                >
+                  {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  <span>Confirmar Importação de {summary.newCount + summary.updateCount} Lojas</span>
+                </button>
+              </div>
             </div>
 
             <table className="w-full text-left border-collapse text-xs">

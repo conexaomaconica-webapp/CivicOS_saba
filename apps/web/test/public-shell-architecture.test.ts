@@ -11,8 +11,8 @@ describe('public shell isolation', () => {
   });
 
   it('mantém shells administrativos nos layouts protegidos', () => {
-    expect(source('app/admin/layout.tsx')).toContain('<ShellWrapper>');
-    expect(source('app/dashboard/layout.tsx')).toContain('<ShellWrapper>');
+    expect(source('app/admin/layout.tsx')).toContain('AdminShell');
+    expect(source('app/dashboard/layout.tsx')).toContain('ShellWrapper');
   });
 
   it('bloqueia o Visual Lab por padrão em produção', () => {

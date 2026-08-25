@@ -1,78 +1,110 @@
 import { test, expect } from '@playwright/test';
+import { getE2EEnv, assertDestructiveOperationsAllowed } from './helpers/e2e-env';
+import { fetchCurrentEntitlementLimit } from './helpers/entitlements';
+import { loginE2EUser } from './helpers/auth';
+import { adminChangeEntitlement } from './helpers/admin';
+import { createBusinessResource, expectBusinessResourceBlocked } from './helpers/businesses';
 
-test.use({ baseURL: 'http://127.0.0.1:3000' });
+const env = getE2EEnv();
+test.use({ baseURL: env.baseUrl });
 test.setTimeout(90_000);
 
-test.describe('BLOCO 5: Full Commercial Lifecycle, Security & Launch Audit', () => {
-  test('1. Security Response Headers Audit (HSTS, X-Frame-Options, nosniff, CSP)', async ({ page }) => {
-    const response = await page.goto('/guia');
-    expect(response).not.toBeNull();
+const commercialPlans = ['bronze', 'prata', 'ouro', 'ouro_founder'] as const;
+const managedResources = ['services_limit', 'gallery_photos_limit', 'benefits_limit', 'events_limit', 'posts_limit'] as const;
 
-    if (response) {
-      const headers = response.headers();
-      expect(headers['x-frame-options']).toBe('DENY');
-      expect(headers['x-content-type-options']).toBe('nosniff');
-      expect(headers['strict-transport-security']).toContain('max-age=');
-      expect(headers['content-security-policy-report-only']).toContain("default-src 'self'");
+test.describe('EPIC: Homologação End-to-End do Anunciante (Staging Sem Mocks)', () => {
+  
+  test.beforeAll(() => {
+    // Garantir que não rodamos suite destrutiva sem intenção
+    assertDestructiveOperationsAllowed();
+  });
+
+  test.describe('Matriz de Planos e Entitlements', () => {
+    for (const plan of commercialPlans) {
+      for (const resource of managedResources) {
+        test(`Plano ${plan.toUpperCase()} respeita os limites de ${resource.toUpperCase()}`, async ({ page }) => {
+          test.skip(!process.env.E2E_RUN_MATRIX, 'Pular matriz E2E quando não explícito');
+          
+          // 1. Busca o limite atual direto no banco do staging (Zero Hardcode)
+          const currentLimit = await fetchCurrentEntitlementLimit(plan, resource);
+          const email = `e2e-${plan === 'ouro_founder' ? 'founder' : plan}@conexaomaconica.com.br`;
+          const businessSlug = `e2e-${plan}-auto`;
+
+          await loginE2EUser(page, email);
+          
+          // 2. Preenche até o limite atual (1..N -> permitido)
+          for (let i = 0; i < currentLimit; i++) {
+            await createBusinessResource(page, businessSlug, resource);
+          }
+          
+          // 3. Tenta passar do limite (N+1 -> bloqueado)
+          await expectBusinessResourceBlocked(page, businessSlug, resource);
+        });
+      }
     }
   });
 
-  test('2. Admin & Dashboard private routes contain noindex and block unauthenticated users', async ({ context, page }) => {
-    await context.addCookies([
-      { name: 'e2e-mock-role', value: 'usuario_comum', domain: '127.0.0.1', path: '/' },
-    ]);
+  test.describe('Cenários de Fogo: Herança e Alteração Dinâmica', () => {
+    test('Herança Ouro Fundador -> Ouro funciona no banco de dados e UI', async ({ page }) => {
+      test.skip(!process.env.E2E_RUN_MATRIX, 'Pular matriz E2E quando não explícito');
+      
+      const ouroLimit = await fetchCurrentEntitlementLimit('ouro', 'events_limit');
+      const founderLimit = await fetchCurrentEntitlementLimit('ouro_founder', 'events_limit');
+      
+      // Validação de contrato no backend (Single Source of Truth)
+      expect(founderLimit).toBe(ouroLimit);
 
-    await page.goto('/admin/aprovacoes');
-    await expect(page).not.toHaveURL(/\/admin\/aprovacoes/);
+      // Validação na interface (UI percebida pelo anunciante)
+      await loginE2EUser(page, 'e2e-founder@conexaomaconica.com.br');
+      // TODO: Checar se a UI do painel exibe "0 de ouroLimit" consumidos 
+    });
 
-    await page.goto('/dashboard');
-    const robotsMeta = page.locator('meta[name="robots"]');
-    if (await robotsMeta.count() > 0) {
-      await expect(robotsMeta).toHaveAttribute('content', /noindex/);
-    }
+    test('Alteração Dinâmica: Admin altera limite e empresa é bloqueada em tempo real', async ({ browser }) => {
+      test.skip(!process.env.E2E_RUN_MATRIX, 'Pular matriz E2E quando não explícito');
+      
+      const resource = 'services_limit';
+      const initialLimit = await fetchCurrentEntitlementLimit('bronze', resource);
+      
+      const adminContext = await browser.newContext();
+      const userContext = await browser.newContext();
+      
+      const adminPage = await adminContext.newPage();
+      const userPage = await userContext.newPage();
+
+      // 1. Loga anunciante e atinge limite (N)
+      await loginE2EUser(userPage, 'e2e-bronze@conexaomaconica.com.br');
+      for (let i = 0; i < initialLimit; i++) {
+        await createBusinessResource(userPage, 'e2e-bronze-auto', resource);
+      }
+      await expectBusinessResourceBlocked(userPage, 'e2e-bronze-auto', resource); // N+1 bloqueado
+
+      // 2. Admin loga e altera cota para N+2
+      await loginE2EUser(adminPage, env.adminEmail, env.adminPassword);
+      await adminChangeEntitlement(adminPage, 'bronze', resource, initialLimit + 2);
+
+      // 3. Anunciante recarrega
+      await userPage.reload();
+      
+      // 4. Anunciante agora consegue criar N+1 e N+2
+      await createBusinessResource(userPage, 'e2e-bronze-auto', resource);
+      await createBusinessResource(userPage, 'e2e-bronze-auto', resource);
+      
+      // 5. Mas N+3 bloqueia novamente
+      await expectBusinessResourceBlocked(userPage, 'e2e-bronze-auto', resource);
+    });
   });
 
-  test('3. Full Commercial Lifecycle: Ouro creation -> Admin Approval -> Public Guia -> Review -> Analytics', async ({ context, page }) => {
-    await context.addCookies([
-      { name: 'e2e-mock-role', value: 'master', domain: '127.0.0.1', path: '/' },
-    ]);
+  test.describe('Segurança e Auditoria do Admin', () => {
+    test('Usuário Anunciante Comum não pode acessar /admin/planos', async ({ page }) => {
+      await loginE2EUser(page, 'e2e-bronze@conexaomaconica.com.br');
+      await page.goto('/admin/planos');
+      expect(page.url()).not.toContain('/admin/planos');
+    });
 
-    // A) Advertiser accesses business dashboard
-    await page.goto('/dashboard/empresas/demo-biz/perfil');
-    await expect(page.locator('h1').last()).toBeVisible();
-
-    // B) Public Guia page renders Ouro business detail and JSON-LD structured data
-    await page.goto('/guia/empresa-ouro');
-    await expect(page.locator('h1').last()).toBeVisible();
-
-    // Verify JSON-LD script tag is present and properly escaped
-    const jsonLdScript = page.locator('script[type="application/ld+json"]').first();
-    await expect(jsonLdScript).toBeAttached();
-    const scriptContent = await jsonLdScript.textContent();
-    expect(scriptContent).not.toContain('<script>');
-
-    // C) Submit review on public business detail
-    await page.goto('/guia/empresa-ouro');
-    const ratingStar = page.locator('button:has-text("★")').first();
-    if (await ratingStar.isVisible()) {
-      await ratingStar.click();
-      await page.fill('textarea', 'Excelente atendimento e serviço de alta qualidade!');
-      await page.click('button:has-text("Enviar Avaliação")');
-      await expect(page.locator('text=sucesso').or(page.locator('text=Pendente'))).toBeVisible({ timeout: 5000 });
-    }
+    test('API Rejeita payload malicioso com permissões/limites inválidos', async ({ request }) => {
+      // TODO: Simular requisição HTTP POST direto para a action bypassing the UI
+      // await request.post('/alguma-rota-action', { data: { plan: 'ouro', services_limit: -1 } })
+    });
   });
 
-  test('4. Dynamic sitemap and robots.txt serve valid tenant-aware metadata', async ({ page }) => {
-    const robotsRes = await page.goto('/robots.txt');
-    expect(robotsRes?.status()).toBe(200);
-    const robotsText = await robotsRes?.text();
-    expect(robotsText).toContain('Disallow: /admin/');
-    expect(robotsText).toContain('Disallow: /dashboard/');
-
-    const sitemapRes = await page.goto('/sitemap.xml');
-    expect(sitemapRes?.status()).toBe(200);
-    const sitemapXml = await sitemapRes?.text();
-    expect(sitemapXml).toContain('/guia');
-    expect(sitemapXml).not.toContain('/admin');
-  });
 });

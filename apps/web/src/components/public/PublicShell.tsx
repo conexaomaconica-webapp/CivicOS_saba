@@ -1,4 +1,7 @@
+'use client';
+
 import type { ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { PublicFooter } from './PublicFooter';
 import { PublicHeader } from './PublicHeader';
 import type { PublicMediaAsset } from '@/lib/business/public-business-presentation';
@@ -20,11 +23,17 @@ export function PublicShell({
   showFooter = true,
   viewer,
 }: PublicShellProps) {
+  const pathname = usePathname();
+  const isGuia = pathname?.startsWith('/guia');
+
+  const renderHeader = showHeader && !isGuia;
+  const renderFooter = showFooter && !isGuia;
+
   return (
     <div className="cm-public-shell">
-      {showHeader ? <PublicHeader productName={productName || 'Conexão Maçônica'} logoUrl={logoUrl} viewer={viewer} /> : null}
+      {renderHeader ? <PublicHeader productName={productName || 'Conexão Maçônica'} logoUrl={logoUrl} viewer={viewer} /> : null}
       <main className="cm-public-main">{children}</main>
-      {showFooter ? <PublicFooter /> : null}
+      {renderFooter ? <PublicFooter /> : null}
     </div>
   );
 }
