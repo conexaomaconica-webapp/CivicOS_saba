@@ -5,6 +5,7 @@
   "description": "Next.js App Router — Web application",
   "scripts": {
     "dev": "next dev --port 3000",
+    "prebuild": "pnpm --filter \"!@saas/web\" build",
     "build": "next build",
     "build:mobile": "NEXT_OUTPUT=export next build",
     "start": "next start",
