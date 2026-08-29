@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
 import type { Database, Json } from '@/types/database.types';
 import {
   APPROVED_FONT_STACKS,
@@ -158,7 +159,7 @@ export default function BrandStudioPage() {
         .eq('id', user.id)
         .maybeSingle();
 
-      if (profileError || !profile || !['master', 'socio_admin'].includes(profile.role)) {
+      if (profileError || !profile || !isPlatformAdminRole(profile.role)) {
         router.push('/');
         return;
       }

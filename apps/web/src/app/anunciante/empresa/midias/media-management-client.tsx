@@ -22,6 +22,7 @@ import {
   AdvertiserProfileDTO,
   AdvertiserMediaItem,
   updateAdvertiserMediaAction,
+  uploadAdvertiserAssetAction,
 } from '@/lib/advertiser/advertiser-profile-service';
 
 export default function AdvertiserMediaManagementClient({ data }: { data: AdvertiserProfileDTO }) {
@@ -45,21 +46,32 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      setFeedback({ type: 'error', message: 'O arquivo excede o limite máximo de 5MB.' });
+      setFeedback({ type: 'error', message: 'O arquivo excede o limite máximo permitido de 5MB.' });
       return;
     }
 
     setUploadingLogo(true);
     setFeedback(null);
 
-    // Simula upload com preview imediato
-    setTimeout(async () => {
-      const mockUrl = URL.createObjectURL(file);
-      setLogoUrl(mockUrl);
-      await updateAdvertiserMediaAction(business.id, 'logo', { url: mockUrl });
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('businessId', business.id);
+      formData.append('assetType', 'logo');
+
+      const res = await uploadAdvertiserAssetAction(formData);
+
+      if (res.success && res.url) {
+        setLogoUrl(res.url);
+        setFeedback({ type: 'success', message: 'Logotipo atualizado e salvo no Storage com sucesso.' });
+      } else {
+        setFeedback({ type: 'error', message: res.message || 'Falha ao atualizar logotipo.' });
+      }
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: 'Erro ao processar upload de logotipo.' });
+    } finally {
       setUploadingLogo(false);
-      setFeedback({ type: 'success', message: 'Logotipo atualizado com sucesso.' });
-    }, 1000);
+    }
   };
 
   const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,20 +79,32 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      setFeedback({ type: 'error', message: 'O arquivo excede o limite máximo de 5MB.' });
+      setFeedback({ type: 'error', message: 'O arquivo excede o limite máximo permitido de 5MB.' });
       return;
     }
 
     setUploadingCover(true);
     setFeedback(null);
 
-    setTimeout(async () => {
-      const mockUrl = URL.createObjectURL(file);
-      setCoverUrl(mockUrl);
-      await updateAdvertiserMediaAction(business.id, 'cover', { url: mockUrl });
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('businessId', business.id);
+      formData.append('assetType', 'cover');
+
+      const res = await uploadAdvertiserAssetAction(formData);
+
+      if (res.success && res.url) {
+        setCoverUrl(res.url);
+        setFeedback({ type: 'success', message: 'Imagem de capa atualizada e salva no Storage com sucesso.' });
+      } else {
+        setFeedback({ type: 'error', message: res.message || 'Falha ao atualizar capa.' });
+      }
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: 'Erro ao processar upload de capa.' });
+    } finally {
       setUploadingCover(false);
-      setFeedback({ type: 'success', message: 'Imagem de capa atualizada com sucesso.' });
-    }, 1000);
+    }
   };
 
   const handleAddGalleryPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,38 +114,46 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
     if (gallery.length >= quotas.photos_limit) {
       setFeedback({
         type: 'error',
-        message: `Você utilizou todas as ${quotas.photos_limit} fotos disponíveis no seu Plano Ouro.`,
+        message: `Você utilizou todas as ${quotas.photos_limit} fotos disponíveis no seu plano.`,
       });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setFeedback({ type: 'error', message: 'O arquivo excede o limite máximo permitido de 5MB.' });
       return;
     }
 
     setUploadingPhoto(true);
     setFeedback(null);
 
-    setTimeout(async () => {
-      const mockUrl = URL.createObjectURL(file);
-      const newPhoto: AdvertiserMediaItem = {
-        id: `photo-${Date.now()}`,
-        url: mockUrl,
-        title: newPhotoTitle || `Foto ${gallery.length + 1}`,
-        display_order: gallery.length + 1,
-      };
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('businessId', business.id);
+      formData.append('assetType', 'gallery');
+      if (newPhotoTitle) formData.append('title', newPhotoTitle);
 
-      const res = await updateAdvertiserMediaAction(business.id, 'gallery_add', {
-        url: mockUrl,
-        title: newPhoto.title,
-      });
+      const res = await uploadAdvertiserAssetAction(formData);
 
-      if (res.success) {
-        setGallery([...gallery, newPhoto]);
+      if (res.success && res.url) {
+        const newPhoto: AdvertiserMediaItem = {
+          id: `photo-${Date.now()}`,
+          url: res.url,
+          title: newPhotoTitle || `Foto ${gallery.length + 1}`,
+          display_order: gallery.length + 1,
+        };
+        setGallery((prev) => [...prev, newPhoto]);
         setNewPhotoTitle('');
-        setFeedback({ type: 'success', message: 'Foto adicionada à galeria com sucesso.' });
+        setFeedback({ type: 'success', message: 'Foto adicionada à galeria e salva no Storage com sucesso.' });
       } else {
-        setFeedback({ type: 'error', message: res.message });
+        setFeedback({ type: 'error', message: res.message || 'Falha ao adicionar foto.' });
       }
-
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: 'Erro ao enviar foto para a galeria.' });
+    } finally {
       setUploadingPhoto(false);
-    }, 1000);
+    }
   };
 
   const handleDeletePhoto = async (photoId: string) => {

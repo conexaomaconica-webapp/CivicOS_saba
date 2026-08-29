@@ -2,6 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { headers } from 'next/headers';
+import { getPlanPaymentRulesAction } from '@/lib/payment/payment-service';
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -60,7 +61,6 @@ export async function createDraftBusinessAction(payload: {
     .replace(/^-+|-+$/g, '') || `empresa-${Date.now()}`;
 
   try {
-    // 1. Cria a empresa em estado Rascunho (publication_status = 'draft')
     const { data: created, error } = await supabase
       .from('businesses')
       .insert({
@@ -78,13 +78,12 @@ export async function createDraftBusinessAction(payload: {
       .select('id, name, slug')
       .single();
 
-    if (error && !error.message.includes('fetch failed')) {
+    if (error) {
       throw new Error(`Erro ao criar rascunho de empresa: ${error.message}`);
     }
 
-    const businessId = created?.id || 'business-draft-1';
+    const businessId = created.id;
 
-    // 2. Vincula imediatamente o usuário autenticado como OWNER da empresa (propriedade registrada antes do pagamento)
     await supabase
       .from('business_members')
       .insert({
@@ -97,21 +96,16 @@ export async function createDraftBusinessAction(payload: {
 
     return {
       success: true,
-      business: { id: businessId, name: payload.name, slug: created?.slug || slug },
+      business: { id: businessId, name: payload.name, slug: created.slug || slug },
     };
   } catch (err: any) {
-    if (err.message.includes('fetch failed')) {
-      return {
-        success: true,
-        business: { id: 'business-draft-1', name: payload.name, slug },
-      };
-    }
+    console.error('Erro em createDraftBusinessAction:', err);
     throw err;
   }
 }
 
 // ----------------------------------------------------------------------------
-// 2. SELECIONAR PLANO E GERAR CHECKOUT (COM NORMALIZAÇÃO DE FOUNDER E MULTI-GATEWAY)
+// 2. SELECIONAR PLANO E GERAR CHECKOUT (COM RESOLUÇÃO CANÔNICA DE PREÇOS)
 // ----------------------------------------------------------------------------
 
 export async function selectPlanAndGenerateCheckoutAction(
@@ -121,7 +115,6 @@ export async function selectPlanAndGenerateCheckoutAction(
 ) {
   await resolveTenantIdServer();
 
-  // Normalização estrita: Founder NUNCA é plan_code. É um plano Ouro + modificador Founder se alocado.
   const isFounderRequested = rawPlanCode === 'ouro_founder';
   const planCode = isFounderRequested ? 'ouro' : rawPlanCode;
 
@@ -129,13 +122,10 @@ export async function selectPlanAndGenerateCheckoutAction(
     throw new Error('INVALID_PLAN: Plano selecionado é inválido.');
   }
 
-  const planPricesCents: Record<string, number> = {
-    bronze: 0,
-    prata: 9900,
-    ouro: isFounderRequested ? 29900 : 19900,
-  };
+  // Consulta regras canônicas de pagamento no banco
+  const rules = await getPlanPaymentRulesAction(planCode);
+  const amountCents = rules.amountCents;
 
-  const amountCents = planPricesCents[planCode] ?? 19900;
   const checkoutId = `chk_${provider}_${Date.now()}_${businessId.substring(0, 8)}`;
 
   return {
@@ -148,74 +138,8 @@ export async function selectPlanAndGenerateCheckoutAction(
       isFounderRequested,
       amountCents,
       currency: 'BRL',
-      paymentUrl: `/anunciar/passo-4?checkoutId=${checkoutId}&businessId=${businessId}&plan=${planCode}&provider=${provider}`,
-      qrCodePixUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%231e293b"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="10">PIX MOCK</text></svg>',
+      paymentUrl: `/anunciar/passo-6?checkoutId=${checkoutId}&businessId=${businessId}&plan=${planCode}&provider=${provider}`,
     },
   };
 }
 
-// ----------------------------------------------------------------------------
-// 3. SIMULAÇÃO DE WEBHOOK DE PAGAMENTO CANÔNICO PARA DEV / TESTES
-// ----------------------------------------------------------------------------
-
-export async function confirmPaymentWebhookSimulationAction(
-  businessId: string,
-  planCode: string,
-  canonicalEvent: string = 'payment_confirmed',
-  provider: 'asaas' | 'stripe' | 'mercadopago' = 'asaas'
-) {
-  const supabase = getAdminSupabase();
-  const tenantId = await resolveTenantIdServer();
-
-  const eventId = `evt_sim_${provider}_${Date.now()}`;
-  const normalizedPlan = planCode === 'ouro_founder' ? 'ouro' : planCode;
-
-  try {
-    const { data: rpcRes, error } = await supabase.rpc('process_canonical_billing_event', {
-      p_tenant_id: tenantId,
-      p_provider: provider,
-      p_provider_event_id: eventId,
-      p_canonical_event: canonicalEvent,
-      p_business_id: businessId,
-      p_user_id: 'dev-user-id',
-      p_plan_code: normalizedPlan,
-      p_amount_cents: normalizedPlan === 'ouro' ? 19900 : 9900,
-      p_payload: { provider, method: 'PIX', status: 'CONFIRMED' },
-    });
-
-    if (error && !error.message.includes('fetch failed')) {
-      throw new Error(`Erro no webhook de simulação: ${error.message}`);
-    }
-
-    return {
-      success: true,
-      result: rpcRes || { status: 'processed' },
-    };
-  } catch (err: any) {
-    if (err.message.includes('fetch failed')) {
-      return { success: true, result: { status: 'processed' } };
-    }
-    throw err;
-  }
-}
-
-// ----------------------------------------------------------------------------
-// 4. COBRANÇA TÉCNICA AVULSA DE SMOKE TEST (R$ 1,00 - TECHNICAL_SMOKE_TEST)
-// ----------------------------------------------------------------------------
-
-export async function executeTechnicalSmokeTestChargeAction() {
-  await resolveTenantIdServer();
-
-  const isConfigured = Boolean(process.env.ASAAS_API_KEY && process.env.ASAAS_WEBHOOK_SECRET);
-  const paymentId = `pay_tech_smoke_1brl_${Date.now()}`;
-  const mockPixCopiaECola = `00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-42661417400052040000530398654041.005802BR5920CONEXAO MACONICA 6009SAO PAULO62070503***6304E2E1`;
-
-  return {
-    ok: true,
-    isConfigured,
-    paymentId,
-    amountBrl: 1.00,
-    pixCopiaECola: mockPixCopiaECola,
-    message: 'Cobrança Técnica Avulsa de R$ 1,00 gerada com sucesso para validação de infraestrutura do Asaas.',
-  };
-}

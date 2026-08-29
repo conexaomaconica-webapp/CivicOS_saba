@@ -22,6 +22,7 @@ import {
   togglePublicationStatusAction,
   toggleRecognitionAction,
 } from '@/lib/admin/admin-businesses-service';
+import { canBusinessReceiveRecognition } from '@/lib/business/recognition-eligibility';
 
 interface Props {
   initialData: AdminBusiness360DTO;
@@ -419,6 +420,112 @@ export default function Company360Client({ initialData }: Props) {
               <span className="text-stone-500 block font-bold">Visitas ao Website:</span>
               <p className="text-2xl font-serif font-bold text-stone-900 mt-1">{data.analytics_summary.website_clicks_30d}</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ABA: RECONHECIMENTOS & SELOS INSTITUCIONAIS */}
+      {activeTab === 'reconhecimentos' && (
+        <div className="bg-white border border-stone-300 rounded-2xl p-6 shadow-xs space-y-6 text-left">
+          <div className="flex justify-between items-center border-b border-stone-200 pb-3">
+            <div>
+              <h3 className="font-serif font-bold text-base text-stone-900 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-[#C9A227]" /> Gestão de Reconhecimentos Institucionais
+              </h3>
+              <p className="text-xs text-stone-500 mt-0.5">
+                Plano Atual da Empresa: <strong className="uppercase text-stone-900">{data.business.plan_code}</strong>
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowRecognitionModal(true)}
+              className="px-4 py-2 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] text-xs font-bold rounded-xl border border-[#C9A227]/40 shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 text-[#C9A227]" />
+              <span>Gerenciar Selos</span>
+            </button>
+          </div>
+
+          {/* ALERTA DE INCONSISTÊNCIA HISTÓRICA */}
+          {((data.business.is_pedra_fundamental && !canBusinessReceiveRecognition(data.business.plan_code, 'pedra_fundamental')) ||
+            (data.business.is_coluna_honra && !canBusinessReceiveRecognition(data.business.plan_code, 'coluna_de_honra'))) && (
+            <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl text-amber-900 space-y-2 shadow-xs">
+              <div className="flex items-center gap-2 font-bold text-sm text-amber-900">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                <span>⚠️ Alerta de Inconsistência Histórica de Elegibilidade</span>
+              </div>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Esta empresa possui selos de alto mérito gravados no banco de dados (
+                {data.business.is_pedra_fundamental && 'Pedra Fundamental '}
+                {data.business.is_coluna_honra && 'Coluna de Honra'}) porém seu plano atual é{' '}
+                <strong className="uppercase">{data.business.plan_code}</strong>. Pela regra oficial de elegibilidade por plano, estes selos <strong>permanecem OCULTOS no perfil público</strong> e exigem correção auditada no Admin ou upgrade para Plano Ouro.
+              </p>
+            </div>
+          )}
+
+          {/* LISTA DOS SELOS */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              {
+                key: 'pedra_fundamental',
+                title: 'Pedra Fundamental (10/10)',
+                active: data.business.is_pedra_fundamental,
+                eligible: canBusinessReceiveRecognition(data.business.plan_code, 'pedra_fundamental'),
+              },
+              {
+                key: 'empresa_fundadora',
+                title: 'Empresa Fundadora',
+                active: data.business.is_founder,
+                eligible: canBusinessReceiveRecognition(data.business.plan_code, 'empresa_fundadora'),
+              },
+              {
+                key: 'coluna_de_honra',
+                title: 'Coluna de Honra',
+                active: data.business.is_coluna_honra,
+                eligible: canBusinessReceiveRecognition(data.business.plan_code, 'coluna_de_honra'),
+              },
+              {
+                key: 'empresa_verificada',
+                title: 'Empresa Verificada',
+                active: data.business.is_verified,
+                eligible: canBusinessReceiveRecognition(data.business.plan_code, 'empresa_verificada'),
+              },
+            ].map((seal) => (
+              <div
+                key={seal.key}
+                className={`p-4 rounded-xl border flex items-center justify-between text-xs font-semibold ${
+                  seal.active
+                    ? seal.eligible
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                      : 'bg-amber-50 border-amber-300 text-amber-900'
+                    : 'bg-stone-50 border-stone-200 text-stone-500'
+                }`}
+              >
+                <div>
+                  <span className="font-serif font-bold text-sm block">{seal.title}</span>
+                  <span className="text-[11px] font-mono">
+                    {seal.active
+                      ? seal.eligible
+                        ? '✓ Ativo e Exibido Publicamente'
+                        : '⚠️ Gravado no banco / Oculto no perfil público'
+                      : 'Não Concedido'}
+                  </span>
+                </div>
+
+                <span
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                    seal.active
+                      ? seal.eligible
+                        ? 'bg-emerald-200 text-emerald-900'
+                        : 'bg-amber-200 text-amber-900'
+                      : 'bg-stone-200 text-stone-600'
+                  }`}
+                >
+                  {seal.active ? (seal.eligible ? 'Ativo' : 'Inconsistente') : 'Inativo'}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}

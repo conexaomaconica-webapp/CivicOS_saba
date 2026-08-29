@@ -8,7 +8,11 @@ export const metadata = {
   title: 'Faturas & Pagamentos · Portal do Anunciante | Conexão Maçônica',
 };
 
-export default async function AdvertiserPaymentsPage() {
+export default async function AdvertiserPaymentsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ businessId?: string }>;
+}) {
   let isUserAuthenticated = false;
 
   try {
@@ -23,7 +27,10 @@ export default async function AdvertiserPaymentsPage() {
     redirect('/login?redirect=%2Fanunciante%2Fpagamentos');
   }
 
-  const dto = await getAdvertiserPlanBillingDTOAction();
+  const resolvedParams = searchParams ? await searchParams : undefined;
+  const businessId = resolvedParams?.businessId;
+
+  const dto = await getAdvertiserPlanBillingDTOAction(businessId);
 
   return <AdvertiserPaymentsClient data={dto} />;
 }

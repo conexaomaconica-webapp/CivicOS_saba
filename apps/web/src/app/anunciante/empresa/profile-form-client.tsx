@@ -262,11 +262,11 @@ export default function AdvertiserProfileFormClient({ data }: { data: Advertiser
             <div className="space-y-1">
               <label className="font-bold text-stone-800">Website Oficial</label>
               <input
-                type="url"
+                type="text"
                 value={formData.website}
                 onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                 className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
-                placeholder="https://suaempresa.com.br"
+                placeholder="suaempresa.com.br ou https://suaempresa.com.br"
               />
             </div>
           </div>

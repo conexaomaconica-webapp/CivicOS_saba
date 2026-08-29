@@ -15,6 +15,8 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test --concurrency=1 && node architecture-tests.js",
     "clean": "rimraf --glob packages/*/dist packages/*/*.tsbuildinfo plugins/*/dist plugins/*/*.tsbuildinfo apps/*/.next apps/*/*.tsbuildinfo",
+    "types:supabase": "node scripts/gen-supabase-types.cjs",
+    "types:supabase:local": "node scripts/gen-supabase-types.cjs --local",
     "supabase:start": "node scripts/db-migrate-test.cjs",
     "db:migrate:test": "node scripts/db-migrate-test.cjs",
     "test:rls": "node scripts/run-rls-tests.cjs",

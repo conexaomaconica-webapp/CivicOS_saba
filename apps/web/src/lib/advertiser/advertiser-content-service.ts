@@ -8,27 +8,25 @@ export interface AdvertiserServiceItem {
   id: string;
   title: string;
   description: string;
-  image_url?: string;
-  category?: string;
+  icon_name?: string;
+  price_info?: string;
   is_active: boolean;
   status: ContentStatus;
   status_label: string;
-  views_count?: number;
-  current_public_version?: { title: string; description: string; image_url?: string };
 }
 
 export interface AdvertiserBenefitItem {
   id: string;
   title: string;
   description: string;
-  discount_condition: string;
+  benefit_type?: string;
+  discount_condition?: string;
   expiration_date?: string;
   rules?: string;
   promo_code?: string;
   is_active: boolean;
   status: ContentStatus;
   status_label: string;
-  clicks_count?: number;
 }
 
 export interface AdvertiserEventItem {
@@ -56,11 +54,55 @@ export interface AdvertiserPostItem {
   status_label: string;
 }
 
+export interface DbServiceRow {
+  id: string;
+  name: string;
+  description: string | null;
+  icon_name: string | null;
+  price_info: string | null;
+  is_active: boolean | null;
+}
+
+export interface DbBenefitRow {
+  id: string;
+  title: string;
+  description: string | null;
+  benefit_type: string | null;
+  discount_percentage: number | null;
+  discount_amount: number | null;
+  discount_code: string | null;
+  redeem_instructions: string | null;
+  valid_until: string | null;
+  is_active: boolean | null;
+}
+
+export interface DbEventRow {
+  id: string;
+  title: string;
+  description: string | null;
+  starts_at: string;
+  location_name: string | null;
+  cover_image_url: string | null;
+  external_ticket_url: string | null;
+  is_active: boolean | null;
+  publication_status: string | null;
+}
+
+export interface DbPostRow {
+  id: string;
+  title: string;
+  content: string;
+  cover_image_url: string | null;
+  published_at: string;
+  is_active: boolean | null;
+  publication_status: string | null;
+}
+
 export interface AdvertiserContentDTO {
   business: {
     id: string;
     name: string;
-    slug: string;
+    slug: string | null;
     plan_code: string;
     plan_name: string;
   };
@@ -80,151 +122,177 @@ export interface AdvertiserContentDTO {
   posts: AdvertiserPostItem[];
 }
 
+/**
+ * Carrega todos os conteúdos e cotas reais do anunciante direto do Supabase.
+ * Sem mocks, sem fallbacks fictícios em caso de banco vazio.
+ */
 export async function getAdvertiserContentDataAction(): Promise<AdvertiserContentDTO> {
-  try {
-    const supabase = await createServerSideClient();
-    const { data: userRes } = await supabase.auth.getUser();
+  const supabase = await createServerSideClient();
+  const { data: userRes, error: authError } = await supabase.auth.getUser();
 
-    let b: any = null;
-
-    if (userRes?.user) {
-      const { data: userBiz } = await supabase
-        .from('businesses')
-        .select('*')
-        .eq('owner_id', userRes.user.id)
-        .maybeSingle();
-      b = userBiz;
-    }
-
-    if (!b) {
-      const { data: fallbackBiz } = await supabase
-        .from('businesses')
-        .select('*')
-        .limit(1)
-        .maybeSingle();
-      b = fallbackBiz;
-    }
-
-    const businessId = b?.id || '00000000-0000-0000-0000-000000000001';
-
-    // Carrega serviços
-    const { data: dbServices } = await (supabase as any)
-      .from('business_services')
-      .select('*')
-      .eq('business_id', businessId)
-      .order('created_at', { ascending: false });
-
-    // Carrega benefícios
-    const { data: dbBenefits } = await (supabase as any)
-      .from('business_benefits')
-      .select('*')
-      .eq('business_id', businessId)
-      .order('created_at', { ascending: false });
-
-    // Mapeamento de Serviços
-    const services: AdvertiserServiceItem[] = (dbServices || []).map((s: any) => ({
-      id: s.id,
-      title: s.title,
-      description: s.description || '',
-      image_url: s.image_url || '/capa-padrao.jpg',
-      category: s.category || 'Geral',
-      is_active: Boolean(s.is_active),
-      status: s.is_active ? 'published' : 'inactive',
-      status_label: s.is_active ? 'Publicado' : 'Inativo',
-      views_count: 142,
-    }));
-
-    if (services.length === 0) {
-      services.push(
-        { id: 'srv-1', title: 'Portaria Remota & Controle de Acesso 24h', description: 'Monitoramento 24h em tempo real com atendimento autônomo para condomínios.', is_active: true, status: 'published', status_label: 'Publicado', views_count: 312, category: 'Segurança' },
-        { id: 'srv-2', title: 'Instalação de Câmeras IP & CFTV HD', description: 'Projeto de monitoramento de alta definição com gravação em nuvem.', is_active: true, status: 'published', status_label: 'Publicado', views_count: 184, category: 'CFTV' },
-        { id: 'srv-3', title: 'Terceirização de Limpeza & Conservação', description: 'Mão de obra especializada em conservação predial e corporativa.', is_active: true, status: 'published', status_label: 'Publicado', views_count: 98, category: 'Serviços' },
-        { id: 'srv-4', title: 'Projetos de Alarme de Incêndio & Pânico', description: 'Manutenção e instalação de sistemas de pânico e combate a incêndios.', is_active: true, status: 'under_review', status_label: 'Aguardando análise', views_count: 42, current_public_version: { title: 'Instalação de Alarme de Incêndio', description: 'Manutenção de sistemas contra incêndio.' } }
-      );
-    }
-
-    // Mapeamento de Benefícios
-    const benefits: AdvertiserBenefitItem[] = (dbBenefits || []).map((ben: any) => ({
-      id: ben.id,
-      title: ben.title,
-      description: ben.description || '',
-      discount_condition: ben.discount_condition || '15% de Desconto Fraterno',
-      expiration_date: ben.expiration_date || '31/12/2026',
-      rules: ben.rules || 'Válido mediante comprovação de vínculo maçônico ou código promocional.',
-      promo_code: ben.promo_code || 'MACOM15',
-      is_active: Boolean(ben.is_active),
-      status: ben.is_active ? 'published' : 'inactive',
-      status_label: ben.is_active ? 'Publicado' : 'Inativo',
-      clicks_count: 86,
-    }));
-
-    if (benefits.length === 0) {
-      benefits.push(
-        { id: 'ben-1', title: '15% de Desconto em Projetos de CFTV para Irmãos', description: 'Condição fraterna exclusiva para membros da rede Conexão Maçônica.', discount_condition: '15% OFF na mão de obra', expiration_date: '31/12/2026', promo_code: 'FRATERNO15', is_active: true, status: 'published', status_label: 'Publicado', clicks_count: 62 },
-        { id: 'ben-2', title: 'Primeiro Mês Grátis na Portaria Remota', description: 'Isenção da primeira mensalidade de monitoramento para contratos anuais.', discount_condition: '1ª Mensalidade Grátis', expiration_date: '31/10/2026', promo_code: 'PORTARIAFREE', is_active: true, status: 'published', status_label: 'Publicado', clicks_count: 24 }
-      );
-    }
-
-    // Mapeamento de Eventos
-    const events: AdvertiserEventItem[] = [
-      { id: 'evt-1', title: 'Workshop: Tendências em Segurança Física e Eletrônica 2027', description: 'Palestra presencial para gestores e síndicos sobre automação e portaria virtual.', event_date: '15/09/2026 às 19:00', location: 'Auditório Comandos — São Paulo/SP', cta_link: 'https://comandosseguranca.com.br/workshop', is_active: true, status: 'published', status_label: 'Publicado' },
-    ];
-
-    // Mapeamento de Posts
-    const posts: AdvertiserPostItem[] = [
-      { id: 'pst-1', title: 'Comandos Completa 15 Anos de Inovação em Segurança', content: 'Agradecemos a todos os parceiros e Irmãos da rede pela confiança em nossa jornada.', published_at: '20/08/2026', is_active: true, status: 'published', status_label: 'Publicado' },
-      { id: 'pst-2', title: 'Lançamento do Novo Módulo de Controle por Reconhecimento Facial', content: 'Tecnologia biométrica de ponta integrada à portaria remota.', published_at: '10/08/2026', is_active: true, status: 'published', status_label: 'Publicado' },
-      { id: 'pst-3', title: 'Dicas para Proteger seu Condomínio Durante os Feriados', content: 'Confira os procedimentos essenciais de checagem e vigilância.', published_at: '01/08/2026', is_active: true, status: 'published', status_label: 'Publicado' },
-    ];
-
-    return {
-      business: {
-        id: businessId,
-        name: b?.name || 'Comandos - Terceirização e Segurança Eletrônica',
-        slug: b?.slug || 'comandos-terceirizacao-e-seguranca-eletronica',
-        plan_code: b?.plan_code || 'ouro',
-        plan_name: 'Plano Ouro',
-      },
-      quotas: {
-        services_used: services.length,
-        services_limit: 10,
-        benefits_used: benefits.length,
-        benefits_limit: 5,
-        events_used: events.length,
-        events_limit: 5,
-        posts_used: posts.length,
-        posts_limit: 10,
-      },
-      services,
-      benefits,
-      events,
-      posts,
-    };
-  } catch (_err) {
-    return {
-      business: {
-        id: '00000000-0000-0000-0000-000000000001',
-        name: 'Comandos - Terceirização e Segurança Eletrônica',
-        slug: 'comandos-terceirizacao-e-seguranca-eletronica',
-        plan_code: 'ouro',
-        plan_name: 'Plano Ouro',
-      },
-      quotas: {
-        services_used: 4,
-        services_limit: 10,
-        benefits_used: 2,
-        benefits_limit: 5,
-        events_used: 1,
-        events_limit: 5,
-        posts_used: 3,
-        posts_limit: 10,
-      },
-      services: [],
-      benefits: [],
-      events: [],
-      posts: [],
-    };
+  if (authError || !userRes?.user) {
+    throw new Error('Sessão expirada ou usuário não autenticado.');
   }
+
+  // 1. Resolve a empresa do usuário autenticado
+  const { data: b, error: bizError } = await supabase
+    .from('businesses')
+    .select('id, name, slug, tenant_id')
+    .eq('owner_id', userRes.user.id)
+    .maybeSingle();
+
+  if (bizError || !b) {
+    throw new Error('Nenhuma empresa encontrada para a conta de anunciante conectada.');
+  }
+
+  const businessId = b.id;
+  const tenantId = b.tenant_id;
+
+  // 2. Resolve plano efetivo via _effective_business_plan
+  const { data: effPlan } = await supabase.rpc('_effective_business_plan', {
+    p_tenant_id: tenantId,
+    p_business_id: businessId,
+  });
+
+  const activePlanCode = effPlan?.[0]?.plan_code || 'none';
+
+  // 3. Resolve cotas em plan_entitlements para o plano e tenant da empresa
+  const { data: entitlements } = await supabase
+    .from('plan_entitlements')
+    .select('feature_code, max_limit')
+    .eq('tenant_id', tenantId)
+    .eq('plan_code', activePlanCode);
+
+  const entMap: Record<string, number> = {};
+  (entitlements || []).forEach((e) => {
+    entMap[e.feature_code] = e.max_limit;
+  });
+
+  // 4. Carrega serviços reais do Postgres
+  const { data: dbServices, error: errServices } = await (supabase as any)
+    .from('business_services')
+    .select('id, name, description, icon_name, price_info, is_active')
+    .eq('tenant_id', tenantId)
+    .eq('business_id', businessId)
+    .order('created_at', { ascending: false });
+
+  if (errServices) {
+    throw new Error(`Erro ao carregar serviços do banco: ${errServices.message}`);
+  }
+
+  // 5. Carrega benefícios reais do Postgres
+  const { data: dbBenefits, error: errBenefits } = await (supabase as any)
+    .from('business_benefits')
+    .select('id, title, description, benefit_type, discount_percentage, discount_amount, discount_code, redeem_instructions, valid_until, is_active')
+    .eq('tenant_id', tenantId)
+    .eq('business_id', businessId)
+    .order('created_at', { ascending: false });
+
+  if (errBenefits) {
+    throw new Error(`Erro ao carregar benefícios do banco: ${errBenefits.message}`);
+  }
+
+  // 6. Carrega eventos reais do Postgres
+  const { data: dbEvents, error: errEvents } = await (supabase as any)
+    .from('business_events')
+    .select('id, title, description, starts_at, location_name, cover_image_url, external_ticket_url, is_active, publication_status')
+    .eq('tenant_id', tenantId)
+    .eq('business_id', businessId)
+    .order('created_at', { ascending: false });
+
+  if (errEvents) {
+    throw new Error(`Erro ao carregar eventos do banco: ${errEvents.message}`);
+  }
+
+  // 7. Carrega posts reais do Postgres
+  const { data: dbPosts, error: errPosts } = await (supabase as any)
+    .from('business_posts')
+    .select('id, title, content, cover_image_url, published_at, is_active, publication_status')
+    .eq('tenant_id', tenantId)
+    .eq('business_id', businessId)
+    .order('created_at', { ascending: false });
+
+  if (errPosts) {
+    throw new Error(`Erro ao carregar publicações do banco: ${errPosts.message}`);
+  }
+
+  // Mapeamento estrito sem mocks
+  const services: AdvertiserServiceItem[] = ((dbServices as DbServiceRow[]) || []).map((s: DbServiceRow) => ({
+    id: s.id,
+    title: s.name,
+    description: s.description || '',
+    icon_name: s.icon_name || undefined,
+    price_info: s.price_info || undefined,
+    is_active: Boolean(s.is_active),
+    status: s.is_active ? 'published' : 'inactive',
+    status_label: s.is_active ? 'Publicado' : 'Inativo',
+  }));
+
+  const benefits: AdvertiserBenefitItem[] = ((dbBenefits as DbBenefitRow[]) || []).map((ben: DbBenefitRow) => ({
+    id: ben.id,
+    title: ben.title,
+    description: ben.description || '',
+    benefit_type: ben.benefit_type || undefined,
+    discount_condition: ben.discount_percentage ? `${ben.discount_percentage}% OFF` : ben.benefit_type || 'Benefício Exclusivo',
+    expiration_date: ben.valid_until ? new Date(ben.valid_until).toLocaleDateString('pt-BR') : undefined,
+    rules: ben.redeem_instructions || undefined,
+    promo_code: ben.discount_code || undefined,
+    is_active: Boolean(ben.is_active),
+    status: ben.is_active ? 'published' : 'inactive',
+    status_label: ben.is_active ? 'Publicado' : 'Inativo',
+  }));
+
+  const events: AdvertiserEventItem[] = ((dbEvents as DbEventRow[]) || []).map((e: DbEventRow) => {
+    const isPast = new Date(e.starts_at) < new Date();
+    return {
+      id: e.id,
+      title: e.title,
+      description: e.description || '',
+      event_date: new Date(e.starts_at).toLocaleString('pt-BR'),
+      location: e.location_name || 'A definir',
+      image_url: e.cover_image_url || undefined,
+      cta_link: e.external_ticket_url || undefined,
+      is_active: Boolean(e.is_active),
+      status: isPast ? 'expired' : (e.is_active ? 'published' : 'inactive'),
+      status_label: isPast ? 'Encerrado' : (e.is_active ? 'Publicado' : 'Inativo'),
+      is_expired: isPast,
+    };
+  });
+
+  const posts: AdvertiserPostItem[] = ((dbPosts as DbPostRow[]) || []).map((p: DbPostRow) => ({
+    id: p.id,
+    title: p.title,
+    content: p.content,
+    image_url: p.cover_image_url || undefined,
+    published_at: new Date(p.published_at).toLocaleDateString('pt-BR'),
+    is_active: Boolean(p.is_active),
+    status: p.is_active ? 'published' : 'inactive',
+    status_label: p.is_active ? 'Publicado' : 'Inativo',
+  }));
+
+  return {
+    business: {
+      id: businessId,
+      name: b.name,
+      slug: b.slug,
+      plan_code: activePlanCode,
+      plan_name: activePlanCode === 'ouro' ? 'Plano Ouro' : activePlanCode === 'prata' ? 'Plano Prata' : 'Plano Bronze',
+    },
+    quotas: {
+      services_used: services.filter((s) => s.is_active).length,
+      services_limit: entMap['services_limit'] ?? 0,
+      benefits_used: benefits.filter((b) => b.is_active).length,
+      benefits_limit: entMap['benefits_limit'] ?? 0,
+      events_used: events.filter((e) => e.is_active).length,
+      events_limit: entMap['events_limit'] ?? 0,
+      posts_used: posts.filter((p) => p.is_active).length,
+      posts_limit: entMap['posts_limit'] ?? 0,
+    },
+    services,
+    benefits,
+    events,
+    posts,
+  };
 }
 
 // ----------------------------------------------------------------------
@@ -232,61 +300,68 @@ export async function getAdvertiserContentDataAction(): Promise<AdvertiserConten
 // ----------------------------------------------------------------------
 export async function saveAdvertiserServiceAction(
   service: Partial<AdvertiserServiceItem> & { business_id: string }
-): Promise<{ success: boolean; message: string; isUnderReview?: boolean }> {
+): Promise<{ success: boolean; message: string }> {
   try {
     const supabase = await createServerSideClient();
+    const { data: biz, error: bizErr } = await supabase
+      .from('businesses')
+      .select('tenant_id')
+      .eq('id', service.business_id)
+      .single();
 
-    // Valida cota no servidor se for inserção nova
+    if (bizErr || !biz) {
+      return { success: false, message: 'Empresa não encontrada.' };
+    }
+
     if (!service.id) {
-      const { count } = await (supabase as any)
+      const { error } = await (supabase as any)
         .from('business_services')
-        .select('*', { count: 'exact' })
-        .eq('business_id', service.business_id);
+        .insert({
+          business_id: service.business_id,
+          tenant_id: biz.tenant_id,
+          name: (service.title || '').trim(),
+          description: service.description?.trim() || null,
+          icon_name: service.icon_name || null,
+          price_info: service.price_info || null,
+          is_active: true,
+        })
+        .select()
+        .single();
 
-      const limit = 10;
-      if (count && count >= limit) {
-        return {
-          success: false,
-          message: `Você atingiu o limite de ${limit} serviços do seu Plano Ouro. Faça upgrade para cadastrar mais.`,
-        };
+      if (error) {
+        return { success: false, message: error.message };
       }
-
-      await (supabase as any).from('business_services').insert({
-        business_id: service.business_id,
-        tenant_id: '00000000-0000-0000-0000-000000000001',
-        title: service.title,
-        description: service.description,
-        category: service.category || 'Geral',
-        is_active: true,
-      });
 
       return {
         success: true,
-        isUnderReview: true,
-        message: 'Novo serviço cadastrado com sucesso! A versão atual continuará pública no Guia enquanto verificamos o novo conteúdo.',
+        message: 'Novo serviço cadastrado e publicado com sucesso no Guia!',
       };
     }
 
-    // Atualização de serviço existente
-    await (supabase as any)
+    const { error } = await (supabase as any)
       .from('business_services')
       .update({
-        title: service.title,
-        description: service.description,
-        category: service.category,
+        name: (service.title || '').trim(),
+        description: service.description?.trim() || null,
+        icon_name: service.icon_name || null,
+        price_info: service.price_info || null,
+        updated_at: new Date().toISOString(),
       })
-      .eq('id', service.id);
+      .eq('id', service.id)
+      .eq('business_id', service.business_id);
+
+    if (error) {
+      return { success: false, message: error.message };
+    }
 
     return {
       success: true,
-      isUnderReview: true,
-      message: 'Alterações no serviço salvas! A versão anterior aprovada continuará visível aos clientes no Guia até a conclusão da análise.',
+      message: 'Serviço atualizado com sucesso!',
     };
-  } catch (_e) {
+  } catch (err: unknown) {
     return {
-      success: true,
-      isUnderReview: true,
-      message: 'Serviço salvo! A versão atual continua no ar no Guia Comercial.',
+      success: false,
+      message: err instanceof Error ? err.message : 'Erro interno ao salvar serviço.',
     };
   }
 }
@@ -297,95 +372,181 @@ export async function toggleServiceActiveAction(
 ): Promise<{ success: boolean; message: string }> {
   try {
     const supabase = await createServerSideClient();
-    await (supabase as any)
+    const { error } = await (supabase as any)
       .from('business_services')
-      .update({ is_active: isActive })
+      .update({ is_active: isActive, updated_at: new Date().toISOString() })
       .eq('id', serviceId);
+
+    if (error) {
+      return { success: false, message: error.message };
+    }
 
     return {
       success: true,
       message: isActive ? 'Serviço reativado e publicado no Guia.' : 'Serviço inativado temporariamente.',
     };
-  } catch (_e) {
-    return { success: true, message: 'Status do serviço atualizado.' };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : 'Erro ao alterar status do serviço.',
+    };
   }
 }
 
 // ----------------------------------------------------------------------
-// SERVER ACTIONS: BENEFÍCIOS (NÍVEL 3 - MODERAÇÃO INSTITUCIONAL)
+// SERVER ACTIONS: BENEFÍCIOS
 // ----------------------------------------------------------------------
 export async function saveAdvertiserBenefitAction(
   benefit: Partial<AdvertiserBenefitItem> & { business_id: string }
 ): Promise<{ success: boolean; message: string }> {
   try {
     const supabase = await createServerSideClient();
+    const { data: biz, error: bizErr } = await supabase
+      .from('businesses')
+      .select('tenant_id')
+      .eq('id', benefit.business_id)
+      .single();
+
+    if (bizErr || !biz) {
+      return { success: false, message: 'Empresa não encontrada.' };
+    }
 
     if (!benefit.id) {
-      const { count } = await (supabase as any)
+      const { error } = await (supabase as any)
         .from('business_benefits')
-        .select('*', { count: 'exact' })
-        .eq('business_id', benefit.business_id);
+        .insert({
+          business_id: benefit.business_id,
+          tenant_id: biz.tenant_id,
+          title: (benefit.title || '').trim(),
+          description: (benefit.description || '').trim(),
+          benefit_type: benefit.benefit_type || 'special_condition',
+          discount_code: benefit.promo_code || null,
+          redeem_instructions: benefit.rules || null,
+          is_active: true,
+        });
 
-      const limit = 5;
-      if (count && count >= limit) {
-        return {
-          success: false,
-          message: `Você atingiu o limite de ${limit} benefícios do seu Plano Ouro.`,
-        };
+      if (error) {
+        return { success: false, message: error.message };
       }
-
-      await (supabase as any).from('business_benefits').insert({
-        business_id: benefit.business_id,
-        tenant_id: '00000000-0000-0000-0000-000000000001',
-        title: benefit.title,
-        description: benefit.description,
-        discount_condition: benefit.discount_condition,
-        rules: benefit.rules,
-        promo_code: benefit.promo_code,
-        is_active: true,
-      });
     } else {
-      await (supabase as any)
+      const { error } = await (supabase as any)
         .from('business_benefits')
         .update({
-          title: benefit.title,
-          description: benefit.description,
-          discount_condition: benefit.discount_condition,
-          rules: benefit.rules,
-          promo_code: benefit.promo_code,
+          title: (benefit.title || '').trim(),
+          description: (benefit.description || '').trim(),
+          benefit_type: benefit.benefit_type || 'special_condition',
+          discount_code: benefit.promo_code || null,
+          redeem_instructions: benefit.rules || null,
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', benefit.id);
+        .eq('id', benefit.id)
+        .eq('business_id', benefit.business_id);
+
+      if (error) {
+        return { success: false, message: error.message };
+      }
     }
 
     return {
       success: true,
-      message: 'Oferta Fraterna salva com sucesso! Por se tratar de um benefício exclusivo, a nova condição será revisada pelo Admin antes da publicação pública.',
+      message: 'Oferta Fraterna salva com sucesso!',
     };
-  } catch (_e) {
+  } catch (err: unknown) {
     return {
-      success: true,
-      message: 'Oferta salva com sucesso e enviada para revisão institucional.',
+      success: false,
+      message: err instanceof Error ? err.message : 'Erro interno ao salvar benefício.',
     };
   }
 }
 
+import {
+  createBusinessEventAction,
+  createBusinessPostAction,
+} from '@/app/actions/events-and-posts';
+
 // ----------------------------------------------------------------------
-// SERVER ACTIONS: EVENTOS & POSTS
+// SERVER ACTIONS: EVENTOS & POSTS (Delegando para autoridade canônica)
 // ----------------------------------------------------------------------
 export async function saveAdvertiserEventAction(
-  _event: Partial<AdvertiserEventItem> & { business_id: string }
+  event: Partial<AdvertiserEventItem> & { business_id: string }
 ): Promise<{ success: boolean; message: string }> {
-  return {
-    success: true,
-    message: 'Evento cadastrado com sucesso! A versão atual continuará visível enquanto a nova proposta é analisada.',
-  };
+  try {
+    const supabase = await createServerSideClient();
+    const { data: biz, error: bizErr } = await supabase
+      .from('businesses')
+      .select('tenant_id')
+      .eq('id', event.business_id)
+      .single();
+
+    if (bizErr || !biz) {
+      return { success: false, message: 'Empresa não encontrada.' };
+    }
+
+    const res = await createBusinessEventAction({
+      id: event.id,
+      tenantId: biz.tenant_id,
+      businessId: event.business_id,
+      title: (event.title || '').trim(),
+      description: event.description?.trim() || undefined,
+      startsAt: event.event_date || new Date().toISOString(),
+      locationName: event.location || undefined,
+      externalTicketUrl: event.cta_link || undefined,
+      coverImageUrl: event.image_url || undefined,
+    });
+
+    if (!res.success) {
+      return { success: false, message: res.error || 'Erro ao salvar evento.' };
+    }
+
+    return {
+      success: true,
+      message: 'Evento salvo com sucesso!',
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : 'Erro ao salvar evento.',
+    };
+  }
 }
 
 export async function saveAdvertiserPostAction(
-  _post: Partial<AdvertiserPostItem> & { business_id: string }
+  post: Partial<AdvertiserPostItem> & { business_id: string }
 ): Promise<{ success: boolean; message: string }> {
-  return {
-    success: true,
-    message: 'Publicação registrada com sucesso.',
-  };
+  try {
+    const supabase = await createServerSideClient();
+    const { data: biz, error: bizErr } = await supabase
+      .from('businesses')
+      .select('tenant_id')
+      .eq('id', post.business_id)
+      .single();
+
+    if (bizErr || !biz) {
+      return { success: false, message: 'Empresa não encontrada.' };
+    }
+
+    const res = await createBusinessPostAction({
+      id: post.id,
+      tenantId: biz.tenant_id,
+      businessId: post.business_id,
+      title: (post.title || '').trim(),
+      content: (post.content || '').trim(),
+      publishedAt: post.published_at || new Date().toISOString(),
+      coverImageUrl: post.image_url || undefined,
+    });
+
+    if (!res.success) {
+      return { success: false, message: res.error || 'Erro ao salvar publicação.' };
+    }
+
+    return {
+      success: true,
+      message: 'Publicação registrada com sucesso!',
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : 'Erro ao salvar publicação.',
+    };
+  }
 }

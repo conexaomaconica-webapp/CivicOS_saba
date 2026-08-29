@@ -37,6 +37,7 @@ export default function PaymentManagementClient({
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<string>('todos');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [_activeMainTab, _setActiveMainTab] = useState<'visao_geral' | 'transacoes' | 'conciliacao' | 'assinaturas' | 'gateway'>('visao_geral');
   const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<AdminPaymentListItem | null>(null);
   const [reprocessingId, setReprocessingId] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);

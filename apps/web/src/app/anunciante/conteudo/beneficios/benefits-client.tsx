@@ -52,7 +52,7 @@ export default function AdvertiserBenefitsClient({ data }: { data: AdvertiserCon
     setEditingBenefit(ben);
     setTitle(ben.title);
     setDescription(ben.description);
-    setDiscountCondition(ben.discount_condition);
+    setDiscountCondition(ben.discount_condition || '');
     setPromoCode(ben.promo_code || '');
     setExpirationDate(ben.expiration_date || '31/12/2026');
     setIsModalOpen(true);
@@ -86,8 +86,8 @@ export default function AdvertiserBenefitsClient({ data }: { data: AdvertiserCon
                   description,
                   discount_condition: discountCondition,
                   promo_code: promoCode,
-                  status: 'under_review',
-                  status_label: 'Aguardando análise',
+                  status: 'published',
+                  status_label: 'Publicado',
                 }
               : b
           )
@@ -101,14 +101,13 @@ export default function AdvertiserBenefitsClient({ data }: { data: AdvertiserCon
           promo_code: promoCode,
           expiration_date: expirationDate,
           is_active: true,
-          status: 'under_review',
-          status_label: 'Aguardando análise',
-          clicks_count: 0,
+          status: 'published',
+          status_label: 'Publicado',
         };
         setBenefits([newBen, ...benefits]);
       }
 
-      setFeedback({ type: 'info', message: res.message });
+      setFeedback({ type: 'success', message: res.message });
       setIsModalOpen(false);
     } else {
       setFeedback({ type: 'error', message: res.message });

@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CreditCard, QrCode, CheckCircle2, ShieldCheck, Loader2, Copy, AlertCircle, Lock } from 'lucide-react';
 import { processPixCheckoutAction, processCreditCardCheckoutAction, getPlanPaymentRulesAction, PlanPaymentRules } from '@/lib/payment/payment-service';
-import { confirmPaymentWebhookSimulationAction } from '@/app/actions/onboarding-checkout-actions';
 
 type CheckoutPaymentProps = {
   userEmail: string;
@@ -48,7 +47,6 @@ export default function CheckoutPaymentClient({
     async function loadRules() {
       const rules = await getPlanPaymentRulesAction(planCode);
       setPlanRules(rules);
-      // Pré-gera o PIX ao carregar
       void generatePix(rules);
     }
     void loadRules();
@@ -110,9 +108,7 @@ export default function CheckoutPaymentClient({
       });
 
       if (res.success) {
-        setStatusMsg(`Transação autorizada com sucesso em ${res.installmentCount}x! Aguardando confirmação do Webhook...`);
-        // Simula webhook no dev/sandbox após autorização do backend
-        await confirmPaymentWebhookSimulationAction(businessId, planCode, 'payment_confirmed', 'asaas');
+        setStatusMsg(`Transação autorizada com sucesso em ${res.installmentCount}x! Redirecionando para seu painel...`);
         setTimeout(() => {
           router.push('/anunciante');
         }, 1500);
@@ -132,23 +128,6 @@ export default function CheckoutPaymentClient({
       navigator.clipboard.writeText(pixResult.pixCopiaECola);
       setCopiedPix(true);
       setTimeout(() => setCopiedPix(false), 2500);
-    }
-  };
-
-  // Simula evento do Webhook Asaas
-  const handleSimulateWebhook = async () => {
-    setLoading(true);
-    setStatusMsg('Notificando servidor via Webhook assinado Asaas...');
-    try {
-      const res = await confirmPaymentWebhookSimulationAction(businessId, planCode, 'payment_confirmed', 'asaas');
-      if (res.success) {
-        setStatusMsg('Pagamento confirmado via Webhook! Ativando plano no guia...');
-        setTimeout(() => router.push('/anunciante'), 1200);
-      }
-    } catch {
-      setErrorMsg('Erro ao notificar Webhook.');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -230,27 +209,6 @@ export default function CheckoutPaymentClient({
                   <span>{copiedPix ? 'Copiado!' : 'Copiar'}</span>
                 </button>
               </div>
-            </div>
-
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => void handleSimulateWebhook()}
-                disabled={loading}
-                className="w-full max-w-sm mx-auto px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Aguardando Notificação Webhook...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Simular Notificação do Gateway Asaas</span>
-                  </>
-                )}
-              </button>
             </div>
           </div>
         )}
@@ -380,7 +338,44 @@ export default function CheckoutPaymentClient({
         )}
 
         {statusMsg && (
-          <p className="text-xs text-emerald-400 font-semibold animate-pulse text-center">{statusMsg}</p>
+          <div className="p-6 bg-[#3B0B14] border border-[#C9A227]/40 rounded-2xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center mx-auto text-emerald-400">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-lg font-serif font-bold text-white">Contratação Concluída com Sucesso!</h3>
+
+            <div className="space-y-2 text-xs text-stone-300 max-w-md mx-auto bg-[#1f0509] p-4 rounded-xl border border-stone-800">
+              <div className="flex items-center justify-between py-1 border-b border-stone-800">
+                <span>Pagamento confirmado</span>
+                <span className="font-bold text-emerald-400">✓ Ativo</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-stone-800">
+                <span>Contrato assinado (SHA-256)</span>
+                <span className="font-bold text-emerald-400">✓ Congelado</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-stone-800">
+                <span>Cadastro da empresa</span>
+                <span className="font-bold text-emerald-400">✓ Recebido</span>
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <span>Status Editorial</span>
+                <span className="font-bold text-[#C9A227]">Aguardando Análise</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-stone-300 max-w-md mx-auto">
+              Seu cadastro será analisado antes da publicação no Guia Comercial. Você pode acompanhar o andamento e completar suas mídias diretamente pelo Portal do Anunciante.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => router.push('/anunciante')}
+              className="px-6 py-3 bg-[#C9A227] hover:bg-[#D9B237] text-[#1f0509] font-extrabold text-xs rounded-xl transition-all shadow-lg cursor-pointer"
+            >
+              Ir para meu painel
+            </button>
+          </div>
         )}
 
         {errorMsg && (
@@ -395,7 +390,7 @@ export default function CheckoutPaymentClient({
       <div className="p-4 bg-stone-900/60 border border-stone-800 rounded-xl text-xs text-stone-400 flex items-center gap-3">
         <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0" />
         <span>
-          <strong>Segurança & Privacidade</strong>: Dados sensíveis de cartão jamais são gravados no banco de dados. A ativação do plano exige exclusivamente notificação de Webhook assinado pelo gateway Asaas.
+          <strong>Segurança &amp; Privacidade</strong>: Os dados do cartão são enviados ao processador de pagamentos e não são armazenados pela Conexão Maçônica.
         </span>
       </div>
     </div>

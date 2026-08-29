@@ -16,6 +16,7 @@ import {
 import {
   AdvertiserContentDTO,
   AdvertiserEventItem,
+  saveAdvertiserEventAction,
 } from '@/lib/advertiser/advertiser-content-service';
 
 export default function AdvertiserEventsClient({ data }: { data: AdvertiserContentDTO }) {
@@ -32,17 +33,35 @@ export default function AdvertiserEventsClient({ data }: { data: AdvertiserConte
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setFeedback(null);
 
-    setTimeout(() => {
+    try {
+      const res = await saveAdvertiserEventAction({
+        business_id: business.id,
+        title,
+        description,
+        event_date: eventDate || new Date().toISOString(),
+        location,
+        cta_link: ctaLink,
+      });
+
+      if (!res.success) {
+        setFeedback({
+          type: 'error',
+          message: res.message,
+        });
+        setSaving(false);
+        return;
+      }
+
       const newEvt: AdvertiserEventItem = {
         id: `evt-${Date.now()}`,
         title,
         description,
-        event_date: eventDate,
+        event_date: eventDate || new Date().toLocaleDateString('pt-BR'),
         location,
         cta_link: ctaLink,
         is_active: true,
@@ -54,10 +73,21 @@ export default function AdvertiserEventsClient({ data }: { data: AdvertiserConte
       setSaving(false);
       setFeedback({
         type: 'success',
-        message: 'Evento cadastrado com sucesso! A versão atual continuará visível enquanto a nova proposta é analisada.',
+        message: 'Evento cadastrado com sucesso!',
       });
       setIsModalOpen(false);
-    }, 800);
+      setTitle('');
+      setDescription('');
+      setEventDate('');
+      setLocation('');
+      setCtaLink('');
+    } catch (err: unknown) {
+      setSaving(false);
+      setFeedback({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Erro ao cadastrar evento.',
+      });
+    }
   };
 
   return (

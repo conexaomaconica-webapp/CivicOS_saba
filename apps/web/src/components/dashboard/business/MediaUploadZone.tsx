@@ -47,8 +47,10 @@ export function MediaUploadZone({
       reader.onload = async () => {
         const fileDataUrl = reader.result as string;
         const res = await uploadBusinessAssetAction(businessId, assetType, fileDataUrl);
-        setUrl(res.url);
-        if (onSuccess) onSuccess(res.url);
+        if (res.url) {
+          setUrl(res.url);
+          if (onSuccess) onSuccess(res.url);
+        }
         setIsUploading(false);
       };
       reader.readAsDataURL(file);

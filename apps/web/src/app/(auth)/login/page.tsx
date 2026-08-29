@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { ShieldCheck, Building2, LayoutDashboard, Crown, LogOut, ArrowRight, Loader2, Lock, Mail } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
+import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
+
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -136,7 +138,7 @@ export default function LoginPage() {
   // SESSÃO ATIVA - SELETOR INTELIGENTE DE PORTAIS (CENTRAL DE ACESSOS)
   if (activeUser) {
     const isMaster = userRole === 'master';
-    const isAdmin = userRole === 'master' || userRole === 'socio_admin' || userRole === 'platform_admin';
+    const isAdmin = isPlatformAdminRole(userRole);
     const isAdvertiserOnly = !isAdmin;
 
     return (

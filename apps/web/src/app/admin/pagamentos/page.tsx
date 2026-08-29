@@ -1,16 +1,17 @@
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import PaymentManagementClient from './payment-management-client';
+import { getAsaasSanitizedStatus } from '@/lib/payment/asaas-config';
 
 export const metadata = {
   title: 'Gestão de Pagamentos & Gateways · Painel Admin',
 };
 
 export default async function AdminPaymentsPage() {
+  const supabase = await createServerSideClient();
   let isUserAuthenticated = false;
 
   try {
-    const supabase = await createServerSideClient();
     const { data } = await supabase.auth.getUser();
     isUserAuthenticated = Boolean(data?.user);
   } catch (_e) {
@@ -21,9 +22,10 @@ export default async function AdminPaymentsPage() {
     redirect('/login?redirect=%2Fadmin%2Fpagamentos');
   }
 
-  // Verifica chaves mascaradas sem expor o segredo
-  const isAsaasConfigured = Boolean(process.env.ASAAS_API_KEY && process.env.ASAAS_WEBHOOK_SECRET);
-  const asaasEnvironment = process.env.ASAAS_ENVIRONMENT || 'sandbox';
+  // Sanitized status sem expor valores de secrets ou tokens
+  const status = getAsaasSanitizedStatus();
+  const isAsaasConfigured = status.apiConfigured && status.webhookConfigured;
+  const asaasEnvironment = status.environment;
 
   return (
     <div className="space-y-6">

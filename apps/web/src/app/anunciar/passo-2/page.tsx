@@ -2,10 +2,11 @@ import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { resolveRequestTenantId } from '@/lib/tenant/tenant-resolver';
 import { listBusinessCategories } from '@/lib/business/business-registration-service';
+import OnboardingHeader from '@/components/onboarding/OnboardingHeader';
 import BusinessForm from './business-form';
 
 export const metadata = {
-  title: 'Onboarding Anunciante · Passo 2 — Dados da Empresa',
+  title: 'Onboarding Anunciante · Passo 2 de 6 — Sua Empresa',
 };
 
 export default async function OnboardingStep2Page() {
@@ -23,52 +24,34 @@ export default async function OnboardingStep2Page() {
     listBusinessCategories(supabase),
   ]);
 
-  return (
-    <main
-      style={{
-        minHeight: '100vh',
-        backgroundColor: 'var(--bg-primary)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: 'var(--space-8) var(--space-4)',
-      }}
-    >
-      <div style={{ width: '100%', maxWidth: 560 }}>
-        <div style={{ marginBottom: 'var(--space-6)' }}>
-          <p
-            style={{
-              fontSize: 'var(--text-xs)',
-              fontWeight: 'var(--font-weight-semibold)',
-              color: 'var(--text-secondary)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-            }}
-          >
-            Onboarding Anunciante · Passo 2 de 7
-          </p>
-          <h1
-            style={{
-              fontSize: 'var(--text-2xl)',
-              fontWeight: 'var(--font-weight-bold)',
-              color: 'var(--text-primary)',
-              marginTop: 'var(--space-2)',
-            }}
-          >
-            Dados da Empresa
-          </h1>
-          <p
-            style={{
-              fontSize: 'var(--text-sm)',
-              color: 'var(--text-secondary)',
-              marginTop: 'var(--space-1)',
-            }}
-          >
-            Informe os dados cadastrais. O registro será salvo em formato de rascunho, com você como titular (CRIT-VSC-003).
-          </p>
-        </div>
+  // Buscar rascunho de empresa existente para UPDATE idempotente
+  const { data: existingBiz } = await (supabase as any)
+    .from('businesses')
+    .select('*')
+    .eq('owner_id', user.id)
+    .limit(1)
+    .maybeSingle();
 
-        <BusinessForm categories={categories} tenantId={tenantId} />
+  return (
+    <main className="min-h-screen w-full bg-[#1f0509] text-white flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">
+      <div className="absolute w-[40vw] h-[40vw] rounded-full bg-[#4B161B]/30 top-[-10%] left-[-10%] blur-3xl pointer-events-none" />
+      <div className="absolute w-[40vw] h-[40vw] rounded-full bg-[#C9A227]/15 bottom-[-10%] right-[-10%] blur-3xl pointer-events-none" />
+
+      <div className="w-full max-w-xl z-10 relative space-y-6">
+        <OnboardingHeader
+          currentStep={2}
+          title="2. Sua Empresa Comercial"
+          subtitle="Informe os dados essenciais da empresa. Você poderá completar fotos e galeria no seu painel."
+          businessName={existingBiz?.name}
+        />
+
+        <div className="bg-[#2b060d]/90 border border-[#C9A227]/30 rounded-3xl p-6 shadow-2xl backdrop-blur-md space-y-4">
+          <p className="text-xs text-[#C9A227] bg-[#3B0B14] p-3 rounded-2xl border border-[#C9A227]/30">
+            💡 <strong>Dica:</strong> Logo, capa corporativa, galeria de fotos e horários detalhados poderão ser preenchidos depois no seu Portal do Anunciante.
+          </p>
+
+          <BusinessForm categories={categories} tenantId={tenantId} />
+        </div>
       </div>
     </main>
   );

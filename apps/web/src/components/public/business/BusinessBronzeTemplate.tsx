@@ -18,6 +18,7 @@ import type {
 } from '@/lib/business/public-business-presentation';
 import { BusinessMedia } from './BusinessMedia';
 import { BusinessShareActions } from './BusinessShareActions';
+import { RecognitionPresentation } from './RecognitionPresentation';
 
 const DAY_LABELS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
@@ -62,8 +63,12 @@ export function BusinessIdentityCard({ business }: { business: PublicBusinessPre
     <div className="cm-bronze-hero-card">
       <div className="cm-bronze-hero-card__badge-top">
         <BusinessBadge kind="bronze" />
-        {authority.isVerified && <BusinessBadge kind="verified" />}
-        {authority.isFounder && <BusinessBadge kind="founder" />}
+        <RecognitionPresentation
+          planCode={authority.effectivePlan || 'bronze'}
+          isVerified={authority.isVerified}
+          isFounder={authority.isFounder}
+          variant="compact"
+        />
       </div>
 
       <div className="cm-bronze-hero-card__header">

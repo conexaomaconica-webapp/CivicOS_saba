@@ -1,0 +1,38 @@
+# Diretrizes do Agente (.clinerules) — Next.js + Supabase + Tailwind CSS
+
+Você é um engenheiro full-stack sênior atuando no repositório SaaS Platform / Conexão Maçônica.
+
+Siga rigorosamente as diretrizes centrais descritas em `./AGENTS.md`.
+
+---
+
+## 1. Economia de Tokens & Eficiência de Cache
+* **Prompt Caching & Eficiência:** Organize instruções e regras de projeto no arquivo central estático para maximizar o reuso de cache de contexto nos provedores suportados.
+* **Inspeção Alvo:** Não leia arquivos inteiros. Use `grep_search` para localizar símbolos e inspecione apenas os blocos estritamente necessários.
+* **Preservação de Código:** Altere apenas os trechos estritamente necessários; não reescreva funções ou arquivos intactos.
+* **Comunicação Direta:** Seja conciso. Sem introduções longas ou resumos óbvios.
+* **Bloqueio de Varredura:** Nunca leia `.next/`, `node_modules/`, `dist/`, arquivos `.lock` (`pnpm-lock.yaml`) ou binários compilados.
+
+---
+
+## 2. Next.js (App Router)
+* **Server Components por Padrão:** Mantenha os componentes no servidor (`RSC`). Use `'use client'` apenas para interatividade necessária no cliente.
+* **Data Fetching & Actions:** Realize buscas de dados e mutações via Server Components e Server Actions tipadas.
+* **Navegação e SEO:** Use `next/link` para links internos e `next/image` para imagens com dimensões e acessibilidade. Aplique as regras de metadados dinâmicos e dados estruturados JSON-LD de `docs/SABA-seo.md`.
+
+---
+
+## 3. Supabase & Banco de Dados
+* **Segurança e RLS:** Toda tabela deve ter Row Level Security (RLS) habilitado.
+* **Isolamento de Chaves:** Nunca exponha a `SUPABASE_SERVICE_ROLE_KEY` no client-side.
+* **Cliente Supabase:** Use `@supabase/ssr` com o tipo genérico `Database` de `@/types/database.types`.
+
+---
+
+## 4. Tailwind CSS & UI
+* **Utility-First:** Use exclusivamente classes utilitárias do Tailwind CSS. Mantenha os componentes focados e reutilizáveis com `cn()`.
+
+---
+
+## 5. Validação
+* Execute `pnpm --filter web typecheck` e `pnpm --filter web exec vitest run` para garantir 0 erros de compilação ou regressão.

@@ -168,11 +168,10 @@ export function AdvertiserSidebar({
                     href={targetHref}
                     target={item.isExternal ? '_blank' : undefined}
                     onClick={() => onMobileClose?.()}
-                    className={`flex items-center justify-between px-3 py-2 rounded-xl transition-colors font-medium text-xs ${
-                      active
-                        ? 'bg-[#3B0B14] text-[#C9A227] font-bold border border-[#C9A227]/30'
-                        : 'text-stone-300 hover:bg-stone-800/60 hover:text-white'
-                    }`}
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl transition-colors font-medium text-xs ${active
+                      ? 'bg-[#3B0B14] text-[#C9A227] font-bold border border-[#C9A227]/30'
+                      : 'text-stone-300 hover:bg-stone-800/60 hover:text-white'
+                      }`}
                   >
                     <div className="flex items-center gap-2.5 truncate">
                       <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-[#C9A227]' : 'text-stone-400'}`} />

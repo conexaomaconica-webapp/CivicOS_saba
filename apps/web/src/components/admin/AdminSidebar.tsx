@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
 import {
   LayoutDashboard,
   CheckSquare,
@@ -21,6 +22,7 @@ import {
   Settings,
   ShieldAlert,
   ChevronRight,
+  Award,
   X,
 } from 'lucide-react';
 import { getApprovalDirectoryListAction } from '@/lib/admin/admin-approval-service';
@@ -121,6 +123,12 @@ export const adminNavSections: NavSection[] = [
         path: '/admin/guia/geral',
         icon: BookOpen,
       },
+      {
+        id: 'reconhecimentos',
+        label: 'Selos de Reconhecimento',
+        path: '/admin/reconhecimentos',
+        icon: Award,
+      },
     ],
   },
   {
@@ -199,7 +207,7 @@ export function AdminSidebar({ isMobileOpen = false, onMobileClose, userRole = '
     return pathname?.startsWith(path);
   };
 
-  const isSuperAdmin = userRole === 'master' || userRole === 'superadmin';
+  const isSuperAdmin = isPlatformAdminRole(userRole);
 
   const sidebarContent = (
     <div className="flex flex-col h-full bg-[#3B0B14] text-stone-200 border-r border-[#C9A227]/30">

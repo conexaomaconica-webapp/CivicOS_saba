@@ -380,7 +380,7 @@ export async function getApprovalDossierAction(businessId: string) {
       },
       media: {
         logo_url: b.logo_url || undefined,
-        banner_url: b.banner_url || b.cover_url || undefined,
+        banner_url: undefined, // Capa derivada de business_media.display_order=0 (não existe como coluna)
         gallery: [],
       },
       completeness: {
@@ -394,7 +394,7 @@ export async function getApprovalDossierAction(businessId: string) {
         },
         recommended_quality: {
           logo: Boolean(b.logo_url),
-          banner: Boolean(b.banner_url || b.cover_url),
+          banner: false, // Deve ser resolvido via business_media
           gallery: false,
           description: Boolean(b.description),
           coordinates: Boolean(b.latitude),

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Save, ArrowUp, ArrowDown, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react';
+import { saveDirectoryHomeSettingsAction } from '@/app/actions/directory-home-settings';
 
 type SectionConfig = {
   id: string;
@@ -34,7 +35,6 @@ export default function AdminGuiaGeralPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [tenantId, setTenantId] = useState<string | null>(null);
 
   const [heroTitle, setHeroTitle] = useState('Encontre empresas, serviços e conexões de confiança');
   const [heroSubtitle, setHeroSubtitle] = useState('Descubra oportunidades dentro de uma rede que valoriza relacionamento, credibilidade e propósito.');
@@ -48,7 +48,6 @@ export default function AdminGuiaGeralPage() {
         const supabase = createClient();
         const { data: profileData } = await (supabase as any).from('profiles').select('tenant_id').maybeSingle();
         const tid = profileData?.tenant_id || '00000000-0000-0000-0000-000000000010';
-        setTenantId(tid);
 
         const { data } = await (supabase as any)
           .from('directory_home_settings')
@@ -94,29 +93,20 @@ export default function AdminGuiaGeralPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tenantId) return;
-
     setSaving(true);
     setSuccessMessage(null);
     try {
-      const supabase = createClient();
-      const payload = {
-        tenant_id: tenantId,
+      const res = await saveDirectoryHomeSettingsAction({
         hero_title: heroTitle,
         hero_subtitle: heroSubtitle,
         hero_search_placeholder: heroSearchPlaceholder,
         default_page_size: defaultPageSize,
         sections_config: sections,
-        updated_at: new Date().toISOString(),
-      };
+      });
 
-      const { error } = await (supabase as any)
-        .from('directory_home_settings')
-        .upsert(payload, { onConflict: 'tenant_id' });
-
-      if (error) throw error;
-      setSuccessMessage('Configurações salvas com sucesso!');
-      setTimeout(() => setSuccessMessage(null), 4000);
+      if (!res.success) throw new Error(res.error);
+      setSuccessMessage('Configurações salvas com sucesso! O Hero da página pública /guia foi atualizado em tempo real.');
+      setTimeout(() => setSuccessMessage(null), 5000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro desconhecido ao salvar';
       alert(`Falha ao salvar: ${msg}`);

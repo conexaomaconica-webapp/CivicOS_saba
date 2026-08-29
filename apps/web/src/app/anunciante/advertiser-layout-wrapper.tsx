@@ -5,7 +5,17 @@ import { Menu, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { AdvertiserSidebar } from '@/components/advertiser/AdvertiserSidebar';
 
-export function AdvertiserLayoutWrapper({ children }: { children: React.ReactNode }) {
+interface AdvertiserLayoutWrapperProps {
+  children: React.ReactNode;
+  businessName?: string;
+  businessSlug?: string;
+}
+
+export function AdvertiserLayoutWrapper({
+  children,
+  businessName = 'Minha Empresa',
+  businessSlug = '',
+}: AdvertiserLayoutWrapperProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
@@ -14,8 +24,8 @@ export function AdvertiserLayoutWrapper({ children }: { children: React.ReactNod
       <AdvertiserSidebar
         isMobileOpen={isMobileMenuOpen}
         onMobileClose={() => setIsMobileMenuOpen(false)}
-        businessName="Comandos Terceirização"
-        businessSlug="comandos-terceirizacao-e-seguranca-eletronica"
+        businessName={businessName}
+        businessSlug={businessSlug}
       />
 
       {/* ÁREA PRINCIPAL */}
@@ -36,7 +46,7 @@ export function AdvertiserLayoutWrapper({ children }: { children: React.ReactNod
           </div>
 
           <Link
-            href="/guia/comandos-terceirizacao-e-seguranca-eletronica"
+            href={`/guia/${businessSlug}`}
             target="_blank"
             className="p-1.5 bg-[#3B0B14] text-[#C9A227] rounded-lg border border-[#C9A227]/40 text-xs font-bold flex items-center gap-1"
           >

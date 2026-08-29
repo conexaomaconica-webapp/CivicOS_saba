@@ -9,19 +9,23 @@ export interface AdvertiserInvoiceItem {
   due_date: string;
   paid_at?: string;
   amount_cents: number;
-  status: 'paid' | 'pending' | 'overdue' | 'processing';
+  status: 'paid' | 'pending' | 'overdue' | 'processing' | 'canceled' | 'refunded' | 'partially_refunded';
   status_label: string;
-  payment_method: 'credit_card' | 'pix' | 'boleto';
-  pdf_url?: string;
+  payment_method: string;
+  provider_transaction_id?: string;
+  total_refunded_cents?: number;
 }
 
 export interface AdvertiserPlanBillingDTO {
+  is_empty?: boolean;
+  requires_selection?: boolean;
+  available_businesses?: Array<{ id: string; name: string }>;
   business: {
     id: string;
     name: string;
     slug: string;
     cnpj?: string;
-  };
+  } | null;
   plan: {
     code: string; // 'bronze' | 'prata' | 'ouro'
     name: string;
@@ -33,25 +37,8 @@ export interface AdvertiserPlanBillingDTO {
     renews_at: string;
     payment_method_summary: string;
     badge_label: string;
-  };
-  quotas: {
-    services_used: number;
-    services_limit: number;
-    benefits_used: number;
-    benefits_limit: number;
-    gallery_used: number;
-    gallery_limit: number;
-    events_used: number;
-    events_limit: number;
-    posts_used: number;
-    posts_limit: number;
-  };
-  upgradeRecommendation?: {
-    target_plan_code: string;
-    target_plan_name: string;
-    highlight_features: string[];
-    price_difference_cents: number;
-  };
+    status: string;
+  } | null;
   invoices: AdvertiserInvoiceItem[];
   contract?: {
     snapshot_id: string;
@@ -64,171 +51,237 @@ export interface AdvertiserPlanBillingDTO {
   };
 }
 
-export async function getAdvertiserPlanBillingDTOAction(): Promise<AdvertiserPlanBillingDTO> {
+/**
+ * Retorna os dados financeiros canônicos do anunciante autenticado.
+ * NUNCA utiliza fallback limit(1) arbitrário em empresas de terceiros.
+ */
+export async function getAdvertiserPlanBillingDTOAction(targetBusinessId?: string): Promise<AdvertiserPlanBillingDTO> {
   try {
     const supabase = await createServerSideClient();
     const { data: userRes } = await supabase.auth.getUser();
 
-    let b: any = null;
-
-    if (userRes?.user) {
-      const { data: userBiz } = await supabase
-        .from('businesses')
-        .select('id, name, slug, cnpj, plan_code')
-        .eq('owner_id', userRes.user.id)
-        .maybeSingle();
-      b = userBiz;
+    if (!userRes?.user) {
+      return {
+        is_empty: true,
+        business: null,
+        plan: null,
+        invoices: [],
+      };
     }
 
-    if (!b) {
-      const { data: fallbackBiz } = await supabase
-        .from('businesses')
-        .select('id, name, slug, cnpj, plan_code')
-        .limit(1)
-        .maybeSingle();
-      b = fallbackBiz;
+    const userId = userRes.user.id;
+
+    // 1. Descoberta Canônica de Empresas Autorizadas para o Usuário
+    const { data: ownedBiz } = await supabase
+      .from('businesses')
+      .select('id, name, slug, cnpj, plan_tier, tenant_id')
+      .eq('owner_id', userId);
+
+    const { data: memberBiz } = await supabase
+      .from('business_members')
+      .select('business_id, businesses!inner(id, name, slug, cnpj, plan_tier, tenant_id)')
+      .eq('user_id', userId);
+
+    const allBizMap = new Map<string, any>();
+    (ownedBiz || []).forEach((b) => allBizMap.set(b.id, b));
+    (memberBiz || []).forEach((m) => {
+      if (m.businesses) allBizMap.set(m.businesses.id, m.businesses);
+    });
+
+    const userBusinesses = Array.from(allBizMap.values());
+
+    // Guardrail Multiempresa: 0 empresas -> EMPTY / SAFE
+    if (userBusinesses.length === 0) {
+      return {
+        is_empty: true,
+        business: null,
+        plan: null,
+        invoices: [],
+      };
     }
 
-    const businessId = b?.id || '00000000-0000-0000-0000-000000000001';
-    const planCode = (b?.plan_code || 'ouro').toLowerCase();
+    // Seleção da Empresa
+    let activeBiz = userBusinesses[0];
+    if (targetBusinessId && allBizMap.has(targetBusinessId)) {
+      activeBiz = allBizMap.get(targetBusinessId);
+    } else if (userBusinesses.length > 1 && !targetBusinessId) {
+      // Se houver mais de 1 empresa e nenhuma especificada, retorna opção de seleção sem escolher arbitrariamente
+      return {
+        requires_selection: true,
+        available_businesses: userBusinesses.map((b) => ({ id: b.id, name: b.name })),
+        business: {
+          id: activeBiz.id,
+          name: activeBiz.name,
+          slug: activeBiz.slug,
+          cnpj: activeBiz.cnpj || '',
+        },
+        plan: null,
+        invoices: [],
+      };
+    }
 
-    // Contrato assinado
+    const businessId = activeBiz.id;
+    const tenantId = activeBiz.tenant_id || '00000000-0000-0000-0000-000000000001';
+
+    // 2. Consulta Canônica de Assinatura & Versão do Plano
+    const { data: subData } = await (supabase as any)
+      .from('subscriptions')
+      .select('id, status, current_period_end, plan_versions!inner(id, plan_id, price_annual, plans!inner(code, name))')
+      .eq('tenant_id', tenantId)
+      .eq('business_id', businessId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const planCode = (subData?.plan_versions?.plans?.code || activeBiz.plan_tier || 'prata').toLowerCase();
+    const subStatus = subData?.status || 'active';
+    const renewsAtDate = subData?.current_period_end
+      ? new Date(subData.current_period_end).toLocaleDateString('pt-BR')
+      : 'A renovar';
+
+    const isOuro = planCode === 'ouro';
+    const isPrata = planCode === 'prata';
+
+    // 3. Consulta Canônica de Faturas, Pagamentos e Estornos (Refunds)
+    const { data: invoicesData } = await (supabase as any)
+      .from('invoices')
+      .select('id, invoice_number, amount_due, amount_paid, currency, status, due_date, paid_at, payment_method, idempotency_key, created_at')
+      .eq('tenant_id', tenantId)
+      .eq('business_id', businessId)
+      .order('created_at', { ascending: false });
+
+    const invoiceList = invoicesData || [];
+    const invoiceIds = invoiceList.map((inv: any) => inv.id);
+
+    let paymentsList: any[] = [];
+    if (invoiceIds.length > 0) {
+      const { data: payData } = await (supabase as any)
+        .from('payments')
+        .select('id, invoice_id, amount, payment_method, provider_code, provider_transaction_id, status, paid_at')
+        .in('invoice_id', invoiceIds);
+      paymentsList = payData || [];
+    }
+
+    const paymentIds = paymentsList.map((p) => p.id);
+    let refundsList: any[] = [];
+    if (paymentIds.length > 0) {
+      const { data: refData } = await (supabase as any)
+        .from('payment_refunds')
+        .select('id, payment_id, amount, created_at')
+        .in('payment_id', paymentIds);
+      refundsList = refData || [];
+    }
+
+    // Mapeamento Estruturado de Faturas para o Anunciante
+    const mappedInvoices: AdvertiserInvoiceItem[] = invoiceList.map((inv: any) => {
+      const relatedPayment = paymentsList.find((p) => p.invoice_id === inv.id);
+      const relatedRefunds = relatedPayment
+        ? refundsList.filter((r) => r.payment_id === relatedPayment.id)
+        : [];
+
+      // Cálculo Factual da Soma dos Estornos
+      const totalRefunded = relatedRefunds.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+      const paymentAmount = Number(relatedPayment?.amount || inv.amount_due || 0);
+
+      let invoiceStatus: AdvertiserInvoiceItem['status'] = 'pending';
+      let statusLabel = 'Pendente';
+
+      // Avaliação de Refund
+      if (totalRefunded > 0 && paymentAmount > 0) {
+        if (totalRefunded >= paymentAmount) {
+          invoiceStatus = 'refunded';
+          statusLabel = 'Reembolsado';
+        } else {
+          invoiceStatus = 'partially_refunded';
+          statusLabel = 'Parcialmente Reembolsado';
+        }
+      } else if (inv.status === 'paid' || relatedPayment?.status === 'succeeded') {
+        invoiceStatus = 'paid';
+        statusLabel = 'Pago';
+      } else if (inv.status === 'open') {
+        const isOverdue = new Date(inv.due_date) < new Date();
+        invoiceStatus = isOverdue ? 'overdue' : 'pending';
+        statusLabel = isOverdue ? 'Vencido' : 'Pendente';
+      } else if (inv.status === 'draft') {
+        invoiceStatus = 'processing';
+        statusLabel = 'Em processamento';
+      } else if (inv.status === 'void' || inv.status === 'uncollectible') {
+        invoiceStatus = 'canceled';
+        statusLabel = 'Cancelado';
+      }
+
+      const methodRaw = relatedPayment?.payment_method || inv.payment_method;
+      const paymentMethodFormatted = methodRaw === 'pix' ? 'PIX' : methodRaw === 'credit_card' ? 'Cartão de Crédito' : 'Não informado';
+
+      return {
+        id: inv.id,
+        invoice_number: inv.invoice_number,
+        due_date: new Date(inv.due_date).toLocaleDateString('pt-BR'),
+        paid_at: inv.paid_at ? new Date(inv.paid_at).toLocaleString('pt-BR') : undefined,
+        amount_cents: Math.round(Number(inv.amount_due || 0) * 100),
+        status: invoiceStatus,
+        status_label: statusLabel,
+        payment_method: paymentMethodFormatted,
+        provider_transaction_id: relatedPayment?.provider_transaction_id,
+        total_refunded_cents: Math.round(totalRefunded * 100),
+      };
+    });
+
+    // 4. Consulta de Contrato Assinado Real
     let contractData: any = undefined;
     try {
       const contractRes = await getSignedContractSnapshotAction(businessId);
       if (contractRes.success && contractRes.contract) {
         contractData = {
-          snapshot_id: contractRes.contract.snapshot_id || 'snap_001',
+          snapshot_id: contractRes.contract.snapshot_id || contractRes.contract.contract_id,
           version: contractRes.contract.version || 'v1.0',
-          sha256_hash: contractRes.contract.sha256_hash || '8f3a9e2b1c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f',
-          signed_at: contractRes.contract.signed_at || '2026-08-24T14:32:00Z',
-          ip_address: contractRes.contract.ip_address || '189.120.45.12',
-          user_agent: contractRes.contract.user_agent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-          rendered_text: contractRes.contract.rendered_text || `TERMO DE ADESÃO AO GUIA COMERCIAL CONEXÃO MAÇÔNICA\n\nEmpresa: ${b?.name || 'Comandos Segurança'}\nCNPJ: ${b?.cnpj || '12.345.678/0001-90'}\nPlano: Ouro (Anual BRL 2.388,00)\n\nAo aceitar este termo, a empresa declara concordância integral com as diretrizes de publicação e termos de serviço da plataforma.`,
+          sha256_hash: contractRes.contract.sha256_hash,
+          signed_at: contractRes.contract.accepted_at || contractRes.contract.signed_at,
+          ip_address: contractRes.contract.ip_address,
+          user_agent: contractRes.contract.user_agent,
+          rendered_text: contractRes.contract.rendered_text,
         };
       }
     } catch (_e) {
-      // Fallback contratual em ambiente offline
+      contractData = undefined;
     }
 
-    if (!contractData) {
-      contractData = {
-        snapshot_id: 'snap_001_comandos',
-        version: 'v1.0',
-        sha256_hash: '8f3a9e2b1c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f',
-        signed_at: '2026-08-24T14:32:00Z',
-        ip_address: '189.120.45.12',
-        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        rendered_text: `TERMO DE ADESÃO AO GUIA COMERCIAL CONEXÃO MAÇÔNICA\n\nRazão Social: COMANDOS SEGURANÇA E TERCEIRIZAÇÃO LTDA\nCNPJ: 12.345.678/0001-90\nPlano Selecionado: Plano Ouro (Anual BRL 2.388,00)\nForma de Pagamento: Cartão de Crédito Parcelado em 6x R$ 398,00 sem juros\n\nCláusula 1ª — Do Objeto\nO presente termo consolida o licenciamento da página corporativa e presença destacada no Guia Comercial da Conexão Maçônica...\n\nCláusula 2ª — Da Integridade e Segurança\nEste documento é assinado digitalmente com timestamp confiável e hash de integridade imutável registrado nos servidores da Conexão Maçônica.`,
-      };
-    }
-
-    const isOuro = planCode === 'ouro';
-    const isPrata = planCode === 'prata';
+    // Último Método de Pagamento Usado
+    const lastPaidInvoice = mappedInvoices.find((i) => i.status === 'paid' || i.status === 'refunded');
+    const paymentMethodSummary = lastPaidInvoice ? lastPaidInvoice.payment_method : 'Não informado';
 
     return {
+      is_empty: false,
       business: {
         id: businessId,
-        name: b?.name || 'Sua Empresa Comercial',
-        slug: b?.slug || 'sua-empresa',
-        cnpj: b?.cnpj || '',
+        name: activeBiz.name,
+        slug: activeBiz.slug,
+        cnpj: activeBiz.cnpj || '',
       },
       plan: {
         code: planCode,
         name: isOuro ? 'Plano Ouro' : isPrata ? 'Plano Prata' : 'Plano Bronze',
         slogan: isOuro ? 'Destaque Prioritário & Cotas Ampliadas' : isPrata ? 'Presença Avançada & Ofertas Fraternas' : 'Cadastro Essencial no Guia',
         description: isOuro
-          ? 'Plano completo com prioridade de exibição no Guia Comercial, cotas ampliadas para serviços, ofertas fraternas, fotos da galeria, eventos e publicações corporativas.'
+          ? 'Plano completo com prioridade de exibição no Guia Comercial.'
           : 'Plano intermediário ideal para empresas em expansão regional.',
         amount_cents: isOuro ? 238800 : isPrata ? 178800 : 0,
         billing_cycle: 'annual',
-        is_active: true,
-        renews_at: '24/08/2027',
-        payment_method_summary: 'Cartão de Crédito (Via Asaas — Gateway Seguro)',
-        badge_label: 'Assinatura Ativa',
+        is_active: subStatus === 'active',
+        renews_at: renewsAtDate,
+        payment_method_summary: paymentMethodSummary,
+        badge_label: subStatus === 'active' ? 'Assinatura Ativa' : subStatus === 'past_due' ? 'Assinatura Pendente' : 'Assinatura Inativa',
+        status: subStatus,
       },
-      quotas: {
-        services_used: 4,
-        services_limit: isOuro ? 10 : isPrata ? 5 : 2,
-        benefits_used: 2,
-        benefits_limit: isOuro ? 5 : isPrata ? 2 : 0,
-        gallery_used: 6,
-        gallery_limit: isOuro ? 10 : isPrata ? 6 : 3,
-        events_used: 1,
-        events_limit: isOuro ? 5 : isPrata ? 1 : 0,
-        posts_used: 3,
-        posts_limit: isOuro ? 10 : isPrata ? 3 : 0,
-      },
-      upgradeRecommendation: !isOuro
-        ? {
-            target_plan_code: 'ouro',
-            target_plan_name: 'Plano Ouro',
-            highlight_features: [
-              'Prioridade máxima nas buscas e destaque comercial no Guia',
-              'Cota estendida para até 10 serviços e 5 Ofertas Fraternas',
-              'Divulgação de eventos corporativos e comunicados oficiais',
-              'Condições de parcelamento sem juros no plano anual',
-            ],
-            price_difference_cents: 60000,
-          }
-        : undefined,
-      invoices: [
-        {
-          id: 'inv-2026-001',
-          invoice_number: 'FAT-2026/08-001',
-          due_date: '24/08/2026',
-          paid_at: '24/08/2026 14:35',
-          amount_cents: isOuro ? 238800 : isPrata ? 178800 : 0,
-          status: 'paid',
-          status_label: 'Pago',
-          payment_method: 'credit_card',
-          pdf_url: '/anunciante/faturas/FAT-2026-08-001.pdf',
-        },
-      ],
-      contract: contractData
-        ? {
-            snapshot_id: contractData.snapshot_id,
-            version: contractData.version,
-            sha256_hash: contractData.sha256_hash,
-            signed_at: contractData.signed_at,
-            ip_address: '', // IP omitido da DTO por decisão de privacidade/UI
-            user_agent: contractData.user_agent,
-            rendered_text: contractData.rendered_text,
-          }
-        : undefined,
+      invoices: mappedInvoices,
+      contract: contractData,
     };
-  } catch (_e) {
+  } catch (err: any) {
+    console.error('Erro em getAdvertiserPlanBillingDTOAction:', err);
     return {
-      business: {
-        id: '00000000-0000-0000-0000-000000000001',
-        name: 'Sua Empresa Comercial',
-        slug: 'sua-empresa',
-        cnpj: '',
-      },
-      plan: {
-        code: 'bronze',
-        name: 'Plano Bronze',
-        slogan: 'Cadastro Essencial no Guia Comercial',
-        description: 'Plano inicial para presença no diretório comercial.',
-        amount_cents: 0,
-        billing_cycle: 'annual',
-        is_active: true,
-        renews_at: 'A renovar',
-        payment_method_summary: 'Isento',
-        badge_label: 'Assinatura Ativa',
-      },
-      quotas: {
-        services_used: 0,
-        services_limit: 2,
-        benefits_used: 0,
-        benefits_limit: 0,
-        gallery_used: 0,
-        gallery_limit: 3,
-        events_used: 0,
-        events_limit: 0,
-        posts_used: 0,
-        posts_limit: 0,
-      },
+      is_empty: true,
+      business: null,
+      plan: null,
       invoices: [],
     };
   }
@@ -239,6 +292,6 @@ export async function requestPlanUpgradeAction(
 ): Promise<{ success: boolean; message: string }> {
   return {
     success: true,
-    message: `Solicitação de alteração para o ${targetPlanCode.toUpperCase()} enviada com sucesso! Nossa equipe comercial entrará em contato para aplicar a diferença contratual.`,
+    message: `Solicitação de alteração para o ${targetPlanCode.toUpperCase()} enviada com sucesso! Nossa equipe comercial entrará em contato.`,
   };
 }

@@ -31,7 +31,6 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('Segurança');
 
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
@@ -42,7 +41,6 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
     setEditingService(null);
     setTitle('');
     setDescription('');
-    setCategory('Segurança');
     setIsModalOpen(true);
   };
 
@@ -50,7 +48,6 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
     setEditingService(srv);
     setTitle(srv.title);
     setDescription(srv.description);
-    setCategory(srv.category || 'Segurança');
     setIsModalOpen(true);
   };
 
@@ -64,7 +61,6 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
       business_id: business.id,
       title,
       description,
-      category,
     });
 
     setSaving(false);
@@ -78,10 +74,8 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
                   ...s,
                   title,
                   description,
-                  category,
-                  status: 'under_review',
-                  status_label: 'Aguardando análise',
-                  current_public_version: s.current_public_version || { title: s.title, description: s.description },
+                  status: 'published',
+                  status_label: 'Publicado',
                 }
               : s
           )
@@ -91,17 +85,15 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
           id: `srv-${Date.now()}`,
           title,
           description,
-          category,
           is_active: true,
-          status: 'under_review',
-          status_label: 'Aguardando análise',
-          views_count: 0,
+          status: 'published',
+          status_label: 'Publicado',
         };
         setServices([newSrv, ...services]);
       }
 
       setFeedback({
-        type: res.isUnderReview ? 'info' : 'success',
+        type: 'success',
         message: res.message,
       });
       setIsModalOpen(false);
@@ -235,16 +227,14 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="px-2.5 py-0.5 bg-stone-100 text-stone-700 rounded-lg text-[10px] font-mono font-bold uppercase">
-                    {srv.category}
+                  <span className="px-2.5 py-0.5 bg-amber-50 text-amber-900 border border-amber-200/60 rounded-lg text-[10px] font-mono font-bold uppercase">
+                    Serviço Comercial
                   </span>
 
                   <span
                     className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                       srv.status === 'published'
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : srv.status === 'under_review'
-                        ? 'bg-amber-50 text-amber-800 border border-amber-200'
                         : 'bg-stone-100 text-stone-500'
                     }`}
                   >
@@ -259,16 +249,6 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
                 <p className="text-xs text-stone-600 leading-relaxed line-clamp-3">
                   {srv.description}
                 </p>
-
-                {/* ALERTA DE VERSÃO ANTERIOR PÚBLICA */}
-                {srv.current_public_version && (
-                  <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-[11px] text-amber-900 space-y-0.5">
-                    <span className="font-bold block flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-amber-700" /> Versão atual em exibição pública no Guia:
-                    </span>
-                    <p className="font-medium text-amber-800">&quot;{srv.current_public_version.title}&quot;</p>
-                  </div>
-                )}
               </div>
 
               <div className="pt-3 border-t border-stone-100 flex items-center justify-between text-xs">
@@ -290,7 +270,7 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
 
                 <div className="flex items-center gap-2">
                   <Link
-                    href={`/guia/${business.slug}`}
+                    href={`/guia/${business.slug || '#'}`}
                     target="_blank"
                     className="p-2 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors text-[11px] font-bold flex items-center gap-1"
                   >
@@ -340,17 +320,6 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
                   className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium text-xs"
                   placeholder="Ex: Terceirização de Portaria Virtual 24h"
                   required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-stone-800">Categoria</label>
-                <input
-                  type="text"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium text-xs"
-                  placeholder="Ex: Segurança, Terceirização, TI"
                 />
               </div>
 

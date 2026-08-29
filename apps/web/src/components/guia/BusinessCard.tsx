@@ -45,7 +45,7 @@ export function BusinessCard({
   const isFeatured =
     effectivePlan != null &&
     (featured || hasBusinessEntitlement(effectivePlan, 'featured_listing'));
-  const href = `/guia/${business.slug ?? business.id}`;
+  const href = `/guia/${business.slug}`;
 
   return (
     <article

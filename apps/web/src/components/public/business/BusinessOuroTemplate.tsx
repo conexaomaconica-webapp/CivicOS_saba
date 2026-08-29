@@ -7,7 +7,6 @@ import {
   MapPin,
   Navigation,
   Phone,
-  ShieldCheck,
   Star,
   Tag,
   Globe,
@@ -18,6 +17,7 @@ import type {
 } from '@/lib/business/public-business-presentation';
 import { BusinessMedia } from './BusinessMedia';
 import { BusinessShareActions } from './BusinessShareActions';
+import { RecognitionPresentation } from './RecognitionPresentation';
 import styles from '@/components/visual-lab/FigmaOuroView.module.css';
 
 const DAY_LABELS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
@@ -95,17 +95,13 @@ export function BusinessOuroTemplate({ business }: { business: PublicBusinessPre
           {/* Identity & Badges */}
           <div className={styles.identityGroup}>
             <div className={styles.badgesRow} data-testid="ouro-badges-row">
-              {authority.isVerified && (
-                <span className={styles.badgeVerified}>
-                  <ShieldCheck className="w-3.5 h-3.5" /> Empresa Verificada
-                </span>
-              )}
               <span className={styles.badgeOuro}>👑 PLANO OURO</span>
-              {authority.isFounder && (
-                <span className={styles.badgeFounder}>
-                  <Star className="w-3.5 h-3.5 fill-current" /> EMPRESA FUNDADORA
-                </span>
-              )}
+              <RecognitionPresentation
+                planCode={authority.effectivePlan || 'ouro'}
+                isVerified={authority.isVerified}
+                isFounder={authority.isFounder}
+                variant="compact"
+              />
             </div>
 
             <h1 className={styles.title}>{identity.name}</h1>

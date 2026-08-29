@@ -6,18 +6,98 @@ import {
   PixChargeResult,
   CreditCardChargeResult,
 } from './payment-provider.interface';
+import { getAsaasConfig } from './asaas-config';
 
 export class AsaasPaymentProvider implements IPaymentProvider {
   private baseUrl: string;
   private apiKey: string;
+  private configured: boolean;
 
   constructor() {
-    this.baseUrl = (process.env.ASAAS_API_BASE_URL || 'https://api.asaas.com/v3').replace(/\/$/, '');
-    this.apiKey = process.env.ASAAS_API_KEY || '';
+    try {
+      const config = getAsaasConfig();
+      this.baseUrl = config.baseUrl;
+      this.apiKey = config.apiKey;
+      this.configured = config.isApiConfigured;
+    } catch (err) {
+      this.baseUrl = 'https://sandbox.asaas.com/api/v3';
+      this.apiKey = '';
+      this.configured = false;
+    }
   }
 
   private isConfigured(): boolean {
-    return Boolean(this.apiKey && this.apiKey.length > 10);
+    return this.configured;
+  }
+
+  // 0. Reconciliação Externa: Busca cobrança no Asaas por externalReference exata
+  async findPaymentByExternalReference(externalReference: string): Promise<{
+    found: boolean;
+    paymentId?: string;
+    status?: string;
+    amountCents?: number;
+    billingType?: string;
+    pixCopiaECola?: string;
+    qrCodeBase64?: string;
+  }> {
+    if (!this.isConfigured() || !externalReference) {
+      return { found: false };
+    }
+
+    try {
+      const res = await fetch(`${this.baseUrl}/payments?externalReference=${encodeURIComponent(externalReference)}`, {
+        method: 'GET',
+        headers: {
+          access_token: this.apiKey,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) return { found: false };
+
+      const json = await res.json();
+      const list = json?.data || [];
+
+      if (list.length === 0) {
+        return { found: false };
+      }
+
+      // Guardrail 4: Se o Asaas devolver > 1 cobrança para a mesma referência exata, interrompe por anomalia
+      if (list.length > 1) {
+        throw new Error(`ANOMALY_MULTIPLE_PAYMENTS_FOR_EXTERNAL_REFERENCE: Foram encontradas ${list.length} cobranças no Asaas com externalReference ${externalReference}`);
+      }
+
+      const pay = list[0];
+      let pixCopiaECola: string | undefined;
+      let qrCodeBase64: string | undefined;
+
+      if (pay.billingType === 'PIX') {
+        const qrRes = await fetch(`${this.baseUrl}/payments/${pay.id}/pixQrCode`, {
+          method: 'GET',
+          headers: { access_token: this.apiKey },
+        });
+        if (qrRes.ok) {
+          const qrJson = await qrRes.json();
+          pixCopiaECola = qrJson.payload;
+          qrCodeBase64 = qrJson.encodedImage;
+        }
+      }
+
+      return {
+        found: true,
+        paymentId: pay.id,
+        status: pay.status,
+        amountCents: Math.round((pay.value || 0) * 100),
+        billingType: pay.billingType,
+        pixCopiaECola,
+        qrCodeBase64,
+      };
+    } catch (err: any) {
+      if (err.message?.includes('ANOMALY_MULTIPLE_PAYMENTS')) {
+        throw err;
+      }
+      return { found: false };
+    }
   }
 
   // 1. Criar / Obter Cliente no Asaas
@@ -75,6 +155,19 @@ export class AsaasPaymentProvider implements IPaymentProvider {
     const valueBrl = (charge.amountCents / 100).toFixed(2);
     const idempotencyKey = charge.idempotencyKey || `pix_${charge.businessId}_${Date.now()}`;
 
+    // 2.1 Reconciliação prévia de timeout / retry
+    const existing = await this.findPaymentByExternalReference(idempotencyKey);
+    if (existing.found && existing.paymentId) {
+      return {
+        success: true,
+        paymentId: existing.paymentId,
+        pixCopiaECola: existing.pixCopiaECola || `00020126580014BR.GOV.BCB.PIX0136${existing.paymentId}`,
+        qrCodeBase64: existing.qrCodeBase64,
+        amountCents: existing.amountCents || charge.amountCents,
+        status: existing.status || 'Aguardando pagamento',
+      };
+    }
+
     if (!this.isConfigured()) {
       const mockPixCopiaECola = `00020126580014BR.GOV.BCB.PIX0136${idempotencyKey}5204000053039865404${valueBrl}5802BR5920CONEXAO MACONICA 6009SAO PAULO6304E2E1`;
       return {
@@ -101,7 +194,7 @@ export class AsaasPaymentProvider implements IPaymentProvider {
           value: parseFloat(valueBrl),
           dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           description: charge.description,
-          externalReference: charge.businessId,
+          externalReference: idempotencyKey,
         }),
       });
 
@@ -138,7 +231,6 @@ export class AsaasPaymentProvider implements IPaymentProvider {
         status: 'Aguardando pagamento',
       };
     } catch (err: any) {
-      // Fallback gracioso com mensagem amigável sem expor detalhes sensíveis
       return {
         success: false,
         paymentId: '',
@@ -150,7 +242,7 @@ export class AsaasPaymentProvider implements IPaymentProvider {
     }
   }
 
-  // 3. Criar Cobrança em Cartão de Crédito Parcelado (SEMPRE PROCESSADO NO BACKEND)
+  // 3. Criar Cobrança em Cartão de Crédito Parcelado (SEMPRE PROCESSADO NO BACKEND COM GUARDRAIL DE CARTÃO)
   async createCreditCardCharge(
     charge: PaymentChargeData,
     customer: PaymentCustomerData,
@@ -159,9 +251,23 @@ export class AsaasPaymentProvider implements IPaymentProvider {
     const valueBrl = (charge.amountCents / 100).toFixed(2);
     const installmentCount = Math.max(1, charge.installmentCount || 1);
     const installmentValueCents = Math.round(charge.amountCents / installmentCount);
+    const idempotencyKey = charge.idempotencyKey || `card_${charge.businessId}_${Date.now()}`;
 
-    // AUDITORIA DE SEGURANÇA: NUNCA LOGAR NÚMERO DE CARTÃO OU CVV
+    // GUARDRAIL 8 DE CARTÃO: NUNCA LOGAR NÚMERO DE CARTÃO (PAN) OU CVV
     console.log(`[PAYMENT_LOG] Processando cobrança cartão para businessId=${charge.businessId}, parcelas=${installmentCount}x, valorCents=${charge.amountCents}`);
+
+    // Reconciliação prévia de timeout / retry
+    const existing = await this.findPaymentByExternalReference(idempotencyKey);
+    if (existing.found && existing.paymentId) {
+      return {
+        success: true,
+        paymentId: existing.paymentId,
+        status: existing.status || 'CONFIRMED',
+        amountCents: existing.amountCents || charge.amountCents,
+        installmentCount,
+        installmentValueCents,
+      };
+    }
 
     if (!this.isConfigured()) {
       return {
@@ -183,7 +289,7 @@ export class AsaasPaymentProvider implements IPaymentProvider {
         value: parseFloat(valueBrl),
         dueDate: new Date().toISOString().split('T')[0],
         description: charge.description,
-        externalReference: charge.businessId,
+        externalReference: idempotencyKey,
         creditCard: {
           holderName: card.holderName,
           number: card.cardNumber.replace(/\D/g, ''),
@@ -217,6 +323,7 @@ export class AsaasPaymentProvider implements IPaymentProvider {
       const cardJson = await cardRes.json().catch(() => ({}));
 
       if (!cardRes.ok) {
+        // Sanitiza a resposta de erro para não ecoar dados sensíveis de cartão
         const friendlyError = cardJson?.errors?.[0]?.description || 'Transação de cartão não autorizada pela operadora.';
         return {
           success: false,

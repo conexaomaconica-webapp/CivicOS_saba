@@ -1,7 +1,8 @@
 'use server';
 
-import { createServerSideClient } from '@/lib/supabase/server';
+import { assertPlatformAdminAccess } from './admin-auth-helper';
 import { revalidatePath } from 'next/cache';
+import { resolveLogoUrl } from '@/lib/business/business-media-helpers';
 
 export interface AdminBusinessListItem {
   id: string;
@@ -150,13 +151,14 @@ export async function getAdminBusinessesListAction(params?: {
   page?: number;
   pageSize?: number;
 }) {
+  const { supabase } = await assertPlatformAdminAccess();
+
   const page = params?.page || 1;
   const pageSize = params?.pageSize || 20;
   const offset = (page - 1) * pageSize;
 
   try {
-    const supabase = await createServerSideClient();
-    let query = supabase.from('businesses').select('*', { count: 'exact' });
+    let query = (supabase as any).from('businesses').select('*', { count: 'exact' });
 
     if (params?.query) {
       const q = `%${params.query.toLowerCase()}%`;
@@ -164,9 +166,7 @@ export async function getAdminBusinessesListAction(params?: {
     }
 
     if (params?.status && params.status !== 'all') {
-      if (params.status === 'inadimplente') {
-        // empresas com pagamento pendente
-      } else {
+      if (params.status !== 'inadimplente') {
         query = query.eq('publication_status', params.status);
       }
     }
@@ -187,380 +187,179 @@ export async function getAdminBusinessesListAction(params?: {
       .order('created_at', { ascending: false })
       .range(offset, offset + pageSize - 1);
 
-    const { data: allBizData } = await supabase.from('businesses').select('*');
+    const { data: allBizData } = await (supabase as any).from('businesses').select('*');
     const allBiz = (allBizData || []) as any[];
 
-    const totalPortfolio = allBiz.length || 15;
-    const publishedCount = allBiz.filter((b) => b.publication_status === 'published').length || 12;
-    const suspendedCount = allBiz.filter((b) => b.publication_status === 'suspended').length || 1;
-    const pendingCount = allBiz.filter((b) => b.publication_status === 'pending_review').length || 4;
-    const pedraCount = allBiz.filter((b) => b.is_pedra_fundamental).length || 1;
+    const totalPortfolio = allBiz.length;
+    const publishedCount = allBiz.filter((b) => b.publication_status === 'published').length;
+    const suspendedCount = allBiz.filter((b) => b.publication_status === 'suspended').length;
+    const pendingCount = allBiz.filter((b) => b.publication_status === 'pending_review').length;
+    const pedraCount = allBiz.filter((b) => b.is_pedra_fundamental).length;
 
     const kpis = {
       total: totalPortfolio,
       published: publishedCount,
       suspended: suspendedCount,
       pending: pendingCount,
-      overdue: 1,
-      incomplete: 3,
+      overdue: 0,
+      incomplete: 0,
       pedra_fundamental_count: pedraCount,
     };
 
     const counts = {
       todas: totalPortfolio,
       publicadas: publishedCount,
-      inadimplentes: 1,
+      inadimplentes: 0,
       suspensas: suspendedCount,
-      incompletas: 3,
-      bronze: allBiz.filter((b) => b.plan_code === 'bronze').length || 2,
-      prata: allBiz.filter((b) => b.plan_code === 'prata').length || 8,
-      ouro: allBiz.filter((b) => b.plan_code === 'ouro').length || 5,
+      incompletas: 0,
+      bronze: allBiz.filter((b) => b.plan_code === 'bronze').length,
+      prata: allBiz.filter((b) => b.plan_code === 'prata').length,
+      ouro: allBiz.filter((b) => b.plan_code === 'ouro').length,
       pedraFundamental: pedraCount,
     };
 
-    let items: AdminBusinessListItem[] = [];
-    if (data && data.length > 0) {
-      items = data.map((b: any) => ({
-        id: b.id,
-        tenant_id: b.tenant_id || '00000000-0000-0000-0000-000000000010',
-        name: b.name || 'Empresa Anunciante',
-        legal_name: b.legal_name || b.name,
-        cnpj_cpf: b.cnpj_cpf || '12.345.678/0001-90',
-        category: b.category || 'Serviços & Comércio',
-        city: b.city || 'São Paulo',
-        state: b.state || 'SP',
-        owner_name: 'Eduardo Comandos',
-        owner_email: b.email || 'contato@anunciante.com',
-        publication_status: (b.publication_status || 'published') as any,
-        payment_status: b.publication_status === 'published' ? 'paid' : 'pending',
-        plan_code: b.plan_code || 'prata',
-        completeness_percent: 92,
-        is_founder: Boolean(b.is_founder),
-        is_pedra_fundamental: Boolean(b.is_pedra_fundamental),
-        is_coluna_honra: Boolean(b.is_coluna_honra),
-        is_verified: true,
-        masonic_relation: 'Irmão / Maçom',
-        masonic_role: 'Proprietário',
-        created_at: b.created_at || new Date().toISOString(),
-      }));
-    } else {
-      items = [
-        {
-          id: '00000000-0000-0000-0000-000000000001',
-          tenant_id: '00000000-0000-0000-0000-000000000010',
-          name: 'Comandos - Terceirização e Segurança Eletrônica',
-          legal_name: 'Comandos Terceirização de Serviços EIRELI',
-          cnpj_cpf: '12.345.678/0001-90',
-          category: 'Segurança Eletrônica & Terceirização',
-          city: 'São Paulo',
-          state: 'SP',
-          owner_name: 'Eduardo Comandos',
-          owner_email: 'contato@comandosseguranca.com.br',
-          publication_status: 'published',
-          payment_status: 'paid',
-          plan_code: 'ouro',
-          completeness_percent: 92,
-          is_founder: true,
-          is_pedra_fundamental: true,
-          is_coluna_honra: true,
-          is_verified: true,
-          masonic_relation: 'Irmão',
-          masonic_role: 'Sócio-Diretor',
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000002',
-          tenant_id: '00000000-0000-0000-0000-000000000010',
-          name: 'Advocacia Silva & Irmãos',
-          legal_name: 'Silva Advocacia & Consultoria',
-          cnpj_cpf: '98.765.432/0001-10',
-          category: 'Serviços Jurídicos',
-          city: 'Campinas',
-          state: 'SP',
-          owner_name: 'Dr. Silva',
-          owner_email: 'silva@advocacia.com',
-          publication_status: 'published',
-          payment_status: 'paid',
-          plan_code: 'prata',
-          completeness_percent: 100,
-          is_founder: false,
-          is_pedra_fundamental: false,
-          is_coluna_honra: false,
-          is_verified: true,
-          masonic_relation: 'Irmão',
-          masonic_role: 'Titular',
-          created_at: new Date().toISOString(),
-        },
-      ];
-    }
+    const items: AdminBusinessListItem[] = (data || []).map((b: any) => ({
+      id: b.id,
+      tenant_id: b.tenant_id || '00000000-0000-0000-0000-000000000001',
+      name: b.name || 'Empresa Anunciante',
+      legal_name: b.legal_name || b.name,
+      cnpj_cpf: b.cnpj_cpf || b.cnpj || 'Não informado',
+      category: b.category || 'Geral',
+      city: b.city || 'São Paulo',
+      state: b.state || 'SP',
+      owner_name: 'Anunciante Titular',
+      owner_email: b.email || 'contato@anunciante.com',
+      publication_status: (b.publication_status || 'published') as any,
+      payment_status: b.publication_status === 'published' ? 'paid' : 'pending',
+      plan_code: b.plan_code || 'prata',
+      completeness_percent: 92,
+      is_founder: Boolean(b.is_founder),
+      is_pedra_fundamental: Boolean(b.is_pedra_fundamental),
+      is_coluna_honra: Boolean(b.is_coluna_honra),
+      is_verified: Boolean(b.is_verified),
+      masonic_relation: 'Irmão / Maçom',
+      masonic_role: 'Proprietário',
+      created_at: b.created_at || new Date().toISOString(),
+    }));
 
     return { items, total: count || items.length, kpis, counts };
   } catch (_err) {
     return {
-      items: [
-        {
-          id: '00000000-0000-0000-0000-000000000001',
-          tenant_id: '00000000-0000-0000-0000-000000000010',
-          name: 'Comandos - Terceirização e Segurança Eletrônica',
-          legal_name: 'Comandos Terceirização de Serviços EIRELI',
-          cnpj_cpf: '12.345.678/0001-90',
-          category: 'Segurança Eletrônica & Terceirização',
-          city: 'São Paulo',
-          state: 'SP',
-          owner_name: 'Eduardo Comandos',
-          owner_email: 'contato@comandosseguranca.com.br',
-          publication_status: 'published',
-          payment_status: 'paid',
-          plan_code: 'ouro',
-          completeness_percent: 92,
-          is_founder: true,
-          is_pedra_fundamental: true,
-          is_coluna_honra: true,
-          is_verified: true,
-          created_at: new Date().toISOString(),
-        },
-      ],
-      total: 1,
-      kpis: { total: 15, published: 12, suspended: 1, pending: 4, overdue: 1, incomplete: 3, pedra_fundamental_count: 1 },
-      counts: { todas: 15, publicadas: 12, inadimplentes: 1, suspensas: 1, incompletas: 3, bronze: 2, prata: 8, ouro: 5, pedraFundamental: 1 },
+      items: [],
+      total: 0,
+      kpis: { total: 0, published: 0, suspended: 0, pending: 0, overdue: 0, incomplete: 0, pedra_fundamental_count: 0 },
+      counts: { todas: 0, publicadas: 0, inadimplentes: 0, suspensas: 0, incompletas: 0, bronze: 0, prata: 0, ouro: 0, pedraFundamental: 0 },
     };
   }
 }
 
-export async function getAdminBusiness360Action(businessId: string): Promise<AdminBusiness360DTO> {
+export async function getAdminBusiness360Action(businessId: string): Promise<AdminBusiness360DTO | null> {
+  const { supabase } = await assertPlatformAdminAccess();
+
   try {
-    const supabase = await createServerSideClient();
-    const { data: dbData } = await supabase
+    const { data: bRaw } = await (supabase as any)
       .from('businesses')
       .select('*')
       .eq('id', businessId)
       .maybeSingle();
 
-    const b = dbData as any;
+    if (!bRaw) return null;
+    const b = bRaw as any;
 
-    const defaultDTO: AdminBusiness360DTO = {
-      business: {
-        id: businessId,
-        tenant_id: b?.tenant_id || '00000000-0000-0000-0000-000000000010',
-        name: b?.name || 'Comandos - Terceirização e Segurança Eletrônica',
-        legal_name: b?.legal_name || 'Comandos Terceirização de Serviços EIRELI',
-        cnpj_cpf: b?.cnpj_cpf || '12.345.678/0001-90',
-        category: b?.category || 'Segurança Eletrônica & Terceirização',
-        description: b?.description || 'Soluções corporativas completas em segurança eletrônica, controle de acesso e terceirização de portaria.',
-        city: b?.city || 'São Paulo',
-        state: b?.state || 'SP',
-        address: b?.address || 'Av. Paulista, 1000 - Cj 501',
-        latitude: b?.latitude || -23.5614,
-        longitude: b?.longitude || -46.6558,
-        phone: b?.phone || '(11) 3333-4444',
-        whatsapp: b?.whatsapp || '(11) 98888-7777',
-        email: b?.email || 'contato@comandosseguranca.com.br',
-        website: b?.website || 'https://comandosseguranca.com.br',
-        social_instagram: '@comandosseguranca',
-        logo_url: b?.logo_url || '/logoconexao_red_vert.png',
-        cover_url: b?.cover_url || '/capa-padrao.jpg',
-        publication_status: b?.publication_status || 'published',
-        is_active: true,
-        is_founder: b ? Boolean(b.is_founder) : true,
-        is_pedra_fundamental: b ? Boolean(b.is_pedra_fundamental) : true,
-        is_coluna_honra: b ? Boolean(b.is_coluna_honra) : true,
-        is_verified: true,
-        plan_code: b?.plan_code || 'ouro',
-        completeness_percent: 92,
-        created_at: b?.created_at || new Date().toISOString(),
-        updated_at: b?.updated_at || new Date().toISOString(),
-      },
-      owner: {
-        id: 'owner-1',
-        full_name: 'Eduardo Comandos',
-        email: 'contato@comandosseguranca.com.br',
-        phone: '(11) 98888-7777',
-        company_role: 'Sócio-Diretor',
-      },
-      masonic_link: {
-        relation: 'Irmão / Maçom',
-        role: 'Sócio-Diretor',
-        potency: 'GLESP / GOB',
-        lodge_name: 'ARLS Ciência e Virtude nº 1234',
-        is_verified: true,
-      },
-      contract: {
-        id: 'contract-001',
-        version: 'v1.0',
-        sha256_hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-        signed_at: new Date().toISOString(),
-        rendered_text: 'Contrato Oficial de Adesão Comercial ao Guia Maçônico...',
-        signer_name: 'Eduardo Comandos',
-      },
-      subscription: {
-        plan_code: b?.plan_code || 'ouro',
-        plan_name: 'Plano Ouro Anual',
-        amount_brl: 2388.0,
-        periodicity: 'anual',
-        status: 'paid',
-        start_date: '2026-08-24T00:00:00.000Z',
-        next_billing_date: '2027-08-24T00:00:00.000Z',
-        entitlements: {
-          services_limit: 10,
-          benefits_limit: 5,
-          gallery_limit: 10,
-          events_limit: 10,
-          posts_limit: 10,
-        },
-      },
-      payments_history: [
-        {
-          id: 'pay-001',
-          date: new Date().toISOString(),
-          amount_brl: 2388.0,
-          payment_method: 'Cartão de Crédito',
-          installments: 12,
-          status_label: 'Confirmado / Pago',
-        },
-      ],
-      content_summary: {
-        logo_url: '/logoconexao_red_vert.png',
-        cover_url: '/capa-padrao.jpg',
-        gallery_count: 7,
-        gallery_limit: 10,
-        services_count: 4,
-        services_limit: 10,
-        benefits_count: 2,
-        benefits_limit: 5,
-        events_count: 1,
-        events_limit: 10,
-      },
-      analytics_summary: {
-        views_30d: 485,
-        views_growth_percent: 18.4,
-        interactions_30d: 94,
-        whatsapp_clicks_30d: 42,
-        route_clicks_30d: 28,
-        website_clicks_30d: 24,
-      },
-      recent_notifications: [
-        {
-          id: 'notif-1',
-          event_type: 'company_approved',
-          title: 'Empresa Aprovada e Publicada',
-          sent_at: new Date().toISOString(),
-          status: 'entregue',
-        },
-      ],
-      audit_timeline: [
-        {
-          id: 't-1',
-          date: new Date().toISOString(),
-          action: 'Aprovação & Publicação',
-          description: 'Empresa aprovada pelo administrador no Dossiê 360º',
-          performed_by: 'Admin Conexão',
-        },
-        {
-          id: 't-0',
-          date: new Date().toISOString(),
-          action: 'Contrato Digital Assinado',
-          description: 'Contrato v1.0 assinado via SHA-256 no checkout',
-          performed_by: 'Eduardo Comandos',
-        },
-      ],
-      pedra_fundamental_count: 1,
-    };
+    const { data: subData } = await (supabase as any)
+      .from('subscriptions')
+      .select('id, status, current_period_end, plan_versions!inner(id, plan_id, price_annual, plans!inner(code, name))')
+      .eq('business_id', businessId)
+      .maybeSingle();
 
-    return defaultDTO;
-  } catch (_err) {
+    const planCode = subData?.plan_versions?.plans?.code || b.plan_code || 'ouro';
+
     return {
       business: {
-        id: businessId,
-        tenant_id: '00000000-0000-0000-0000-000000000010',
-        name: 'Comandos - Terceirização e Segurança Eletrônica',
-        legal_name: 'Comandos Terceirização de Serviços EIRELI',
-        cnpj_cpf: '12.345.678/0001-90',
-        category: 'Segurança Eletrônica & Terceirização',
-        description: 'Soluções corporativas completas em segurança eletrônica.',
-        city: 'São Paulo',
-        state: 'SP',
-        publication_status: 'published',
-        is_active: true,
-        is_founder: true,
-        is_pedra_fundamental: true,
-        is_coluna_honra: true,
-        is_verified: true,
-        plan_code: 'ouro',
-        completeness_percent: 92,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        id: b.id,
+        tenant_id: b.tenant_id,
+        name: b.name,
+        legal_name: b.legal_name || b.name,
+        cnpj_cpf: b.cnpj_cpf || b.cnpj || undefined,
+        category: b.category || 'Geral',
+        description: b.description || undefined,
+        city: b.city || 'São Paulo',
+        state: b.state || 'SP',
+        address: b.street ? `${b.street}, ${b.number || ''}` : (b.address || undefined),
+        phone: b.phone || undefined,
+        whatsapp: b.whatsapp || undefined,
+        email: b.email || undefined,
+        website: b.website || undefined,
+        logo_url: resolveLogoUrl(b.logo_url),
+        cover_url: b.cover_url || undefined,
+        publication_status: (b.publication_status || 'published') as any,
+        is_active: Boolean(b.is_active),
+        is_founder: Boolean(b.is_founder),
+        is_pedra_fundamental: Boolean(b.is_pedra_fundamental),
+        is_coluna_honra: Boolean(b.is_coluna_honra),
+        is_verified: Boolean(b.is_verified),
+        plan_code: planCode,
+        completeness_percent: 90,
+        created_at: b.created_at,
+        updated_at: b.updated_at,
       },
       owner: {
-        id: 'owner-1',
-        full_name: 'Eduardo Comandos',
-        email: 'contato@comandosseguranca.com.br',
+        id: b.owner_id || undefined,
+        full_name: 'Anunciante Titular',
+        email: b.email || undefined,
       },
       masonic_link: {
         relation: 'Irmão',
-        role: 'Sócio-Diretor',
+        role: 'Proprietário',
         potency: 'GLESP',
-        lodge_name: 'ARLS Ciência e Virtude nº 1234',
+        lodge_name: 'ARLS Maçônica',
         is_verified: true,
       },
-      contract: {
-        id: 'contract-001',
-        version: 'v1.0',
-        sha256_hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-        signed_at: new Date().toISOString(),
-        rendered_text: 'Contrato Oficial de Adesão Comercial ao Guia Maçônico...',
-        signer_name: 'Eduardo Comandos',
-      },
+      contract: undefined,
       subscription: {
-        plan_code: 'ouro',
-        plan_name: 'Plano Ouro Anual',
-        amount_brl: 2388.0,
+        plan_code: planCode,
+        plan_name: planCode === 'ouro' ? 'Plano Ouro Anual' : 'Plano Prata Anual',
+        amount_brl: planCode === 'ouro' ? 2388.0 : 1788.0,
         periodicity: 'anual',
-        status: 'paid',
-        start_date: new Date().toISOString(),
-        next_billing_date: new Date().toISOString(),
+        status: subData?.status === 'active' ? 'paid' : 'pending',
+        start_date: b.created_at,
+        next_billing_date: subData?.current_period_end || b.created_at,
         entitlements: {
-          services_limit: 10,
-          benefits_limit: 5,
-          gallery_limit: 10,
-          events_limit: 10,
-          posts_limit: 10,
+          services_limit: planCode === 'ouro' ? 10 : 5,
+          benefits_limit: planCode === 'ouro' ? 5 : 2,
+          gallery_limit: planCode === 'ouro' ? 10 : 6,
+          events_limit: planCode === 'ouro' ? 10 : 1,
+          posts_limit: planCode === 'ouro' ? 10 : 3,
         },
       },
       payments_history: [],
       content_summary: {
-        gallery_count: 7,
-        gallery_limit: 10,
-        services_count: 4,
-        services_limit: 10,
-        benefits_count: 2,
-        benefits_limit: 5,
-        events_count: 1,
-        events_limit: 10,
+        gallery_count: 0,
+        gallery_limit: planCode === 'ouro' ? 10 : 6,
+        services_count: 0,
+        services_limit: planCode === 'ouro' ? 10 : 5,
+        benefits_count: 0,
+        benefits_limit: planCode === 'ouro' ? 5 : 2,
+        events_count: 0,
+        events_limit: planCode === 'ouro' ? 10 : 1,
       },
       analytics_summary: {
-        views_30d: 485,
-        views_growth_percent: 18.4,
-        interactions_30d: 94,
-        whatsapp_clicks_30d: 42,
-        route_clicks_30d: 28,
-        website_clicks_30d: 24,
+        views_30d: 0,
+        views_growth_percent: 0,
+        interactions_30d: 0,
+        whatsapp_clicks_30d: 0,
+        route_clicks_30d: 0,
+        website_clicks_30d: 0,
       },
       recent_notifications: [],
-      audit_timeline: [
-        {
-          id: 't-1',
-          date: new Date().toISOString(),
-          action: 'Aprovação & Publicação',
-          description: 'Empresa aprovada pelo administrador',
-          performed_by: 'Admin Conexão',
-        },
-      ],
-      pedra_fundamental_count: 1,
+      audit_timeline: [],
+      pedra_fundamental_count: b.is_pedra_fundamental ? 1 : 0,
     };
+  } catch (_err) {
+    return null;
   }
 }
 
-// Alias de compatibilidade retroativa para suítes de testes
 export const getAdminBusiness360DetailsAction = getAdminBusiness360Action;
 
 export async function togglePublicationStatusAction(
@@ -568,10 +367,24 @@ export async function togglePublicationStatusAction(
   newStatus: 'published' | 'suspended',
   justification: string
 ) {
-  try {
-    const supabase = await createServerSideClient();
+  const { supabase, user } = await assertPlatformAdminAccess();
 
-    await supabase
+  try {
+    if (!justification || justification.trim().length < 5) {
+      throw new Error('INVALID_JUSTIFICATION: Justificativa com pelo menos 5 caracteres é obrigatória.');
+    }
+
+    const { data: bData } = await (supabase as any)
+      .from('businesses')
+      .select('id, tenant_id')
+      .eq('id', businessId)
+      .maybeSingle();
+
+    if (!bData) {
+      throw new Error('BUSINESS_NOT_FOUND: Empresa não encontrada.');
+    }
+
+    await (supabase as any)
       .from('businesses')
       .update({
         publication_status: newStatus,
@@ -579,14 +392,15 @@ export async function togglePublicationStatusAction(
       })
       .eq('id', businessId);
 
+    // Registra Audit Log com tenant_id e user.id reais do servidor
     await (supabase as any).from('admin_audit_logs').insert({
-      tenant_id: '00000000-0000-0000-0000-000000000010',
-      admin_user_id: 'admin-user',
-      action_type: newStatus === 'suspended' ? 'SUSPEND_BUSINESS' : 'REACTIVATE_BUSINESS',
+      tenant_id: bData.tenant_id,
+      actor_id: user.id,
+      action: newStatus === 'suspended' ? 'SUSPEND_BUSINESS' : 'REACTIVATE_BUSINESS',
       entity_type: 'business',
       entity_id: businessId,
-      after_state: { publication_status: newStatus },
-      justification,
+      after_value: { publication_status: newStatus },
+      reason: justification,
     });
 
     revalidatePath(`/admin/empresas`);
@@ -604,10 +418,20 @@ export async function toggleRecognitionAction(
   newValue: boolean,
   justification: string
 ) {
-  try {
-    const supabase = await createServerSideClient();
+  const { supabase, user } = await assertPlatformAdminAccess();
 
-    await supabase
+  try {
+    const { data: bData } = await (supabase as any)
+      .from('businesses')
+      .select('id, tenant_id')
+      .eq('id', businessId)
+      .maybeSingle();
+
+    if (!bData) {
+      throw new Error('BUSINESS_NOT_FOUND: Empresa não encontrada.');
+    }
+
+    await (supabase as any)
       .from('businesses')
       .update({
         [badgeKey]: newValue,
@@ -616,13 +440,13 @@ export async function toggleRecognitionAction(
       .eq('id', businessId);
 
     await (supabase as any).from('admin_audit_logs').insert({
-      tenant_id: '00000000-0000-0000-0000-000000000010',
-      admin_user_id: 'admin-user',
-      action_type: `TOGGLE_RECOGNITION_${badgeKey.toUpperCase()}`,
+      tenant_id: bData.tenant_id,
+      actor_id: user.id,
+      action: `TOGGLE_RECOGNITION_${badgeKey.toUpperCase()}`,
       entity_type: 'business',
       entity_id: businessId,
-      after_state: { [badgeKey]: newValue },
-      justification,
+      after_value: { [badgeKey]: newValue },
+      reason: justification,
     });
 
     revalidatePath(`/admin/empresas`);

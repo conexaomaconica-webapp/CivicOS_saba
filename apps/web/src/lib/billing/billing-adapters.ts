@@ -23,11 +23,23 @@ export interface CanonicalBillingEvent {
 // 1. ASAAS BILLING ADAPTER
 // ----------------------------------------------------------------------------
 
+import { getAsaasConfig } from '@/lib/payment/asaas-config';
+
 export class AsaasBillingAdapter {
   static validateSignature(accessTokenHeader: string | null): boolean {
-    const secretToken = process.env.ASAAS_WEBHOOK_SECRET;
-    if (!secretToken) return true; // Em modo dev aceita se secret não estiver configurado
-    return accessTokenHeader === secretToken;
+    if (!accessTokenHeader || typeof accessTokenHeader !== 'string') {
+      return false;
+    }
+
+    try {
+      const config = getAsaasConfig();
+      if (!config.isWebhookConfigured || !config.webhookSecret) {
+        return false;
+      }
+      return accessTokenHeader === config.webhookSecret;
+    } catch (err) {
+      return false;
+    }
   }
 
   static parseEvent(_headers: Headers, payload: Record<string, unknown>): CanonicalBillingEvent {

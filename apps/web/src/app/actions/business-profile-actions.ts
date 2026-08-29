@@ -2,18 +2,20 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { headers } from 'next/headers';
+import { revalidatePath } from 'next/cache';
 
 // Cliente Supabase com Service Role para execução segura no servidor
+// Timeout removido: o antigo AbortSignal.timeout(1500) causava 'fetch failed' em operações normais
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 'sb_secret_key';
-  return createClient(url, key, {
-    global: {
-      fetch: (input, init) => {
-        return fetch(input, { ...init, signal: AbortSignal.timeout(1500) });
-      }
-    }
-  });
+  return createClient(url, key);
+}
+
+function safeRevalidate(...paths: string[]) {
+  for (const p of paths) {
+    try { revalidatePath(p); } catch { /* Vitest */ }
+  }
 }
 
 // Auxiliar: Resolve o tenant pelo Host do cabeçalho da requisição
@@ -81,66 +83,53 @@ export async function updateBusinessProfileInfoAction(businessId: string, payloa
   const tenantId = await resolveTenantIdServer();
   await verifyBusinessOwnership(supabase, tenantId, businessId);
 
-  try {
-    const { error } = await supabase
-      .from('businesses')
-      .update({
-        name: payload.name,
-        tagline: payload.tagline || null,
-        category: payload.category || null,
-        description: payload.description || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('tenant_id', tenantId)
-      .eq('id', businessId);
+  const { error } = await supabase
+    .from('businesses')
+    .update({
+      name: payload.name,
+      tagline: payload.tagline || null,
+      category: payload.category || null,
+      description: payload.description || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('tenant_id', tenantId)
+    .eq('id', businessId);
 
-    if (error && !error.message.includes('fetch failed')) {
-      throw new Error(`Erro ao atualizar perfil comercial: ${error.message}`);
-    }
-  } catch (err: any) {
-    if (err.message.includes('fetch failed')) {
-      // Test mock fallback
-      return { success: true };
-    }
-    throw err;
+  if (error) {
+    throw new Error(`Erro ao atualizar perfil comercial: ${error.message}`);
   }
 
+  safeRevalidate('/anunciante/empresa', '/anunciante', '/guia');
   return { success: true };
 }
 
 // ----------------------------------------------------------------------------
-// 2. DADOS ADMINISTRATIVOS PRIVADOS (RAZÃO SOCIAL / CNPJ / CPF) - ISOLADOS DA RPC PÚBLICA
+// 2. DADOS ADMINISTRATIVOS PRIVADOS (RAZÃO SOCIAL / CNPJ / CPF)
 // ----------------------------------------------------------------------------
 
 export async function updateBusinessAdminDataAction(businessId: string, payload: {
   legalName?: string;
-  documentNumber?: string; // CNPJ ou CPF
+  documentNumber?: string;
 }) {
   const supabase = getAdminSupabase();
   const tenantId = await resolveTenantIdServer();
   await verifyBusinessOwnership(supabase, tenantId, businessId);
 
-  try {
-    const { error } = await supabase
-      .from('businesses')
-      .update({
-        legal_name: payload.legalName || null,
-        document_number: payload.documentNumber || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('tenant_id', tenantId)
-      .eq('id', businessId);
+  const { error } = await supabase
+    .from('businesses')
+    .update({
+      legal_name: payload.legalName || null,
+      document_number: payload.documentNumber || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('tenant_id', tenantId)
+    .eq('id', businessId);
 
-    if (error && !error.message.includes('fetch failed')) {
-      throw new Error(`Erro ao atualizar dados administrativos: ${error.message}`);
-    }
-  } catch (err: any) {
-    if (err.message.includes('fetch failed')) {
-      return { success: true };
-    }
-    throw err;
+  if (error) {
+    throw new Error(`Erro ao atualizar dados administrativos: ${error.message}`);
   }
 
+  safeRevalidate('/anunciante/empresa', '/admin');
   return { success: true };
 }
 
@@ -158,29 +147,23 @@ export async function updateBusinessContactsAction(businessId: string, payload: 
   const tenantId = await resolveTenantIdServer();
   await verifyBusinessOwnership(supabase, tenantId, businessId);
 
-  try {
-    const { error } = await supabase
-      .from('businesses')
-      .update({
-        phone: payload.phone || null,
-        whatsapp: payload.whatsapp || null,
-        public_email: payload.email || null,
-        website: payload.website || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('tenant_id', tenantId)
-      .eq('id', businessId);
+  const { error } = await supabase
+    .from('businesses')
+    .update({
+      phone: payload.phone || null,
+      whatsapp: payload.whatsapp || null,
+      public_email: payload.email || null,
+      website: payload.website || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('tenant_id', tenantId)
+    .eq('id', businessId);
 
-    if (error && !error.message.includes('fetch failed')) {
-      throw new Error(`Erro ao atualizar contatos comerciais: ${error.message}`);
-    }
-  } catch (err: any) {
-    if (err.message.includes('fetch failed')) {
-      return { success: true };
-    }
-    throw err;
+  if (error) {
+    throw new Error(`Erro ao atualizar contatos comerciais: ${error.message}`);
   }
 
+  safeRevalidate('/anunciante/empresa', '/anunciante', '/guia');
   return { success: true };
 }
 
@@ -201,78 +184,57 @@ export async function updateBusinessLocationAction(businessId: string, payload: 
   const tenantId = await resolveTenantIdServer();
   await verifyBusinessOwnership(supabase, tenantId, businessId);
 
-  try {
-    const { error } = await supabase
-      .from('businesses')
-      .update({
-        street: payload.street || null,
-        number: payload.number || null,
-        neighborhood: payload.neighborhood || null,
-        city: payload.city || null,
-        state: payload.state || null,
-        zip_code: payload.zipCode || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('tenant_id', tenantId)
-      .eq('id', businessId);
+  const { error } = await supabase
+    .from('businesses')
+    .update({
+      street: payload.street || null,
+      number: payload.number || null,
+      neighborhood: payload.neighborhood || null,
+      city: payload.city || null,
+      state: payload.state || null,
+      zip_code: payload.zipCode || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('tenant_id', tenantId)
+    .eq('id', businessId);
 
-    if (error && !error.message.includes('fetch failed')) {
-      throw new Error(`Erro ao atualizar localização: ${error.message}`);
-    }
-  } catch (err: any) {
-    if (err.message.includes('fetch failed')) {
-      return { success: true };
-    }
-    throw err;
+  if (error) {
+    throw new Error(`Erro ao atualizar localização: ${error.message}`);
   }
 
+  safeRevalidate('/anunciante/empresa', '/guia');
   return { success: true };
 }
 
 // ----------------------------------------------------------------------------
-// 5. UPLOAD DE MÍDIA NO STORAGE (PATH SERVER-CONSTRUCTED `{tenant_id}/{business_id}/{asset_type}/{filename}`)
+// 5. UPLOAD DE MÍDIA NO STORAGE
+// Fonte canônica:
+//   Logo: businesses.logo_url
+//   Capa: business_media.display_order = 0
+//   NÃO existe businesses.cover_url
 // ----------------------------------------------------------------------------
 
 export async function uploadBusinessAssetAction(
   businessId: string,
-  assetType: 'logo' | 'cover',
+  _assetType: 'logo' | 'cover',
   _fileDataUrl: string
 ) {
   const supabase = getAdminSupabase();
   const tenantId = await resolveTenantIdServer();
   await verifyBusinessOwnership(supabase, tenantId, businessId);
 
-  const filename = `${Date.now()}-${assetType}.webp`;
-  const storagePath = `${tenantId}/${businessId}/${assetType}/${filename}`;
-  const publicUrl = `https://storage.conexaomaconica.com.br/business-assets/${storagePath}`;
-
-  const fieldToUpdate = assetType === 'logo' ? { logo_url: publicUrl } : { cover_url: publicUrl };
-
-  try {
-    const { error } = await supabase
-      .from('businesses')
-      .update({
-        ...fieldToUpdate,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('tenant_id', tenantId)
-      .eq('id', businessId);
-
-    if (error && !error.message.includes('fetch failed')) {
-      throw new Error(`Erro ao salvar mídia de ${assetType}: ${error.message}`);
-    }
-  } catch (err: any) {
-    if (err.message.includes('fetch failed')) {
-      return { success: true, url: publicUrl };
-    }
-    throw err;
-  }
-
-  return { success: true, url: publicUrl };
+  // NOTE: Esta action é um placeholder para upload via data URL.
+  // O fluxo real de upload usa uploadAdvertiserAssetAction com FormData.
+  // Mantida para compatibilidade, mas sem fabricar URLs falsas.
+  return {
+    success: false,
+    message: 'Use uploadAdvertiserAssetAction com FormData para upload real de mídia.',
+    url: null,
+  };
 }
 
 // ----------------------------------------------------------------------------
-// 6. GESTÃO DE MÍDIA DA GALERIA (REAPROVEITANDO TABELA CANÔNICA `business_media`)
+// 6. GESTÃO DE MÍDIA DA GALERIA (TABELA CANÔNICA business_media)
 // ----------------------------------------------------------------------------
 
 export async function addGalleryMediaAction(businessId: string, payload: {
@@ -283,41 +245,35 @@ export async function addGalleryMediaAction(businessId: string, payload: {
   const tenantId = await resolveTenantIdServer();
   await verifyBusinessOwnership(supabase, tenantId, businessId);
 
-  try {
-    const { data: existing } = await supabase
-      .from('business_media')
-      .select('display_order')
-      .eq('tenant_id', tenantId)
-      .eq('business_id', businessId)
-      .order('display_order', { ascending: false })
-      .limit(1);
+  const { data: existing } = await supabase
+    .from('business_media')
+    .select('display_order')
+    .eq('tenant_id', tenantId)
+    .eq('business_id', businessId)
+    .order('display_order', { ascending: false })
+    .limit(1);
 
-    const nextOrder = (existing?.[0]?.display_order || 0) + 1;
+  const nextOrder = (existing?.[0]?.display_order || 0) + 1;
 
-    const { data, error } = await supabase
-      .from('business_media')
-      .insert({
-        tenant_id: tenantId,
-        business_id: businessId,
-        media_type: 'image',
-        url: payload.url,
-        title: payload.title || null,
-        display_order: nextOrder,
-      })
-      .select()
-      .single();
+  const { data, error } = await supabase
+    .from('business_media')
+    .insert({
+      tenant_id: tenantId,
+      business_id: businessId,
+      media_type: 'image',
+      url: payload.url,
+      title: payload.title || null,
+      display_order: nextOrder,
+    })
+    .select()
+    .single();
 
-    if (error && !error.message.includes('fetch failed')) {
-      throw new Error(`Erro ao adicionar foto na galeria: ${error.message}`);
-    }
-
-    return { success: true, item: data || { id: 'media-mock-id', url: payload.url, display_order: nextOrder } };
-  } catch (err: any) {
-    if (err.message.includes('fetch failed')) {
-      return { success: true, item: { id: 'media-mock-id', url: payload.url, display_order: 1 } };
-    }
-    throw err;
+  if (error) {
+    throw new Error(`Erro ao adicionar foto na galeria: ${error.message}`);
   }
+
+  safeRevalidate('/anunciante/empresa/midias', '/anunciante/empresa', '/guia');
+  return { success: true, item: data };
 }
 
 export async function deleteGalleryMediaAction(businessId: string, mediaId: string) {
@@ -325,24 +281,17 @@ export async function deleteGalleryMediaAction(businessId: string, mediaId: stri
   const tenantId = await resolveTenantIdServer();
   await verifyBusinessOwnership(supabase, tenantId, businessId);
 
-  try {
+  const { error } = await supabase
+    .from('business_media')
+    .delete()
+    .eq('tenant_id', tenantId)
+    .eq('business_id', businessId)
+    .eq('id', mediaId);
 
-    const { error } = await supabase
-      .from('business_media')
-      .delete()
-      .eq('tenant_id', tenantId)
-      .eq('business_id', businessId)
-      .eq('id', mediaId);
-
-    if (error && !error.message.includes('fetch failed')) {
-      throw new Error(`Erro ao remover foto da galeria: ${error.message}`);
-    }
-  } catch (err: any) {
-    if (err.message.includes('fetch failed')) {
-      return { success: true };
-    }
-    throw err;
+  if (error) {
+    throw new Error(`Erro ao remover foto da galeria: ${error.message}`);
   }
 
+  safeRevalidate('/anunciante/empresa/midias', '/anunciante/empresa', '/guia');
   return { success: true };
 }

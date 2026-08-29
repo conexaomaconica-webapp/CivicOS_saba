@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath, revalidateTag } from 'next/cache';
-import { headers } from 'next/headers';
 import { createServerSideClient } from '@/lib/supabase/server';
 
 export interface ActionResult<T = unknown> {
@@ -15,10 +14,6 @@ export interface ActionResult<T = unknown> {
  * NUNCA confia em tenant_id, role, quota ou plano enviados pelo cliente.
  */
 async function authorizeBusinessAccess(businessId: string) {
-  const headerStore = await headers();
-  const rawHost = headerStore.get('host') ?? 'localhost';
-  const host = rawHost.split(':')[0] || 'localhost';
-
   const supabase = await createServerSideClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -26,62 +21,49 @@ async function authorizeBusinessAccess(businessId: string) {
     throw new Error('Sessão expirada ou usuário não autenticado.');
   }
 
-  // Buscar tenant a partir do host
-  const { data: tenantData } = await supabase
-    .from('tenants')
-    .select('id')
-    .eq('hostname', host)
-    .single();
+  // 1. Autoridade Server-side: Executa RPC de permissão administrativa da plataforma
+  const { data: rpcIsAdmin, error: rpcErr } = await (supabase as unknown as { rpc: (fn: string) => Promise<{ data: boolean; error: { message?: string } | null }> }).rpc('has_platform_admin_access');
 
-  const tenantId = tenantData?.id;
-
-  // Verificar se o usuário é membro da empresa no tenant
-  let memberQuery = supabase
-    .from('business_members')
-    .select('role')
-    .eq('business_id', businessId)
-    .eq('user_id', user.id);
-
-  if (tenantId) {
-    memberQuery = memberQuery.eq('tenant_id', tenantId);
+  if (rpcErr) {
+    throw new Error(`Erro de infraestrutura ao validar permissões administrativas: ${rpcErr.message || 'Falha na RPC'}`);
   }
 
-  const { data: memberData } = await memberQuery.single();
+  const isPlatformAdmin = Boolean(rpcIsAdmin);
 
-  // Permite acesso se for membro ou admin da plataforma
-  const { data: isAdmin } = await (supabase as unknown as { rpc: (fn: string) => Promise<{ data: boolean }> }).rpc('has_platform_admin_access');
+  // 2. Se for admin de plataforma autorizado pela RPC, permite acesso imediato
+  if (isPlatformAdmin) {
+    return { supabase, user, tenantId: null, role: 'platform_admin' };
+  }
 
-  if (!memberData && !isAdmin) {
+  // 3. Caso contrário, valida a empresa e a propriedade/membership tenant-aware
+  const { data: bizData, error: bizErr } = await supabase
+    .from('businesses')
+    .select('id, owner_id, tenant_id')
+    .eq('id', businessId)
+    .maybeSingle();
+
+  if (bizErr || !bizData) {
+    throw new Error('Empresa não encontrada.');
+  }
+
+  const isOwner = bizData.owner_id === user.id;
+
+  // 4. Valida se o usuário possui vinculo de membro ativo e tenant-aware em business_members
+  const { data: memberData } = await supabase
+    .from('business_members')
+    .select('role')
+    .eq('tenant_id', bizData.tenant_id)
+    .eq('business_id', businessId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  const isMember = Boolean(isOwner || memberData);
+
+  if (!isMember) {
     throw new Error('Você não possui permissão para gerenciar esta empresa.');
   }
 
-  // Client tipado defensivamente para as tabelas e RPCs das migrations 042 e 043
-  const db = supabase as unknown as {
-    from: (table: string) => {
-      insert: (payload: Record<string, unknown>) => {
-        select: () => {
-          single: () => Promise<{ data: Record<string, unknown> | null; error: { message?: string; code?: string } | null }>;
-        };
-      };
-      update: (payload: Record<string, unknown>) => {
-        eq: (col: string, val: string) => {
-          eq: (col: string, val: string) => {
-            select: () => {
-              single: () => Promise<{ data: Record<string, unknown> | null; error: { message?: string; code?: string } | null }>;
-            };
-          };
-        };
-      };
-      delete: () => {
-        eq: (col: string, val: string) => {
-          eq: (col: string, val: string) => Promise<{ error: { message?: string } | null }>;
-        };
-      };
-    };
-    rpc: (fn: string, params?: Record<string, unknown>) => Promise<{ error: { message?: string } | null }>;
-  };
-
-  return { supabase: db, user, tenantId, role: memberData?.role };
+  return { supabase: supabase as any, user, tenantId: bizData.tenant_id, role: memberData?.role || 'owner' };
 }
 
 /* ============================================================================

@@ -1,6 +1,7 @@
 'use server';
 
 import { createServerSideClient } from '@/lib/supabase/server';
+import { getAsaasSanitizedStatus } from '@/lib/payment/asaas-config';
 
 export interface ServiceHealthStatus {
   serviceId: string;
@@ -122,7 +123,8 @@ export async function checkSystemHealthAction(): Promise<MasterControlDashboardD
   });
 
   // 5. Gateway de Pagamentos Asaas API
-  const isAsaasConfigured = Boolean(process.env.ASAAS_API_KEY && process.env.ASAAS_WEBHOOK_SECRET);
+  const asaasStatus = getAsaasSanitizedStatus();
+  const isAsaasConfigured = asaasStatus.apiConfigured && asaasStatus.webhookConfigured;
   services.push({
     serviceId: 'asaas_gateway',
     name: 'Gateway de Pagamentos Asaas (API REST)',
@@ -130,8 +132,8 @@ export async function checkSystemHealthAction(): Promise<MasterControlDashboardD
     status: isAsaasConfigured ? 'operational' : 'degraded',
     lastChecked: new Date().toISOString(),
     message: isAsaasConfigured
-      ? 'Chaves ASAAS_API_KEY e Webhook Secret ativas em produção/sandbox.'
-      : 'Atenção: Variáveis de ambiente Asaas não configuradas.',
+      ? `Gateway Asaas ativo em modo ${asaasStatus.environment.toUpperCase()}.`
+      : 'Atenção: Variáveis de ambiente Asaas não configuradas ou inconsistentes.',
   });
 
   // 6. Servidor de E-mails Transacionais (SMTP Mailer)

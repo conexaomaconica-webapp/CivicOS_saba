@@ -294,7 +294,7 @@ $$;
 
 ALTER FUNCTION public.public_directory_home_data(TEXT, TEXT) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.public_directory_home_data(TEXT, TEXT) FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.public_directory_home_data(TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.public_directory_home_data(TEXT, TEXT) TO anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- 3. RPC: public_businesses_search (Paginated, Filtered)

@@ -14,6 +14,7 @@ import {
 import {
   AdvertiserContentDTO,
   AdvertiserPostItem,
+  saveAdvertiserPostAction,
 } from '@/lib/advertiser/advertiser-content-service';
 
 export default function AdvertiserPostsClient({ data }: { data: AdvertiserContentDTO }) {
@@ -27,12 +28,27 @@ export default function AdvertiserPostsClient({ data }: { data: AdvertiserConten
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setFeedback(null);
 
-    setTimeout(() => {
+    try {
+      const res = await saveAdvertiserPostAction({
+        business_id: business.id,
+        title,
+        content,
+      });
+
+      if (!res.success) {
+        setFeedback({
+          type: 'error',
+          message: res.message,
+        });
+        setSaving(false);
+        return;
+      }
+
       const newPost: AdvertiserPostItem = {
         id: `pst-${Date.now()}`,
         title,
@@ -50,7 +66,15 @@ export default function AdvertiserPostsClient({ data }: { data: AdvertiserConten
         message: 'Publicação registrada com sucesso.',
       });
       setIsModalOpen(false);
-    }, 800);
+      setTitle('');
+      setContent('');
+    } catch (err: unknown) {
+      setSaving(false);
+      setFeedback({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Erro ao registrar publicação.',
+      });
+    }
   };
 
   return (

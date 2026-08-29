@@ -1,6 +1,7 @@
 'use server';
 
 import { createServerSideClient } from '@/lib/supabase/server';
+import { resolveBusinessMedia, resolveLogoUrl, resolveCoverUrl } from '@/lib/business/business-media-helpers';
 
 export interface AdvertiserDashboardDTO {
   business: {
@@ -74,25 +75,25 @@ export async function getAdvertiserDashboardDTOAction(_userId?: string): Promise
 
     const b = businessData;
 
+    // Resolver mídia via helper centralizado
+    const media = await resolveBusinessMedia(supabase, b?.id || '', { logoUrl: b?.logo_url });
+
     const dto: AdvertiserDashboardDTO = {
       business: {
-        id: b?.id || '00000000-0000-0000-0000-000000000001',
-        name: b?.name || 'Comandos - Terceirização e Segurança Eletrônica',
-        slug: b?.slug || 'comandos-terceirizacao-e-seguranca-eletronica',
-        publication_status_label: 'Anúncio publicado',
-        is_published: true,
+        id: b?.id || '',
+        name: b?.name || '',
+        slug: b?.slug || '',
+        publication_status_label: b?.publication_status === 'published' ? 'Anúncio publicado' : 'Aguardando análise',
+        is_published: b?.publication_status === 'published',
         payment_status_label: 'Pagamento em dia',
         is_payment_up_to_date: true,
-        plan_code: b?.plan_code || 'ouro',
-        plan_name: 'Plano Ouro',
-        expiration_date: '24/08/2027',
+        plan_code: b?.plan_code || b?.plan_tier || '',
+        plan_name: '',
+        expiration_date: '',
         completeness_percent: 86,
-        missing_fields: [
-          'Adicionar imagem de capa corporativa',
-          'Adicionar mais fotos da empresa na galeria',
-        ],
-        logo_url: b?.logo_url || '/logoconexao_red_vert.png',
-        cover_url: b?.cover_url || '/capa-padrao.jpg',
+        missing_fields: [],
+        logo_url: resolveLogoUrl(media.logo_url),
+        cover_url: resolveCoverUrl(media.cover_url),
       },
       results30d: {
         views: 1284,
@@ -141,44 +142,42 @@ export async function getAdvertiserDashboardDTOAction(_userId?: string): Promise
     };
 
     return dto;
-  } catch (_err) {
+  } catch (err: any) {
+    console.error('Erro ao carregar dashboard do anunciante:', err);
     return {
       business: {
-        id: '00000000-0000-0000-0000-000000000001',
-        name: 'Comandos - Terceirização e Segurança Eletrônica',
-        slug: 'comandos-terceirizacao-e-seguranca-eletronica',
-        publication_status_label: 'Anúncio publicado',
-        is_published: true,
-        payment_status_label: 'Pagamento em dia',
-        is_payment_up_to_date: true,
-        plan_code: 'ouro',
-        plan_name: 'Plano Ouro',
-        expiration_date: '24/08/2027',
-        completeness_percent: 86,
-        missing_fields: [
-          'Adicionar imagem de capa corporativa',
-          'Adicionar mais fotos da empresa na galeria',
-        ],
+        id: '',
+        name: '',
+        slug: '',
+        publication_status_label: '',
+        is_published: false,
+        payment_status_label: '',
+        is_payment_up_to_date: false,
+        plan_code: '',
+        plan_name: '',
+        expiration_date: '',
+        completeness_percent: 0,
+        missing_fields: [],
         logo_url: '/logoconexao_red_vert.png',
         cover_url: '/capa-padrao.jpg',
       },
       results30d: {
-        views: 1284,
-        interactions: 137,
-        whatsapp_clicks: 86,
-        route_clicks: 24,
-        website_clicks: 18,
-        growth_percent: 18,
+        views: 0,
+        interactions: 0,
+        whatsapp_clicks: 0,
+        route_clicks: 0,
+        website_clicks: 0,
+        growth_percent: 0,
       },
       quotas: {
-        photos_used: 7,
-        photos_limit: 10,
-        services_used: 4,
-        services_limit: 10,
-        benefits_used: 2,
-        benefits_limit: 5,
-        events_used: 1,
-        events_limit: 5,
+        photos_used: 0,
+        photos_limit: 0,
+        services_used: 0,
+        services_limit: 0,
+        benefits_used: 0,
+        benefits_limit: 0,
+        events_used: 0,
+        events_limit: 0,
       },
       attention_alerts: [],
     };

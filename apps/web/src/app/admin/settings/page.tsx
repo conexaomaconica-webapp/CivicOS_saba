@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Database } from '@/types/database.types';
 
+import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
+
 export default function AdminSettingsPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -43,7 +45,7 @@ export default function AdminSettingsPage() {
         .eq('id', user.id)
         .maybeSingle();
 
-      if (profileError || !profile || !['master', 'socio_admin'].includes(profile.role)) {
+      if (profileError || !profile || !isPlatformAdminRole(profile.role)) {
         router.push('/');
         return;
       }

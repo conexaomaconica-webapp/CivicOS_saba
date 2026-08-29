@@ -7,7 +7,6 @@ import {
   MapPin,
   Navigation,
   Phone,
-  ShieldCheck,
   Star,
   Tag,
   Globe,
@@ -18,6 +17,7 @@ import type {
 } from '@/lib/business/public-business-presentation';
 import { BusinessMedia } from './BusinessMedia';
 import { BusinessShareActions } from './BusinessShareActions';
+import { RecognitionPresentation } from './RecognitionPresentation';
 import styles from '@/components/visual-lab/FigmaPrataView.module.css';
 
 const DAY_LABELS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
@@ -100,16 +100,12 @@ export function BusinessPrataTemplate({ business }: { business: PublicBusinessPr
         <div className={styles.identityCard}>
           <div className={styles.badgeRow}>
             <span className={styles.badgePrata}>PLANO PRATA</span>
-            {authority.isVerified && (
-              <span className={styles.badgeVerified}>
-                <ShieldCheck className="w-3.5 h-3.5" /> Empresa Verificada
-              </span>
-            )}
-            {authority.isFounder && (
-              <span className={styles.badgeFounder}>
-                <Star className="w-3.5 h-3.5 fill-current" /> EMPRESA FUNDADORA
-              </span>
-            )}
+            <RecognitionPresentation
+              planCode={authority.effectivePlan || 'prata'}
+              isVerified={authority.isVerified}
+              isFounder={authority.isFounder}
+              variant="compact"
+            />
           </div>
 
           <div className={styles.headerInfo}>

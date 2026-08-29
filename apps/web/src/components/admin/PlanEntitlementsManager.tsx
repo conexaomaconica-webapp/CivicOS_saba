@@ -22,6 +22,54 @@ interface PlanEntitlementsManagerProps {
   initialData: CommercialPlanFullData[];
 }
 
+function QuotaControl({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (val: number) => void;
+}) {
+  const handleDecrement = () => onChange(Math.max(0, value - 1));
+  const handleIncrement = () => onChange(value + 1);
+  const handleDirectInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = parseInt(e.target.value, 10);
+    onChange(isNaN(raw) || raw < 0 ? 0 : raw);
+  };
+
+  return (
+    <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-1.5">
+      <label className="font-bold text-stone-700 block text-xs">{label}</label>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={handleDecrement}
+          className="w-7 h-7 flex items-center justify-center bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold rounded-lg transition-colors cursor-pointer"
+          title="Diminuir cota"
+        >
+          -
+        </button>
+        <input
+          type="number"
+          min={0}
+          value={value}
+          onChange={handleDirectInput}
+          className="w-full px-1 py-1 bg-white border border-stone-300 rounded-lg font-mono text-stone-900 text-center font-bold text-xs"
+        />
+        <button
+          type="button"
+          onClick={handleIncrement}
+          className="w-7 h-7 flex items-center justify-center bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold rounded-lg transition-colors cursor-pointer"
+          title="Aumentar cota"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManagerProps) {
   const [plans, setPlans] = useState<CommercialPlanFullData[]>(initialData);
   const [selectedPlan, setSelectedPlan] = useState<'bronze' | 'prata' | 'ouro'>('prata');
@@ -240,15 +288,31 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-1">
-              <label className="block text-xs font-bold text-stone-700">Valor Anual (em Centavos BRL):</label>
-              <input
-                type="number"
-                value={activePlanData.amount_cents}
-                onChange={(e) => handleFieldChange('amount_cents', Number(e.target.value))}
-                className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs text-stone-900 font-mono outline-none focus:border-[#4B161B]"
-              />
-              <span className="text-[11px] text-stone-500 font-semibold">
-                Equivale a: R$ {(activePlanData.amount_cents / 100).toFixed(2)} / ano
+              <label className="block text-xs font-bold text-stone-700">Valor Anual (BRL):</label>
+              <div className="relative">
+                <span className="absolute left-3 top-2 text-xs text-stone-500 font-bold">R$</span>
+                <input
+                  type="text"
+                  value={
+                    (activePlanData.amount_cents / 100).toLocaleString('pt-BR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })
+                  }
+                  onChange={(e) => {
+                    const rawVal = e.target.value;
+                    // Remove R$, pontos de milhar e converte vírgula decimal
+                    const cleanStr = rawVal.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
+                    const num = Number(cleanStr);
+                    if (!isNaN(num) && num >= 0) {
+                      handleFieldChange('amount_cents', Math.round(num * 100));
+                    }
+                  }}
+                  className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs text-stone-900 font-mono font-bold outline-none focus:border-[#4B161B]"
+                />
+              </div>
+              <span className="text-[11px] text-stone-500 font-semibold block">
+                Valor bruto gravado: {activePlanData.amount_cents} centavos BRL
               </span>
             </div>
 
@@ -282,62 +346,38 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
           </div>
         </div>
 
-        {/* 3. COTAS NUMÉRICAS DE ENTITLEMENTS */}
+        {/* 3. COTAS NUMÉRICAS DE ENTITLEMENTS COM CONTROLES [-] E [+] */}
         <div className="pt-4 border-t border-stone-200 space-y-3">
           <h3 className="font-serif font-bold text-sm text-stone-900 flex items-center gap-1.5">
             <Layers className="w-4 h-4 text-[#4B161B]" /> Cotas de Recursos Numéricas (Entitlements)
           </h3>
 
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
-            <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-1">
-              <label className="font-bold text-stone-700 block">Fotos Galeria:</label>
-              <input
-                type="number"
-                value={activePlanData.gallery_photos_limit}
-                onChange={(e) => handleFieldChange('gallery_photos_limit', Number(e.target.value))}
-                className="w-full px-2 py-1 bg-white border border-stone-300 rounded-lg font-mono text-stone-900 text-center font-bold"
-              />
-            </div>
-
-            <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-1">
-              <label className="font-bold text-stone-700 block">Serviços:</label>
-              <input
-                type="number"
-                value={activePlanData.services_limit}
-                onChange={(e) => handleFieldChange('services_limit', Number(e.target.value))}
-                className="w-full px-2 py-1 bg-white border border-stone-300 rounded-lg font-mono text-stone-900 text-center font-bold"
-              />
-            </div>
-
-            <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-1">
-              <label className="font-bold text-stone-700 block">Benefícios:</label>
-              <input
-                type="number"
-                value={activePlanData.benefits_limit}
-                onChange={(e) => handleFieldChange('benefits_limit', Number(e.target.value))}
-                className="w-full px-2 py-1 bg-white border border-stone-300 rounded-lg font-mono text-stone-900 text-center font-bold"
-              />
-            </div>
-
-            <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-1">
-              <label className="font-bold text-stone-700 block">Eventos:</label>
-              <input
-                type="number"
-                value={activePlanData.events_limit}
-                onChange={(e) => handleFieldChange('events_limit', Number(e.target.value))}
-                className="w-full px-2 py-1 bg-white border border-stone-300 rounded-lg font-mono text-stone-900 text-center font-bold"
-              />
-            </div>
-
-            <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-1">
-              <label className="font-bold text-stone-700 block">Posts:</label>
-              <input
-                type="number"
-                value={activePlanData.posts_limit}
-                onChange={(e) => handleFieldChange('posts_limit', Number(e.target.value))}
-                className="w-full px-2 py-1 bg-white border border-stone-300 rounded-lg font-mono text-stone-900 text-center font-bold"
-              />
-            </div>
+            <QuotaControl
+              label="Fotos Galeria:"
+              value={activePlanData.gallery_photos_limit}
+              onChange={(val) => handleFieldChange('gallery_photos_limit', val)}
+            />
+            <QuotaControl
+              label="Serviços:"
+              value={activePlanData.services_limit}
+              onChange={(val) => handleFieldChange('services_limit', val)}
+            />
+            <QuotaControl
+              label="Benefícios:"
+              value={activePlanData.benefits_limit}
+              onChange={(val) => handleFieldChange('benefits_limit', val)}
+            />
+            <QuotaControl
+              label="Eventos:"
+              value={activePlanData.events_limit}
+              onChange={(val) => handleFieldChange('events_limit', val)}
+            />
+            <QuotaControl
+              label="Posts:"
+              value={activePlanData.posts_limit}
+              onChange={(val) => handleFieldChange('posts_limit', val)}
+            />
           </div>
         </div>
 

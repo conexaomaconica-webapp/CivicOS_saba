@@ -222,6 +222,8 @@ export async function updateCommercialPlanAction(input: UpdateCommercialPlanInpu
     revalidatePath('/admin/planos');
     revalidatePath('/admin/pagamentos');
     revalidatePath('/anunciar/passo-3');
+    revalidatePath('/anunciar/passo-4');
+    revalidatePath('/anunciante/plano');
     revalidatePath('/anunciante');
     revalidatePath('/guia');
     revalidatePath('/');

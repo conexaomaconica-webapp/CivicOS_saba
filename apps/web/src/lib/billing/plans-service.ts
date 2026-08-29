@@ -113,11 +113,17 @@ export async function fetchTenantPlans(
     .in('plan_code', ['bronze', 'prata', 'ouro']);
 
   if (error) {
-    // Retorna defaults se tabela ainda não tiver dados
+    console.error('Erro ao buscar plan_payment_rules no Supabase:', error.message);
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(`SERVICO_INDISPONIVEL: Não foi possível carregar as regras de planos vigentes do banco de dados (${error.message}).`);
+    }
     return defaultList;
   }
 
   if (!rulesData || rulesData.length === 0) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SERVICO_INDISPONIVEL: Nenhuma regra de plano comercial cadastrada no banco de dados.');
+    }
     return defaultList;
   }
 
