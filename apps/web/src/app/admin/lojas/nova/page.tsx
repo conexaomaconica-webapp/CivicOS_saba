@@ -4,13 +4,14 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Landmark, ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { createAdminLodgeAction, updateAdminLodgeAction } from '@/lib/admin/admin-lodges-service';
+import { Landmark, ArrowLeft, Save, Loader2, Upload, Image as ImageIcon } from 'lucide-react';
 
 export default function AdminNovaLojaPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [potencies, setPotencies] = useState<{ id: string; slug: string; name: string; abbreviation: string }[]>([]);
   const [rites, setRites] = useState<{ id: string; slug: string; name: string }[]>([]);
@@ -22,17 +23,23 @@ export default function AdminNovaLojaPage() {
   const [riteId, setRiteId] = useState('');
   const [foundationDate, setFoundationDate] = useState('');
   const [worshipfulMaster, setWorshipfulMaster] = useState('');
+  const [slug, setSlug] = useState('');
+
+  // Media Files e Preview URLs
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
 
   // Location
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [cep, setCep] = useState('');
   const [address, setAddress] = useState('');
-  const [latitude, _setLatitude] = useState('');
-  const [longitude, _setLongitude] = useState('');
 
   // Flags de Visibilidade
   const [isPublished, setIsPublished] = useState(true);
+  const [isActive, setIsActive] = useState(true);
   const [isFeatured, setIsFeatured] = useState(false);
   const [showWorshipfulMaster, setShowWorshipfulMaster] = useState(true);
   const [showAddress, setShowAddress] = useState(true);
@@ -40,7 +47,6 @@ export default function AdminNovaLojaPage() {
   // Reuniões
   const [meetingDay, setMeetingDay] = useState('quarta');
   const [meetingTime, setMeetingTime] = useState('20:00');
-  const [meetingLabel, _setMeetingLabel] = useState('Sessão Ordinária');
 
   // Contatos
   const [phone, setPhone] = useState('');
@@ -52,10 +58,6 @@ export default function AdminNovaLojaPage() {
     async function loadAux() {
       try {
         const supabase = createClient();
-        const { data: profileData } = await (supabase as any).from('profiles').select('tenant_id').maybeSingle();
-        const tid = profileData?.tenant_id || '00000000-0000-0000-0000-000000000010';
-        setTenantId(tid);
-
         const [{ data: potData }, { data: riteData }] = await Promise.all([
           (supabase as any).from('masonic_potencies').select('id, slug, name, abbreviation').eq('is_active', true),
           (supabase as any).from('masonic_rites').select('id, slug, name').eq('is_active', true),
@@ -78,21 +80,35 @@ export default function AdminNovaLojaPage() {
     loadAux();
   }, []);
 
+  // Handler para Selecionar Logo (Preview Local)
+  const handleSelectLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoFile(file);
+    setLogoPreviewUrl(URL.createObjectURL(file));
+  };
+
+  // Handler para Selecionar Capa (Preview Local)
+  const handleSelectCover = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverFile(file);
+    setCoverPreviewUrl(URL.createObjectURL(file));
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tenantId || !name) return;
+    if (!name.trim()) return;
 
     setSaving(true);
+    setErrorMessage(null);
     try {
-      const supabase = createClient();
       const num = codeNumber ? parseInt(codeNumber, 10) : null;
-      const slug = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${num || Math.floor(Math.random() * 1000)}`;
-
       const selectedPotency = potencies.find((p) => p.id === potencyId);
       const selectedRite = rites.find((r) => r.id === riteId);
 
-      const payload = {
-        tenant_id: tenantId,
+      // Passo 1: Criar o registro da Loja no banco e obter o ID REAL
+      const res = await createAdminLodgeAction({
         name,
         code_number: num,
         potency_id: potencyId || null,
@@ -105,83 +121,87 @@ export default function AdminNovaLojaPage() {
         state: state || null,
         cep: cep || null,
         address: address || null,
-        latitude: latitude ? parseFloat(latitude) : null,
-        longitude: longitude ? parseFloat(longitude) : null,
-        slug,
+        slug: slug || undefined,
         is_published: isPublished,
+        is_active: isActive,
         is_featured: isFeatured,
         show_worshipful_master: showWorshipfulMaster,
         show_address: showAddress,
-        updated_at: new Date().toISOString(),
-      };
+        meeting_day: meetingDay,
+        meeting_time: meetingTime,
+        phone,
+        whatsapp,
+        email,
+        website,
+      });
 
-      const { data: orgData, error } = await (supabase as any)
-        .from('organizations')
-        .insert(payload)
-        .select()
-        .single();
+      if (!res.success || !res.data?.id) {
+        setErrorMessage(res.error || 'Erro ao cadastrar Loja Maçônica.');
+        setSaving(false);
+        return;
+      }
 
-      if (error) throw error;
+      const orgId = res.data.id;
+      const supabase = createClient();
+      const { data: profileData } = await (supabase as any).from('profiles').select('tenant_id').maybeSingle();
+      const tenantId = profileData?.tenant_id || '00000000-0000-0000-0000-000000000010';
 
-      // Inserir reunião se configurada
-      if (meetingDay) {
-        await (supabase as any).from('organization_meetings').insert({
-          tenant_id: tenantId,
-          organization_id: orgData.id,
-          meeting_day: meetingDay,
-          meeting_time: meetingTime,
-          label: meetingLabel,
-          is_public: true,
+      let uploadedLogoUrl: string | null = null;
+      let uploadedCoverUrl: string | null = null;
+
+      // Passo 2: Upload das mídias com o organization_id REAL
+      if (logoFile) {
+        try {
+          const fileExt = logoFile.name.split('.').pop();
+          const fileName = `logo-${Date.now()}.${fileExt}`;
+          const filePath = `${tenantId}/lodges/${orgId}/logo/${fileName}`;
+
+          const { error: logoErr } = await supabase.storage
+            .from('business-assets')
+            .upload(filePath, logoFile, { upsert: true });
+
+          if (!logoErr) {
+            const { data: urlData } = supabase.storage.from('business-assets').getPublicUrl(filePath);
+            uploadedLogoUrl = urlData.publicUrl;
+          }
+        } catch (err) {
+          console.error('Erro no upload da logo:', err);
+        }
+      }
+
+      if (coverFile) {
+        try {
+          const fileExt = coverFile.name.split('.').pop();
+          const fileName = `cover-${Date.now()}.${fileExt}`;
+          const filePath = `${tenantId}/lodges/${orgId}/cover/${fileName}`;
+
+          const { error: coverErr } = await supabase.storage
+            .from('business-assets')
+            .upload(filePath, coverFile, { upsert: true });
+
+          if (!coverErr) {
+            const { data: urlData } = supabase.storage.from('business-assets').getPublicUrl(filePath);
+            uploadedCoverUrl = urlData.publicUrl;
+          }
+        } catch (err) {
+          console.error('Erro no upload da foto da sede:', err);
+        }
+      }
+
+      // Passo 3: Atualizar as URLs de mídia se houver uploads bem sucedidos
+      if (uploadedLogoUrl || uploadedCoverUrl) {
+        await updateAdminLodgeAction(orgId, {
+          name,
+          logo_url: uploadedLogoUrl || undefined,
+          cover_url: uploadedCoverUrl || undefined,
         });
       }
 
-      // Inserir contatos informados
-      if (phone) {
-        await (supabase as any).from('organization_contacts').insert({
-          tenant_id: tenantId,
-          organization_id: orgData.id,
-          type: 'phone',
-          value: phone,
-          label: 'Telefone Institucional',
-          is_public: true,
-        });
-      }
-      if (whatsapp) {
-        await (supabase as any).from('organization_contacts').insert({
-          tenant_id: tenantId,
-          organization_id: orgData.id,
-          type: 'whatsapp',
-          value: whatsapp,
-          label: 'WhatsApp Secretaria',
-          is_public: true,
-        });
-      }
-      if (email) {
-        await (supabase as any).from('organization_contacts').insert({
-          tenant_id: tenantId,
-          organization_id: orgData.id,
-          type: 'email',
-          value: email,
-          label: 'E-mail Oficial',
-          is_public: true,
-        });
-      }
-      if (website) {
-        await (supabase as any).from('organization_contacts').insert({
-          tenant_id: tenantId,
-          organization_id: orgData.id,
-          type: 'website',
-          value: website,
-          label: 'Website Oficial',
-          is_public: true,
-        });
-      }
-
-      alert('Loja Maçônica salva com sucesso!');
+      alert('Loja Maçônica cadastrada com sucesso!');
       router.push('/admin/lojas');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erro ao salvar loja';
-      alert(msg);
+      const msg = err instanceof Error ? err.message : 'Erro inesperado ao salvar loja.';
+      setErrorMessage(msg);
     } finally {
       setSaving(false);
     }
@@ -189,14 +209,14 @@ export default function AdminNovaLojaPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-12 text-gray-500">
-        <Loader2 className="w-6 h-6 animate-spin mr-2" /> Carregando formulário...
+      <div className="flex items-center justify-center p-12 text-stone-500 font-semibold text-xs">
+        <Loader2 className="w-6 h-6 animate-spin mr-2 text-amber-900" /> Carregando formulário de cadastro...
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSave} className="space-y-6 max-w-4xl mx-auto">
+    <form onSubmit={handleSave} className="space-y-6 max-w-4xl mx-auto pb-16 text-left">
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <Link href="/admin/lojas" className="flex items-center gap-1 text-xs font-bold text-stone-600 hover:text-amber-900">
@@ -206,22 +226,79 @@ export default function AdminNovaLojaPage() {
         <button
           type="submit"
           disabled={saving}
-          className="flex items-center gap-2 bg-[#3b0b14] text-white px-6 py-2.5 rounded-xl font-bold text-xs hover:bg-[#5d1523] transition-colors shadow-2xs disabled:opacity-50"
+          className="flex items-center gap-2 bg-[#3b0b14] text-white px-6 py-2.5 rounded-xl font-bold text-xs hover:bg-[#5d1523] transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          <span>Salvar Loja</span>
+          <span>Salvar Loja Maçônica</span>
         </button>
       </div>
 
-      <div className="bg-white p-6 rounded-2xl border shadow-2xs space-y-6">
-        <h2 className="font-serif font-bold text-xl text-gray-900 border-b pb-3 flex items-center gap-2">
+      {errorMessage && (
+        <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl text-xs font-bold">
+          ⚠️ {errorMessage}
+        </div>
+      )}
+
+      <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-2xs space-y-6">
+        <h2 className="font-serif font-bold text-xl text-stone-900 border-b border-stone-200 pb-3 flex items-center gap-2">
           <Landmark className="w-5 h-5 text-amber-900" />
           <span>Cadastro de Nova Loja Maçônica</span>
         </h2>
 
-        {/* 1. Identificação Institucional */}
+        {/* 1. Mídias da Loja (Logo e Capa da Sede) */}
         <div className="space-y-4">
-          <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">1. Identificação da Oficina</h3>
+          <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">1. Brasão & Imagem da Sede</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Logo / Brasão */}
+            <div className="p-4 border border-stone-200 rounded-xl bg-stone-50 space-y-3">
+              <label className="block text-xs font-bold text-stone-800">Logomarca / Brasão da Loja</label>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-xl bg-stone-200 border border-stone-300 flex items-center justify-center overflow-hidden shrink-0">
+                  {logoPreviewUrl ? (
+                    <img src={logoPreviewUrl} alt="Brasão da Loja" className="w-full h-full object-cover" />
+                  ) : (
+                    <ImageIcon className="w-6 h-6 text-stone-400" />
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{logoPreviewUrl ? 'Alterar Brasão' : 'Selecionar Brasão'}</span>
+                    <input type="file" accept="image/*" onChange={handleSelectLogo} className="hidden" />
+                  </label>
+                  <p className="text-[11px] text-stone-500">PNG ou JPG (recomendado 400x400px)</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Foto da Sede / Fachada */}
+            <div className="p-4 border border-stone-200 rounded-xl bg-stone-50 space-y-3">
+              <label className="block text-xs font-bold text-stone-800">Foto da Sede / Fachada (Capa)</label>
+              <div className="flex items-center gap-4">
+                <div className="w-24 h-16 rounded-xl bg-stone-200 border border-stone-300 flex items-center justify-center overflow-hidden shrink-0">
+                  {coverPreviewUrl ? (
+                    <img src={coverPreviewUrl} alt="Sede da Loja" className="w-full h-full object-cover" />
+                  ) : (
+                    <ImageIcon className="w-6 h-6 text-stone-400" />
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{coverPreviewUrl ? 'Alterar Foto Sede' : 'Selecionar Foto Sede'}</span>
+                    <input type="file" accept="image/*" onChange={handleSelectCover} className="hidden" />
+                  </label>
+                  <p className="text-[11px] text-stone-500">Foto da fachada ou templo (1200x600px)</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. Identificação Institucional */}
+        <div className="space-y-4 pt-4 border-t border-stone-200">
+          <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">2. Identificação da Oficina</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-2">
@@ -231,7 +308,7 @@ export default function AdminNovaLojaPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Ex: União e Progresso"
-                className="w-full px-3 py-2 border rounded-xl text-xs text-gray-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900 font-semibold"
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900 font-semibold"
                 required
               />
             </div>
@@ -243,7 +320,7 @@ export default function AdminNovaLojaPage() {
                 value={codeNumber}
                 onChange={(e) => setCodeNumber(e.target.value)}
                 placeholder="Ex: 123"
-                className="w-full px-3 py-2 border rounded-xl text-xs text-gray-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
               />
             </div>
           </div>
@@ -254,7 +331,7 @@ export default function AdminNovaLojaPage() {
               <select
                 value={potencyId}
                 onChange={(e) => setPotencyId(e.target.value)}
-                className="w-full px-3 py-2 border rounded-xl text-xs text-gray-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
               >
                 {potencies.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -269,7 +346,7 @@ export default function AdminNovaLojaPage() {
               <select
                 value={riteId}
                 onChange={(e) => setRiteId(e.target.value)}
-                className="w-full px-3 py-2 border rounded-xl text-xs text-gray-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
               >
                 {rites.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -285,15 +362,27 @@ export default function AdminNovaLojaPage() {
                 type="date"
                 value={foundationDate}
                 onChange={(e) => setFoundationDate(e.target.value)}
-                className="w-full px-3 py-2 border rounded-xl text-xs text-gray-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
               />
             </div>
           </div>
+
+          <div>
+            <label className="block text-xs font-bold text-stone-800 mb-1">Slug Personalizado (Opcional)</label>
+            <input
+              type="text"
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+              placeholder="Ex: uniao-e-progresso-123"
+              className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+            />
+            <p className="text-[11px] text-stone-500 mt-1">Se deixado em branco, será gerado automaticamente a partir do nome e número.</p>
+          </div>
         </div>
 
-        {/* 2. Administração & Reuniões */}
-        <div className="space-y-4 pt-4 border-t">
-          <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">2. Administração & Reuniões</h3>
+        {/* 3. Administração & Reuniões */}
+        <div className="space-y-4 pt-4 border-t border-stone-200">
+          <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">3. Administração & Reuniões</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -303,7 +392,7 @@ export default function AdminNovaLojaPage() {
                 value={worshipfulMaster}
                 onChange={(e) => setWorshipfulMaster(e.target.value)}
                 placeholder="Nome do Venerável Mestre"
-                className="w-full px-3 py-2 border rounded-xl text-xs text-gray-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900 font-semibold"
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900 font-semibold"
               />
             </div>
 
@@ -313,7 +402,7 @@ export default function AdminNovaLojaPage() {
                 <select
                   value={meetingDay}
                   onChange={(e) => setMeetingDay(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-xl text-xs text-gray-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+                  className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
                 >
                   <option value="segunda">Segunda-feira</option>
                   <option value="terca">Terça-feira</option>
@@ -332,16 +421,16 @@ export default function AdminNovaLojaPage() {
                   value={meetingTime}
                   onChange={(e) => setMeetingTime(e.target.value)}
                   placeholder="20:00"
-                  className="w-full px-3 py-2 border rounded-xl text-xs text-gray-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+                  className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
                 />
               </div>
             </div>
           </div>
         </div>
 
-        {/* 3. Localização */}
-        <div className="space-y-4 pt-4 border-t">
-          <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">3. Localização & Endereço</h3>
+        {/* 4. Localização & Endereço */}
+        <div className="space-y-4 pt-4 border-t border-stone-200">
+          <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">4. Localização & Endereço</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -350,8 +439,8 @@ export default function AdminNovaLojaPage() {
                 type="text"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                placeholder="Ex: Feira de Santana"
-                className="w-full px-3 py-2 border rounded-xl text-xs text-gray-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+                placeholder="Ex: São Paulo"
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
               />
             </div>
 
@@ -361,8 +450,9 @@ export default function AdminNovaLojaPage() {
                 type="text"
                 value={state}
                 onChange={(e) => setState(e.target.value)}
-                placeholder="Ex: BA"
-                className="w-full px-3 py-2 border rounded-xl text-xs text-gray-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+                placeholder="Ex: SP"
+                maxLength={2}
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900 uppercase"
               />
             </div>
 
@@ -372,48 +462,48 @@ export default function AdminNovaLojaPage() {
                 type="text"
                 value={cep}
                 onChange={(e) => setCep(e.target.value)}
-                placeholder="44000-000"
-                className="w-full px-3 py-2 border rounded-xl text-xs text-gray-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+                placeholder="00000-000"
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-stone-800 mb-1">Endereço Completo</label>
+            <label className="block text-xs font-bold text-stone-800 mb-1">Endereço Completo do Templo</label>
             <input
               type="text"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="Rua, número, bairro..."
-              className="w-full px-3 py-2 border rounded-xl text-xs text-gray-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+              className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
             />
           </div>
         </div>
 
-        {/* 4. Contatos */}
-        <div className="space-y-4 pt-4 border-t">
-          <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">4. Contatos Institucionais</h3>
+        {/* 5. Contatos Institucionais */}
+        <div className="space-y-4 pt-4 border-t border-stone-200">
+          <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">5. Contatos Institucionais</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-stone-800 mb-1">Telefone Institucional</label>
+              <label className="block text-xs font-bold text-stone-800 mb-1">Telefone da Loja</label>
               <input
                 type="text"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="(75) 99999-9999"
-                className="w-full px-3 py-2 border rounded-xl text-xs text-gray-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+                placeholder="(11) 3333-4444"
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-stone-800 mb-1">WhatsApp Secretaria</label>
+              <label className="block text-xs font-bold text-stone-800 mb-1">WhatsApp da Secretaria</label>
               <input
                 type="text"
                 value={whatsapp}
                 onChange={(e) => setWhatsapp(e.target.value)}
-                placeholder="(75) 99999-9999"
-                className="w-full px-3 py-2 border rounded-xl text-xs text-gray-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+                placeholder="(11) 98888-7777"
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
               />
             </div>
 
@@ -424,66 +514,91 @@ export default function AdminNovaLojaPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="contato@loja.org.br"
-                className="w-full px-3 py-2 border rounded-xl text-xs text-gray-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-stone-800 mb-1">Website Oficial</label>
               <input
-                type="url"
+                type="text"
                 value={website}
                 onChange={(e) => setWebsite(e.target.value)}
                 placeholder="https://loja.org.br"
-                className="w-full px-3 py-2 border rounded-xl text-xs text-gray-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
               />
             </div>
           </div>
         </div>
 
-        {/* 5. Publicação & Privacidade */}
-        <div className="space-y-4 pt-4 border-t">
-          <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">5. Publicação & Visibilidade</h3>
+        {/* 6. Governança de Exposição & Publicação */}
+        <div className="space-y-4 pt-4 border-t border-stone-200">
+          <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">6. Governança de Exposição no Guia</h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label className="flex items-center gap-2 text-xs font-semibold text-stone-800 cursor-pointer">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="flex items-center gap-3 p-3 bg-stone-50 border border-stone-200 rounded-xl cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="w-4 h-4 accent-amber-900 rounded"
+              />
+              <div>
+                <span className="text-xs font-bold text-stone-900 block">Registro Ativo (`is_active`)</span>
+                <span className="text-[11px] text-stone-500">Mantém a Loja ativa administrativamente no sistema.</span>
+              </div>
+            </label>
+
+            <label className="flex items-center gap-3 p-3 bg-stone-50 border border-stone-200 rounded-xl cursor-pointer">
               <input
                 type="checkbox"
                 checked={isPublished}
                 onChange={(e) => setIsPublished(e.target.checked)}
                 className="w-4 h-4 accent-amber-900 rounded"
               />
-              <span>Publicar loja no diretório público (/guia/lojas)</span>
+              <div>
+                <span className="text-xs font-bold text-stone-900 block">Publicar no Guia Maçônico (`is_published`)</span>
+                <span className="text-[11px] text-stone-500">Exibe o card e a página detalhada da Loja nas buscas públicas.</span>
+              </div>
             </label>
 
-            <label className="flex items-center gap-2 text-xs font-semibold text-stone-800 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isFeatured}
-                onChange={(e) => setIsFeatured(e.target.checked)}
-                className="w-4 h-4 accent-amber-900 rounded"
-              />
-              <span>Exibir loja como Destaque</span>
-            </label>
-
-            <label className="flex items-center gap-2 text-xs font-semibold text-stone-800 cursor-pointer">
+            <label className="flex items-center gap-3 p-3 bg-stone-50 border border-stone-200 rounded-xl cursor-pointer">
               <input
                 type="checkbox"
                 checked={showWorshipfulMaster}
                 onChange={(e) => setShowWorshipfulMaster(e.target.checked)}
                 className="w-4 h-4 accent-amber-900 rounded"
               />
-              <span>Exibir nome do Venerável Mestre publicamente</span>
+              <div>
+                <span className="text-xs font-bold text-stone-900 block">Exibir Nome do Venerável Mestre</span>
+                <span className="text-[11px] text-stone-500">Permite a visualização pública do responsável da gestão.</span>
+              </div>
             </label>
 
-            <label className="flex items-center gap-2 text-xs font-semibold text-stone-800 cursor-pointer">
+            <label className="flex items-center gap-3 p-3 bg-stone-50 border border-stone-200 rounded-xl cursor-pointer">
               <input
                 type="checkbox"
                 checked={showAddress}
                 onChange={(e) => setShowAddress(e.target.checked)}
                 className="w-4 h-4 accent-amber-900 rounded"
               />
-              <span>Exibir endereço completo publicamente</span>
+              <div>
+                <span className="text-xs font-bold text-stone-900 block">Exibir Endereço do Templo</span>
+                <span className="text-[11px] text-stone-500">Exibe rua, número e mapa para visitantes.</span>
+              </div>
+            </label>
+
+            <label className="flex items-center gap-3 p-3 bg-stone-50 border border-stone-200 rounded-xl cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isFeatured}
+                onChange={(e) => setIsFeatured(e.target.checked)}
+                className="w-4 h-4 accent-amber-900 rounded"
+              />
+              <div>
+                <span className="text-xs font-bold text-stone-900 block">Loja em Destaque (`is_featured`)</span>
+                <span className="text-[11px] text-stone-500">Destaca a Loja nos resultados das buscas no Guia.</span>
+              </div>
             </label>
           </div>
         </div>

@@ -2,6 +2,7 @@
 
 import { assertPlatformAdminAccess } from './admin-auth-helper';
 import { revalidatePath } from 'next/cache';
+import { deriveCanonicalBillingStatus } from '@/lib/payment/canonical-billing-status';
 
 export interface AdminPaymentListItem {
   id: string;
@@ -116,7 +117,12 @@ export async function getAdminPaymentsDashboardAction(params?: {
 
         const planCode = sub?.plan_versions?.plans?.code || biz?.plan_tier || 'ouro';
         const amountCents = inv.amount_cents || (inv.amount_due ? Math.round(inv.amount_due * 100) : 178800);
-        const status = inv.status === 'paid' ? 'paid' : inv.status === 'overdue' ? 'overdue' : inv.status === 'failed' ? 'failed' : 'pending';
+        const canonical = deriveCanonicalBillingStatus({
+          invoiceStatus: inv.status,
+          subscriptionStatus: sub?.status,
+          hasInvoices: true,
+        });
+        const status = canonical.status === 'paid' ? 'paid' : canonical.status === 'overdue' ? 'overdue' : canonical.status === 'failed' ? 'failed' : 'pending';
         const gatewayStatus = status === 'paid' ? 'RECEIVED' : status === 'overdue' ? 'OVERDUE' : 'PENDING';
         const platformStatus = sub?.status || 'active';
 

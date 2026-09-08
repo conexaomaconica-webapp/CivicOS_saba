@@ -49,6 +49,12 @@ export function BusinessDirectoryClient({
   const [pageSize, setPageSize] = useState<number>(initialPageSize);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
+  // Sincroniza filtros locais quando props/URL forem atualizadas
+  React.useEffect(() => {
+    setFilters(initialFilters);
+  }, [initialFilters]);
+
+
   // Helper to build URL and navigate
   const updateUrl = (updatedFilters: FilterState, updatedSort: string, updatedView: ViewMode, updatedPage: number, updatedSize: number) => {
     const params = new URLSearchParams(searchParams.toString());

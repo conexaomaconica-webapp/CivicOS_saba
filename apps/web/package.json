@@ -4,7 +4,7 @@
   "private": true,
   "description": "Next.js App Router — Web application",
   "scripts": {
-    "dev": "next dev --port 3000",
+    "dev": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next dev --port 3000",
     "prebuild": "pnpm --filter \"!@saas/web\" build",
     "build": "next build",
     "build:mobile": "NEXT_OUTPUT=export next build",

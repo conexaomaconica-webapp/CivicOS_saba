@@ -171,7 +171,7 @@ export function BenefitManagementTable({ businessId, benefits }: Props) {
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-lg font-bold text-slate-900">Benefícios e Ofertas Fraternas</h2>
+          <h2 className="text-lg font-bold text-slate-900">Benefícios e Ofertas</h2>
           <p className="text-xs text-slate-500">Gerencie os descontos e vantagens especiais concedidas aos membros da comunidade.</p>
         </div>
 
@@ -294,11 +294,10 @@ export function BenefitManagementTable({ businessId, benefits }: Props) {
                     type="button"
                     onClick={() => { void handleToggleActive(item); }}
                     disabled={isPending}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors border ${
-                      item.isActive
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors border ${item.isActive
                         ? 'text-slate-700 bg-slate-50 border-slate-200 hover:bg-slate-100'
                         : 'text-emerald-800 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
-                    }`}
+                      }`}
                     data-testid={`toggle-active-${item.id}`}
                   >
                     {item.isActive ? 'Desativar' : 'Ativar'}

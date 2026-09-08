@@ -25,6 +25,7 @@ type Props = {
     q?: string;
     state?: string;
     city?: string;
+    cidade?: string;
     cat?: string;
     subcat?: string;
     rel?: string | string[];
@@ -38,6 +39,7 @@ type Props = {
     page_size?: string;
   }>;
 };
+
 
 export const metadata: Metadata = {
   title: 'Empresas e Serviços Maçônicos | Conexão Maçônica',
@@ -57,7 +59,7 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
 
   const q = params.q || '';
   const stateParam = params.state || '';
-  const city = params.city || '';
+  const city = params.city || params.cidade || '';
   const cat = params.cat || '';
   const subcat = params.subcat || '';
   
@@ -88,8 +90,37 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
     // Fallback
   }
 
-  const availableCities: string[] = homeData?.available_cities || [];
+  let availableCities: string[] = homeData?.available_cities || [];
+
+  if (!availableCities || availableCities.length === 0) {
+    try {
+      const { data: activeBiz } = await (supabase as any)
+        .from('businesses')
+        .select('id, city, business_locations(city)')
+        .eq('publication_status', 'published')
+        .eq('is_active', true);
+
+      if (activeBiz && activeBiz.length > 0) {
+        const citySet = new Set<string>();
+        activeBiz.forEach((b: any) => {
+          if (b.city && typeof b.city === 'string' && b.city.trim()) {
+            citySet.add(b.city.trim());
+          }
+          const locs = Array.isArray(b.business_locations) ? b.business_locations : [];
+          locs.forEach((l: any) => {
+            if (l.city && typeof l.city === 'string' && l.city.trim()) {
+              citySet.add(l.city.trim());
+            }
+          });
+        });
+        availableCities = Array.from(citySet).sort();
+      }
+    } catch (_e) {}
+  }
+
   const categories = homeData?.categories || [];
+
+
 
   // 2. Execute Business Search Query RPC with fallback for 055/056 schema compatibility
   let searchDataRaw: any = null;
@@ -129,6 +160,61 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
     });
     searchDataRaw = res055;
   }
+
+  if (!searchDataRaw || !searchDataRaw.items || searchDataRaw.items.length === 0) {
+    try {
+      let directQuery = (supabase as any)
+        .from('businesses')
+        .select('id, slug, name, description, logo_url, plan_tier, publication_status, is_active, category, business_locations(city, state)')
+        .eq('publication_status', 'published')
+        .eq('is_active', true);
+
+      if (q) {
+        directQuery = directQuery.or(`name.ilike.%${q}%,description.ilike.%${q}%`);
+      }
+
+      const { data: directBiz, count } = await directQuery;
+      let filteredBiz = directBiz || [];
+
+      if (cat) {
+        const normCat = cat.toLowerCase();
+        filteredBiz = filteredBiz.filter((b: any) => b.category?.toLowerCase() === normCat);
+      }
+
+      if (city) {
+        const normCity = city.toLowerCase();
+        filteredBiz = filteredBiz.filter((b: any) => {
+          const locs = Array.isArray(b.business_locations) ? b.business_locations : [];
+          return locs.some((l: any) => l.city?.toLowerCase().includes(normCity));
+        });
+      }
+
+      if (filteredBiz.length > 0) {
+        searchDataRaw = {
+          items: filteredBiz.map((b: any) => ({
+            id: b.id,
+            slug: b.slug,
+            name: b.name,
+            short_description: b.description ? b.description.slice(0, 200) : '',
+            logo_url: b.logo_url,
+            cover_url: null,
+            category_slug: b.category,
+            category_name: b.category,
+            city: Array.isArray(b.business_locations) && b.business_locations[0] ? b.business_locations[0].city : null,
+            state: Array.isArray(b.business_locations) && b.business_locations[0] ? b.business_locations[0].state : null,
+            is_verified: true,
+            is_founder: false,
+            effective_plan_code: b.plan_tier || 'prata',
+          })),
+          total: count || filteredBiz.length,
+          page: 1,
+          page_size: 12,
+          total_pages: 1,
+        };
+      }
+    } catch (_fallbackErr) {}
+  }
+
 
   const searchData = searchDataRaw || {
     items: [],

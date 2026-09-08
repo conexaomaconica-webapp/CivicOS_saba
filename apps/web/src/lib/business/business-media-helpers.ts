@@ -23,8 +23,8 @@ export interface BusinessMediaResolved {
   }>;
 }
 
-const DEFAULT_LOGO = '/logoconexao_red_vert.png';
-const DEFAULT_COVER = '/capa-padrao.jpg';
+const DEFAULT_LOGO = '/logofallback.png';
+const DEFAULT_COVER = '/capafallback.png';
 
 /**
  * Resolve logo, capa e galeria para uma empresa.

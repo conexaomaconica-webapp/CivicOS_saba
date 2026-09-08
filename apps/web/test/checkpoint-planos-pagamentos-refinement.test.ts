@@ -2,9 +2,24 @@ import { describe, it, expect, vi } from 'vitest';
 import { getPlanEntitlementsAction, updateCommercialPlanAction } from '../src/app/actions/plan-entitlements';
 import { getAdminPaymentsDashboardAction, reprocessPaymentWebhookAction } from '../src/lib/admin/admin-payments-service';
 
+vi.mock('next/headers', () => ({
+  cookies: () => Promise.resolve({ get: () => undefined, getAll: () => [], set: () => {}, delete: () => {} }),
+}));
+
 vi.mock('../src/lib/supabase/server', () => ({
   createServerSideClient: vi.fn().mockImplementation(() => {
     return Promise.resolve({
+      auth: {
+        getUser: () => Promise.resolve({
+          data: { user: { id: '00000000-0000-0000-0000-000000000099', email: 'admin@cm.com.br' } },
+          error: null,
+        }),
+      },
+      rpc: (fnName: string) => {
+        if (fnName === 'has_platform_admin_access') return Promise.resolve({ data: true, error: null });
+        if (fnName === 'process_canonical_billing_event') return Promise.resolve({ data: { success: true }, error: null });
+        return Promise.resolve({ data: null, error: null });
+      },
       from: vi.fn().mockImplementation((table: string) => {
         if (table === 'tenants') {
           return {
@@ -53,8 +68,77 @@ vi.mock('../src/lib/supabase/server', () => ({
         }
         if (table === 'businesses') {
           return {
-            select: vi.fn().mockResolvedValue({
-              data: [{ id: 'b-1', name: 'Comandos', plan_code: 'ouro' }],
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: 'b-1', name: 'Comandos Terceirização', plan_tier: 'ouro' },
+              error: null,
+            }),
+            then: (r: any) => r({ data: [{ id: 'b-1', name: 'Comandos Terceirização', plan_tier: 'ouro' }], error: null }),
+          };
+        }
+        if (table === 'invoices') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            order: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: 'pay-003',
+                business_id: 'b-1',
+                amount_cents: 238800,
+                amount_due: 2388.00,
+                status: 'paid',
+                payment_method: 'credit_card',
+                created_at: new Date().toISOString(),
+              },
+              error: null,
+            }),
+            then: (r: any) => r({
+              data: [
+                {
+                  id: 'pay-003',
+                  business_id: 'b-1',
+                  amount_cents: 238800,
+                  amount_due: 2388.00,
+                  status: 'paid',
+                  payment_method: 'credit_card',
+                  created_at: new Date().toISOString(),
+                },
+              ],
+              error: null,
+            }),
+          };
+        }
+        if (table === 'payment_provider_events') {
+          const chain: any = {
+            select: () => chain,
+            eq: () => chain,
+            maybeSingle: () => Promise.resolve({
+              data: {
+                id: 'pay-003',
+                tenant_id: '00000000-0000-0000-0000-000000000010',
+                provider: 'asaas',
+                provider_event_id: 'evt_asaas_123',
+                canonical_event: 'payment_confirmed',
+                business_id: 'b-1',
+                plan_code: 'ouro',
+                amount_cents: 238800,
+                payload: {},
+              },
+              error: null,
+            }),
+          };
+          return chain;
+        }
+        if (table === 'subscriptions') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            then: (r: any) => r({
+              data: [
+                { id: 'sub-1', business_id: 'b-1', status: 'active' },
+              ],
               error: null,
             }),
           };
@@ -69,6 +153,7 @@ vi.mock('../src/lib/supabase/server', () => ({
           update: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
           maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          then: (r: any) => r({ data: [], error: null }),
         };
       }),
     });
@@ -110,6 +195,7 @@ describe('Refinamento Planos (/admin/planos) e Pagamentos (/admin/pagamentos)', 
 
   it('3. Central de Pagamentos — Carrega KPIs operacionais e fila de conciliação de divergências', async () => {
     const res = await getAdminPaymentsDashboardAction();
+    expect(res.kpis).toBeDefined();
     expect(res.kpis.monthlyReceivedBrl).toBeGreaterThan(0);
     expect(res.reconciliationRequired).toBeDefined();
     expect(res.items.length).toBeGreaterThan(0);

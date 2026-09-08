@@ -37,7 +37,7 @@ export default async function OnboardingStep5Page() {
 
   const planCode = biz.plan_tier || 'ouro';
   const planName = planCode === 'ouro' ? 'Plano Ouro (Anual)' : planCode === 'prata' ? 'Plano Prata (Anual)' : 'Plano Bronze (Essencial)';
-  const planPrice = planCode === 'ouro' ? 'R$ 2.388,00 / ano' : planCode === 'prata' ? 'R$ 1.788,00 / ano' : 'Gratuito';
+  const planPrice = planCode === 'ouro' ? 'R$ 1.000,00 / ano' : planCode === 'prata' ? 'R$ 800,00 / ano' : 'R$ 500,00 / ano';
 
   return (
     <main className="min-h-screen w-full bg-[#1f0509] text-white flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">

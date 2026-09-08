@@ -51,6 +51,14 @@ export interface AdvertiserPlanBillingDTO {
   };
 }
 
+import {
+  deriveCanonicalBillingStatus,
+  CanonicalBillingStatus,
+} from '@/lib/payment/canonical-billing-status';
+
+export { deriveCanonicalBillingStatus };
+export type { CanonicalBillingStatus };
+
 /**
  * Retorna os dados financeiros canônicos do anunciante autenticado.
  * NUNCA utiliza fallback limit(1) arbitrário em empresas de terceiros.
@@ -134,7 +142,8 @@ export async function getAdvertiserPlanBillingDTOAction(targetBusinessId?: strin
       .maybeSingle();
 
     const planCode = (subData?.plan_versions?.plans?.code || activeBiz.plan_tier || 'prata').toLowerCase();
-    const subStatus = subData?.status || 'active';
+    // NÃO assumir 'active' quando subData for ausente; defaulting seguro para 'pending'
+    const subStatus = subData ? subData.status : 'pending';
     const renewsAtDate = subData?.current_period_end
       ? new Date(subData.current_period_end).toLocaleDateString('pt-BR')
       : 'A renovar';
@@ -181,34 +190,13 @@ export async function getAdvertiserPlanBillingDTOAction(targetBusinessId?: strin
 
       // Cálculo Factual da Soma dos Estornos
       const totalRefunded = relatedRefunds.reduce((sum, r) => sum + Number(r.amount || 0), 0);
-      const paymentAmount = Number(relatedPayment?.amount || inv.amount_due || 0);
 
-      let invoiceStatus: AdvertiserInvoiceItem['status'] = 'pending';
-      let statusLabel = 'Pendente';
-
-      // Avaliação de Refund
-      if (totalRefunded > 0 && paymentAmount > 0) {
-        if (totalRefunded >= paymentAmount) {
-          invoiceStatus = 'refunded';
-          statusLabel = 'Reembolsado';
-        } else {
-          invoiceStatus = 'partially_refunded';
-          statusLabel = 'Parcialmente Reembolsado';
-        }
-      } else if (inv.status === 'paid' || relatedPayment?.status === 'succeeded') {
-        invoiceStatus = 'paid';
-        statusLabel = 'Pago';
-      } else if (inv.status === 'open') {
-        const isOverdue = new Date(inv.due_date) < new Date();
-        invoiceStatus = isOverdue ? 'overdue' : 'pending';
-        statusLabel = isOverdue ? 'Vencido' : 'Pendente';
-      } else if (inv.status === 'draft') {
-        invoiceStatus = 'processing';
-        statusLabel = 'Em processamento';
-      } else if (inv.status === 'void' || inv.status === 'uncollectible') {
-        invoiceStatus = 'canceled';
-        statusLabel = 'Cancelado';
-      }
+      const canonical = deriveCanonicalBillingStatus({
+        invoiceStatus: inv.status,
+        paymentStatus: relatedPayment?.status,
+        subscriptionStatus: subStatus,
+        hasInvoices: true,
+      });
 
       const methodRaw = relatedPayment?.payment_method || inv.payment_method;
       const paymentMethodFormatted = methodRaw === 'pix' ? 'PIX' : methodRaw === 'credit_card' ? 'Cartão de Crédito' : 'Não informado';
@@ -219,8 +207,8 @@ export async function getAdvertiserPlanBillingDTOAction(targetBusinessId?: strin
         due_date: new Date(inv.due_date).toLocaleDateString('pt-BR'),
         paid_at: inv.paid_at ? new Date(inv.paid_at).toLocaleString('pt-BR') : undefined,
         amount_cents: Math.round(Number(inv.amount_due || 0) * 100),
-        status: invoiceStatus,
-        status_label: statusLabel,
+        status: canonical.status,
+        status_label: canonical.label,
         payment_method: paymentMethodFormatted,
         provider_transaction_id: relatedPayment?.provider_transaction_id,
         total_refunded_cents: Math.round(totalRefunded * 100),
@@ -250,6 +238,15 @@ export async function getAdvertiserPlanBillingDTOAction(targetBusinessId?: strin
     const lastPaidInvoice = mappedInvoices.find((i) => i.status === 'paid' || i.status === 'refunded');
     const paymentMethodSummary = lastPaidInvoice ? lastPaidInvoice.payment_method : 'Não informado';
 
+    const hasConfirmedInvoice = mappedInvoices.some((i) => i.status === 'paid');
+    const isPlanActive = subData ? subData.status === 'active' : hasConfirmedInvoice;
+
+    const overallBillingStatus = deriveCanonicalBillingStatus({
+      invoiceStatus: mappedInvoices[0]?.status,
+      subscriptionStatus: subStatus,
+      hasInvoices: mappedInvoices.length > 0,
+    });
+
     return {
       is_empty: false,
       business: {
@@ -267,11 +264,11 @@ export async function getAdvertiserPlanBillingDTOAction(targetBusinessId?: strin
           : 'Plano intermediário ideal para empresas em expansão regional.',
         amount_cents: isOuro ? 238800 : isPrata ? 178800 : 0,
         billing_cycle: 'annual',
-        is_active: subStatus === 'active',
+        is_active: isPlanActive,
         renews_at: renewsAtDate,
         payment_method_summary: paymentMethodSummary,
-        badge_label: subStatus === 'active' ? 'Assinatura Ativa' : subStatus === 'past_due' ? 'Assinatura Pendente' : 'Assinatura Inativa',
-        status: subStatus,
+        badge_label: overallBillingStatus.label,
+        status: overallBillingStatus.status,
       },
       invoices: mappedInvoices,
       contract: contractData,

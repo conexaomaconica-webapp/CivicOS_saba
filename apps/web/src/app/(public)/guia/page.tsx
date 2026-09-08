@@ -24,6 +24,7 @@ type Props = {
   searchParams: Promise<{
     q?: string;
     city?: string;
+    cidade?: string;
     cat?: string;
     verified?: string;
     benefits?: string;
@@ -33,6 +34,7 @@ type Props = {
     rite?: string;
   }>;
 };
+
 
 export const metadata: Metadata = {
   title: 'Guia Comercial e Maçônico — Conexão Maçônica',
@@ -50,7 +52,7 @@ export const metadata: Metadata = {
 export default async function GuiaPage({ searchParams }: Props) {
   const params = await searchParams;
   const q = params.q || '';
-  const city = params.city || '';
+  const city = params.city || params.cidade || '';
   const cat = params.cat || '';
   const verified = params.verified === 'true';
   const benefits = params.benefits === 'true';
@@ -113,15 +115,76 @@ export default async function GuiaPage({ searchParams }: Props) {
     available_cities: [],
   };
 
-  const searchData: any = searchRes.data || {
-    items: [],
-    total: 0,
-    page: 1,
-    page_size: 12,
-    total_pages: 1,
-    has_next_page: false,
-    has_previous_page: false,
-  };
+  let searchData: any = searchRes.data;
+
+  if (!searchData || !searchData.items || searchData.items.length === 0) {
+    try {
+      let directQuery = (supabase as any)
+        .from('businesses')
+        .select('id, slug, name, description, logo_url, plan_tier, publication_status, is_active, category, business_locations(city, state)')
+        .eq('publication_status', 'published')
+        .eq('is_active', true);
+
+      if (q) {
+        directQuery = directQuery.or(`name.ilike.%${q}%,description.ilike.%${q}%`);
+      }
+
+      const { data: directBiz } = await directQuery;
+      let filteredBiz = directBiz || [];
+
+      if (cat) {
+        const normCat = cat.toLowerCase();
+        filteredBiz = filteredBiz.filter((b: any) => b.category?.toLowerCase() === normCat);
+      }
+
+      if (city) {
+        const normCity = city.toLowerCase();
+        filteredBiz = filteredBiz.filter((b: any) => {
+          const locs = Array.isArray(b.business_locations) ? b.business_locations : [];
+          return locs.some((l: any) => l.city?.toLowerCase().includes(normCity));
+        });
+      }
+
+      if (filteredBiz.length > 0) {
+        searchData = {
+          items: filteredBiz.map((b: any) => ({
+            id: b.id,
+            slug: b.slug,
+            name: b.name,
+            short_description: b.description ? b.description.slice(0, 200) : '',
+            logo_url: b.logo_url,
+            cover_url: null,
+            category_slug: b.category,
+            category_name: b.category,
+            city: Array.isArray(b.business_locations) && b.business_locations[0] ? b.business_locations[0].city : null,
+            state: Array.isArray(b.business_locations) && b.business_locations[0] ? b.business_locations[0].state : null,
+            is_verified: true,
+            is_founder: false,
+            effective_plan_code: b.plan_tier || 'prata',
+          })),
+          total: filteredBiz.length,
+          page: 1,
+          page_size: 12,
+          total_pages: 1,
+          has_next_page: false,
+          has_previous_page: false,
+        };
+      }
+    } catch (_fallbackErr) {}
+  }
+
+
+  if (!searchData) {
+    searchData = {
+      items: [],
+      total: 0,
+      page: 1,
+      page_size: 12,
+      total_pages: 1,
+      has_next_page: false,
+      has_previous_page: false,
+    };
+  }
 
   const lodgesData: any = lodgesRes.data || {
     items: [],
@@ -137,9 +200,38 @@ export default async function GuiaPage({ searchParams }: Props) {
   const banners = (homeData.banners as DirectoryBannerItem[]) || [];
   const categories = (homeData.categories as DirectoryCategoryItem[]) || [];
   const sponsored = (homeData.sponsored as DirectorySponsoredItem[]) || [];
-  const availableCities = (homeData.available_cities as string[]) || [];
+  let availableCities = (homeData.available_cities as string[]) || [];
+
+
+  if (!availableCities || availableCities.length === 0) {
+    try {
+      const { data: activeBiz } = await (supabase as any)
+        .from('businesses')
+        .select('id, city, business_locations(city)')
+        .eq('publication_status', 'published')
+        .eq('is_active', true);
+
+      if (activeBiz && activeBiz.length > 0) {
+        const citySet = new Set<string>();
+        activeBiz.forEach((b: any) => {
+          if (b.city && typeof b.city === 'string' && b.city.trim()) {
+            citySet.add(b.city.trim());
+          }
+          const locs = Array.isArray(b.business_locations) ? b.business_locations : [];
+          locs.forEach((l: any) => {
+            if (l.city && typeof l.city === 'string' && l.city.trim()) {
+              citySet.add(l.city.trim());
+            }
+          });
+        });
+        availableCities = Array.from(citySet).sort();
+      }
+    } catch (_e) {}
+  }
+
 
   const businessItems = (searchData.items as PublicSearchResultItem[]) || [];
+
   const lodgeItems = (lodgesData.items as PublicMasonicLodgeItem[]) || [];
 
   return (

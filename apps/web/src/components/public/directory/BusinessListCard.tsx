@@ -94,18 +94,18 @@ export function BusinessListCard({ data, onViewOnMap }: BusinessListCardProps) {
       return { label: 'Coluna de Honra', bg: 'bg-amber-50 text-amber-950 border-amber-300 font-semibold', icon: ShieldCheck };
     }
     if (plan === 'ouro' || plan === 'gold') {
-      return { label: 'Plano Ouro', bg: 'bg-[#fdf8eb] text-[#855e10] border-[#e8d7ad] font-semibold', icon: Crown };
+      return { label: 'Conexão Ouro', bg: 'bg-[#fdf8eb] text-[#855e10] border-[#e8d7ad] font-semibold', icon: Crown };
     }
     if (data.is_verified) {
       return { label: 'Verificada', bg: 'bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold', icon: ShieldCheck };
     }
     if (plan === 'prata' || plan === 'silver') {
-      return { label: 'Plano Prata', bg: 'bg-slate-100 text-slate-800 border-slate-300 font-semibold', icon: Award };
+      return { label: 'Conexão Prata', bg: 'bg-slate-100 text-slate-800 border-slate-300 font-semibold', icon: Award };
     }
     if (plan === 'bronze') {
-      return { label: 'Plano Bronze', bg: 'bg-orange-50 text-amber-900 border-orange-200 font-semibold', icon: Award };
+      return { label: 'Conexão Bronze', bg: 'bg-orange-50 text-amber-900 border-orange-200 font-semibold', icon: Award };
     }
-    return { label: 'Anunciante', bg: 'bg-amber-50/60 text-amber-900 border-amber-200', icon: ShieldCheck };
+    return { label: 'Conexão Bronze', bg: 'bg-amber-50/60 text-amber-900 border-amber-200', icon: ShieldCheck };
   };
 
   const badge = resolveBadge();

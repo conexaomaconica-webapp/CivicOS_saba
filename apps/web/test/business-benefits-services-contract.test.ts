@@ -27,6 +27,7 @@ describe('Checkpoint 7A — Contrato Público e Sanitização de Benefícios & S
     const row = {
       ...BASE_ROW,
       effective_plan_code: 'bronze',
+      entitlements: { services_limit: 3, benefits_limit: 0 },
       benefits: [
         { id: 'b1', title: 'Benefício Ouro', description: 'Desconto VIP', discount_code: 'VIP10' },
       ],
@@ -43,18 +44,19 @@ describe('Checkpoint 7A — Contrato Público e Sanitização de Benefícios & S
       ...row,
       // Sob plano Bronze, RPC retorna 0 benefícios e serviços sanitizados
       benefits: [],
-      services: row.services.slice(0, 3).map((s) => ({ id: s.id, name: s.name })),
+      services: row.services.slice(0, 2).map((s) => ({ id: s.id, name: s.name })),
     }, []);
 
     expect(presentation.benefit).toBeNull();
-    expect(presentation.services).toHaveLength(3);
+    expect(presentation.services).toHaveLength(2);
     expect(presentation.services[0]).toEqual({ id: 's1', name: 'Serviço 1', description: null, iconName: null, priceInfo: null });
   });
 
-  it('Sanitiza adequadamente plano Prata (1 benefício sem código VIP, até 10 serviços com descrição)', () => {
+  it('Sanitiza adequadamente plano Prata (1 benefício sem código VIP, até 5 serviços com descrição)', () => {
     const row = {
       ...BASE_ROW,
       effective_plan_code: 'prata',
+      entitlements: { services_limit: 5, benefits_limit: 1 },
       benefits: [
         {
           id: 'b1',
@@ -72,7 +74,7 @@ describe('Checkpoint 7A — Contrato Público e Sanitização de Benefícios & S
         description: `Descrição ${i + 1}`,
         icon_name: null, // Sanitizado para Prata
         price_info: null, // Sanitizado para Prata
-      })).slice(0, 10),
+      })).slice(0, 5),
     };
 
     const presentation = toPublicBusinessPresentation(row, []);
@@ -80,7 +82,7 @@ describe('Checkpoint 7A — Contrato Público e Sanitização de Benefícios & S
     expect(presentation.benefit).not.toBeNull();
     expect(presentation.benefit?.title).toBe('Condição Especial Prata');
     expect(presentation.benefit?.discountCode).toBeNull();
-    expect(presentation.services).toHaveLength(10);
+    expect(presentation.services).toHaveLength(5);
     expect(presentation.services[0].description).toBe('Descrição 1');
     expect(presentation.services[0].iconName).toBeNull();
     expect(presentation.services[0].priceInfo).toBeNull();
@@ -90,6 +92,7 @@ describe('Checkpoint 7A — Contrato Público e Sanitização de Benefícios & S
     const row = {
       ...BASE_ROW,
       effective_plan_code: 'ouro',
+      entitlements: { services_limit: 25, benefits_limit: 3 },
       benefits: [
         {
           id: 'b1',

@@ -80,7 +80,7 @@ export async function trackDirectoryEventAction(payload: {
 
   try {
     const supabase = getAdminSupabase();
-    await supabase.rpc('record_directory_analytics_event', {
+    const { error: rpcErr } = await (supabase as any).rpc('record_directory_analytics_event', {
       p_business_id: payload.businessId,
       p_event_type: payload.eventType,
       p_city: payload.city || 'São Paulo',
@@ -89,8 +89,30 @@ export async function trackDirectoryEventAction(payload: {
       p_session_hash: sessionHash,
     });
 
+    if (rpcErr) {
+      await (supabase as any).from('analytics_events').insert({
+        business_id: payload.businessId,
+        event_type: payload.eventType,
+        city: payload.city || 'São Paulo',
+        state: payload.state || 'SP',
+        source: payload.source || 'direct',
+        session_hash: sessionHash,
+      });
+    }
+
     return { ok: true };
   } catch (_err) {
+    try {
+      const supabase = getAdminSupabase();
+      await (supabase as any).from('analytics_events').insert({
+        business_id: payload.businessId,
+        event_type: payload.eventType,
+        city: payload.city || 'São Paulo',
+        state: payload.state || 'SP',
+        source: payload.source || 'direct',
+        session_hash: sessionHash,
+      });
+    } catch (_e) {}
     return { ok: true, fallback: true };
   }
 }

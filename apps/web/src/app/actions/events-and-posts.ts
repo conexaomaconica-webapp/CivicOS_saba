@@ -438,3 +438,42 @@ export async function updateBusinessPostStatusAction(input: {
     };
   }
 }
+
+export const upsertBusinessEventAction = createBusinessEventAction;
+export const upsertBusinessPostAction = createBusinessPostAction;
+
+export async function deleteBusinessEventAction(input: { eventId: string; businessId: string }): Promise<ActionResponse> {
+  try {
+    const supabase = await createServerSideClient();
+    const { error } = await supabase
+      .from('business_events')
+      .delete()
+      .eq('id', input.eventId)
+      .eq('business_id', input.businessId);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Erro ao excluir evento.' };
+  }
+}
+
+export async function deleteBusinessPostAction(input: { postId: string; businessId: string }): Promise<ActionResponse> {
+  try {
+    const supabase = await createServerSideClient();
+    const { error } = await supabase
+      .from('business_posts')
+      .delete()
+      .eq('id', input.postId)
+      .eq('business_id', input.businessId);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Erro ao excluir publicação.' };
+  }
+}

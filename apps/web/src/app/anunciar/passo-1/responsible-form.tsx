@@ -132,7 +132,7 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
     if (authenticated) {
       router.push('/anunciar/passo-2');
     } else {
-      router.push('/login?redirect=%2Fanunciar%2Fpasso-1');
+      router.push('/register?redirect=%2Fanunciar%2Fpasso-2');
     }
   };
 

@@ -292,7 +292,7 @@ export default async function AdminDashboardPage() {
                   <th className="py-3 px-4">Empresa & Categoria</th>
                   <th className="py-3 px-4">Responsável</th>
                   <th className="py-3 px-4 text-center">Plano</th>
-                  <th className="py-3 px-4 text-center">Completude</th>
+                  <th className="py-3 px-4 text-center">Status do cadastro</th>
                   <th className="py-3 px-4 text-center">Pagamento</th>
                   <th className="py-3 px-4 text-center">Status</th>
                   <th className="py-3 px-4 text-right">Ação</th>

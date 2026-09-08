@@ -122,11 +122,11 @@ export function BusinessCard({
     }
   };
 
-  // Resolucao do Selo Principal (Prioridades 1 a 6 estritas)
+  // Resolucao do Nível de Conexão Comercial e Reconhecimentos Institucionais
   const resolveMainBadge = () => {
     const plan = (data.effective_plan_code || '').toLowerCase();
 
-    // Prioridade 1: Pedra Fundamental (Apenas 10 anunciantes exclusivos)
+    // Prioridade 1: Pedra Fundamental (Apenas 10 apoiadores históricos)
     if (data.is_pedra_fundamental || plan === 'pedra_fundamental') {
       return {
         label: 'Pedra Fundamental',
@@ -135,7 +135,7 @@ export function BusinessCard({
       };
     }
 
-    // Prioridade 2: Coluna de Honra (is_founder - 100 clientes fundadores)
+    // Prioridade 2: Coluna de Honra (Destaque de mérito e contribuição)
     if (data.is_founder || plan === 'coluna_honra') {
       return {
         label: 'Coluna de Honra',
@@ -144,10 +144,10 @@ export function BusinessCard({
       };
     }
 
-    // Prioridade 3: Plano Ouro
+    // Prioridade 3: Conexão Ouro
     if (plan === 'ouro' || plan === 'gold') {
       return {
-        label: 'Plano Ouro',
+        label: 'Conexão Ouro',
         bg: 'bg-[#fdf8eb] text-[#855e10] border-[#e8d7ad] font-semibold',
         icon: Crown,
       };
@@ -162,19 +162,19 @@ export function BusinessCard({
       };
     }
 
-    // Prioridade 5: Plano Prata
+    // Prioridade 5: Conexão Prata
     if (plan === 'prata' || plan === 'silver') {
       return {
-        label: 'Plano Prata',
+        label: 'Conexão Prata',
         bg: 'bg-slate-100 text-slate-800 border-slate-300 font-semibold',
         icon: Award,
       };
     }
 
-    // Prioridade 6: Plano Bronze
+    // Prioridade 6: Conexão Bronze
     if (plan === 'bronze') {
       return {
-        label: 'Plano Bronze',
+        label: 'Conexão Bronze',
         bg: 'bg-orange-50 text-amber-900 border-orange-200 font-semibold',
         icon: Award,
       };
@@ -192,7 +192,7 @@ export function BusinessCard({
 
     // Fallback neutro
     return {
-      label: 'Anunciante',
+      label: 'Conexão Bronze',
       bg: 'bg-amber-50/60 text-amber-900 border-amber-200',
       icon: ShieldCheck,
     };

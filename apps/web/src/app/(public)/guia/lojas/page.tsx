@@ -111,42 +111,19 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
   }
 
   if (!searchRes || !searchRes.items) {
-    // Direct table query fallback
-    const { data: orgsData } = await (supabase as any)
-      .from('organizations')
-      .select('id, name, code_number, potency, rite, city, state, address, latitude, longitude, logo_url, cover_url, worshipful_master_name, is_featured, slug, show_address, show_worshipful_master')
-      .eq('is_published', true)
-      .limit(pageSize);
-
-    const fallbackItems = (orgsData || []).map((o: any) => ({
-      id: o.id,
-      slug: o.slug || o.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      name: o.name,
-      code_number: o.code_number,
-      potency: o.potency,
-      rite: o.rite,
-      city: o.city,
-      state: o.state,
-      address: o.show_address ? o.address : null,
-      latitude: o.latitude,
-      longitude: o.longitude,
-      logo_url: o.logo_url,
-      cover_url: o.cover_url,
-      worshipful_master_name: o.show_worshipful_master ? o.worshipful_master_name : null,
-      is_featured: o.is_featured,
-    }));
-
     searchRes = {
-      items: fallbackItems,
-      total: fallbackItems.length,
+      items: [],
+      total: 0,
       page: 1,
       page_size: pageSize,
-      total_pages: 1,
+      total_pages: 0,
+      has_next_page: false,
+      has_previous_page: false,
     };
   }
 
   const searchData = searchRes;
-  const lodgeItems: LodgeCardData[] = (searchData.items as LodgeCardData[]) || [];
+  const lodgeItems: LodgeCardData[] = (searchRes.items as LodgeCardData[]) || [];
 
   const initialFilters: LodgeFilterState = {
     state: stateParam,

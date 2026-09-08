@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { AsaasPaymentProvider } from '../src/lib/payment/asaas-payment-provider';
-import { CANONICAL_PLAN_PAYMENT_RULES } from '../src/lib/payment/payment-service';
+import { CANONICAL_PLAN_PAYMENT_RULES } from '../src/lib/payment/payment-rules-types';
 
 describe('BLOCO 7 — ETAPA 2A: CHECKPOINT DO MOTOR DE CHECKOUT CANÔNICO & ASAAS', () => {
   it('1. Deve validar que as regras de preço e parcelamento vêm da fonte canônica do banco', () => {

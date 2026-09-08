@@ -404,3 +404,129 @@ export async function deleteBusinessBenefitAction(
     return { success: false, error: err instanceof Error ? err.message : 'Erro ao excluir benefício.' };
   }
 }
+
+/* ============================================================================
+ * EXCLUSÃO / ARQUIVAMENTO ADMINISTRATIVO DE ANUNCIANTE (Soft & Hard Delete)
+ * ============================================================================ */
+
+export async function deleteBusinessAdminAction(
+  businessId: string,
+  mode: 'archive' | 'hard_delete',
+  confirmationName?: string
+): Promise<ActionResult<{ businessId: string; mode: string }>> {
+  try {
+    const { supabase, user } = await authorizeBusinessAccess(businessId);
+
+    // 1. Obter registro da empresa para verificação e auditoria
+    const { data: biz, error: bizErr } = await (supabase as any)
+      .from('businesses')
+      .select('id, name, slug, tenant_id')
+      .eq('id', businessId)
+      .maybeSingle();
+
+    if (bizErr || !biz) {
+      return { success: false, error: 'Empresa não encontrada no banco de dados.' };
+    }
+
+    if (mode === 'archive') {
+      // SOFT DELETE (Inativação / Desativação Segura que preserva dados financeiros)
+      const { error: archiveErr } = await (supabase as any)
+        .from('businesses')
+        .update({
+          is_active: false,
+          publication_status: 'suspended',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', businessId);
+
+      if (archiveErr) {
+        return { success: false, error: `Falha ao inativar empresa: ${archiveErr.message}` };
+      }
+
+      // Auditoria
+      try {
+        await (supabase as any).from('admin_audit_logs').insert({
+          actor_id: user.id,
+          action: 'ARCHIVE_BUSINESS',
+          entity_type: 'businesses',
+          entity_id: businessId,
+          after_value: { is_active: false, publication_status: 'suspended' },
+        });
+      } catch {}
+
+      revalidatePath('/admin/empresas');
+      revalidatePath('/guia', 'layout');
+
+      return {
+        success: true,
+        data: { businessId, mode: 'archive' },
+      };
+    } else {
+      // HARD DELETE (Exclusão Permanente Físico do Banco de Dados)
+      if (!confirmationName || confirmationName.trim().toLowerCase() !== biz.name.trim().toLowerCase()) {
+        return {
+          success: false,
+          error: `O nome digitado ("${confirmationName || ''}") não coincide exatamente com o nome da empresa ("${biz.name}").`,
+        };
+      }
+
+      // Remover tabelas dependentes
+      const childTables = [
+        'business_media',
+        'business_contacts',
+        'business_locations',
+        'business_hours',
+        'business_benefits',
+        'business_services',
+        'business_events',
+        'business_posts',
+        'business_members',
+        'business_categories',
+        'business_reviews',
+        'business_favorites',
+      ];
+
+      for (const table of childTables) {
+        try {
+          await (supabase as any).from(table).delete().eq('business_id', businessId);
+        } catch {
+          // Continua para próxima tabela
+        }
+      }
+
+      // Remover o registro em businesses
+      const { error: deleteErr } = await (supabase as any)
+        .from('businesses')
+        .delete()
+        .eq('id', businessId);
+
+      if (deleteErr) {
+        return {
+          success: false,
+          error: `Falha na exclusão física do banco de dados: ${deleteErr.message}`,
+        };
+      }
+
+      // Auditoria
+      try {
+        await (supabase as any).from('admin_audit_logs').insert({
+          actor_id: user.id,
+          action: 'HARD_DELETE_BUSINESS',
+          entity_type: 'businesses',
+          entity_id: businessId,
+          before_value: { name: biz.name, slug: biz.slug },
+        });
+      } catch {}
+
+      revalidatePath('/admin/empresas');
+      revalidatePath('/guia', 'layout');
+
+      return {
+        success: true,
+        data: { businessId, mode: 'hard_delete' },
+      };
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Falha ao processar solicitação de exclusão.' };
+  }
+}

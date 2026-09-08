@@ -12,7 +12,31 @@ function crop(alt: string, x: number, y: number, width: number, height: number):
 }
 
 /** Fixture exclusiva da rota Visual Lab Ouro */
+/** Fixture exclusiva da rota Visual Lab Ouro */
 export const ouroBusinessFixture: PublicBusinessPresentation = {
+  plan: {
+    commercialPlan: 'ouro',
+    template: 'ouro',
+  },
+  entitlements: {
+    maxPhotos: 10,
+    maxServices: 10,
+    maxEvents: 5,
+    maxPosts: 5,
+    maxBenefits: 5,
+    canShowBenefits: true,
+    canShowEvents: true,
+    canShowPosts: true,
+    canShowWebsite: true,
+    canShowSocialLinks: true,
+  },
+  recognition: {
+    verified: true,
+    founder: false,
+    pedraFundamental: false,
+    colunaDeHonra: false,
+    goldPlanBadge: true,
+  },
   identity: {
     slug: 'padaria-estrela-ouro',
     name: 'Padaria & Confeitaria Estrela',
@@ -34,19 +58,23 @@ export const ouroBusinessFixture: PublicBusinessPresentation = {
     ],
   },
   owner: {
-    name: 'Roberto Estrela',
-    businessRole: 'Sócio Fundador',
-    organization: 'Loja Luz e Verdade',
-    communityLabel: 'Irmão',
-    avatar: crop('Foto de Roberto Estrela', 1150, 245, 110, 111),
+    name: 'Helena Estrela',
+    businessRole: 'Fundadora e Chef Executiva',
+    organization: 'A.R.L.S. Luz e Verdade nº 15',
+    communityLabel: 'Cunhada',
+    avatar: {
+      url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80',
+      alt: 'Foto de Helena Estrela',
+      type: 'image',
+    },
   },
   contacts: {
     phone: '(11) 2233-4455',
     whatsapp: '5511977778888',
     email: 'contato@padariaestrela.com.br',
-    instagram: 'https://instagram.com/padariaestrela',
-    facebook: 'https://facebook.com/padariaestrela',
-    website: 'https://padariaestrela.com.br',
+    instagram: 'padariaestrela',
+    facebook: 'padariaestrela',
+    website: 'padariaestrela.com.br',
   },
   location: {
     address: 'Rua das Flores, 123 — Moema, São Paulo, SP, 04500-000',
@@ -124,6 +152,28 @@ export const ouroBusinessFixture: PublicBusinessPresentation = {
       discountCode: 'LEVAIN30',
       redeemInstructions: 'Solicite ao atendente antes da emissão da nota.',
       badgeText: 'R$ 30 OFF',
+    },
+  ],
+  events: [
+    {
+      id: 'e-ouro-1',
+      title: 'Degustação Guiada de Pães Levain',
+      description: 'Encontro fraterno com harmonização de pães artesanais de fermentação natural e vinhos selecionados.',
+      startDate: '2026-09-15 19:00',
+      endDate: '2026-09-15 22:00',
+      location: 'Salão Privativo — Padaria Estrela Moema',
+      imageUrl: null,
+      externalUrl: null,
+    },
+  ],
+  posts: [
+    {
+      id: 'p-ouro-1',
+      title: 'A Arte da Fermentação Natural de 48 Horas',
+      summary: 'Entenda os benefícios nutricionais e o processo artesanal por trás dos nossos pães de fermentação lenta.',
+      content: 'Nossos pães utilizam fermento natural vivo (levain) cultivado há mais de 25 anos...',
+      publishedAt: '2026-08-20',
+      imageUrl: null,
     },
   ],
   reviews: {

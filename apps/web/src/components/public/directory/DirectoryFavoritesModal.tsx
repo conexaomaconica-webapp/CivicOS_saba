@@ -26,18 +26,47 @@ export function DirectoryFavoritesModal() {
         const host = typeof window !== 'undefined' ? window.location.host : 'localhost:3000';
         
         // Single batch RPC query using p_slugs array
-        const { data, error } = await (supabase as any).rpc('public_businesses_search', {
-          p_host: host,
-          p_slugs: favoriteSlugs,
-          p_page: 1,
-          p_page_size: Math.max(favoriteSlugs.length, 50),
-        });
+        let fetchedItems: BusinessCardData[] = [];
+        try {
+          const { data, error } = await (supabase as any).rpc('public_businesses_search', {
+            p_host: host,
+            p_slugs: favoriteSlugs,
+            p_page: 1,
+            p_page_size: Math.max(favoriteSlugs.length, 50),
+          });
 
-        if (error) {
-          console.error('Error from public_businesses_search RPC:', error);
+          if (!error && data?.items) {
+            fetchedItems = data.items as BusinessCardData[];
+          }
+        } catch (_rpcErr) {}
+
+        // Resilient fallback query on businesses table if RPC fails or returns 0 items
+        if (fetchedItems.length === 0 && favoriteSlugs.length > 0) {
+          try {
+            const { data: directBiz } = await (supabase as any)
+              .from('businesses')
+              .select('id, slug, name, description, logo_url, plan_tier, publication_status, is_active, category')
+              .in('slug', favoriteSlugs)
+              .eq('publication_status', 'published')
+              .eq('is_active', true);
+
+            if (directBiz && directBiz.length > 0) {
+              fetchedItems = directBiz.map((b: any) => ({
+                id: b.id,
+                slug: b.slug,
+                name: b.name,
+                short_description: b.description ? b.description.slice(0, 200) : '',
+                logo_url: b.logo_url,
+                cover_url: null,
+                category_slug: b.category,
+                category_name: b.category,
+                is_verified: true,
+                is_founder: false,
+                effective_plan_code: b.plan_tier || 'prata',
+              }));
+            }
+          } catch (_fallbackErr) {}
         }
-
-        const fetchedItems: BusinessCardData[] = (data?.items || []) as BusinessCardData[];
         const itemMap = new Map<string, BusinessCardData>();
         fetchedItems.forEach((biz) => {
           if (biz.slug) itemMap.set(biz.slug.toLowerCase(), biz);

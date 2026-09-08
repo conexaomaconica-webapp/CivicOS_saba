@@ -61,17 +61,16 @@ export default function MasonicBondForm({ businessId, businessName }: MasonicBon
           {[
             { id: 'brother', label: 'Irmão', desc: 'Membro Regular da Loja' },
             { id: 'sister', label: 'Cunhada', desc: 'Esposa / Viúva de Maçom' },
-            { id: 'nephew', label: 'Sobrinho', desc: 'Filho / DeMolay / Filha de Jó' },
+            { id: 'nephew', label: 'Sobrinho', desc: 'Filho / APJ / DeMolay / Filha de Jó' },
           ].map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => setMasonicStatus(item.id as any)}
-              className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                masonicStatus === item.id
-                  ? 'bg-[#3B0B14] border-[#C9A227] text-white shadow-md'
-                  : 'bg-stone-900/60 border-stone-800 text-stone-300 hover:border-stone-700'
-              }`}
+              className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${masonicStatus === item.id
+                ? 'bg-[#3B0B14] border-[#C9A227] text-white shadow-md'
+                : 'bg-stone-900/60 border-stone-800 text-stone-300 hover:border-stone-700'
+                }`}
             >
               <strong className="block text-sm font-bold">{item.label}</strong>
               <span className="text-[11px] text-stone-400 block mt-0.5">{item.desc}</span>
@@ -125,11 +124,10 @@ export default function MasonicBondForm({ businessId, businessName }: MasonicBon
               key={item.id}
               type="button"
               onClick={() => setCompanyRelationship(item.id as any)}
-              className={`p-3 rounded-xl border text-center transition-all cursor-pointer text-xs font-bold ${
-                companyRelationship === item.id
-                  ? 'bg-[#3B0B14] border-[#C9A227] text-white shadow-xs'
-                  : 'bg-stone-900/60 border-stone-800 text-stone-400 hover:border-stone-700'
-              }`}
+              className={`p-3 rounded-xl border text-center transition-all cursor-pointer text-xs font-bold ${companyRelationship === item.id
+                ? 'bg-[#3B0B14] border-[#C9A227] text-white shadow-xs'
+                : 'bg-stone-900/60 border-stone-800 text-stone-400 hover:border-stone-700'
+                }`}
             >
               {item.label}
             </button>

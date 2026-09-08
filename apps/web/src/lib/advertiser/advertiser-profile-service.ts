@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { resolveBusinessMedia, resolveLogoUrl, resolveCoverUrl } from '@/lib/business/business-media-helpers';
+import { getCanonicalDefaultLimit } from '@/lib/billing/plans-service';
 
 function safeRevalidatePath(path: string, type?: 'page' | 'layout') {
   try {
@@ -225,7 +226,7 @@ export async function updateAdvertiserProfileFieldsAction(
     if (fields.phone !== undefined) updatePayload.phone = fields.phone;
     else if (fields.whatsapp !== undefined) updatePayload.phone = fields.whatsapp;
     if (fields.public_email !== undefined) updatePayload.email = fields.public_email;
-    
+
     // Tratamento amigável de Website: insere automaticamente https:// se o usuário omitir
     if (fields.website !== undefined) {
       let web = fields.website.trim();
@@ -307,7 +308,7 @@ export async function uploadAdvertiserAssetAction(formData: FormData): Promise<{
   try {
     const file = formData.get('file') as File | null;
     const businessId = (formData.get('businessId') as string) || '00000000-0000-0000-0000-000000000001';
-    const assetType = (formData.get('assetType') as 'logo' | 'cover' | 'gallery') || 'gallery';
+    const assetType = (formData.get('assetType') as 'logo' | 'cover' | 'gallery' | 'avatar') || 'gallery';
     const title = (formData.get('title') as string) || null;
 
     if (!file) {
@@ -329,7 +330,14 @@ export async function uploadAdvertiserAssetAction(formData: FormData): Promise<{
     }
 
     const supabase = await createServerSideClient();
-    const tenantId = '00000000-0000-0000-0000-000000000001';
+
+    const { data: bizRecord } = await (supabase as any)
+      .from('businesses')
+      .select('id, tenant_id')
+      .eq('id', businessId)
+      .maybeSingle();
+
+    const tenantId = bizRecord?.tenant_id || '00000000-0000-0000-0000-000000000001';
 
     const timestamp = Date.now();
     const safeFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
@@ -348,7 +356,7 @@ export async function uploadAdvertiserAssetAction(formData: FormData): Promise<{
       return { success: false, message: `Erro ao enviar arquivo para o Storage: ${storageError.message}` };
     }
 
-    // Obter URL pública real do Supabase (NÃO fabricar URL)
+    // Obter URL pública real do Supabase
     const { data: publicUrlData } = (supabase.storage as any)
       .from('business-assets')
       .getPublicUrl(storagePath);
@@ -358,17 +366,34 @@ export async function uploadAdvertiserAssetAction(formData: FormData): Promise<{
       return { success: false, message: 'Erro: não foi possível obter URL pública do arquivo enviado.' };
     }
 
+    // 1. Caso FOTO DO EMPRESÁRIO / RESPONSÁVEL (Isolado da Logomarca)
+    if (assetType === 'avatar') {
+      try {
+        await (supabase as any)
+          .from('business_responsibles')
+          .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
+          .eq('business_id', businessId);
+      } catch (_e) {}
+
+      safeRevalidatePath(`/admin/empresas/${businessId}`);
+      safeRevalidatePath('/admin/empresas');
+
+      return { success: true, message: 'Foto do empresário atualizada e salva com sucesso no Storage.', url: publicUrl };
+    }
+
+    // 2. Caso LOGOTIPO DA EMPRESA
     if (assetType === 'logo') {
       const { error: dbError } = await (supabase as any)
         .from('businesses')
         .update({ logo_url: publicUrl, updated_at: new Date().toISOString() })
         .eq('id', businessId);
 
+
       if (dbError) {
         // ROLLBACK: Remove arquivo do Storage se o Postgres falhar (Zero órfãos)
         try {
           await (supabase.storage as any).from('business-assets').remove([storagePath]);
-        } catch (_rollbackErr) {}
+        } catch (_rollbackErr) { }
 
         return { success: false, message: `Erro ao salvar logotipo no banco: ${dbError.message}` };
       }
@@ -382,13 +407,12 @@ export async function uploadAdvertiserAssetAction(formData: FormData): Promise<{
     }
 
     if (assetType === 'cover') {
-      // 1. Inserir nova capa primeiro
       const { error: insertErr } = await (supabase as any).from('business_media').insert({
         business_id: businessId,
         tenant_id: tenantId,
         media_type: 'image',
         url: publicUrl,
-        title: 'Imagem de Capa Corporativa',
+        title: 'Imagem de Capa',
         display_order: 0,
       });
 
@@ -396,17 +420,16 @@ export async function uploadAdvertiserAssetAction(formData: FormData): Promise<{
         // ROLLBACK: Remove arquivo do Storage se o Postgres falhar
         try {
           await (supabase.storage as any).from('business-assets').remove([storagePath]);
-        } catch (_rollbackErr) {}
+        } catch (_rollbackErr) { }
 
         return { success: false, message: `Erro ao salvar capa no banco: ${insertErr.message}` };
       }
 
-      // 2. Limpar capas antigas com display_order = 0 que tenham URL diferente da nova
+      // Limpar capas antigas com display_order = 0 que tenham URL diferente da nova
       await (supabase as any)
         .from('business_media')
         .delete()
         .eq('business_id', businessId)
-        .eq('media_type', 'image')
         .eq('display_order', 0)
         .neq('url', publicUrl);
 
@@ -423,7 +446,6 @@ export async function uploadAdvertiserAssetAction(formData: FormData): Promise<{
         .from('business_media')
         .select('*', { count: 'exact' })
         .eq('business_id', businessId)
-        .eq('media_type', 'image')
         .gt('display_order', 0);
 
       const limit = 10;
@@ -447,7 +469,7 @@ export async function uploadAdvertiserAssetAction(formData: FormData): Promise<{
         // ROLLBACK: Remove arquivo do Storage se o Postgres falhar
         try {
           await (supabase.storage as any).from('business-assets').remove([storagePath]);
-        } catch (_rollbackErr) {}
+        } catch (_rollbackErr) { }
 
         return { success: false, message: `Erro ao salvar foto no banco: ${galleryDbError.message}` };
       }
@@ -505,7 +527,7 @@ export async function updateAdvertiserMediaAction(
         tenant_id: '00000000-0000-0000-0000-000000000001',
         media_type: 'image',
         url: payload.url,
-        title: 'Imagem de Capa Corporativa',
+        title: 'Imagem de Capa',
         display_order: 0,
       });
 
@@ -520,16 +542,32 @@ export async function updateAdvertiserMediaAction(
     }
 
     if (mediaType === 'gallery_add' && payload?.url) {
+      const { data: b } = await (supabase as any)
+        .from('businesses')
+        .select('tenant_id, plan_code, plan_tier')
+        .eq('id', businessId)
+        .maybeSingle();
+
+      const planCode = b?.plan_code || b?.plan_tier || 'bronze';
+      const { data: entRow } = await (supabase as any)
+        .from('plan_entitlements')
+        .select('max_limit')
+        .eq('tenant_id', b?.tenant_id || '00000000-0000-0000-0000-000000000001')
+        .eq('plan_code', planCode)
+        .eq('feature_code', 'gallery_photos_limit')
+        .maybeSingle();
+
+      const limit = entRow?.max_limit ?? getCanonicalDefaultLimit(planCode, 'gallery_photos_limit');
+
       const { count } = await (supabase as any)
         .from('business_media')
         .select('*', { count: 'exact' })
         .eq('business_id', businessId);
 
-      const limit = 10;
       if (count && count >= limit) {
         return {
           success: false,
-          message: `Você atingiu o limite de ${limit} fotos do seu Plano Ouro. Conheça outros planos para aumentar sua galeria.`,
+          message: `Você atingiu o limite de ${limit} fotos do seu plano (${planCode.toUpperCase()}). Conheça outros planos para aumentar sua galeria.`,
         };
       }
 

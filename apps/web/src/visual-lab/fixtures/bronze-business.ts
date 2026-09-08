@@ -13,6 +13,28 @@ function crop(alt: string, x: number, y: number, width: number, height: number):
 
 /** Fixture exclusiva da rota Visual Lab, nunca usada pelo fluxo produtivo. */
 export const bronzeBusinessFixture: PublicBusinessPresentation = {
+  plan: {
+    commercialPlan: 'bronze',
+    template: 'bronze',
+  },
+  entitlements: {
+    maxPhotos: 1,
+    maxServices: 2,
+    maxEvents: 0,
+    maxPosts: 0,
+    maxBenefits: 0,
+    canShowBenefits: false,
+    canShowEvents: false,
+    canShowPosts: false,
+    canShowWebsite: false,
+    canShowSocialLinks: false,
+  },
+  recognition: {
+    verified: true,
+    founder: false,
+    pedraFundamental: false,
+    colunaDeHonra: false,
+  },
   identity: {
     slug: 'saba-advocacia-visual-lab',
     name: 'Saba Advocacia',
@@ -33,17 +55,21 @@ export const bronzeBusinessFixture: PublicBusinessPresentation = {
   owner: {
     name: 'Eduardo Saba',
     businessRole: 'Proprietário',
-    organization: null,
+    organization: 'A.R.L.S. Harmonia e Sabedoria nº 42',
     communityLabel: 'Irmão',
-    avatar: crop('Responsável de homologação visual', 1150, 245, 110, 111),
+    avatar: {
+      url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&auto=format&fit=crop&q=80',
+      alt: 'Foto de Eduardo Saba',
+      type: 'image',
+    },
   },
   contacts: {
     phone: '(75) 3025-4242',
     whatsapp: '5575999881122',
     email: 'contato@sabaadvocacia.com.br',
-    instagram: 'https://instagram.com/',
-    facebook: 'https://facebook.com/',
-    website: 'https://sabaadvocacia.com.br',
+    instagram: null,
+    facebook: null,
+    website: null,
   },
   location: {
     address: 'Av. Getúlio Vargas, 1240 — Centro, Feira de Santana, BA, 44001-075',
@@ -60,11 +86,14 @@ export const bronzeBusinessFixture: PublicBusinessPresentation = {
     { dayOfWeek: 4, openTime: '08:00', closeTime: '18:00', isClosed: false },
     { dayOfWeek: 5, openTime: '08:00', closeTime: '18:00', isClosed: false },
   ],
-  services: [],
-  benefit: {
-    title: 'Benefício especial',
-    description: '10% de desconto na primeira consultoria para membros da comunidade.',
-  },
+  services: [
+    { id: 's1', name: 'Consultoria Jurídica Empresarial', description: 'Elaboração e análise de contratos empresariais com foco em prevenção de riscos.', priceInfo: 'Sob Consulta' },
+    { id: 's2', name: 'Direito Societário & M&A', description: 'Estruturação de acordos de sócios e apoio em operações de reorganização.', priceInfo: 'Sob Consulta' },
+  ],
+  benefit: null,
+  benefits: [],
+  events: [],
+  posts: [],
   reviews: {
     average: 4.9,
     count: 128,

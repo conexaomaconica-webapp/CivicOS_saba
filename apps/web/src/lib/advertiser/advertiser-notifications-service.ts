@@ -51,7 +51,7 @@ export async function getAdvertiserNotificationsDTOAction(): Promise<AdvertiserN
       {
         id: 'notif-2',
         title: 'Fatura Anual Confirmada',
-        message: 'Seu pagamento do Plano Ouro foi confirmado via gateway seguro Asaas. O recibo já está disponível para download.',
+        message: 'Seu pagamento da assinatura foi confirmado via gateway seguro Asaas. O recibo já está disponível para download.',
         category: 'billing',
         category_label: 'Financeiro',
         created_at: 'Há 1 dia',

@@ -99,6 +99,37 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
     handleFieldChange('commercial_features', updatedFeatures);
   };
 
+  const handleRestoreDefaultFeatures = () => {
+    const DEFAULT_FEATURES_BY_PLAN: Record<string, string[]> = {
+      bronze: [
+        'Presença básica no Guia Comercial',
+        'Até 3 Fotos na Galeria',
+        'Até 2 Serviços cadastrados',
+        '1 Oferta/Benefício ativo',
+        'Parcelamento em até 2x sem juros',
+      ],
+      prata: [
+        'Destaque no Guia Comercial',
+        'Até 6 Fotos na Galeria',
+        'Até 5 Serviços cadastrados',
+        'Até 3 Ofertas/Benefícios ativos',
+        'Publicação de Eventos e Comunicados',
+        'Parcelamento em até 4x sem juros',
+      ],
+      ouro: [
+        'Topo das Buscas e Maior Destaque',
+        'Até 10 Fotos na Galeria',
+        'Até 10 Serviços cadastrados',
+        'Até 5 Ofertas/Benefícios ativos',
+        'Publicação Ilimitada de Eventos',
+        'Analytics Avançado (7, 30 e 90 dias)',
+        'Parcelamento em até 6x sem juros',
+      ],
+    };
+    const defaults = DEFAULT_FEATURES_BY_PLAN[selectedPlan] || [];
+    handleFieldChange('commercial_features', defaults);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -158,12 +189,12 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
           </span>
         </div>
         <Link
-          href="/anunciar/passo-3"
+          href={`/visual-lab/${selectedPlan}`}
           target="_blank"
           className="px-3 py-1.5 bg-[#C9A227] hover:bg-amber-400 text-[#3B0B14] font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 shrink-0 shadow-xs"
         >
           <ExternalLink className="w-3.5 h-3.5" />
-          <span>Pré-visualizar como o Cliente verá</span>
+          <span>Pré-visualizar Template ({activePlanData.title})</span>
         </Link>
       </div>
 
@@ -383,17 +414,26 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
 
         {/* 4. DIFERENCIAIS COMERCIAIS VISÍVEIS NO ONBOARDING (/anunciar/passo-3) */}
         <div className="pt-4 border-t border-stone-200 space-y-3">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center flex-wrap gap-2">
             <h3 className="font-serif font-bold text-sm text-stone-900 flex items-center gap-1.5">
-              <ImageIcon className="w-4 h-4 text-[#4B161B]" /> Lista de Diferenciais Comerciais no Onboarding
+              <ImageIcon className="w-4 h-4 text-[#4B161B]" /> Lista de Diferenciais Comerciais ({activePlanData.title})
             </h3>
-            <button
-              type="button"
-              onClick={handleAddFeature}
-              className="text-xs font-bold text-[#4B161B] hover:underline"
-            >
-              + Adicionar Diferencial
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleRestoreDefaultFeatures}
+                className="text-xs font-bold text-amber-700 hover:text-amber-900 hover:underline cursor-pointer"
+              >
+                ↺ Restaurar Padrões do {activePlanData.title}
+              </button>
+              <button
+                type="button"
+                onClick={handleAddFeature}
+                className="text-xs font-bold text-[#4B161B] hover:underline cursor-pointer"
+              >
+                + Adicionar Diferencial
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2">

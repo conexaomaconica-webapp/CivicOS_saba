@@ -85,6 +85,23 @@ export default function RegisterPage() {
     setErrors({ ...errors, [key]: nextErrors[key] });
   };
 
+  const [redirectTarget, setRedirectTarget] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const redirectParam = params.get('redirect');
+      if (
+        redirectParam &&
+        redirectParam.startsWith('/') &&
+        !redirectParam.startsWith('//') &&
+        !redirectParam.includes('\\')
+      ) {
+        setRedirectTarget(redirectParam);
+      }
+    }
+  }, []);
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -109,7 +126,11 @@ export default function RegisterPage() {
         setErrorMsg(result.error.message);
       } else {
         alert('Cadastro realizado com sucesso! Verifique seu e-mail para confirmação se necessário.');
-        router.push('/login');
+        if (redirectTarget) {
+          router.push(`/login?redirect=${encodeURIComponent(redirectTarget)}&registered=true`);
+        } else {
+          router.push('/login');
+        }
       }
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Erro inesperado ao realizar cadastro.');
@@ -347,7 +368,7 @@ export default function RegisterPage() {
       >
         <span>Já tem uma conta?</span>
         <Link
-          href="/login"
+          href={redirectTarget ? `/login?redirect=${encodeURIComponent(redirectTarget)}` : '/login'}
           style={{
             color: 'var(--text-link)',
             fontWeight: 'var(--font-weight-semibold)',

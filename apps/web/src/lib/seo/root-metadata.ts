@@ -20,7 +20,6 @@ export async function generateRootMetadata(): Promise<Metadata> {
       shortcut: brand.faviconUrl ?? '/icone.png',
       apple: brand.faviconUrl ?? '/icone.png',
     },
-    ...(brand.primaryColor ? { themeColor: brand.primaryColor } : {}),
     robots: { index: true, follow: true },
   };
 }

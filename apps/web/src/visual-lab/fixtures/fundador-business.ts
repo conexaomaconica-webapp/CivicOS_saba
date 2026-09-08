@@ -12,7 +12,30 @@ function crop(alt: string, x: number, y: number, width: number, height: number):
 }
 
 /** Fixture exclusiva da rota Visual Lab Empresa Fundadora (Ouro + Selo Fundador) */
+/** Fixture exclusiva da rota Visual Lab Empresa Fundadora (Ouro + Selo Fundador) */
 export const fundadorBusinessFixture: PublicBusinessPresentation = {
+  plan: {
+    commercialPlan: 'ouro',
+    template: 'ouro',
+  },
+  entitlements: {
+    maxPhotos: 10,
+    maxServices: 10,
+    maxEvents: 5,
+    maxPosts: 5,
+    maxBenefits: 5,
+    canShowBenefits: true,
+    canShowEvents: true,
+    canShowPosts: true,
+    canShowWebsite: true,
+    canShowSocialLinks: true,
+  },
+  recognition: {
+    verified: true,
+    founder: true,
+    pedraFundamental: false,
+    colunaDeHonra: false,
+  },
   identity: {
     slug: 'grupo-construtor-alfa-fundador',
     name: 'Grupo Construtor Alfa',
@@ -38,15 +61,19 @@ export const fundadorBusinessFixture: PublicBusinessPresentation = {
     businessRole: 'Presidente Executivo',
     organization: 'Grande Oriente Estadual',
     communityLabel: 'Irmão',
-    avatar: crop('Foto de Marcelo Alfa', 1150, 245, 110, 111),
+    avatar: {
+      url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
+      alt: 'Foto de Marcelo Alfa',
+      type: 'image',
+    },
   },
   contacts: {
     phone: '(11) 4004-9000',
     whatsapp: '5511999990000',
     email: 'contato@grupoalfa.com.br',
-    instagram: 'https://instagram.com/grupoalfa',
-    facebook: 'https://facebook.com/grupoalfa',
-    website: 'https://grupoalfa.com.br',
+    instagram: 'grupoalfa',
+    facebook: 'grupoalfa',
+    website: 'grupoalfa.com.br',
   },
   location: {
     address: 'Av. Brigadeiro Faria Lima, 3400 — Itaim Bibi, São Paulo, SP, 04538-132',
@@ -108,6 +135,8 @@ export const fundadorBusinessFixture: PublicBusinessPresentation = {
       badgeText: 'CORTESIA FUNDADORA',
     },
   ],
+  events: [],
+  posts: [],
   reviews: {
     average: 5.0,
     count: 342,

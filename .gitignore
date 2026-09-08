@@ -49,3 +49,5 @@ supabase_cli/
 # session logs and scratch temp files
 session-ses_*.md
 COMPATIBILITY_ANALYSIS_*.md
+scratch/
+

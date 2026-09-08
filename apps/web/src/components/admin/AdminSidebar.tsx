@@ -23,6 +23,7 @@ import {
   ShieldAlert,
   ChevronRight,
   Award,
+  Scale,
   X,
 } from 'lucide-react';
 import { getApprovalDirectoryListAction } from '@/lib/admin/admin-approval-service';
@@ -143,8 +144,19 @@ export const adminNavSections: NavSection[] = [
     ],
   },
   {
-    sectionTitle: '5. GOVERNANÇA',
+    sectionTitle: '5. GOVERNANÇA & JURÍDICO',
     items: [
+      {
+        id: 'juridico',
+        label: 'Modelos de Contrato',
+        path: '/admin/juridico/contratos',
+        icon: Scale,
+        subItems: [
+          { label: 'Contrato de Anunciante', path: '/admin/juridico/contratos' },
+          { label: 'Termos de Uso', path: '/admin/juridico/contratos?tipo=termos' },
+          { label: 'Política de Privacidade', path: '/admin/juridico/contratos?tipo=privacidade' },
+        ],
+      },
       {
         id: 'auditoria',
         label: 'Trilha de Auditoria',

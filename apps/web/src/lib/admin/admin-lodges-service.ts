@@ -1,6 +1,8 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
+import { assertPlatformAdminAccess } from './admin-auth-helper';
+import { revalidatePath } from 'next/cache';
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -458,6 +460,7 @@ export async function toggleLodgePublicationStatusAction(
       .from('organizations')
       .update({
         is_active: isActive,
+        is_published: isActive,
         updated_at: new Date().toISOString(),
       })
       .eq('id', lodgeId);
@@ -473,3 +476,224 @@ export async function toggleLodgePublicationStatusAction(
 }
 
 const DEFAULT_LODGE_ID = '00000000-0000-0000-0000-000000000020';
+
+export interface AdminLodgeFormPayload {
+  name: string;
+  code_number?: number | null;
+  potency_id?: string | null;
+  potency?: string | null;
+  rite_id?: string | null;
+  rite?: string | null;
+  foundation_date?: string | null;
+  worshipful_master_name?: string | null;
+  city?: string | null;
+  state?: string | null;
+  cep?: string | null;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  logo_url?: string | null;
+  cover_url?: string | null;
+  is_published?: boolean;
+  is_active?: boolean;
+  is_featured?: boolean;
+  show_worshipful_master?: boolean;
+  show_address?: boolean;
+  meeting_day?: string;
+  meeting_time?: string;
+  phone?: string;
+  whatsapp?: string;
+  email?: string;
+  website?: string;
+  slug?: string;
+}
+
+async function resolvePlatformAdminTenantId(supabase: any): Promise<string> {
+  const { data: profile } = await supabase.from('profiles').select('tenant_id').maybeSingle();
+  return profile?.tenant_id || '00000000-0000-0000-0000-000000000010';
+}
+
+export async function createAdminLodgeAction(payload: AdminLodgeFormPayload): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const { supabase } = await assertPlatformAdminAccess();
+
+    if (!payload.name || !payload.name.trim()) {
+      return { success: false, error: 'O nome da Loja Maçônica é obrigatório.' };
+    }
+
+    const tenantId = await resolvePlatformAdminTenantId(supabase);
+    const rawSlug = payload.slug || `${payload.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${payload.code_number || Math.floor(Math.random() * 1000)}`;
+    const slug = rawSlug.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+
+    const orgInsertPayload = {
+      tenant_id: tenantId,
+      name: payload.name.trim(),
+      code_number: payload.code_number ?? null,
+      potency_id: payload.potency_id || null,
+      potency: payload.potency || 'GOB',
+      rite_id: payload.rite_id || null,
+      rite: payload.rite || 'REAA',
+      foundation_date: payload.foundation_date || null,
+      worshipful_master_name: payload.worshipful_master_name || null,
+      city: payload.city || null,
+      state: payload.state || null,
+      cep: payload.cep || null,
+      address: payload.address || null,
+      latitude: payload.latitude ?? null,
+      longitude: payload.longitude ?? null,
+      logo_url: payload.logo_url || null,
+      cover_url: payload.cover_url || null,
+      slug,
+      is_active: payload.is_active ?? true,
+      is_published: payload.is_published ?? true,
+      is_featured: payload.is_featured ?? false,
+      show_worshipful_master: payload.show_worshipful_master ?? true,
+      show_address: payload.show_address ?? true,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data: orgData, error: orgError } = await (supabase as any)
+      .from('organizations')
+      .insert(orgInsertPayload)
+      .select()
+      .single();
+
+    if (orgError) {
+      console.error('[createAdminLodgeAction] Error inserting organization:', orgError);
+      if (orgError.code === '23505') {
+        return { success: false, error: 'Já existe uma Loja Maçônica com este slug ou identificador.' };
+      }
+      return { success: false, error: 'Falha ao cadastrar a Loja Maçônica no servidor.' };
+    }
+
+    if (payload.meeting_day && orgData?.id) {
+      await (supabase as any).from('organization_meetings').insert({
+        tenant_id: tenantId,
+        organization_id: orgData.id,
+        meeting_day: payload.meeting_day,
+        meeting_time: payload.meeting_time || '20:00',
+        label: 'Sessão Ordinária',
+        is_public: true,
+      });
+    }
+
+    const contactsToInsert = [];
+    if (payload.phone) contactsToInsert.push({ tenant_id: tenantId, organization_id: orgData.id, type: 'phone', value: payload.phone, label: 'Telefone Institucional', is_public: true });
+    if (payload.whatsapp) contactsToInsert.push({ tenant_id: tenantId, organization_id: orgData.id, type: 'whatsapp', value: payload.whatsapp, label: 'WhatsApp Secretaria', is_public: true });
+    if (payload.email) contactsToInsert.push({ tenant_id: tenantId, organization_id: orgData.id, type: 'email', value: payload.email, label: 'E-mail Oficial', is_public: true });
+    if (payload.website) contactsToInsert.push({ tenant_id: tenantId, organization_id: orgData.id, type: 'website', value: payload.website, label: 'Website Oficial', is_public: true });
+
+    if (contactsToInsert.length > 0) {
+      await (supabase as any).from('organization_contacts').insert(contactsToInsert);
+    }
+
+    revalidatePath('/admin/lojas');
+    revalidatePath('/guia/lojas');
+    revalidatePath(`/guia/lojas/${slug}`);
+
+    return { success: true, data: orgData };
+  } catch (err: any) {
+    console.error('[createAdminLodgeAction] Exception:', err);
+    return { success: false, error: err.message || 'Erro interno ao salvar Loja Maçônica.' };
+  }
+}
+
+export async function updateAdminLodgeAction(lodgeId: string, payload: AdminLodgeFormPayload): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const { supabase } = await assertPlatformAdminAccess();
+
+    if (!lodgeId) {
+      return { success: false, error: 'ID da Loja não informado.' };
+    }
+
+    if (!payload.name || !payload.name.trim()) {
+      return { success: false, error: 'O nome da Loja Maçônica é obrigatório.' };
+    }
+
+    const { data: existingLodge } = await (supabase as any)
+      .from('organizations')
+      .select('slug, tenant_id')
+      .eq('id', lodgeId)
+      .maybeSingle();
+
+    const tenantId = existingLodge?.tenant_id || (await resolvePlatformAdminTenantId(supabase));
+    const oldSlug = existingLodge?.slug;
+
+    const rawSlug = payload.slug || oldSlug || `${payload.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${payload.code_number || Math.floor(Math.random() * 1000)}`;
+    const slug = rawSlug.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+
+    const orgUpdatePayload = {
+      name: payload.name.trim(),
+      code_number: payload.code_number ?? null,
+      potency_id: payload.potency_id || null,
+      potency: payload.potency || 'GOB',
+      rite_id: payload.rite_id || null,
+      rite: payload.rite || 'REAA',
+      foundation_date: payload.foundation_date || null,
+      worshipful_master_name: payload.worshipful_master_name || null,
+      city: payload.city || null,
+      state: payload.state || null,
+      cep: payload.cep || null,
+      address: payload.address || null,
+      latitude: payload.latitude ?? null,
+      longitude: payload.longitude ?? null,
+      logo_url: payload.logo_url || null,
+      cover_url: payload.cover_url || null,
+      slug,
+      is_active: payload.is_active ?? true,
+      is_published: payload.is_published ?? true,
+      is_featured: payload.is_featured ?? false,
+      show_worshipful_master: payload.show_worshipful_master ?? true,
+      show_address: payload.show_address ?? true,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data: orgData, error: orgError } = await (supabase as any)
+      .from('organizations')
+      .update(orgUpdatePayload)
+      .eq('id', lodgeId)
+      .select()
+      .single();
+
+    if (orgError) {
+      console.error('[updateAdminLodgeAction] Error updating organization:', orgError);
+      if (orgError.code === '23505') {
+        return { success: false, error: 'Já existe outra Loja Maçônica com este slug.' };
+      }
+      return { success: false, error: 'Falha ao atualizar a Loja Maçônica no servidor.' };
+    }
+
+    if (payload.meeting_day) {
+      await (supabase as any).from('organization_meetings').delete().eq('organization_id', lodgeId);
+      await (supabase as any).from('organization_meetings').insert({
+        tenant_id: tenantId,
+        organization_id: lodgeId,
+        meeting_day: payload.meeting_day,
+        meeting_time: payload.meeting_time || '20:00',
+        label: 'Sessão Ordinária',
+        is_public: true,
+      });
+    }
+
+    await (supabase as any).from('organization_contacts').delete().eq('organization_id', lodgeId);
+    const contactsToInsert = [];
+    if (payload.phone) contactsToInsert.push({ tenant_id: tenantId, organization_id: lodgeId, type: 'phone', value: payload.phone, label: 'Telefone Institucional', is_public: true });
+    if (payload.whatsapp) contactsToInsert.push({ tenant_id: tenantId, organization_id: lodgeId, type: 'whatsapp', value: payload.whatsapp, label: 'WhatsApp Secretaria', is_public: true });
+    if (payload.email) contactsToInsert.push({ tenant_id: tenantId, organization_id: lodgeId, type: 'email', value: payload.email, label: 'E-mail Oficial', is_public: true });
+    if (payload.website) contactsToInsert.push({ tenant_id: tenantId, organization_id: lodgeId, type: 'website', value: payload.website, label: 'Website Oficial', is_public: true });
+
+    if (contactsToInsert.length > 0) {
+      await (supabase as any).from('organization_contacts').insert(contactsToInsert);
+    }
+
+    revalidatePath('/admin/lojas');
+    revalidatePath('/guia/lojas');
+    if (oldSlug) revalidatePath(`/guia/lojas/${oldSlug}`);
+    revalidatePath(`/guia/lojas/${slug}`);
+
+    return { success: true, data: orgData };
+  } catch (err: any) {
+    console.error('[updateAdminLodgeAction] Exception:', err);
+    return { success: false, error: err.message || 'Erro interno ao atualizar Loja Maçônica.' };
+  }
+}

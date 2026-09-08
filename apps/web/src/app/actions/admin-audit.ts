@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -69,33 +70,16 @@ export async function updatePlanQuotaAction(input: {
 }
 
 export async function moderatePublicationStatusAction(input: {
-  tenantId: string;
+  tenantId?: string;
   businessId: string;
   newStatus: 'draft' | 'pending_review' | 'published' | 'rejected' | 'suspended';
   reason?: string;
 }): Promise<AdminActionResult> {
-  const validTenantId = validateAndResolveTenantUuid(input.tenantId);
+  const validTenantId = input.tenantId ? validateAndResolveTenantUuid(input.tenantId) : null;
 
   try {
     const supabase = await createServerSideClient();
-    const { data, error } = await supabase.rpc('moderate_business_publication_status', {
-      p_tenant_id: validTenantId,
-      p_business_id: input.businessId,
-      p_new_status: input.newStatus,
-      p_reason: input.reason || 'Moderação de status de publicação pelo admin',
-    });
-
-    if (!error) {
-      return { success: true, data };
-    }
-  } catch (_e) {
-    // Segue para fallback direto
-  }
-
-  // Fallback seguro via service role no Supabase
-  try {
-    const adminSupabase = getAdminSupabase();
-    await adminSupabase
+    let query = (supabase as any)
       .from('businesses')
       .update({
         publication_status: input.newStatus,
@@ -103,6 +87,24 @@ export async function moderatePublicationStatusAction(input: {
         updated_at: new Date().toISOString(),
       })
       .eq('id', input.businessId);
+
+    if (validTenantId) {
+      query = query.eq('tenant_id', validTenantId);
+    }
+
+    const { error: updateErr } = await query;
+
+    if (updateErr) {
+      console.error('[moderatePublicationStatusAction] DB Error:', updateErr);
+      return { success: false, error: updateErr.message };
+    }
+
+    try {
+      revalidatePath('/admin/empresas');
+      revalidatePath(`/admin/empresas/${input.businessId}`);
+      revalidatePath('/guia');
+      revalidatePath('/guia/empresas');
+    } catch (_rErr) { }
 
     return { success: true, data: { status: input.newStatus } };
   } catch (err: any) {

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { CreditCard, QrCode, CheckCircle2, ShieldCheck, Loader2, Copy, AlertCircle, Lock } from 'lucide-react';
+import { CreditCard, QrCode, CheckCircle2, ShieldCheck, Copy, AlertCircle, Lock, ArrowRight } from 'lucide-react';
 import { processPixCheckoutAction, processCreditCardCheckoutAction, getPlanPaymentRulesAction, PlanPaymentRules } from '@/lib/payment/payment-service';
 
 type CheckoutPaymentProps = {
@@ -209,6 +209,14 @@ export default function CheckoutPaymentClient({
                   <span>{copiedPix ? 'Copiado!' : 'Copiar'}</span>
                 </button>
               </div>
+              <button
+                type="button"
+                onClick={() => router.push('/anunciar/passo-7')}
+                className="w-full py-3.5 mt-4 rounded-xl bg-gradient-to-r from-[#3B0B14] to-[#4B161B] hover:from-[#520f1c] text-[#C9A227] font-bold text-xs border border-[#C9A227]/60 transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+              >
+                <span>Avançar para Leitura e Assinatura do Contrato (Passo 7)</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}
@@ -320,19 +328,10 @@ export default function CheckoutPaymentClient({
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-950/50 cursor-pointer mt-2"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#3B0B14] to-[#4B161B] hover:from-[#520f1c] text-[#C9A227] font-bold text-xs border border-[#C9A227]/60 transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer mt-3"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  <span>Processando com Asaas API...</span>
-                </>
-              ) : (
-                <>
-                  <Lock className="w-4 h-4" />
-                  <span>Confirmar Pagamento em {selectedInstallments}x de {((planAmountCents / 100) / selectedInstallments).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                </>
-              )}
+              <span>Avançar para Leitura e Assinatura do Contrato (Passo 7)</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </form>
         )}

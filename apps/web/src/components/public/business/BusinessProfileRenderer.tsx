@@ -1,7 +1,7 @@
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
-import { BusinessBronzeTemplate } from './BusinessBronzeTemplate';
-import { BusinessPrataTemplate } from './BusinessPrataTemplate';
-import { BusinessOuroTemplate } from './BusinessOuroTemplate';
+import { BronzeBusinessProfile } from './layouts/BronzeBusinessProfile';
+import { SilverBusinessProfile } from './layouts/SilverBusinessProfile';
+import { GoldBusinessProfile } from './layouts/GoldBusinessProfile';
 
 type BusinessProfileRendererProps = {
   business: PublicBusinessPresentation;
@@ -10,26 +10,18 @@ type BusinessProfileRendererProps = {
 /**
  * BusinessProfileRenderer
  * 
- * Componente produtivo que resolve o template visual com base estritamente
- * no `effectivePlan` retornado pelo backend / contratos de autoridade pública.
- * 
- * Regras Comerciais & Guardrails:
- * 1. effectivePlan == null → falha fechado (não renderiza recursos comerciais nem concede Bronze grátis).
- * 2. effectivePlan == 'bronze' → renderiza variante Bronze.
- * 3. effectivePlan == 'prata' → renderiza variante Prata.
- * 4. effectivePlan == 'ouro' → renderiza variante Ouro (com destaque especial de isFounder se ativo).
- * 5. Empresa Fundadora (isFounder) e Empresa Verificada (isVerified) são selos independentes de autoridade.
+ * Dispatcher central que recebe o objeto de apresentação canônica `PublicBusinessPresentation`
+ * e seleciona o layout apropriado (`BronzeBusinessProfile`, `SilverBusinessProfile` ou `GoldBusinessProfile`)
+ * com base estritamente em `business.plan.template` pré-resolvido na camada de presentation.
  */
 export function BusinessProfileRenderer({ business }: BusinessProfileRendererProps) {
-  const { effectivePlan } = business.authority;
-
-  // Fail closed: empresa sem plano efetivo ativo não concede template público comercial.
-  if (!effectivePlan) {
+  // Fail closed: empresa sem plano público ativo ou sem apresentação válida
+  if (!business || !business.plan || !business.plan.template) {
     return (
-      <div className="cm-bronze-page text-center py-16">
-        <div className="max-w-md mx-auto p-8 border border-gray-200 rounded-xl bg-white shadow-sm">
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Perfil Indisponível</h2>
-          <p className="text-sm text-gray-600">
+      <div className="min-h-screen bg-stone-950 flex items-center justify-center p-6 text-center">
+        <div className="max-w-md mx-auto p-8 border border-stone-800 rounded-2xl bg-stone-900 shadow-xl space-y-3">
+          <h2 className="text-xl font-serif font-bold text-stone-100">Perfil Indisponível</h2>
+          <p className="text-xs text-stone-400 leading-relaxed">
             Esta empresa não possui uma assinatura de plano público ativa no momento.
           </p>
         </div>
@@ -37,15 +29,15 @@ export function BusinessProfileRenderer({ business }: BusinessProfileRendererPro
     );
   }
 
-  // Switch de template por plano efetivo resolvido no backend
-  switch (effectivePlan) {
-    case 'bronze':
-      return <BusinessBronzeTemplate business={business} />;
-    case 'prata':
-      return <BusinessPrataTemplate business={business} />;
+  // Switch de layout por template pré-resolvido na presentation layer
+  switch (business.plan.template) {
     case 'ouro':
-      return <BusinessOuroTemplate business={business} />;
+      return <GoldBusinessProfile profile={business} />;
+    case 'prata':
+      return <SilverBusinessProfile profile={business} />;
+    case 'bronze':
     default:
-      return <BusinessBronzeTemplate business={business} />;
+      return <BronzeBusinessProfile profile={business} />;
   }
 }
+

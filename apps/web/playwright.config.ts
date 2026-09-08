@@ -1,4 +1,8 @@
 import { defineConfig } from '@playwright/test';
+import dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config({ path: path.resolve(__dirname, '.env.local') });
 
 export default defineConfig({
   testDir: './e2e',
@@ -17,10 +21,12 @@ export default defineConfig({
     launchOptions: { args: ['--font-render-hinting=none'] },
   },
   webServer: {
-    command: 'pnpm.cmd --filter @saas/web dev',
+    command: 'cmd.exe /c "set NODE_OPTIONS=--max-old-space-size=2048 && pnpm.cmd --filter @saas/web dev"',
     url: 'http://127.0.0.1:3000',
     timeout: 120_000,
     reuseExistingServer: true,
   },
+
 });
+
 

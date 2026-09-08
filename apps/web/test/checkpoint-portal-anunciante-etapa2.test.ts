@@ -24,6 +24,7 @@ vi.mock('../src/lib/supabase/server', () => ({
                 whatsapp: '(11) 98765-4321',
                 logo_url: '/logo.png',
                 cover_url: '/cover.jpg',
+                plan_code: 'ouro',
               },
               error: null,
             }),
@@ -47,6 +48,7 @@ vi.mock('../src/lib/supabase/server', () => ({
         }
         return {
           select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
           maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
         };
       }),

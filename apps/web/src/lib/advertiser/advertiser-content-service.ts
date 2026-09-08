@@ -74,6 +74,8 @@ export interface DbBenefitRow {
   redeem_instructions: string | null;
   valid_until: string | null;
   is_active: boolean | null;
+  status: string | null;
+  archived_at: string | null;
 }
 
 export interface DbEventRow {
@@ -180,13 +182,15 @@ export async function getAdvertiserContentDataAction(): Promise<AdvertiserConten
     throw new Error(`Erro ao carregar serviços do banco: ${errServices.message}`);
   }
 
-  // 5. Carrega benefícios reais do Postgres
-  const { data: dbBenefits, error: errBenefits } = await (supabase as any)
+  // 5. Carrega benefícios reais do Postgres (excluindo arquivados)
+  const { data: rawDbBenefits, error: errBenefits } = await (supabase as any)
     .from('business_benefits')
-    .select('id, title, description, benefit_type, discount_percentage, discount_amount, discount_code, redeem_instructions, valid_until, is_active')
+    .select('id, title, description, benefit_type, discount_percentage, discount_amount, discount_code, redeem_instructions, valid_until, is_active, status, archived_at')
     .eq('tenant_id', tenantId)
     .eq('business_id', businessId)
     .order('created_at', { ascending: false });
+
+  const dbBenefits = (rawDbBenefits || []).filter((b: any) => !b.archived_at);
 
   if (errBenefits) {
     throw new Error(`Erro ao carregar benefícios do banco: ${errBenefits.message}`);
@@ -228,19 +232,32 @@ export async function getAdvertiserContentDataAction(): Promise<AdvertiserConten
     status_label: s.is_active ? 'Publicado' : 'Inativo',
   }));
 
-  const benefits: AdvertiserBenefitItem[] = ((dbBenefits as DbBenefitRow[]) || []).map((ben: DbBenefitRow) => ({
-    id: ben.id,
-    title: ben.title,
-    description: ben.description || '',
-    benefit_type: ben.benefit_type || undefined,
-    discount_condition: ben.discount_percentage ? `${ben.discount_percentage}% OFF` : ben.benefit_type || 'Benefício Exclusivo',
-    expiration_date: ben.valid_until ? new Date(ben.valid_until).toLocaleDateString('pt-BR') : undefined,
-    rules: ben.redeem_instructions || undefined,
-    promo_code: ben.discount_code || undefined,
-    is_active: Boolean(ben.is_active),
-    status: ben.is_active ? 'published' : 'inactive',
-    status_label: ben.is_active ? 'Publicado' : 'Inativo',
-  }));
+  const BENEFIT_STATUS_LABELS: Record<string, string> = {
+    draft: 'Rascunho',
+    scheduled: 'Agendado',
+    active: 'Publicado',
+    paused: 'Pausado',
+    expired: 'Expirado',
+    exhausted: 'Esgotado',
+    archived: 'Arquivado',
+  };
+
+  const benefits: AdvertiserBenefitItem[] = ((dbBenefits as DbBenefitRow[]) || []).map((ben: DbBenefitRow) => {
+    const canonicalStatus = ben.status || (ben.is_active ? 'active' : 'draft');
+    return {
+      id: ben.id,
+      title: ben.title,
+      description: ben.description || '',
+      benefit_type: ben.benefit_type || undefined,
+      discount_condition: ben.discount_percentage ? `${ben.discount_percentage}% OFF` : ben.benefit_type || 'Benefício Exclusivo',
+      expiration_date: ben.valid_until ? new Date(ben.valid_until).toLocaleDateString('pt-BR') : undefined,
+      rules: ben.redeem_instructions || undefined,
+      promo_code: ben.discount_code || undefined,
+      is_active: canonicalStatus === 'active',
+      status: canonicalStatus === 'active' ? 'published' : 'inactive' as ContentStatus,
+      status_label: BENEFIT_STATUS_LABELS[canonicalStatus] || canonicalStatus,
+    };
+  });
 
   const events: AdvertiserEventItem[] = ((dbEvents as DbEventRow[]) || []).map((e: DbEventRow) => {
     const isPast = new Date(e.starts_at) < new Date();
@@ -276,7 +293,7 @@ export async function getAdvertiserContentDataAction(): Promise<AdvertiserConten
       name: b.name,
       slug: b.slug,
       plan_code: activePlanCode,
-      plan_name: activePlanCode === 'ouro' ? 'Plano Ouro' : activePlanCode === 'prata' ? 'Plano Prata' : 'Plano Bronze',
+      plan_name: `Plano ${activePlanCode.charAt(0).toUpperCase() + activePlanCode.slice(1)}`,
     },
     quotas: {
       services_used: services.filter((s) => s.is_active).length,

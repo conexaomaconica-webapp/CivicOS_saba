@@ -8,8 +8,8 @@ describe('Admin Definitive Sidebar & Architecture Checklist', () => {
     const webAppRoot = path.join(__dirname, '../src/app');
 
     const checkRouteExists = (routePath: string) => {
-      // Remove barra inicial
-      const cleanPath = routePath.replace(/^\//, '');
+      // Remove query string e barra inicial
+      const cleanPath = routePath.split('?')[0].replace(/^\//, '');
       const possiblePageTsx = path.join(webAppRoot, cleanPath, 'page.tsx');
       const possiblePageJsx = path.join(webAppRoot, cleanPath, 'page.jsx');
 

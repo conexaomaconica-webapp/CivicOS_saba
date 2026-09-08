@@ -1,11 +1,130 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// 1. Mock commercial eligibility gate and access authorization
+vi.mock('@/lib/payment/commercial-eligibility-gate', () => ({
+  assertBusinessCommercialEligibility: vi.fn().mockResolvedValue({
+    eligible: true,
+    masonicVerified: true,
+    contractSigned: false,
+    reasons: [],
+  }),
+}));
+
+// Stateful in-memory mock store for plan payment rules
+let dynamicRulesStore: Record<string, any> = {
+  prata: {
+    plan_code: 'prata',
+    title: 'Plano Prata',
+    amount_cents: 178800,
+    installments_max: 6,
+    interest_free_installments: 6,
+    payment_methods_allowed: ['pix', 'credit_card'],
+  },
+  ouro: {
+    plan_code: 'ouro',
+    title: 'Plano Ouro',
+    amount_cents: 238800,
+    installments_max: 12,
+    interest_free_installments: 12,
+    payment_methods_allowed: ['pix', 'credit_card'],
+  },
+};
+
+vi.mock('next/headers', () => ({
+  cookies: () => Promise.resolve({
+    get: () => undefined, getAll: () => [], set: () => {}, delete: () => {},
+  }),
+}));
+
+const chainable = (tableName: string) => {
+  const c: any = {
+    select: () => c,
+    insert: () => c,
+    update: () => c,
+    upsert: (payload: any) => {
+      if (payload && payload.plan_code) {
+        dynamicRulesStore[payload.plan_code] = {
+          ...dynamicRulesStore[payload.plan_code],
+          ...payload,
+        };
+      }
+      return Promise.resolve({ data: payload, error: null });
+    },
+    delete: () => c,
+    eq: (col: string, val: string) => {
+      if (col === 'plan_code' && dynamicRulesStore[val]) {
+        c._currentResult = dynamicRulesStore[val];
+      }
+      return c;
+    },
+    neq: () => c, gt: () => c, gte: () => c, lt: () => c, lte: () => c,
+    like: () => c, ilike: () => c, is: () => c, in: () => c, or: () => c, not: () => c,
+    contains: () => c, containedBy: () => c, filter: () => c, match: () => c,
+    order: () => c, limit: () => c, range: () => c,
+    single: () => Promise.resolve({ data: c._currentResult || null, error: null }),
+    maybeSingle: () => Promise.resolve({ data: c._currentResult || null, error: null }),
+    then: (r: any) => r({ data: c._currentResult ? [c._currentResult] : [], error: null }),
+  };
+  return c;
+};
+
+vi.mock('../src/lib/supabase/server', () => ({
+  createServerSideClient: vi.fn().mockImplementation(() => Promise.resolve({
+    auth: {
+      getUser: () => Promise.resolve({
+        data: { user: { id: '00000000-0000-0000-0000-000000000099', email: 'admin@cm.com.br' } },
+        error: null,
+      }),
+    },
+    rpc: (fnName: string, args: any) => {
+      if (fnName === 'has_platform_admin_access') return Promise.resolve({ data: true, error: null });
+      if (fnName === 'admin_update_plan_payment_rule') {
+        if (args && args.p_plan_code) {
+          dynamicRulesStore[args.p_plan_code] = {
+            ...dynamicRulesStore[args.p_plan_code],
+            plan_code: args.p_plan_code,
+            amount_cents: args.p_amount_cents,
+            installments_max: args.p_installments_max,
+            interest_free_installments: args.p_interest_free_installments,
+          };
+        }
+        return Promise.resolve({ data: { ok: true }, error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    },
+    from: (table: string) => chainable(table),
+  })),
+}));
+
 import {
   getPlanPaymentRulesAction,
   updatePlanPaymentRulesAdminAction,
   processCreditCardCheckoutAction,
 } from '../src/lib/payment/payment-service';
 
-describe('ADMIN CM — CHECKPOINT 3: Admin de Condições de Pagamento e Parcelamento', () => {
+describe('ADMIN CM — CHECKPOINT 3: Admin de Condições de Pagamento e Parcelamento (STATEFUL MOCK)', () => {
+  beforeEach(() => {
+    // Reset store to initial defaults before each test
+    dynamicRulesStore = {
+      prata: {
+        plan_code: 'prata',
+        title: 'Plano Prata',
+        amount_cents: 178800,
+        installments_max: 6,
+        interest_free_installments: 6,
+        payment_methods_allowed: ['pix', 'credit_card'],
+      },
+      ouro: {
+        plan_code: 'ouro',
+        title: 'Plano Ouro',
+        amount_cents: 238800,
+        installments_max: 12,
+        interest_free_installments: 12,
+        payment_methods_allowed: ['pix', 'credit_card'],
+      },
+    };
+  });
+
   it('1. Retorna regras de parcelamento do servidor com diferenciação de installments_max e interest_free_installments', async () => {
     const rulesPrata = await getPlanPaymentRulesAction('prata');
     expect(rulesPrata).toBeDefined();
@@ -33,7 +152,7 @@ describe('ADMIN CM — CHECKPOINT 3: Admin de Condições de Pagamento e Parcela
     expect(updatedRules.interestFreeInstallments).toBe(4);
   });
 
-  it('3. Valida no servidor o novo limite de parcelas configurado dinamicamente no admin', async () => {
+  it('3. Valida no servidor o novo limite de parcelas configurado dinamicamente no admin e o aplica no checkout', async () => {
     // Atualiza Prata para max 8x
     await updatePlanPaymentRulesAdminAction({
       planCode: 'prata',
@@ -42,9 +161,9 @@ describe('ADMIN CM — CHECKPOINT 3: Admin de Condições de Pagamento e Parcela
       interestFreeInstallments: 6,
     });
 
-    // 8x deve ser aceito
+    // 8x no Prata agora DEVE ser aceito pois o Admin aumentou o limite para 8x
     const validRes = await processCreditCardCheckoutAction({
-      businessId: 'biz_admin_test',
+      businessId: '00000000-0000-0000-0000-000000000001',
       planCode: 'prata',
       installmentCount: 8,
       customerName: 'Eduardo Saba',
@@ -61,10 +180,10 @@ describe('ADMIN CM — CHECKPOINT 3: Admin de Condições de Pagamento e Parcela
     expect(validRes.success).toBe(true);
     expect(validRes.installmentCount).toBe(8);
 
-    // 10x deve ser bloqueado no servidor
+    // 10x deve continuar sendo bloqueado no servidor
     await expect(
       processCreditCardCheckoutAction({
-        businessId: 'biz_admin_test',
+        businessId: '00000000-0000-0000-0000-000000000001',
         planCode: 'prata',
         installmentCount: 10,
         customerName: 'Eduardo Saba',

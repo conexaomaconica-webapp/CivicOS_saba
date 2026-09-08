@@ -3,6 +3,7 @@
 import { createServerSideClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { dispatchNotificationAction } from '@/lib/notifications/notification-service';
+import { getMockApprovalDossier } from './fixtures/mock-approval-dossier';
 
 export interface ApprovalDirectoryItem {
   id: string;
@@ -246,112 +247,7 @@ export async function getApprovalDossierAction(businessId: string) {
     const b = dbData as any;
 
     if (error || !b) {
-      const dossierComandos: ApprovalDossier360 = {
-        business_id: businessId,
-        tenant_id: '00000000-0000-0000-0000-000000000010',
-        publication_status: 'pending_review',
-        created_at: new Date().toISOString(),
-        responsible: {
-          user_id: '00000000-0000-0000-0000-000000000099',
-          full_name: 'Eduardo Comandos',
-          cpf: '123.456.789-00',
-          email: 'contato@comandosseguranca.com.br',
-          phone: '(11) 98888-7777',
-          company_role: 'Sócio-Diretor',
-        },
-        company: {
-          name: 'Comandos - Terceirização e Segurança Eletrônica',
-          legal_name: 'Comandos Segurança Eletrônica & Serviços LTDA',
-          cnpj_cpf: '12.345.678/0001-90',
-          category: 'Segurança Eletrônica & Terceirização',
-          description: 'Soluções corporativas completas em segurança eletrônica, controle de acesso, monitoramento 24h e terceirização de portaria.',
-          phone: '(11) 3333-4444',
-          whatsapp: '(11) 98888-7777',
-          email: 'contato@comandosseguranca.com.br',
-          website: 'https://comandosseguranca.com.br',
-          instagram: '@comandosseguranca',
-          address: 'Av. Paulista, 1000 - Cj 501',
-          city: 'São Paulo',
-          uf: 'SP',
-          latitude: -23.5614,
-          longitude: -46.6558,
-        },
-        media: {
-          logo_url: '/logoconexao_red_vert.png',
-          banner_url: '/capa-padrao.jpg',
-          gallery: ['/galeria1.jpg', '/galeria2.jpg'],
-        },
-        completeness: {
-          percent: 92,
-          mandatory: {
-            responsible: true,
-            business_data: true,
-            masonic_link: true,
-            signed_contract: true,
-            valid_payment: true,
-          },
-          recommended_quality: {
-            logo: true,
-            banner: false,
-            gallery: true,
-            description: true,
-            coordinates: true,
-          },
-          pending_items: ['Adicionar imagem de capa oficial', 'Confirmar coordenadas no mapa'],
-          is_ready_for_approval: true,
-        },
-        masonic_link: {
-          affiliation_role: 'Irmão',
-          related_brother_name: 'Eduardo Comandos',
-          lodge_name: 'ARLS Ciência e Virtude nº 1234',
-          potencia_name: 'GLESP / GOB',
-          evidence_url: '/comprovante-cimb.pdf',
-          verification_status: 'verified',
-          public_exposure_consent: true,
-        },
-        contract: {
-          snapshot_id: 'cs-comandos-001',
-          version: 'v1.0',
-          signed_at: new Date().toISOString(),
-          plan_code: 'ouro',
-          amount_cents: 238800,
-          sha256_hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-        },
-        payment: {
-          plan_code: 'ouro',
-          amount_cents: 238800,
-          payment_method: 'credit_card',
-          installments_max: 12,
-          status: 'paid',
-          paid_at: new Date().toISOString(),
-          valid_until: '2027-08-24T00:00:00.000Z',
-        },
-        plan_entitlements: {
-          title: 'Plano Ouro',
-          gallery_photos_limit: 10,
-          services_limit: 10,
-          benefits_limit: 5,
-          events_limit: 10,
-          posts_limit: 10,
-        },
-        recognitions: {
-          is_pedra_fundamental: true,
-          pedra_fundamental_index: 1,
-          is_founder: true,
-          is_coluna_honra: true,
-          is_verified: true,
-        },
-        correction_notes: undefined,
-        audit_logs: [
-          {
-            id: 'log-1',
-            admin_name: 'Admin Conexão',
-            action_type: 'UPDATE_COMPANY_DATA',
-            created_at: new Date().toISOString(),
-          },
-        ],
-      };
-      return { success: true, dossier: dossierComandos };
+      return { success: true, dossier: getMockApprovalDossier(businessId) };
     }
 
     const dossier: ApprovalDossier360 = {
@@ -419,14 +315,24 @@ export async function getApprovalDossierAction(businessId: string) {
         installments_max: 6,
         status: 'paid',
       },
-      plan_entitlements: {
-        title: b.plan_code === 'ouro' ? 'Plano Ouro' : 'Plano Prata',
-        gallery_photos_limit: b.plan_code === 'ouro' ? 10 : 6,
-        services_limit: 5,
-        benefits_limit: 3,
-        events_limit: 2,
-        posts_limit: 2,
-      },
+      plan_entitlements: await (async () => {
+        const dossierPlanCode = b.plan_code || 'prata';
+        const { data: dossierEntRows } = await (supabase as any)
+          .from('plan_entitlements')
+          .select('feature_code, max_limit')
+          .eq('tenant_id', b.tenant_id)
+          .eq('plan_code', dossierPlanCode);
+        const dossierEntMap: Record<string, number> = {};
+        (dossierEntRows || []).forEach((e: any) => { dossierEntMap[e.feature_code] = e.max_limit; });
+        return {
+          title: `Plano ${dossierPlanCode.charAt(0).toUpperCase() + dossierPlanCode.slice(1)}`,
+          gallery_photos_limit: dossierEntMap['gallery_photos_limit'] ?? 0,
+          services_limit: dossierEntMap['services_limit'] ?? 0,
+          benefits_limit: dossierEntMap['benefits_limit'] ?? 0,
+          events_limit: dossierEntMap['events_limit'] ?? 0,
+          posts_limit: dossierEntMap['posts_limit'] ?? 0,
+        };
+      })(),
       recognitions: {
         is_pedra_fundamental: Boolean(b.is_pedra_fundamental),
         is_founder: Boolean(b.is_founder),
@@ -560,6 +466,7 @@ export async function requestBusinessCorrectionAction(businessId: string, observ
       .from('businesses')
       .update({
         publication_status: 'draft',
+        is_published: false,
         correction_notes: fullNotes,
         last_correction_requested_at: new Date().toISOString(),
       })
@@ -606,6 +513,7 @@ export async function finalizeApprovalDecisionAction(
       .from('businesses')
       .update({
         publication_status: newStatus,
+        is_published: decision === 'publish',
         updated_at: new Date().toISOString(),
       })
       .eq('id', businessId);

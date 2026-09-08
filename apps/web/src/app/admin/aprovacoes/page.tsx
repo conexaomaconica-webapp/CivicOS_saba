@@ -93,11 +93,10 @@ export default function AdminAprovacoesPage() {
         <button
           type="button"
           onClick={() => setSelectedFilter('pending_review')}
-          className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-            selectedFilter === 'pending_review'
-              ? 'bg-[#3B0B14] text-white border-[#C9A227]'
-              : 'bg-white text-stone-900 border-stone-300 hover:border-[#3B0B14]'
-          }`}
+          className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${selectedFilter === 'pending_review'
+            ? 'bg-[#3B0B14] text-white border-[#C9A227]'
+            : 'bg-white text-stone-900 border-stone-300 hover:border-[#3B0B14]'
+            }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Aguardando Análise</span>
@@ -109,11 +108,10 @@ export default function AdminAprovacoesPage() {
         <button
           type="button"
           onClick={() => setSelectedFilter('pronto_para_aprovacao')}
-          className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-            selectedFilter === 'pronto_para_aprovacao'
-              ? 'bg-[#3B0B14] text-white border-[#C9A227]'
-              : 'bg-white text-stone-900 border-stone-300 hover:border-emerald-600'
-          }`}
+          className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${selectedFilter === 'pronto_para_aprovacao'
+            ? 'bg-[#3B0B14] text-white border-[#C9A227]'
+            : 'bg-white text-stone-900 border-stone-300 hover:border-emerald-600'
+            }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Prontos p/ Aprovar</span>
@@ -125,11 +123,10 @@ export default function AdminAprovacoesPage() {
         <button
           type="button"
           onClick={() => setSelectedFilter('aguardando_pagamento')}
-          className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-            selectedFilter === 'aguardando_pagamento'
-              ? 'bg-[#3B0B14] text-white border-[#C9A227]'
-              : 'bg-white text-stone-900 border-stone-300 hover:border-amber-600'
-          }`}
+          className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${selectedFilter === 'aguardando_pagamento'
+            ? 'bg-[#3B0B14] text-white border-[#C9A227]'
+            : 'bg-white text-stone-900 border-stone-300 hover:border-amber-600'
+            }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Sem Pagamento</span>
@@ -141,11 +138,10 @@ export default function AdminAprovacoesPage() {
         <button
           type="button"
           onClick={() => setSelectedFilter('aguardando_vinculo')}
-          className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-            selectedFilter === 'aguardando_vinculo'
-              ? 'bg-[#3B0B14] text-white border-[#C9A227]'
-              : 'bg-white text-stone-900 border-stone-300 hover:border-amber-600'
-          }`}
+          className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${selectedFilter === 'aguardando_vinculo'
+            ? 'bg-[#3B0B14] text-white border-[#C9A227]'
+            : 'bg-white text-stone-900 border-stone-300 hover:border-amber-600'
+            }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Sem Vínculo</span>
@@ -157,11 +153,10 @@ export default function AdminAprovacoesPage() {
         <button
           type="button"
           onClick={() => setSelectedFilter('cadastro_incompleto')}
-          className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-            selectedFilter === 'cadastro_incompleto'
-              ? 'bg-[#3B0B14] text-white border-[#C9A227]'
-              : 'bg-white text-stone-900 border-stone-300 hover:border-[#3B0B14]'
-          }`}
+          className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${selectedFilter === 'cadastro_incompleto'
+            ? 'bg-[#3B0B14] text-white border-[#C9A227]'
+            : 'bg-white text-stone-900 border-stone-300 hover:border-[#3B0B14]'
+            }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Incompletos (&lt;70%)</span>
@@ -203,11 +198,10 @@ export default function AdminAprovacoesPage() {
                 key={f.id}
                 type="button"
                 onClick={() => setSelectedFilter(f.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                  selectedFilter === f.id
-                    ? 'bg-[#3B0B14] text-[#C9A227] border border-[#C9A227]/40 shadow-xs'
-                    : 'bg-stone-100 text-stone-700 border border-stone-200 hover:bg-stone-200'
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${selectedFilter === f.id
+                  ? 'bg-[#3B0B14] text-[#C9A227] border border-[#C9A227]/40 shadow-xs'
+                  : 'bg-stone-100 text-stone-700 border border-stone-200 hover:bg-stone-200'
+                  }`}
               >
                 {f.label}
               </button>
@@ -238,7 +232,7 @@ export default function AdminAprovacoesPage() {
                   <th className="py-3 px-4">Empresa & Categoria</th>
                   <th className="py-3 px-4">Responsável</th>
                   <th className="py-3 px-4 text-center">Plano</th>
-                  <th className="py-3 px-4 text-center">Completude</th>
+                  <th className="py-3 px-4 text-center">Status do cadastro</th>
                   <th className="py-3 px-4 text-center">Vínculo</th>
                   <th className="py-3 px-4 text-center">Contrato</th>
                   <th className="py-3 px-4 text-center">Pagamento</th>
@@ -282,18 +276,17 @@ export default function AdminAprovacoesPage() {
                       </span>
                     </td>
 
-                    {/* COMPLETUDE % */}
+                    {/* Status do cadastro */}
                     <td className="py-3.5 px-4 text-center">
                       <div className="inline-flex items-center gap-1.5">
                         <div className="w-12 bg-stone-200 h-2 rounded-full overflow-hidden">
                           <div
-                            className={`h-full ${
-                              item.completeness_percent >= 90
-                                ? 'bg-emerald-600'
-                                : item.completeness_percent >= 70
+                            className={`h-full ${item.completeness_percent >= 90
+                              ? 'bg-emerald-600'
+                              : item.completeness_percent >= 70
                                 ? 'bg-amber-500'
                                 : 'bg-rose-600'
-                            }`}
+                              }`}
                             style={{ width: `${item.completeness_percent}%` }}
                           />
                         </div>

@@ -59,8 +59,16 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
 
+  // Aumentar o limite de tamanho do corpo das Server Actions para uploads de mídias
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
+  },
+
   // Enable typed routes
   typedRoutes: true,
 };
+
 
 export default nextConfig;

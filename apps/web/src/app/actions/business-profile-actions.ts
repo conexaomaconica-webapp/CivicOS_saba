@@ -119,9 +119,10 @@ export async function updateBusinessAdminDataAction(businessId: string, payload:
     .from('businesses')
     .update({
       legal_name: payload.legalName || null,
-      document_number: payload.documentNumber || null,
+      cnpj: payload.documentNumber || null,
       updated_at: new Date().toISOString(),
     })
+
     .eq('tenant_id', tenantId)
     .eq('id', businessId);
 

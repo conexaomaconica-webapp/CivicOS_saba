@@ -118,16 +118,72 @@ export function validateCnpj(cnpj: string): string | null {
   return null;
 }
 
+export function validateCpf(cpf: string): string | null {
+  const digits = cpf.replace(/\D/g, '');
+  if (!digits) return 'Informe o CPF.';
+  if (digits.length !== 11) return 'CPF deve ter 11 dígitos.';
+  if (/^(\d)\1{10}$/.test(digits)) return 'CPF inválido.';
+  
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += Number(digits[i]) * (10 - i);
+  let rem = (sum * 10) % 11;
+  if (rem === 10 || rem === 11) rem = 0;
+  if (rem !== Number(digits[9])) return 'CPF inválido. Verifique os dígitos.';
+
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += Number(digits[i]) * (11 - i);
+  rem = (sum * 10) % 11;
+  if (rem === 10 || rem === 11) rem = 0;
+  if (rem !== Number(digits[10])) return 'CPF inválido. Verifique os dígitos.';
+
+  return null;
+}
+
+export function validateCpfCnpj(value: string): string | null {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return null;
+  if (digits.length === 11) return validateCpf(digits);
+  if (digits.length === 14) return validateCnpj(digits);
+  return 'Documento deve ter 11 dígitos (CPF) ou 14 dígitos (CNPJ).';
+}
+
+export function formatCpfCnpj(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 14);
+  if (digits.length <= 11) {
+    return digits
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  }
+  return digits
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1/$2')
+    .replace(/(\d{4})(\d)/, '$1-$2');
+}
+
+export function formatPhone(value: string): string {
+  let digits = value.replace(/\D/g, '');
+  if (digits.startsWith('55') && digits.length > 11) {
+    digits = digits.slice(2);
+  }
+  digits = digits.slice(0, 11);
+  if (digits.length <= 2) return digits ? `(${digits}` : '';
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
 /**
  * Brazilian phone (WhatsApp): optional +55, DDD + 8/9 digits → 10 or 11 digits.
  */
 export function validatePhone(phone: string): string | null {
   const digits = phone.replace(/\D/g, '').replace(/^55/, '');
   if (!digits) {
-    return 'Informe o WhatsApp.';
+    return 'Informe o telefone de contato.';
   }
   if (digits.length < 10 || digits.length > 11) {
-    return 'Telefone inválido. Informe DDD + número.';
+    return 'Telefone inválido. Informe DDD + número (10 ou 11 dígitos).';
   }
   return null;
 }

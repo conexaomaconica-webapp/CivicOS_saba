@@ -161,7 +161,7 @@ export default async function BusinessDashboardPage({ params }: BusinessDashboar
             <span className="text-xs font-bold text-blue-600 group-hover:underline">Gerenciar &rarr;</span>
           </div>
           <div className="text-2xl font-bold text-slate-900">
-            {servicesCount || 0} <span className="text-xs font-normal text-slate-500">/ {servicesLimit ?? 25} permitidos</span>
+            {servicesCount || 0} <span className="text-xs font-normal text-slate-500">/ {servicesLimit ?? 0} permitidos</span>
           </div>
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-3 overflow-hidden">
             <div
@@ -181,7 +181,7 @@ export default async function BusinessDashboardPage({ params }: BusinessDashboar
             <span className="text-xs font-bold text-blue-600 group-hover:underline">Gerenciar &rarr;</span>
           </div>
           <div className="text-2xl font-bold text-slate-900">
-            {benefitsCount || 0} <span className="text-xs font-normal text-slate-500">/ {benefitsLimit ?? 3} permitidos</span>
+            {benefitsCount || 0} <span className="text-xs font-normal text-slate-500">/ {benefitsLimit ?? 0} permitidos</span>
           </div>
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-3 overflow-hidden">
             <div
@@ -201,7 +201,7 @@ export default async function BusinessDashboardPage({ params }: BusinessDashboar
             <span className="text-xs font-bold text-blue-600 group-hover:underline">Gerenciar &rarr;</span>
           </div>
           <div className="text-2xl font-bold text-slate-900">
-            {galleryCount || 0} <span className="text-xs font-normal text-slate-500">/ {galleryLimit ?? 10} permitidas</span>
+            {galleryCount || 0} <span className="text-xs font-normal text-slate-500">/ {galleryLimit ?? 0} permitidas</span>
           </div>
           <div className="w-full bg-slate-100 h-1.5 rounded-full mt-3 overflow-hidden">
             <div

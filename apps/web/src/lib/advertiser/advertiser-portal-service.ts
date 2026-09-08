@@ -78,6 +78,39 @@ export async function getAdvertiserDashboardDTOAction(_userId?: string): Promise
     // Resolver mídia via helper centralizado
     const media = await resolveBusinessMedia(supabase, b?.id || '', { logoUrl: b?.logo_url });
 
+    // Resolver cotas via plan_entitlements (fonte canônica)
+    const activePlanCode = b?.plan_code || b?.plan_tier || 'bronze';
+    const { data: dashEntRows } = await (supabase as any)
+      .from('plan_entitlements')
+      .select('feature_code, max_limit')
+      .eq('tenant_id', b?.tenant_id)
+      .eq('plan_code', activePlanCode);
+    const dashEntMap: Record<string, number> = {};
+    (dashEntRows || []).forEach((e: any) => { dashEntMap[e.feature_code] = e.max_limit; });
+
+    // Contagem real de registros ativos
+    const bizId = b?.id || '';
+    const { count: photosCount } = await (supabase as any)
+      .from('business_media')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', bizId);
+    const { count: servicesCount } = await (supabase as any)
+      .from('business_services')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', bizId)
+      .eq('is_active', true);
+    const { count: benefitsCount } = await (supabase as any)
+      .from('business_benefits')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', bizId)
+      .is('archived_at', null)
+      .in('status', ['scheduled', 'active', 'paused', 'exhausted']);
+    const { count: eventsCount } = await (supabase as any)
+      .from('business_events')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', bizId)
+      .eq('is_active', true);
+
     const dto: AdvertiserDashboardDTO = {
       business: {
         id: b?.id || '',
@@ -104,14 +137,14 @@ export async function getAdvertiserDashboardDTOAction(_userId?: string): Promise
         growth_percent: 18,
       },
       quotas: {
-        photos_used: 7,
-        photos_limit: 10,
-        services_used: 4,
-        services_limit: 10,
-        benefits_used: 2,
-        benefits_limit: 5,
-        events_used: 1,
-        events_limit: 5,
+        photos_used: photosCount || 0,
+        photos_limit: dashEntMap['gallery_photos_limit'] ?? 0,
+        services_used: servicesCount || 0,
+        services_limit: dashEntMap['services_limit'] ?? 0,
+        benefits_used: benefitsCount || 0,
+        benefits_limit: dashEntMap['benefits_limit'] ?? 0,
+        events_used: eventsCount || 0,
+        events_limit: dashEntMap['events_limit'] ?? 0,
       },
       attention_alerts: [
         {
@@ -126,7 +159,7 @@ export async function getAdvertiserDashboardDTOAction(_userId?: string): Promise
           id: 'alt-2',
           type: 'warning',
           title: '70% da cota de fotos da galeria utilizada',
-          description: 'Você já cadastrou 7 das 10 fotos permitidas no seu Plano Ouro.',
+          description: 'Você atingiu 70% da cota de fotos da galeria permitida pelo seu plano comercial.',
           action_label: 'Gerenciar Fotos',
           action_url: '/anunciante/empresa/midias',
         },

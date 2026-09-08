@@ -151,3 +151,15 @@ export async function fetchTenantPlans(
     return plan;
   });
 }
+
+export const CANONICAL_FEATURE_LIMITS: Record<string, Record<string, number>> = {
+  bronze: { ['gallery_photos_limit']: 3, ['services_limit']: 3, ['benefits_limit']: 0, ['events_limit']: 0, ['posts_limit']: 0 },
+  prata: { ['gallery_photos_limit']: 6, ['services_limit']: 5, ['benefits_limit']: 3, ['events_limit']: 2, ['posts_limit']: 2 },
+  ouro: { ['gallery_photos_limit']: 10, ['services_limit']: 10, ['benefits_limit']: 5, ['events_limit']: 10, ['posts_limit']: 10 },
+};
+
+export function getCanonicalDefaultLimit(planCode: string, featureCode: string): number {
+  const norm = (planCode || 'bronze').toLowerCase();
+  return CANONICAL_FEATURE_LIMITS[norm]?.[featureCode] ?? 0;
+}
+
