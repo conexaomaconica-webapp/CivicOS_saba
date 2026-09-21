@@ -19,6 +19,7 @@ import { BusinessLocationCard } from '../sections/BusinessLocationCard';
 import { BusinessCommunityReviewsCard } from '../sections/BusinessCommunityReviewsCard';
 import { BusinessHours } from '../sections/BusinessHours';
 import { BusinessContacts } from '../sections/BusinessContacts';
+import { BusinessVideo } from '../sections/BusinessVideo';
 
 type GoldBusinessProfileProps = {
   profile: PublicBusinessPresentation;
@@ -200,6 +201,7 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
             </div>
 
             <div id="fotos-videos">
+              <BusinessVideo video={profile.media.video} />
               <BusinessGallery gallery={profile.media.gallery} />
             </div>
 

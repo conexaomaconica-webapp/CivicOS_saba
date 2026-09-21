@@ -108,7 +108,7 @@ describe('Checkpoint de Auditoria Corretiva — Rotas Críticas & Navegação do
 
   it('2. Canonical Payments Route — Confirma rota canônica /anunciante/pagamentos e integridade de faturas', async () => {
     const billing = await getAdvertiserPlanBillingDTOAction();
-    expect(billing.plan.name).toBe('Plano Ouro');
+    expect(billing.plan.name).toBe('Plano Acácia');
     expect(billing.invoices.length).toBeGreaterThan(0);
     expect(billing.invoices[0]?.status).toBe('paid');
   });

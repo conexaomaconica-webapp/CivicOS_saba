@@ -93,7 +93,7 @@ describe('Portal do Anunciante — Etapa 5: Plano, Financeiro e Contrato (/anunc
     const dto = await getAdvertiserPlanBillingDTOAction();
     expect(dto).toBeDefined();
     expect(dto.plan).toBeDefined();
-    expect(dto.plan.name).toContain('Ouro');
+    expect(dto.plan.name).toContain('Acácia');
   });
 
   it('2. Invoices & Payment Summary — Histórico de faturas e método de pagamento em cartão 6x', async () => {

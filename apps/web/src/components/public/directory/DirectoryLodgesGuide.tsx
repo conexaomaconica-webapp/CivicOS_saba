@@ -42,7 +42,7 @@ export function DirectoryLodgesGuide({
   };
 
   return (
-    <section className="dh-container my-14" id="lojas">
+    <section className="dh-container py-4" id="lojas">
       <div>
         <h2 className="dh-section-title">Guia de Lojas Maçônicas</h2>
         <p className="text-xs text-gray-500 mt-1">

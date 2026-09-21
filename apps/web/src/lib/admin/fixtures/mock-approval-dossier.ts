@@ -45,6 +45,7 @@ export function getMockApprovalDossier(businessId: string): ApprovalDossier360 {
         signed_contract: true,
         valid_payment: true,
       },
+      requirements: [],
       recommended_quality: {
         logo: true,
         banner: false,
@@ -82,7 +83,7 @@ export function getMockApprovalDossier(businessId: string): ApprovalDossier360 {
       valid_until: '2027-08-24T00:00:00.000Z',
     },
     plan_entitlements: {
-      title: 'Plano Ouro',
+      title: 'Plano Acácia',
       gallery_photos_limit: 10,
       services_limit: 10,
       benefits_limit: 5,

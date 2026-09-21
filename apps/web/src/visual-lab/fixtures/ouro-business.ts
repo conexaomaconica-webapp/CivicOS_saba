@@ -24,6 +24,7 @@ export const ouroBusinessFixture: PublicBusinessPresentation = {
     maxEvents: 5,
     maxPosts: 5,
     maxBenefits: 5,
+    maxVideos: 1,
     canShowBenefits: true,
     canShowEvents: true,
     canShowPosts: true,
@@ -51,6 +52,7 @@ export const ouroBusinessFixture: PublicBusinessPresentation = {
     communityVerified: true,
   },
   media: {
+    video: null,
     cover: crop('Fachada e salão principal da Padaria Estrela', 23, 102, 521, 280),
     gallery: [
       crop('Vitrine de doces finos', 282, 719, 52, 52),

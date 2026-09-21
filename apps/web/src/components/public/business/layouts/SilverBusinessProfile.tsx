@@ -33,7 +33,9 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
   const isFavorited = isFavorite(identity.slug);
 
   // 1. Filtrar lista de mídias eliminando duplicatas entre cover e gallery
-  const rawMediaList = [media.cover, ...(media.gallery || [])].filter(Boolean) as PublicMediaAsset[];
+  const coverAsset = media?.cover ?? null;
+  const galleryAssets = media?.gallery ?? [];
+  const rawMediaList = [coverAsset, ...galleryAssets].filter(Boolean) as PublicMediaAsset[];
   const heroImages = rawMediaList.filter((item, index, self) =>
     index === self.findIndex((t) => t.url === item.url)
   );

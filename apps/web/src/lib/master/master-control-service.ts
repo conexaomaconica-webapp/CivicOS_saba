@@ -162,7 +162,7 @@ export async function checkSystemHealthAction(): Promise<MasterControlDashboardD
       title: 'Webhook Asaas PAYMENT_RECEIVED processado',
       type: 'webhook' as const,
       status: 'success' as const,
-      details: 'Cobrança do Plano Ouro (Comandos) confirmada via cartão 12x.',
+      details: 'Cobrança do Plano Acácia (Comandos) confirmada via cartão 12x.',
     },
     {
       id: 'evt-2',

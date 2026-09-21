@@ -37,11 +37,21 @@ export default tseslint.config(
             {
               group: ['@saas/plugins/*'],
               message: 'Plugins cannot cross-import each other.'
+            },
+            {
+              group: ['**/*.mock', '**/*.mock.*', '**/*.fixture', '**/*.fixture.*', '**/fixtures/*', '**/mocks/*'],
+              message: 'Do not import mocks or fixtures in production code. They are for tests only.'
             }
           ]
         }
       ]
     },
+  },
+  {
+    files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx'],
+    rules: {
+      'no-restricted-imports': 'off'
+    }
   },
   {
     files: ['apps/web/src/app/**/*.tsx', 'apps/web/src/components/**/*.tsx'],

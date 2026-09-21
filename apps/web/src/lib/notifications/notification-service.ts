@@ -150,7 +150,7 @@ export async function getInAppNotificationsAction(userId?: string): Promise<{
       recipient_masked_email: 'co***@comandosseguranca.com.br',
       event_type: 'payment_confirmed',
       title: 'Pagamento confirmado com sucesso',
-      body: 'Sua assinatura do Plano Prata foi confirmada via Asaas Gateway.',
+      body: 'Sua assinatura do Plano Compasso foi confirmada via Asaas Gateway.',
       action_url: '/anunciante',
       channel: 'both',
       is_read: true,

@@ -140,10 +140,10 @@ export function LandingLeadCapture() {
                 value={interestedPlan}
                 onChange={(e) => setInterestedPlan(e.target.value as any)}
               >
-                <option value="ouro_founder">Plano Ouro Fundador (Oferta Especial de Lançamento)</option>
-                <option value="ouro">Plano Ouro (Recursos Completos + Eventos/Posts)</option>
-                <option value="prata">Plano Prata (Empresa + Galeria de Fotos)</option>
-                <option value="bronze">Plano Bronze (Presença Básica no Guia)</option>
+                <option value="ouro_founder">Plano Acácia Fundador (Oferta Especial de Lançamento)</option>
+                <option value="ouro">Plano Acácia (Recursos Completos + Eventos/Posts)</option>
+                <option value="prata">Plano Compasso (Empresa + Galeria de Fotos)</option>
+                <option value="bronze">Plano Esquadro (Presença Básica no Guia)</option>
               </select>
             </div>
 

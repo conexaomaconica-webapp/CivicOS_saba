@@ -1,36 +1,31 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import {
   Search,
   Filter,
-  ArrowRight,
-  Sparkles,
-  Building2,
   Clock,
   CreditCard,
   Award,
   AlertTriangle,
+  Sparkles,
+  List,
+  LayoutGrid,
+  X,
+  RefreshCcw,
 } from 'lucide-react';
 import {
   getApprovalDirectoryListAction,
+  deleteApprovalAction,
   ApprovalDirectoryItem,
 } from '@/lib/admin/admin-approval-service';
+import { ApprovalTable, ApprovalGrid } from './_components/ApprovalViews';
+
+type ViewMode = 'list' | 'grid';
 
 export default function AdminAprovacoesPage() {
   const [items, setItems] = useState<ApprovalDirectoryItem[]>([]);
-  const [counts, setCounts] = useState<{
-    total: number;
-    ready: number;
-    pendingReview: number;
-    missingContract: number;
-    missingPayment: number;
-    missingLink: number;
-    incomplete: number;
-    correctionRequested: number;
-    rejected: number;
-  }>({
+  const [counts, setCounts] = useState({
     total: 0,
     ready: 0,
     pendingReview: 0,
@@ -41,34 +36,93 @@ export default function AdminAprovacoesPage() {
     correctionRequested: 0,
     rejected: 0,
   });
+  
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<string>('todos');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const saved = localStorage.getItem('saba_approval_view_mode');
+    if (saved === 'list' || saved === 'grid') {
+      setViewMode(saved as ViewMode);
+    } else {
+      // Padrão: grid para mobile, list para desktop
+      if (typeof window !== 'undefined' && window.innerWidth < 768) {
+        setViewMode('grid');
+      }
+    }
+  }, []);
+
+  const handleViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem('saba_approval_view_mode', mode);
+  };
 
   const loadData = async (filter: string) => {
     setLoading(true);
-    const res = await getApprovalDirectoryListAction(filter);
-    if (res.success && res.items) {
-      setItems(res.items);
-      if (res.counts) setCounts(res.counts);
+    setError(null);
+    try {
+      const res = await getApprovalDirectoryListAction(filter);
+      if (res.success && res.items) {
+        setItems(res.items);
+        if (res.counts) setCounts(res.counts);
+      } else {
+        setError(res.error || 'Erro desconhecido ao carregar.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Falha de rede.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta solicitação de anúncio? Esta ação não pode ser desfeita.')) return;
+    
+    const res = await deleteApprovalAction(id);
+    
+    if (res.success) {
+      // Reload current view
+      loadData(selectedFilter);
+    } else {
+      alert(res.error || 'Erro ao tentar excluir a solicitação.');
+    }
   };
 
   useEffect(() => {
     loadData(selectedFilter);
   }, [selectedFilter]);
 
-  const filteredItems = items.filter(
-    (item) =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.owner_email && item.owner_email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.category && item.category.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredItems = items.filter((item) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    
+    return (
+      (item.name && item.name.toLowerCase().includes(q)) ||
+      (item.owner_email && item.owner_email.toLowerCase().includes(q)) ||
+      (item.category && item.category.toLowerCase().includes(q)) ||
+      (item.cnpj && item.cnpj.replace(/\D/g, '').includes(q.replace(/\D/g, ''))) ||
+      (item.city && item.city.toLowerCase().includes(q)) ||
+      (item.owner_name && item.owner_name.toLowerCase().includes(q))
+    );
+  });
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setSelectedFilter('todos');
+  };
+
+  const hasActiveFilters = selectedFilter !== 'todos' || searchQuery.trim().length > 0;
+
+  if (!mounted) return null;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 text-left">
-      {/* 1. CABEÇALHO DA CENTRAL DE APROVAÇÕES */}
+      {/* CABEÇALHO DA CENTRAL DE APROVAÇÕES */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-300 pb-4">
         <div>
           <div className="flex items-center gap-2">
@@ -88,7 +142,7 @@ export default function AdminAprovacoesPage() {
         </div>
       </div>
 
-      {/* 2. KPIS SUPERIORES DA FILA (TRIAGEM RÁPIDA) */}
+      {/* KPIS SUPERIORES DA FILA (TRIAGEM RÁPIDA) */}
       <section className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <button
           type="button"
@@ -99,8 +153,8 @@ export default function AdminAprovacoesPage() {
             }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Aguardando Análise</span>
-            <Clock className="w-4 h-4 text-amber-600" />
+            <span className={`text-[11px] font-bold uppercase tracking-wider ${selectedFilter === 'pending_review' ? 'text-stone-300' : 'text-stone-500'}`}>Aguardando Análise</span>
+            <Clock className={`w-4 h-4 ${selectedFilter === 'pending_review' ? 'text-[#C9A227]' : 'text-amber-600'}`} />
           </div>
           <p className="text-2xl font-serif font-bold mt-1">{counts.pendingReview}</p>
         </button>
@@ -114,10 +168,10 @@ export default function AdminAprovacoesPage() {
             }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Prontos p/ Aprovar</span>
-            <Sparkles className="w-4 h-4 text-emerald-600" />
+            <span className={`text-[11px] font-bold uppercase tracking-wider ${selectedFilter === 'pronto_para_aprovacao' ? 'text-emerald-300' : 'text-emerald-800'}`}>Prontos p/ Aprovar</span>
+            <Sparkles className={`w-4 h-4 ${selectedFilter === 'pronto_para_aprovacao' ? 'text-emerald-400' : 'text-emerald-600'}`} />
           </div>
-          <p className="text-2xl font-serif font-bold text-emerald-900 mt-1">{counts.ready}</p>
+          <p className={`text-2xl font-serif font-bold mt-1 ${selectedFilter === 'pronto_para_aprovacao' ? 'text-white' : 'text-emerald-900'}`}>{counts.ready}</p>
         </button>
 
         <button
@@ -129,10 +183,10 @@ export default function AdminAprovacoesPage() {
             }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Sem Pagamento</span>
-            <CreditCard className="w-4 h-4 text-amber-600" />
+            <span className={`text-[11px] font-bold uppercase tracking-wider ${selectedFilter === 'aguardando_pagamento' ? 'text-amber-200' : 'text-stone-500'}`}>Sem Pagamento</span>
+            <CreditCard className={`w-4 h-4 ${selectedFilter === 'aguardando_pagamento' ? 'text-amber-400' : 'text-amber-600'}`} />
           </div>
-          <p className="text-2xl font-serif font-bold text-amber-900 mt-1">{counts.missingPayment}</p>
+          <p className={`text-2xl font-serif font-bold mt-1 ${selectedFilter === 'aguardando_pagamento' ? 'text-white' : 'text-amber-900'}`}>{counts.missingPayment}</p>
         </button>
 
         <button
@@ -144,10 +198,10 @@ export default function AdminAprovacoesPage() {
             }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Sem Vínculo</span>
-            <Award className="w-4 h-4 text-amber-600" />
+            <span className={`text-[11px] font-bold uppercase tracking-wider ${selectedFilter === 'aguardando_vinculo' ? 'text-stone-300' : 'text-stone-500'}`}>Sem Vínculo</span>
+            <Award className={`w-4 h-4 ${selectedFilter === 'aguardando_vinculo' ? 'text-[#C9A227]' : 'text-amber-600'}`} />
           </div>
-          <p className="text-2xl font-serif font-bold text-stone-900 mt-1">{counts.missingLink}</p>
+          <p className="text-2xl font-serif font-bold mt-1">{counts.missingLink}</p>
         </button>
 
         <button
@@ -159,16 +213,16 @@ export default function AdminAprovacoesPage() {
             }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Incompletos (&lt;70%)</span>
-            <AlertTriangle className="w-4 h-4 text-amber-600" />
+            <span className={`text-[11px] font-bold uppercase tracking-wider ${selectedFilter === 'cadastro_incompleto' ? 'text-amber-200' : 'text-stone-500'}`}>Incompletos (&lt;70%)</span>
+            <AlertTriangle className={`w-4 h-4 ${selectedFilter === 'cadastro_incompleto' ? 'text-amber-400' : 'text-amber-600'}`} />
           </div>
-          <p className="text-2xl font-serif font-bold text-stone-900 mt-1">{counts.incomplete}</p>
+          <p className="text-2xl font-serif font-bold mt-1">{counts.incomplete}</p>
         </button>
       </section>
 
-      {/* 3. FILTROS RÁPIDOS & BUSCA */}
-      <div className="bg-white border border-stone-300 rounded-2xl p-4 shadow-xs space-y-3">
-        <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+      {/* FILTROS RÁPIDOS E BUSCA E CONTROLE DE VISUALIZAÇÃO */}
+      <div className="bg-white border border-stone-300 rounded-2xl p-4 shadow-xs space-y-4">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="relative flex-1 w-full">
             <Search className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
             <input
@@ -180,197 +234,99 @@ export default function AdminAprovacoesPage() {
             />
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 scrollbar-none">
-            <Filter className="w-4 h-4 text-stone-500 shrink-0" />
-            <span className="text-xs font-bold text-stone-600 shrink-0">Filtro:</span>
-
-            {[
-              { id: 'todos', label: `Todos (${counts.total})` },
-              { id: 'pronto_para_aprovacao', label: `⭐ Prontos (${counts.ready})` },
-              { id: 'cadastro_incompleto', label: `Incompletos (${counts.incomplete})` },
-              { id: 'aguardando_contrato', label: `Sem Contrato (${counts.missingContract})` },
-              { id: 'aguardando_pagamento', label: `Sem Pagamento (${counts.missingPayment})` },
-              { id: 'aguardando_vinculo', label: `Sem Vínculo (${counts.missingLink})` },
-              { id: 'correction_requested', label: `Correção Solicitada (${counts.correctionRequested})` },
-              { id: 'rejected', label: `Rejeitados (${counts.rejected})` },
-            ].map((f) => (
+          <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto scrollbar-none">
+            <div className="flex bg-stone-100 p-1 rounded-xl border border-stone-200" role="group" aria-label="Modo de visualização">
               <button
-                key={f.id}
                 type="button"
-                onClick={() => setSelectedFilter(f.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${selectedFilter === f.id
-                  ? 'bg-[#3B0B14] text-[#C9A227] border border-[#C9A227]/40 shadow-xs'
-                  : 'bg-stone-100 text-stone-700 border border-stone-200 hover:bg-stone-200'
-                  }`}
+                title="Visualização em Lista"
+                aria-pressed={viewMode === 'list'}
+                onClick={() => handleViewMode('list')}
+                className={`p-1.5 rounded-lg transition-colors flex items-center justify-center ${viewMode === 'list' ? 'bg-white shadow-xs text-stone-900 border border-stone-200' : 'text-stone-500 hover:text-stone-700'}`}
               >
-                {f.label}
+                <List className="w-4 h-4" />
               </button>
-            ))}
+              <button
+                type="button"
+                title="Visualização em Cards"
+                aria-pressed={viewMode === 'grid'}
+                onClick={() => handleViewMode('grid')}
+                className={`p-1.5 rounded-lg transition-colors flex items-center justify-center ${viewMode === 'grid' ? 'bg-white shadow-xs text-stone-900 border border-stone-200' : 'text-stone-500 hover:text-stone-700'}`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
           </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 overflow-x-auto w-full pb-1 scrollbar-none">
+          <Filter className="w-4 h-4 text-stone-500 shrink-0" />
+          <span className="text-xs font-bold text-stone-600 shrink-0">Filtro:</span>
+
+          {[
+            { id: 'todos', label: `Todos (${counts.total})` },
+            { id: 'pronto_para_aprovacao', label: `⭐ Prontos (${counts.ready})` },
+            { id: 'cadastro_incompleto', label: `Incompletos (${counts.incomplete})` },
+            { id: 'aguardando_contrato', label: `Sem Contrato (${counts.missingContract})` },
+            { id: 'aguardando_pagamento', label: `Sem Pagamento (${counts.missingPayment})` },
+            { id: 'aguardando_vinculo', label: `Sem Vínculo (${counts.missingLink})` },
+            { id: 'correction_requested', label: `Correção Solicitada (${counts.correctionRequested})` },
+            { id: 'rejected', label: `Rejeitados (${counts.rejected})` },
+          ].map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setSelectedFilter(f.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${selectedFilter === f.id
+                ? 'bg-[#3B0B14] text-[#C9A227] border border-[#C9A227]/40 shadow-xs'
+                : 'bg-stone-100 text-stone-700 border border-stone-200 hover:bg-stone-200'
+                }`}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* 4. LISTA DA FILA COM PRIORIDADE VISUAL HARMONIOSA */}
-      <div className="bg-white border border-stone-300 rounded-2xl shadow-xs overflow-hidden">
-        {loading ? (
-          <div className="p-12 text-center text-xs text-stone-500 font-semibold">
-            Carregando estação de conferência pré-publicação...
-          </div>
-        ) : filteredItems.length === 0 ? (
-          <div className="p-12 text-center space-y-2">
-            <Building2 className="w-8 h-8 text-stone-400 mx-auto" />
-            <p className="text-sm font-bold text-stone-800">
-              Nenhuma solicitação aguardando análise neste filtro.
-            </p>
-            <p className="text-xs text-stone-500">Tudo em dia por aqui!</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-stone-100 border-b border-stone-200 text-stone-700 font-bold uppercase tracking-wider">
-                  <th className="py-3 px-4">Empresa & Categoria</th>
-                  <th className="py-3 px-4">Responsável</th>
-                  <th className="py-3 px-4 text-center">Plano</th>
-                  <th className="py-3 px-4 text-center">Status do cadastro</th>
-                  <th className="py-3 px-4 text-center">Vínculo</th>
-                  <th className="py-3 px-4 text-center">Contrato</th>
-                  <th className="py-3 px-4 text-center">Pagamento</th>
-                  <th className="py-3 px-4 text-center">Status / Apto</th>
-                  <th className="py-3 px-4 text-right">Ação</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-200">
-                {filteredItems.map((item) => (
-                  <tr key={item.id} className="hover:bg-stone-50/80 transition-colors">
-                    {/* EMPRESA */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-start gap-2.5">
-                        <div className="w-9 h-9 rounded-xl bg-stone-100 border border-stone-200 flex items-center justify-center text-[#3B0B14] font-serif font-bold text-sm shrink-0">
-                          {item.name.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="font-serif font-bold text-sm text-stone-900 line-clamp-1 flex items-center gap-1.5">
-                            <span>{item.name}</span>
-                            {item.is_pedra_fundamental && (
-                              <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 font-sans text-[9px] font-extrabold">
-                                Pedra Fundamental
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[11px] text-stone-500 font-semibold">{item.category}</span>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* RESPONSÁVEL */}
-                    <td className="py-3.5 px-4 text-stone-700">
-                      <div className="font-bold text-stone-900">{item.owner_name}</div>
-                      <div className="text-[11px] text-stone-500 font-mono line-clamp-1">{item.owner_email}</div>
-                    </td>
-
-                    {/* PLANO */}
-                    <td className="py-3.5 px-4 text-center">
-                      <span className="px-2.5 py-1 rounded-full bg-stone-100 text-stone-900 font-extrabold text-[10px] uppercase border border-stone-300">
-                        {item.plan_code}
-                      </span>
-                    </td>
-
-                    {/* Status do cadastro */}
-                    <td className="py-3.5 px-4 text-center">
-                      <div className="inline-flex items-center gap-1.5">
-                        <div className="w-12 bg-stone-200 h-2 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full ${item.completeness_percent >= 90
-                              ? 'bg-emerald-600'
-                              : item.completeness_percent >= 70
-                                ? 'bg-amber-500'
-                                : 'bg-rose-600'
-                              }`}
-                            style={{ width: `${item.completeness_percent}%` }}
-                          />
-                        </div>
-                        <span className="font-mono font-bold text-stone-800">{item.completeness_percent}%</span>
-                      </div>
-                    </td>
-
-                    {/* VÍNCULO */}
-                    <td className="py-3.5 px-4 text-center">
-                      {item.has_masonic_link ? (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-[10px]">
-                          ✓ Validado
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10px]">
-                          Pendente
-                        </span>
-                      )}
-                    </td>
-
-                    {/* CONTRATO */}
-                    <td className="py-3.5 px-4 text-center">
-                      {item.has_signed_contract ? (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-[10px]">
-                          ✓ Assinado
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-900 border border-rose-300 font-bold text-[10px]">
-                          Sem Contrato
-                        </span>
-                      )}
-                    </td>
-
-                    {/* PAGAMENTO */}
-                    <td className="py-3.5 px-4 text-center">
-                      {item.has_valid_payment ? (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-[10px]">
-                          ✓ Confirmado
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10px]">
-                          Pendente
-                        </span>
-                      )}
-                    </td>
-
-                    {/* STATUS / BADGE PRONTO */}
-                    <td className="py-3.5 px-4 text-center space-y-1">
-                      {item.is_ready_for_approval ? (
-                        <span className="px-2.5 py-1 rounded-full bg-[#C9A227] text-[#3B0B14] font-extrabold text-[10px] tracking-wider uppercase shadow-xs flex items-center justify-center gap-1">
-                          <Sparkles className="w-3 h-3" /> Pronto p/ Aprovar
-                        </span>
-                      ) : item.publication_status === 'correction_requested' ? (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10px] uppercase">
-                          Correção Solicitada
-                        </span>
-                      ) : item.publication_status === 'rejected' ? (
-                        <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-900 border border-rose-300 font-bold text-[10px] uppercase">
-                          Rejeitado
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-300 font-bold text-[10px] uppercase">
-                          {item.publication_status}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* AÇÃO: ANALISAR CADASTRO */}
-                    <td className="py-3.5 px-4 text-right">
-                      <Link
-                        href={`/admin/aprovacoes/${item.id}`}
-                        className="px-3.5 py-1.5 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-extrabold text-xs rounded-xl transition-all inline-flex items-center gap-1.5 shadow-xs border border-[#C9A227]/40 cursor-pointer"
-                      >
-                        <span>Analisar Cadastro</span>
-                        <ArrowRight className="w-3.5 h-3.5 text-[#C9A227]" />
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <div className="flex items-center justify-between text-xs text-stone-500 font-medium">
+        <span>
+          Exibindo {filteredItems.length} de {items.length} solicitações
+        </span>
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="flex items-center gap-1 hover:text-stone-800 transition-colors cursor-pointer text-rose-700 font-bold"
+          >
+            <X className="w-3.5 h-3.5" /> Limpar Filtros
+          </button>
         )}
       </div>
+
+      {error ? (
+        <div className="bg-rose-50 border border-rose-200 p-8 rounded-2xl flex flex-col items-center justify-center text-center space-y-4">
+          <AlertTriangle className="w-10 h-10 text-rose-500" />
+          <div>
+            <h3 className="text-lg font-bold text-rose-900">Falha ao carregar aprovações</h3>
+            <p className="text-sm text-rose-700">{error}</p>
+          </div>
+          <button
+            onClick={() => loadData(selectedFilter)}
+            className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl font-bold text-sm hover:bg-rose-700 transition-colors"
+          >
+            <RefreshCcw className="w-4 h-4" /> Tentar novamente
+          </button>
+        </div>
+      ) : loading ? (
+        <div className={`gap-4 ${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3' : 'space-y-3'}`}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-stone-100 animate-pulse rounded-2xl h-32 border border-stone-200"></div>
+          ))}
+        </div>
+      ) : viewMode === 'grid' ? (
+        <ApprovalGrid items={filteredItems} onDelete={handleDelete} />
+      ) : (
+        <ApprovalTable items={filteredItems} onDelete={handleDelete} />
+      )}
     </div>
   );
 }

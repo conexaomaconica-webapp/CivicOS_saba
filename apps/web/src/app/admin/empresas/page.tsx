@@ -28,6 +28,7 @@ import {
   SlidersHorizontal,
   Check,
   EyeOff,
+  Plus,
 } from 'lucide-react';
 
 
@@ -314,6 +315,9 @@ export default function AdminBusinessesDirectoryPage() {
             Gerencie empresas ativas, monitore vigências financeiras, cotas do plano e mantenha a saúde da carteira.
           </p>
         </div>
+        <Link href="/admin/empresas/nova" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#3B0B14] px-4 py-2.5 text-sm font-extrabold text-[#C9A227] shadow-xs hover:bg-[#4B161B]">
+          <Plus className="h-4 w-4" /> Cadastrar anunciante
+        </Link>
       </div>
 
       {/* KPIS SUPERIORES DA CARTEIRA */}

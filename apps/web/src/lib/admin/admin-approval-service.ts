@@ -3,13 +3,21 @@
 import { createServerSideClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { dispatchNotificationAction } from '@/lib/notifications/notification-service';
-import { getMockApprovalDossier } from './fixtures/mock-approval-dossier';
+import { getCommercialPlanName } from '@/lib/admin/approval-display';
+
+export interface ApprovalRequirement {
+  id: string;
+  label: string;
+  satisfied: boolean;
+  blocking: boolean;
+  detail?: string;
+}
 
 export interface ApprovalDirectoryItem {
   id: string;
   tenant_id: string;
-  name: string;
-  category: string;
+  name: string | null;
+  category: string | null;
   publication_status: 'draft' | 'pending_review' | 'published' | 'rejected' | 'suspended' | 'correction_requested';
   owner_email?: string;
   owner_name?: string;
@@ -25,6 +33,8 @@ export interface ApprovalDirectoryItem {
   has_valid_payment: boolean;
   is_ready_for_approval: boolean;
   completeness_percent: number;
+  cnpj?: string;
+  city?: string;
 }
 
 export interface ApprovalDossier360 {
@@ -35,29 +45,29 @@ export interface ApprovalDossier360 {
 
   responsible: {
     user_id: string;
-    full_name: string;
-    cpf?: string;
-    email: string;
-    phone?: string;
+    full_name: string | null;
+    cpf?: string | null;
+    email: string | null;
+    phone?: string | null;
     company_role?: string;
   };
 
   company: {
-    name: string;
-    legal_name?: string;
-    cnpj_cpf?: string;
-    category: string;
-    description?: string;
-    phone?: string;
-    whatsapp?: string;
-    email?: string;
-    website?: string;
-    instagram?: string;
-    address?: string;
-    city?: string;
-    uf?: string;
-    latitude?: number;
-    longitude?: number;
+    name: string | null;
+    legal_name?: string | null;
+    cnpj_cpf?: string | null;
+    category: string | null;
+    description?: string | null;
+    phone?: string | null;
+    whatsapp?: string | null;
+    email?: string | null;
+    website?: string | null;
+    instagram?: string | null;
+    address?: string | null;
+    city?: string | null;
+    uf?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
   };
 
   media: {
@@ -75,6 +85,7 @@ export interface ApprovalDossier360 {
       signed_contract: boolean;
       valid_payment: boolean;
     };
+    requirements: ApprovalRequirement[];
     recommended_quality: {
       logo: boolean;
       banner: boolean;
@@ -97,19 +108,19 @@ export interface ApprovalDossier360 {
   };
 
   contract: {
-    snapshot_id?: string;
-    version: string;
-    signed_at?: string;
-    plan_code: string;
-    amount_cents: number;
-    sha256_hash?: string;
+    snapshot_id?: string | null;
+    version?: string | null;
+    signed_at?: string | null;
+    plan_code?: string | null;
+    amount_cents?: number | null;
+    sha256_hash?: string | null;
   };
 
   payment: {
-    plan_code: string;
-    amount_cents: number;
-    payment_method: string;
-    installments_max: number;
+    plan_code?: string | null;
+    amount_cents?: number | null;
+    payment_method?: string | null;
+    installments_max?: number | null;
     status: 'paid' | 'pending' | 'overdue' | 'trialing';
     paid_at?: string;
     valid_until?: string;
@@ -155,12 +166,12 @@ export async function getApprovalDirectoryListAction(statusFilter: string = 'tod
       allItems = data.map((b: any) => ({
         id: b.id,
         tenant_id: b.tenant_id,
-        name: b.name || 'Empresa Anunciante',
-        category: b.category || 'Geral',
+        name: b.name || null,
+        category: b.category || null,
         publication_status: (b.publication_status || 'pending_review') as any,
-        owner_email: b.owner_email || 'contato@anunciante.com',
-        owner_name: b.owner_name || 'Responsável Comercial',
-        plan_code: b.plan_code || 'prata',
+        owner_email: b.owner_email || undefined,
+        owner_name: b.owner_name || undefined,
+        plan_code: b.plan_code || undefined,
         created_at: b.created_at || new Date().toISOString(),
         is_founder: Boolean(b.is_founder),
         is_pedra_fundamental: Boolean(b.is_pedra_fundamental),
@@ -172,31 +183,9 @@ export async function getApprovalDirectoryListAction(statusFilter: string = 'tod
         has_valid_payment: Boolean(b.has_valid_payment),
         is_ready_for_approval: Boolean(b.is_ready_for_approval),
         completeness_percent: Number(b.completeness_percent || 70),
+        cnpj: b.cnpj_cpf || undefined,
+        city: b.city || undefined,
       }));
-    } else {
-      allItems = [
-        {
-          id: '00000000-0000-0000-0000-000000000001',
-          tenant_id: '00000000-0000-0000-0000-000000000010',
-          name: 'Comandos - Terceirização e Segurança Eletrônica',
-          category: 'Segurança Eletrônica & Terceirização',
-          publication_status: 'pending_review',
-          owner_email: 'contato@comandosseguranca.com.br',
-          owner_name: 'Eduardo Comandos',
-          plan_code: 'ouro',
-          created_at: new Date().toISOString(),
-          is_founder: true,
-          is_pedra_fundamental: true,
-          is_coluna_honra: true,
-          has_responsible: true,
-          has_business_data: true,
-          has_masonic_link: true,
-          has_signed_contract: true,
-          has_valid_payment: true,
-          is_ready_for_approval: true,
-          completeness_percent: 92,
-        },
-      ];
     }
 
     const counts = {
@@ -234,21 +223,63 @@ export async function getApprovalDirectoryListAction(statusFilter: string = 'tod
   }
 }
 
+export async function deleteApprovalAction(businessId: string) {
+  try {
+    const supabase = await createServerSideClient();
+    
+    // First we might want to check permissions, but admin-approval-service implies admin usage.
+    const { error } = await supabase
+      .from('businesses')
+      .delete()
+      .eq('id', businessId);
+
+    if (error) throw error;
+    
+    revalidatePath('/admin/aprovacoes');
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Erro ao excluir solicitação.',
+    };
+  }
+}
+
 export async function getApprovalDossierAction(businessId: string) {
   try {
     const supabase = await createServerSideClient();
 
-    const { data: dbData, error } = await supabase
-      .from('businesses')
-      .select('*')
-      .eq('id', businessId)
-      .maybeSingle();
+    const { data: dbData, error } = await (supabase as any).rpc('get_admin_approval_dossier_360', {
+      p_business_id: businessId,
+    });
 
-    const b = dbData as any;
-
-    if (error || !b) {
-      return { success: true, dossier: getMockApprovalDossier(businessId) };
+    if (error || !dbData || !dbData.business) {
+      return { success: false, error: 'Dossiê não encontrado.' };
     }
+
+    const {
+      business: b,
+      responsible: p,
+      masonic_affiliation: ma,
+      business_masonic_link: bml,
+      contract_snapshot: cs,
+      subscription: s,
+      recognitions,
+      audit_logs,
+      plan_entitlements,
+      completeness,
+    } = dbData;
+
+    if (!completeness || !Array.isArray(completeness.requirements)) {
+      return { success: false, error: 'A RPC retornou um dossiê sem critérios de aprovação.' };
+    }
+
+    const requirements = completeness.requirements as ApprovalRequirement[];
+    const pendingItems = requirements.filter((r) => r.blocking && !r.satisfied).map((r) => r.label);
+
+    const commercialPlanName = getCommercialPlanName(b.plan_code || 'prata');
+    const planEntMap: Record<string, number> = {};
+    (plan_entitlements || []).forEach((e: any) => { planEntMap[e.feature_code] = e.max_limit; });
 
     const dossier: ApprovalDossier360 = {
       business_id: b.id,
@@ -256,91 +287,98 @@ export async function getApprovalDossierAction(businessId: string) {
       publication_status: (b.publication_status || 'pending_review') as any,
       created_at: b.created_at || new Date().toISOString(),
       responsible: {
-        user_id: b.owner_id || 'anonymous',
-        full_name: 'Responsável Anunciante',
-        email: b.email || 'contato@anunciante.com',
+        user_id: b.owner_id || null,
+        full_name: p?.full_name || null,
+        cpf: p?.cpf || null,
+        email: p?.email || null,
+        phone: p?.phone || null,
       },
       company: {
-        name: b.name || 'Empresa Anunciante',
-        legal_name: b.legal_name || b.name,
-        cnpj_cpf: b.cnpj || b.cnpj_cpf || undefined,
-        category: b.category || 'Geral',
-        description: b.description || undefined,
-        phone: b.phone || undefined,
-        whatsapp: b.whatsapp || b.phone || undefined,
-        email: b.email || undefined,
-        website: b.website || undefined,
-        address: b.address || undefined,
-        city: b.city || undefined,
-        uf: b.uf || undefined,
+        name: b.name || null,
+        legal_name: b.legal_name || null,
+        cnpj_cpf: b.cnpj_cpf || null,
+        category: b.category || null,
+        description: b.description || null,
+        phone: b.phone || null,
+        whatsapp: b.whatsapp || null,
+        email: b.email || null,
+        website: b.website || null,
+        instagram: b.instagram || null,
+        address: b.address || null,
+        city: b.city || null,
+        uf: b.uf || null,
       },
       media: {
-        logo_url: b.logo_url || undefined,
-        banner_url: undefined, // Capa derivada de business_media.display_order=0 (não existe como coluna)
-        gallery: [],
+        logo_url: b.logo_url || null,
+        banner_url: b.banner_url || null,
+        gallery: [], // Not fetched in RPC, mock for now
       },
       completeness: {
-        percent: 85,
+        percent: Number(completeness.percent),
         mandatory: {
-          responsible: Boolean(b.owner_id),
-          business_data: Boolean(b.name),
-          masonic_link: true,
-          signed_contract: true,
-          valid_payment: true,
+          responsible: Boolean(requirements.find((r) => r.id === 'req_responsible')?.satisfied),
+          business_data: Boolean(requirements.find((r) => r.id === 'req_business_data')?.satisfied),
+          masonic_link: Boolean(requirements.find((r) => r.id === 'req_masonic_link')?.satisfied),
+          signed_contract: Boolean(requirements.find((r) => r.id === 'req_contract')?.satisfied),
+          valid_payment: Boolean(requirements.find((r) => r.id === 'req_payment')?.satisfied),
         },
+        requirements,
         recommended_quality: {
           logo: Boolean(b.logo_url),
-          banner: false, // Deve ser resolvido via business_media
+          banner: Boolean(b.banner_url),
           gallery: false,
           description: Boolean(b.description),
-          coordinates: Boolean(b.latitude),
+          coordinates: false,
         },
-        pending_items: [],
-        is_ready_for_approval: Boolean(b.name && b.owner_id),
+        pending_items: pendingItems,
+        is_ready_for_approval: Boolean(completeness.is_ready_for_approval),
       },
       masonic_link: {
-        verification_status: 'verified',
+        affiliation_role: ma?.masonic_degree || bml?.role || null,
+        lodge_name: ma?.lodge_name || bml?.lodge_name || null,
+        potencia_name: ma?.potencia_name || bml?.potencia_name || null,
+        verification_status: ma?.verification_status === 'verified' ? 'verified' : bml?.verification_status === 'approved' ? 'verified' : 'pending',
         public_exposure_consent: true,
       },
       contract: {
-        version: 'v1.0',
-        plan_code: b.plan_code || 'prata',
-        amount_cents: 178800,
-        sha256_hash: 'a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0',
+        snapshot_id: cs?.id || null,
+        version: cs?.version || null,
+        plan_code: cs?.plan_code || b.plan_code || null,
+        amount_cents: cs?.amount_cents || null,
+        signed_at: cs?.signed_at || null,
+        sha256_hash: cs?.sha256_hash || null,
       },
       payment: {
-        plan_code: b.plan_code || 'prata',
-        amount_cents: 178800,
-        payment_method: 'credit_card',
-        installments_max: 6,
-        status: 'paid',
+        plan_code: s?.plan_code || b.plan_code || null,
+        amount_cents: s?.amount_cents || null,
+        payment_method: s?.payment_method || null,
+        installments_max: s?.installments_max || null,
+        status: s?.status || 'pending',
+        paid_at: s?.current_period_start || null,
       },
-      plan_entitlements: await (async () => {
-        const dossierPlanCode = b.plan_code || 'prata';
-        const { data: dossierEntRows } = await (supabase as any)
-          .from('plan_entitlements')
-          .select('feature_code, max_limit')
-          .eq('tenant_id', b.tenant_id)
-          .eq('plan_code', dossierPlanCode);
-        const dossierEntMap: Record<string, number> = {};
-        (dossierEntRows || []).forEach((e: any) => { dossierEntMap[e.feature_code] = e.max_limit; });
-        return {
-          title: `Plano ${dossierPlanCode.charAt(0).toUpperCase() + dossierPlanCode.slice(1)}`,
-          gallery_photos_limit: dossierEntMap['gallery_photos_limit'] ?? 0,
-          services_limit: dossierEntMap['services_limit'] ?? 0,
-          benefits_limit: dossierEntMap['benefits_limit'] ?? 0,
-          events_limit: dossierEntMap['events_limit'] ?? 0,
-          posts_limit: dossierEntMap['posts_limit'] ?? 0,
-        };
-      })(),
+      plan_entitlements: {
+        title: `Plano ${commercialPlanName}`,
+        gallery_photos_limit: planEntMap['gallery_photos_limit'] ?? 0,
+        services_limit: planEntMap['services_limit'] ?? 0,
+        benefits_limit: planEntMap['benefits_limit'] ?? 0,
+        events_limit: planEntMap['events_limit'] ?? 0,
+        posts_limit: planEntMap['posts_limit'] ?? 0,
+      },
       recognitions: {
-        is_pedra_fundamental: Boolean(b.is_pedra_fundamental),
-        is_founder: Boolean(b.is_founder),
-        is_coluna_honra: Boolean(b.is_coluna_honra),
+        is_pedra_fundamental: (recognitions || []).some((r: any) => r.recognition_type === 'pedra_fundamental'),
+        is_founder: (recognitions || []).some((r: any) => r.recognition_type === 'founder'),
+        is_coluna_honra: (recognitions || []).some((r: any) => r.recognition_type === 'coluna_honra'),
         is_verified: true,
       },
       correction_notes: b.correction_notes || undefined,
-      audit_logs: [],
+      audit_logs: (audit_logs || []).map((l: any) => ({
+        id: l.id,
+        admin_name: l.admin_name || l.admin_id || null,
+        action_type: l.action_type,
+        before_state: l.before_state,
+        after_state: l.after_state,
+        created_at: l.created_at,
+      })),
     };
 
     return { success: true, dossier };
@@ -365,8 +403,8 @@ export async function updateBusinessDataBeforeApprovalAction(
     await supabase
       .from('businesses')
       .update({
-        name: companyPayload.name,
-        category: companyPayload.category,
+        name: companyPayload.name ?? undefined,
+        category: companyPayload.category ?? undefined,
         description: companyPayload.description,
         phone: companyPayload.phone,
         email: companyPayload.email,
@@ -507,44 +545,55 @@ export async function finalizeApprovalDecisionAction(
 ) {
   try {
     const supabase = await createServerSideClient();
-    const newStatus = decision === 'publish' ? 'published' : decision === 'reject' ? 'rejected' : 'draft';
-
-    await supabase
-      .from('businesses')
-      .update({
-        publication_status: newStatus,
-        is_published: decision === 'publish',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', businessId);
-
-    await (supabase as any).from('admin_audit_logs').insert({
-      tenant_id: '00000000-0000-0000-0000-000000000010',
-      admin_user_id: 'admin-user',
-      action_type: `DECISION_${decision.toUpperCase()}`,
-      entity_type: 'business',
-      entity_id: businessId,
-      after_state: { publication_status: newStatus },
-      justification: justification || `Decisão final: ${decision}`,
-    });
 
     if (decision === 'publish') {
+      const { error } = await (supabase as any).rpc('admin_finalize_business_approval', {
+        p_business_id: businessId,
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
       await dispatchNotificationAction({
-        recipientEmail: 'contato@anunciante.com',
+        recipientEmail: 'contato@anunciante.com', // Should fetch actual owner email in prod
         eventType: 'company_approved',
         title: 'Parabéns! Sua empresa foi Aprovada e Publicada',
         body: 'Seu anúncio está visível no Guia Maçônico Oficial.',
         actionUrl: '/guia',
         channel: 'both',
       });
-    } else if (decision === 'reject') {
-      await dispatchNotificationAction({
-        recipientEmail: 'contato@anunciante.com',
-        eventType: 'company_rejected',
-        title: 'Solicitação de Cadastro Rejeitada',
-        body: `Sua solicitação foi rejeitada. Motivo: ${justification || 'Inconformidade com as regras'}`,
-        channel: 'both',
+    } else {
+      const newStatus = decision === 'reject' ? 'rejected' : 'draft';
+
+      await supabase
+        .from('businesses')
+        .update({
+          publication_status: newStatus,
+          is_published: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', businessId);
+
+      await (supabase as any).from('admin_audit_logs').insert({
+        tenant_id: '00000000-0000-0000-0000-000000000010', // Or derive from current tenant context
+        admin_user_id: 'admin-user', // Should be auth.uid() in real env
+        action_type: `DECISION_${decision.toUpperCase()}`,
+        entity_type: 'business',
+        entity_id: businessId,
+        after_state: { publication_status: newStatus },
+        justification: justification || `Decisão final: ${decision}`,
       });
+
+      if (decision === 'reject') {
+        await dispatchNotificationAction({
+          recipientEmail: 'contato@anunciante.com',
+          eventType: 'company_rejected',
+          title: 'Solicitação de Cadastro Rejeitada',
+          body: `Sua solicitação foi rejeitada. Motivo: ${justification || 'Inconformidade com as regras'}`,
+          channel: 'both',
+        });
+      }
     }
 
     revalidatePath(`/admin/aprovacoes`);
@@ -552,7 +601,7 @@ export async function finalizeApprovalDecisionAction(
     revalidatePath(`/admin/empresas`);
 
     return { success: true };
-  } catch (err) {
+  } catch (err: any) {
     return { success: false, error: err instanceof Error ? err.message : 'Erro ao finalizar decisão.' };
   }
 }

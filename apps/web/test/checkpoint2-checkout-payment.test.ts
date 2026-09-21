@@ -125,13 +125,13 @@ describe('Checkpoint 2 — Checkout Real PIX + Cartão de Crédito Parcelado', (
         cardNumber: '4532111122223333',
         expiryMonth: '12',
         expiryYear: '2030',
-        ccv: '789',
+        ccv: '98765',
         cpfCnpj: '123.456.789-00',
       },
     });
 
     const sanitized = JSON.stringify(res);
     expect(sanitized).not.toContain('4532111122223333');
-    expect(sanitized).not.toContain('789');
+    expect(sanitized).not.toContain('98765');
   });
 });

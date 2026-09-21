@@ -205,7 +205,7 @@ export default function AdvertiserHomeClient({ data }: { data: AdvertiserDashboa
         <div className="flex items-center justify-between border-b border-stone-100 pb-3">
           <div>
             <span className="text-[11px] font-mono font-bold text-stone-500 uppercase tracking-wider block">
-              Capacidade do Plano Ouro
+              Capacidade do Plano Acácia
             </span>
             <h2 className="text-lg font-serif font-bold text-stone-900 mt-0.5">
               Uso de Cotas &amp; Recursos Liberados

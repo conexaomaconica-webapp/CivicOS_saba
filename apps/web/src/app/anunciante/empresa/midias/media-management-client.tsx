@@ -17,6 +17,7 @@ import {
   Award,
   ArrowRight,
   X,
+  Video,
 } from 'lucide-react';
 import {
   AdvertiserProfileDTO,
@@ -31,6 +32,9 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
   const [logoUrl, setLogoUrl] = useState(business.logo_url || '/logoconexao_red_vert.png');
   const [coverUrl, setCoverUrl] = useState(business.cover_url || '/capa-padrao.jpg');
   const [gallery, setGallery] = useState<AdvertiserMediaItem[]>(initialGallery);
+  const [videoUrl, setVideoUrl] = useState(data.business_video?.url || '');
+  const [hasVideo, setHasVideo] = useState(Boolean(data.business_video));
+  const [savingVideo, setSavingVideo] = useState(false);
 
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -177,6 +181,23 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
 
   const isQuotaFull = gallery.length >= quotas.photos_limit;
 
+  const handleSaveVideo = async () => {
+    setSavingVideo(true);
+    const result = await updateAdvertiserMediaAction(business.id, 'video_set', { url: videoUrl });
+    if (result.success) setHasVideo(true);
+    setFeedback({ type: result.success ? 'success' : 'error', message: result.message });
+    setSavingVideo(false);
+  };
+
+  const handleDeleteVideo = async () => {
+    const result = await updateAdvertiserMediaAction(business.id, 'video_delete', {});
+    if (result.success) {
+      setVideoUrl('');
+      setHasVideo(false);
+    }
+    setFeedback({ type: result.success ? 'success' : 'error', message: result.message });
+  };
+
   return (
     <div className="space-y-6 text-left">
       {/* HEADER DA TELA & PRÉ-VISUALIZAÇÃO */}
@@ -306,6 +327,18 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
         </div>
       </div>
 
+      {quotas.videos_limit > 0 && (
+        <section className="rounded-3xl border border-[#C9A227]/40 bg-white p-6 shadow-sm">
+          <h2 className="flex items-center gap-2 font-serif text-lg font-bold text-stone-900"><Video className="h-5 w-5 text-[#C9A227]" /> Vídeo institucional</h2>
+          <p className="mt-1 text-xs text-stone-500">Benefício do Plano Acácia: publique um link do YouTube ou Vimeo no perfil da empresa.</p>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <input type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." className="min-w-0 flex-1 rounded-xl border border-stone-300 bg-stone-50 px-3 py-2.5 text-sm outline-none focus:border-[#C9A227]" />
+            <button type="button" onClick={handleSaveVideo} disabled={savingVideo || !videoUrl.trim()} className="rounded-xl bg-[#3B0B14] px-4 py-2.5 text-xs font-bold text-[#C9A227] disabled:opacity-50">{savingVideo ? 'Salvando...' : 'Salvar vídeo'}</button>
+            {hasVideo && <button type="button" onClick={handleDeleteVideo} className="rounded-xl border border-red-300 px-4 py-2.5 text-xs font-bold text-red-700">Remover</button>}
+          </div>
+        </section>
+      )}
+
       {/* SEÇÃO 2: GALERIA DE FOTOS (COM COTA NUMÉRICA DO PLANO OURO) */}
       <div className="bg-white border border-stone-200 rounded-3xl p-6 shadow-sm space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
@@ -361,7 +394,7 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
               <span className="font-semibold">
-                Você utilizou todas as {quotas.photos_limit} fotos disponíveis no seu Plano Ouro.
+                Você utilizou todas as {quotas.photos_limit} fotos disponíveis no seu Plano Acácia.
               </span>
             </div>
             <Link

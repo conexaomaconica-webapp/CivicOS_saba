@@ -100,18 +100,20 @@ export function DirectoryHero({
   };
 
   return (
-    <section className="dh-hero">
-      {/* Floating & Pulsing Golden Circles */}
-      <div className="dh-gold-orb dh-gold-orb--1" aria-hidden="true" />
-      <div className="dh-gold-orb dh-gold-orb--2" aria-hidden="true" />
-      <div className="dh-gold-orb dh-gold-orb--3" aria-hidden="true" />
+    <section className="dh-hero relative z-30">
+      {/* Floating & Pulsing Golden Circles (clipped in background container so search dropdown overflow is visible) */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+        <div className="dh-gold-orb dh-gold-orb--1" />
+        <div className="dh-gold-orb dh-gold-orb--2" />
+        <div className="dh-gold-orb dh-gold-orb--3" />
+      </div>
 
       <div className="dh-container relative z-10">
         <h1 className="dh-hero__title">{title}</h1>
         <p className="dh-hero__subtitle">{subtitle}</p>
 
         {/* Live Search Input Bar & Dropdown */}
-        <div ref={searchContainerRef} className="relative max-w-[780px] mx-auto">
+        <div ref={searchContainerRef} className="relative max-w-[780px] mx-auto z-40">
           <div className="dh-search-box">
             <Search className="w-5 h-5 text-amber-500 ml-3 shrink-0" />
             

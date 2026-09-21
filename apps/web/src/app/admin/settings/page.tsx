@@ -352,7 +352,7 @@ export default function AdminSettingsPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-4)', marginTop: 'var(--space-1)' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                 <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-bold)' }}>
-                  Plano Bronze (R$)
+                  Plano Esquadro (R$)
                 </label>
                 <input
                   type="number"
@@ -374,7 +374,7 @@ export default function AdminSettingsPage() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                 <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-bold)' }}>
-                  Plano Prata (R$)
+                  Plano Compasso (R$)
                 </label>
                 <input
                   type="number"
@@ -396,7 +396,7 @@ export default function AdminSettingsPage() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                 <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-bold)' }}>
-                  Plano Ouro (R$)
+                  Plano Acácia (R$)
                 </label>
                 <input
                   type="number"

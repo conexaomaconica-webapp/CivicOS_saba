@@ -79,6 +79,25 @@ vi.mock('../src/lib/supabase/server', () => ({
             error: null,
           });
         }
+        if (fnName === 'get_admin_approval_dossier_360') {
+          return Promise.resolve({
+            data: {
+              business: { id: '00000000-0000-0000-0000-000000000001', tenant_id: '00000000-0000-0000-0000-000000000010', name: 'Comandos', category: 'Segurança', owner_id: 'owner-1', plan_code: 'ouro', logo_url: '/logo.png' },
+              responsible: { full_name: 'Eduardo Comandos', email: 'contato@comandos.com.br' },
+              masonic_affiliation: { verification_status: 'verified' },
+              contract_snapshot: { id: 'contract-1', status: 'signed', sha256_hash: 'hash', plan_code: 'ouro' },
+              subscription: { status: 'paid', plan_code: 'ouro' },
+              recognitions: [], audit_logs: [], plan_entitlements: [],
+              completeness: { percent: 100, is_ready_for_approval: true, requirements: [
+                { id: 'req_responsible', label: 'Responsável Designado', satisfied: true, blocking: true },
+                { id: 'req_business_data', label: 'Dados Cadastrais Mínimos', satisfied: true, blocking: true },
+                { id: 'req_masonic_link', label: 'Vínculo Maçônico Verificado', satisfied: true, blocking: true },
+                { id: 'req_contract', label: 'Assinatura Eletrônica (Contrato)', satisfied: true, blocking: true },
+                { id: 'req_payment', label: 'Pagamento / Assinatura', satisfied: true, blocking: true },
+              ] },
+            }, error: null,
+          });
+        }
         return Promise.resolve({ data: null, error: null });
       }),
     });

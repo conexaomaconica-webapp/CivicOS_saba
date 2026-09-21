@@ -124,7 +124,7 @@ export function BusinessCard({
 
   // Resolucao do Nível de Conexão Comercial e Reconhecimentos Institucionais
   const resolveMainBadge = () => {
-    const plan = (data.effective_plan_code || '').toLowerCase();
+    const plan = (data.effective_plan_code || '').toLowerCase().trim();
 
     // Prioridade 1: Pedra Fundamental (Apenas 10 apoiadores históricos)
     if (data.is_pedra_fundamental || plan === 'pedra_fundamental') {
@@ -145,7 +145,7 @@ export function BusinessCard({
     }
 
     // Prioridade 3: Conexão Ouro
-    if (plan === 'ouro' || plan === 'gold') {
+    if (plan === 'ouro' || plan === 'gold' || plan === 'ouro_founder') {
       return {
         label: 'Conexão Ouro',
         bg: 'bg-[#fdf8eb] text-[#855e10] border-[#e8d7ad] font-semibold',
@@ -153,16 +153,7 @@ export function BusinessCard({
       };
     }
 
-    // Prioridade 4: Empresa Verificada
-    if (data.is_verified) {
-      return {
-        label: 'Empresa Verificada',
-        bg: 'bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold',
-        icon: ShieldCheck,
-      };
-    }
-
-    // Prioridade 5: Conexão Prata
+    // Prioridade 4: Conexão Prata
     if (plan === 'prata' || plan === 'silver') {
       return {
         label: 'Conexão Prata',
@@ -171,12 +162,21 @@ export function BusinessCard({
       };
     }
 
-    // Prioridade 6: Conexão Bronze
+    // Prioridade 5: Conexão Bronze
     if (plan === 'bronze') {
       return {
         label: 'Conexão Bronze',
         bg: 'bg-orange-50 text-amber-900 border-orange-200 font-semibold',
         icon: Award,
+      };
+    }
+
+    // Prioridade 6: Empresa Verificada (Fallback para empresas sem plano definido)
+    if (data.is_verified) {
+      return {
+        label: 'Empresa Verificada',
+        bg: 'bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold',
+        icon: ShieldCheck,
       };
     }
 

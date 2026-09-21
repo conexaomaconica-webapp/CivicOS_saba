@@ -89,7 +89,7 @@ export function DirectoryCategories({ categories = [], onCategorySelect }: Direc
   };
 
   return (
-    <section className="dh-container my-8">
+    <section className="dh-container py-4">
       {/* Botão 'Ver todas' alinhado à direita */}
       <div className="flex justify-end mb-4">
         <Link

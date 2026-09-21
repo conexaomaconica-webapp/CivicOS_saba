@@ -8,8 +8,15 @@ interface AdminShellProps {
   children: React.ReactNode;
 }
 
+import { usePathname } from 'next/navigation';
+
 export function AdminShell({ children }: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+
+  if (pathname?.endsWith('/preview')) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen bg-[#FAF7F2] text-[#1f1914] flex flex-col font-sans antialiased">

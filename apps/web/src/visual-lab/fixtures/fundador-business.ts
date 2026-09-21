@@ -24,6 +24,7 @@ export const fundadorBusinessFixture: PublicBusinessPresentation = {
     maxEvents: 5,
     maxPosts: 5,
     maxBenefits: 5,
+    maxVideos: 1,
     canShowBenefits: true,
     canShowEvents: true,
     canShowPosts: true,
@@ -50,6 +51,7 @@ export const fundadorBusinessFixture: PublicBusinessPresentation = {
     communityVerified: true,
   },
   media: {
+    video: null,
     cover: crop('Edifício corporativo de alto padrão do Grupo Alfa', 23, 102, 521, 280),
     gallery: [
       crop('Maquete de empreendimento residencial', 282, 719, 52, 52),

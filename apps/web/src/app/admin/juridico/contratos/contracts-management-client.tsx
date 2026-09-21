@@ -144,7 +144,7 @@ E, por manifestação eletrônica de vontade, o ANUNCIANTE declara que teve aces
     { name: '{{documento_anunciante}}', desc: 'CNPJ ou CPF cadastrado na plataforma' },
     { name: '{{responsavel_legal}}', desc: 'Nome completo do Responsável Legal' },
     { name: '{{email_responsavel}}', desc: 'E-mail autenticado do Responsável Legal' },
-    { name: '{{plano_nome}}', desc: 'Nome comercial do plano (ex: Plano Ouro, Plano Prata)' },
+    { name: '{{plano_nome}}', desc: 'Nome comercial do plano (ex: Plano Acácia, Plano Compasso)' },
     { name: '{{plano_valor}}', desc: 'Valor oficial do plano contratado (ex: R$ 2.388,00/ano)' },
     { name: '{{vigencia}}', desc: 'Período contratual (ex: 12 meses / 1 ano)' },
     { name: '{{sha256_hash}}', desc: 'Hash criptográfico gerado no aceite eletrônico' },
@@ -171,7 +171,7 @@ E, por manifestação eletrônica de vontade, o ANUNCIANTE declara que teve aces
       .replace(/{{documento_anunciante}}/g, '12.345.678/0001-99')
       .replace(/{{responsavel_legal}}/g, 'EDUARDO P. SABA')
       .replace(/{{email_responsavel}}/g, 'anunciante@conexaomaconica.com.br')
-      .replace(/{{plano_nome}}/g, 'Plano Ouro Anual')
+      .replace(/{{plano_nome}}/g, 'Plano Acácia Anual')
       .replace(/{{plano_valor}}/g, 'R$ 2.388,00/ano')
       .replace(/{{vigencia}}/g, '12 (doze) meses')
       .replace(/&/g, '&amp;')

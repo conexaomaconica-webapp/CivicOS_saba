@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { displayOptionalText } from '@/lib/utils/display';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -227,18 +228,26 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
             <div className="px-3 py-1.5 rounded-xl bg-stone-900/60 border border-stone-700 text-stone-200">
               Completude: <strong className="text-emerald-400">{dossier.completeness.percent}%</strong>
             </div>
-            <div className="px-3 py-1.5 rounded-xl bg-stone-900/60 border border-stone-700 text-stone-200">
-              Contrato: <strong className="text-emerald-400">Assinado SHA-256</strong>
-            </div>
-            <div className="px-3 py-1.5 rounded-xl bg-stone-900/60 border border-stone-700 text-stone-200">
-              Pagamento: <strong className="text-emerald-400">Confirmado</strong>
-            </div>
-            <div className="px-3 py-1.5 rounded-xl bg-stone-900/60 border border-stone-700 text-stone-200">
-              Vínculo: <strong className="text-emerald-400">Validado</strong>
-            </div>
+            
+            {dossier.completeness.requirements.map(req => (
+              <div 
+                key={req.id} 
+                className={`px-3 py-1.5 rounded-xl border flex gap-1.5 items-center ${
+                  req.satisfied 
+                    ? 'bg-stone-900/60 border-stone-700 text-stone-200' 
+                    : 'bg-red-950/40 border-red-800/60 text-red-200'
+                }`}
+              >
+                {req.label}:{' '}
+                <strong className={req.satisfied ? 'text-emerald-400' : 'text-red-400'}>
+                  {req.satisfied ? 'Validado' : 'Pendente'}
+                </strong>
+              </div>
+            ))}
+            
             {dossier.recognitions.is_pedra_fundamental && (
               <div className="px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold">
-                Pedra Fundamental: Elegível (1/10)
+                Pedra Fundamental Atribuída
               </div>
             )}
           </div>
@@ -282,8 +291,8 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
           <button
             type="button"
             onClick={() => setShowApprovalConfirmModal(true)}
-            disabled={loading}
-            className="px-6 py-2 bg-[#C9A227] hover:bg-amber-400 text-[#3B0B14] font-extrabold text-xs rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-lg"
+            disabled={loading || !dossier.completeness.is_ready_for_approval}
+            className="px-6 py-2 bg-[#C9A227] hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-[#3B0B14] font-extrabold text-xs rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-lg"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin text-[#3B0B14]" /> : <CheckCircle2 className="w-4 h-4 text-[#3B0B14]" />}
             <span>Aprovar e Publicar Anúncio</span>
@@ -334,26 +343,28 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
               Requisitos para Publicação (Obrigatórios)
             </h3>
             <div className="space-y-2 text-xs font-semibold text-stone-800">
-              <div className="flex items-center justify-between p-2 bg-emerald-50 rounded-xl border border-emerald-200">
-                <span>✓ Responsável Comercial Identificado</span>
-                <span className="text-emerald-700 font-bold">100% OK</span>
-              </div>
-              <div className="flex items-center justify-between p-2 bg-emerald-50 rounded-xl border border-emerald-200">
-                <span>✓ Dados da Empresa Validados</span>
-                <span className="text-emerald-700 font-bold">100% OK</span>
-              </div>
-              <div className="flex items-center justify-between p-2 bg-emerald-50 rounded-xl border border-emerald-200">
-                <span>✓ Vínculo Maçônico Conferido</span>
-                <span className="text-emerald-700 font-bold">100% OK</span>
-              </div>
-              <div className="flex items-center justify-between p-2 bg-emerald-50 rounded-xl border border-emerald-200">
-                <span>✓ Contrato Digital Assinado (SHA-256)</span>
-                <span className="text-emerald-700 font-bold">100% OK</span>
-              </div>
-              <div className="flex items-center justify-between p-2 bg-emerald-50 rounded-xl border border-emerald-200">
-                <span>✓ Pagamento Confirmado no Asaas</span>
-                <span className="text-emerald-700 font-bold">100% OK</span>
-              </div>
+              {dossier.completeness.requirements.filter(r => r.blocking).map((req) => (
+                <div 
+                  key={req.id} 
+                  className={`flex items-center justify-between p-2 rounded-xl border ${
+                    req.satisfied 
+                      ? 'bg-emerald-50 border-emerald-200' 
+                      : 'bg-red-50 border-red-200'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    {req.satisfied ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-red-600" />
+                    )}
+                    {req.label}
+                  </span>
+                  <span className={req.satisfied ? 'text-emerald-700 font-bold' : 'text-red-700 font-bold'}>
+                    {req.satisfied ? '100% OK' : 'PENDENTE'}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -416,7 +427,7 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
                   <label className="block font-bold text-stone-700">Nome Fantasia:</label>
                   <input
                     type="text"
-                    value={companyForm.name}
+                    value={companyForm.name || ''}
                     onChange={(e) => setCompanyForm({ ...companyForm, name: e.target.value })}
                     className="w-full px-3 py-1.5 bg-stone-50 border border-stone-300 rounded-xl outline-none focus:border-[#3B0B14]"
                   />
@@ -443,7 +454,7 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
                   <label className="block font-bold text-stone-700">Categoria:</label>
                   <input
                     type="text"
-                    value={companyForm.category}
+                    value={companyForm.category || ''}
                     onChange={(e) => setCompanyForm({ ...companyForm, category: e.target.value })}
                     className="w-full px-3 py-1.5 bg-stone-50 border border-stone-300 rounded-xl outline-none focus:border-[#3B0B14]"
                   />
@@ -501,31 +512,31 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-stone-800">
               <div>
                 <span className="text-stone-500 block">Nome Fantasia:</span>
-                <strong className="font-serif font-bold text-sm text-stone-900">{dossier.company.name}</strong>
+                <strong className="font-serif font-bold text-sm text-stone-900">{displayOptionalText(dossier.company.name, 'Empresa sem nome')}</strong>
               </div>
               <div>
                 <span className="text-stone-500 block">Razão Social:</span>
-                <strong>{dossier.company.legal_name || dossier.company.name}</strong>
+                <strong>{displayOptionalText(dossier.company.legal_name || dossier.company.name, 'Empresa sem nome')}</strong>
               </div>
               <div>
                 <span className="text-stone-500 block">CNPJ / CPF:</span>
-                <strong className="font-mono">{dossier.company.cnpj_cpf || 'Não informado'}</strong>
+                <strong className="font-mono">{displayOptionalText(dossier.company.cnpj_cpf)}</strong>
               </div>
               <div>
                 <span className="text-stone-500 block">Categoria:</span>
-                <strong>{dossier.company.category}</strong>
+                <strong>{displayOptionalText(dossier.company.category, 'Geral')}</strong>
               </div>
               <div>
                 <span className="text-stone-500 block">WhatsApp:</span>
-                <strong>{dossier.company.whatsapp || 'Não informado'}</strong>
+                <strong>{displayOptionalText(dossier.company.whatsapp)}</strong>
               </div>
               <div>
                 <span className="text-stone-500 block">Endereço:</span>
-                <strong>{dossier.company.address || 'São Paulo, SP'}</strong>
+                <strong>{displayOptionalText(dossier.company.address)}</strong>
               </div>
               <div className="sm:col-span-2">
                 <span className="text-stone-500 block">Descrição:</span>
-                <p className="mt-1 leading-relaxed text-stone-700">{dossier.company.description}</p>
+                <p className="mt-1 leading-relaxed text-stone-700">{displayOptionalText(dossier.company.description)}</p>
               </div>
             </div>
           )}
@@ -537,7 +548,7 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
         <div className="bg-white border border-stone-300 rounded-2xl p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-stone-200 pb-3">
             <h3 className="font-serif font-bold text-base text-stone-900 flex items-center gap-2">
-              <ImageIcon className="w-5 h-5 text-[#3B0B14]" /> 10. Mídias & Apresentação Visual
+              <ImageIcon className="w-5 h-5 text-[#3B0B14]" /> Mídias & Apresentação Visual
             </h3>
             <button
               type="button"
@@ -592,7 +603,7 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
                   {dossier.media.logo_url ? (
                     <img src={dossier.media.logo_url} alt="Logo" className="w-full h-full object-cover" />
                   ) : (
-                    dossier.company.name.charAt(0)
+                    dossier.company.name ? dossier.company.name.charAt(0) : '?'
                   )}
                 </div>
                 <span className="text-[11px] text-stone-500 block">
@@ -626,20 +637,20 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
             <h3 className="font-serif font-bold text-base text-stone-900 flex items-center gap-2">
               <Award className="w-5 h-5 text-[#3B0B14]" /> Vínculo Maçônico Fraterno
             </h3>
-            <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 font-bold text-xs">
-              ✓ Validado Independentemente
+            <span className={`px-3 py-1 rounded-full font-bold text-xs ${dossier.masonic_link.verification_status === 'verified' ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'}`}>
+              {dossier.masonic_link.verification_status === 'verified' ? '✓ Validado Independentemente' : '○ Pendente de Validação'}
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-stone-800">
             <div>
               <span className="text-stone-500 block">Grau / Papel Fraterno:</span>
-              <strong className="text-stone-900 text-sm font-serif">{dossier.masonic_link.affiliation_role || 'Irmão'}</strong>
+              <strong className="text-stone-900 text-sm font-serif">{displayOptionalText(dossier.masonic_link.affiliation_role, 'Não informado')}</strong>
             </div>
             <div>
               <span className="text-stone-500 block">Loja & Potência:</span>
               <strong className="text-stone-900">
-                {dossier.masonic_link.lodge_name || 'ARLS Ciência e Virtude nº 1234'} ({dossier.masonic_link.potencia_name || 'GLESP'})
+                {displayOptionalText(dossier.masonic_link.lodge_name, 'Loja não informada')} ({displayOptionalText(dossier.masonic_link.potencia_name, 'Potência não informada')})
               </strong>
             </div>
           </div>
@@ -668,22 +679,22 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
         <div className="bg-white border border-stone-300 rounded-2xl p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-stone-200 pb-3">
             <h3 className="font-serif font-bold text-base text-stone-900 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-[#3B0B14]" /> 11. Contrato Digital Assinado (Read-Only)
+              <FileText className="w-5 h-5 text-[#3B0B14]" /> Contrato Digital Assinado (Read-Only)
             </h3>
-            <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 font-bold text-xs">
-              ✓ Imutável SHA-256
+            <span className={`px-3 py-1 rounded-full font-bold text-xs ${dossier.contract.snapshot_id ? 'bg-emerald-100 text-emerald-900' : 'bg-red-100 text-red-900'}`}>
+              {dossier.contract.snapshot_id ? '✓ Imutável SHA-256' : '○ Pendente'}
             </span>
           </div>
 
           <div className="space-y-3 text-xs text-stone-800">
             <div className="flex items-center justify-between">
               <span className="text-stone-600">Versão do Contrato:</span>
-              <strong className="font-mono text-stone-900">{dossier.contract.version}</strong>
+              <strong className="font-mono text-stone-900">{displayOptionalText(dossier.contract.version)}</strong>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-stone-600">Hash de Segurança SHA-256:</span>
               <strong className="font-mono text-[11px] text-stone-700 truncate max-w-[280px]">
-                {dossier.contract.sha256_hash}
+                {displayOptionalText(dossier.contract.sha256_hash)}
               </strong>
             </div>
 
@@ -714,8 +725,8 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
             <h3 className="font-serif font-bold text-base text-stone-900 flex items-center gap-2">
               <CreditCard className="w-5 h-5 text-[#3B0B14]" /> Situação Financeira (Asaas Gateway)
             </h3>
-            <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 font-bold text-xs">
-              ✓ Pagamento Confirmado
+            <span className={`px-3 py-1 rounded-full font-bold text-xs ${['active', 'paid', 'trialing'].includes(dossier.payment.status) ? 'bg-emerald-100 text-emerald-900' : 'bg-red-100 text-red-900'}`}>
+              {['active', 'paid', 'trialing'].includes(dossier.payment.status) ? '✓ Pagamento Confirmado' : `○ ${dossier.payment.status}`}
             </span>
           </div>
 
@@ -726,11 +737,11 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
             </div>
             <div>
               <span className="text-stone-500 block">Valor Anual:</span>
-              <strong className="font-mono">R$ {(dossier.payment.amount_cents / 100).toFixed(2)}</strong>
+              <strong className="font-mono">R$ {dossier.payment.amount_cents ? (dossier.payment.amount_cents / 100).toFixed(2) : '0.00'}</strong>
             </div>
             <div>
               <span className="text-stone-500 block">Forma de Pagamento:</span>
-              <strong className="font-bold">Cartão de Crédito (12x sem juros)</strong>
+              <strong className="font-bold">{displayOptionalText(dossier.payment.payment_method)}</strong>
             </div>
           </div>
         </div>
@@ -752,7 +763,8 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
         <button
           type="button"
           onClick={() => setShowApprovalConfirmModal(true)}
-          className="flex-1 py-2 bg-[#C9A227] hover:bg-amber-400 text-[#3B0B14] font-extrabold text-xs rounded-xl flex items-center justify-center gap-1 shadow-lg"
+          disabled={!dossier.completeness.is_ready_for_approval}
+          className="flex-1 py-2 bg-[#C9A227] hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-[#3B0B14] font-extrabold text-xs rounded-xl flex items-center justify-center gap-1 shadow-lg cursor-pointer"
         >
           <CheckCircle2 className="w-4 h-4 text-[#3B0B14]" />
           <span>Aprovar e Publicar</span>
@@ -870,18 +882,18 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
                 <span className="text-stone-600">Plano Comercial:</span>
                 <strong className="uppercase text-[#3B0B14]">{dossier.contract.plan_code}</strong>
               </div>
-              <div className="flex justify-between">
-                <span className="text-stone-600">Pagamento:</span>
-                <strong className="text-emerald-700">✓ Confirmado</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-stone-600">Vínculo Fraterno:</span>
-                <strong className="text-emerald-700">✓ Validado</strong>
-              </div>
+              {dossier.completeness.requirements.map(req => (
+                <div key={req.id} className="flex justify-between">
+                  <span className="text-stone-600">{req.label}:</span>
+                  <strong className={req.satisfied ? 'text-emerald-700' : 'text-red-700'}>
+                    {req.satisfied ? '✓ Validado' : '✗ Pendente'}
+                  </strong>
+                </div>
+              ))}
               {dossier.recognitions.is_pedra_fundamental && (
                 <div className="flex justify-between text-amber-900 font-bold">
                   <span>Pedra Fundamental:</span>
-                  <span>Elegível (1/10)</span>
+                  <span>Atribuída</span>
                 </div>
               )}
             </div>
@@ -908,63 +920,43 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
         </div>
       )}
 
-      {/* MODAL DE PRÉ-VISUALIZAÇÃO DO ANÚNCIO NO GUIA */}
+      {/* MODAL DE PRÉ-VISUALIZAÇÃO DO ANÚNCIO NO GUIA (IFRAME) */}
       {showPreviewModal && (
-        <div className="fixed inset-0 bg-stone-950/80 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-stone-300 rounded-2xl p-6 max-w-2xl w-full space-y-4 shadow-2xl overflow-hidden text-left">
-            <div className="flex justify-between items-center border-b border-stone-200 pb-3">
+        <div className="fixed inset-0 bg-stone-950/80 backdrop-blur-xs flex items-center justify-center p-4 md:p-8 z-50">
+          <div className="bg-white border border-stone-300 rounded-2xl w-full max-w-6xl h-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-left relative">
+            <div className="flex justify-between items-center border-b border-stone-200 px-6 py-4 bg-stone-50">
               <div className="flex items-center gap-2">
                 <span className="px-2 py-0.5 rounded-full bg-[#3B0B14] text-[#C9A227] font-bold text-[10px] uppercase">
-                  Pré-visualização do Anúncio Público
+                  Pré-visualização Canônica
                 </span>
                 <h3 className="font-serif font-bold text-base text-stone-900">{dossier.company.name}</h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowPreviewModal(false)}
-                className="text-stone-400 hover:text-stone-600 text-lg font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-6 bg-stone-50 border border-stone-200 rounded-2xl space-y-4 text-left">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-2xl bg-[#3B0B14] text-[#C9A227] font-serif font-bold text-xl flex items-center justify-center overflow-hidden border border-[#C9A227]/40 shadow-md">
-                    {dossier.media.logo_url ? (
-                      <img src={dossier.media.logo_url} alt="Logo" className="w-full h-full object-cover" />
-                    ) : (
-                      dossier.company.name.charAt(0)
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="font-serif font-bold text-lg text-stone-900">{dossier.company.name}</h4>
-                    <span className="text-xs text-stone-500 font-semibold">{dossier.company.category}</span>
-                  </div>
-                </div>
-
-                <span className="px-3 py-1 rounded-full bg-[#3B0B14] text-[#C9A227] font-serif font-bold text-xs uppercase border border-[#C9A227]/40">
-                  {dossier.contract.plan_code}
-                </span>
-              </div>
-
-              <p className="text-xs text-stone-700 leading-relaxed">{dossier.company.description}</p>
-
-              <div className="pt-3 border-t border-stone-200 text-xs text-stone-600 space-y-1">
-                <div>📍 {dossier.company.address || 'São Paulo, SP'}</div>
-                <div>💬 WhatsApp Direct: {dossier.company.whatsapp || '(11) 98888-7777'}</div>
+              <div className="flex items-center gap-3">
+                <Link
+                  href={`/admin/aprovacoes/${dossier.business_id}/preview`}
+                  target="_blank"
+                  className="px-3 py-1.5 text-xs font-bold text-stone-600 hover:text-stone-900 flex items-center gap-1 border border-stone-200 rounded-lg hover:bg-stone-100"
+                >
+                  Abrir nova aba
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setShowPreviewModal(false)}
+                  className="text-stone-400 hover:text-stone-600 text-lg font-bold"
+                >
+                  ✕
+                </button>
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
-              <button
-                type="button"
-                onClick={() => setShowPreviewModal(false)}
-                className="px-5 py-2 bg-[#3B0B14] text-[#C9A227] font-bold text-xs rounded-xl cursor-pointer"
-              >
-                Fechar Pré-visualização
-              </button>
+            <div className="flex-1 bg-stone-200 relative overflow-hidden">
+              {/* Iframe sandboxed para a rota administrativa dedicada */}
+              <iframe 
+                src={`/admin/aprovacoes/${dossier.business_id}/preview`}
+                className="w-full h-full border-none"
+                title={`Preview ${dossier.company.name}`}
+                sandbox="allow-same-origin allow-scripts"
+              />
             </div>
           </div>
         </div>

@@ -72,8 +72,10 @@ export interface AdvertiserProfileDTO {
   quotas: {
     photos_used: number;
     photos_limit: number;
+    videos_limit: number;
   };
   gallery_photos: AdvertiserMediaItem[];
+  business_video?: AdvertiserMediaItem;
 }
 
 export async function getAdvertiserProfileDataAction(): Promise<AdvertiserProfileDTO> {
@@ -115,6 +117,16 @@ export async function getAdvertiserProfileDataAction(): Promise<AdvertiserProfil
       title: m.title || `Foto ${idx + 1}`,
       display_order: m.display_order,
     }));
+    let videoRow: AdvertiserMediaItem | null = null;
+    let videosLimit = getCanonicalDefaultLimit(b?.plan_code || b?.plan_tier || 'bronze', 'business_video_limit');
+    try {
+      const videoResult = await (supabase as any).from('business_media').select('id, url, title, display_order').eq('business_id', businessId).eq('media_type', 'video').maybeSingle();
+      videoRow = videoResult.data || null;
+      const entitlementResult = await (supabase as any).from('plan_entitlements').select('max_limit').eq('tenant_id', b?.tenant_id).eq('plan_code', b?.plan_code || b?.plan_tier || 'bronze').eq('feature_code', 'business_video_limit').maybeSingle();
+      videosLimit = entitlementResult.data?.max_limit ?? videosLimit;
+    } catch {
+      // Compatibilidade com ambientes legados/mocks sem a nova consulta; usa o limite canônico.
+    }
 
     const missing_fields = [];
     if (resolvedCoverUrl === '/capa-padrao.jpg') missing_fields.push({ fieldKey: 'cover', label: 'Imagem de capa corporativa', action_url: '/anunciante/empresa/midias' });
@@ -149,8 +161,10 @@ export async function getAdvertiserProfileDataAction(): Promise<AdvertiserProfil
       quotas: {
         photos_used: realGallery.length,
         photos_limit: 10,
+        videos_limit: videosLimit,
       },
       gallery_photos: realGallery,
+      business_video: videoRow || undefined,
     };
   } catch (err: any) {
     console.error('Erro ao carregar perfil do anunciante:', err);
@@ -182,6 +196,7 @@ export async function getAdvertiserProfileDataAction(): Promise<AdvertiserProfil
       quotas: {
         photos_used: 0,
         photos_limit: 10,
+        videos_limit: 0,
       },
       gallery_photos: [],
     };
@@ -491,11 +506,38 @@ export async function uploadAdvertiserAssetAction(formData: FormData): Promise<{
 
 export async function updateAdvertiserMediaAction(
   businessId: string,
-  mediaType: 'logo' | 'cover' | 'gallery_add' | 'gallery_delete' | 'gallery_reorder',
+  mediaType: 'logo' | 'cover' | 'gallery_add' | 'gallery_delete' | 'gallery_reorder' | 'video_set' | 'video_delete',
   payload: any
 ): Promise<{ success: boolean; message: string; newMediaList?: AdvertiserMediaItem[] }> {
   try {
     const supabase = await createServerSideClient();
+
+    if (mediaType === 'video_set' && payload?.url) {
+      const { data: userData } = await supabase.auth.getUser();
+      const { data: b } = await (supabase as any).from('businesses').select('tenant_id, plan_code, plan_tier, owner_id').eq('id', businessId).maybeSingle();
+      if (!userData?.user || b?.owner_id !== userData.user.id) return { success: false, message: 'Empresa não autorizada.' };
+      const url = String(payload.url).trim();
+      if (!/^https:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|vimeo\.com\/)\S+$/i.test(url)) return { success: false, message: 'Informe um link válido do YouTube ou Vimeo.' };
+      const planCode = b.plan_code || b.plan_tier || 'bronze';
+      const { data: entitlement } = await (supabase as any).from('plan_entitlements').select('max_limit').eq('tenant_id', b.tenant_id).eq('plan_code', planCode).eq('feature_code', 'business_video_limit').maybeSingle();
+      const limit = entitlement?.max_limit ?? getCanonicalDefaultLimit(planCode, 'business_video_limit');
+      if (limit < 1) return { success: false, message: 'O vídeo institucional está disponível somente em planos com essa permissão.' };
+      const { data: existing } = await (supabase as any).from('business_media').select('id').eq('business_id', businessId).eq('media_type', 'video').maybeSingle();
+      const values = { url, title: payload.title || 'Vídeo institucional', updated_at: new Date().toISOString() };
+      const { error } = existing
+        ? await (supabase as any).from('business_media').update(values).eq('id', existing.id)
+        : await (supabase as any).from('business_media').insert({ ...values, tenant_id: b.tenant_id, business_id: businessId, media_type: 'video', display_order: 0 });
+      if (error) return { success: false, message: error.message };
+      safeRevalidatePath(`/guia`, 'layout');
+      return { success: true, message: 'Vídeo institucional salvo com sucesso.' };
+    }
+    if (mediaType === 'video_delete') {
+      const { data: userData } = await supabase.auth.getUser();
+      const { data: business } = await (supabase as any).from('businesses').select('owner_id').eq('id', businessId).maybeSingle();
+      if (!userData?.user || business?.owner_id !== userData.user.id) return { success: false, message: 'Empresa não autorizada.' };
+      const { error } = await (supabase as any).from('business_media').delete().eq('business_id', businessId).eq('media_type', 'video');
+      return error ? { success: false, message: error.message } : { success: true, message: 'Vídeo removido.' };
+    }
 
     if (mediaType === 'logo' && payload?.url) {
       const res = await (supabase as any)

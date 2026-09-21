@@ -21,11 +21,11 @@ export function LandingFaq() {
     },
     {
       q: 'O que é uma Empresa Fundadora e qual a limitação de vagas?',
-      a: 'É a condição histórica reservada exclusivamente às 100 primeiras empresas que participarem do lançamento. O Plano Ouro Fundador oferece todos os recursos do Plano Ouro por R$ 599/ano durante os 2 primeiros anos.',
+      a: 'É a condição histórica reservada exclusivamente às 100 primeiras empresas que participarem do lançamento. O Plano Acácia Fundador oferece todos os recursos do Plano Acácia por R$ 599/ano durante os 2 primeiros anos.',
     },
     {
       q: 'Como funciona a renovação do Plano Fundador a partir do 3º ano?',
-      a: 'A condição promocional de R$ 599/ano é garantida pelos 2 primeiros anos. A partir do 3º ano, a renovação passa a seguir o valor vigente do Plano Ouro, mantendo permanentemente o selo Empresa Fundadora no perfil.',
+      a: 'A condição promocional de R$ 599/ano é garantida pelos 2 primeiros anos. A partir do 3º ano, a renovação passa a seguir o valor vigente do Plano Acácia, mantendo permanentemente o selo Empresa Fundadora no perfil.',
     },
   ];
 

@@ -57,6 +57,6 @@ describe('BENEFITS-002 Anti-Hardcode Regression Tests', () => {
     expect(adminBizService).toContain("from('plan_entitlements')");
     expect(advertiserPortalService).toContain("from('plan_entitlements')");
     expect(advertiserContentService).toContain("from('plan_entitlements')");
-    expect(adminApprovalService).toContain("from('plan_entitlements')");
+    expect(adminApprovalService).toContain("rpc('get_admin_approval_dossier_360'");
   });
 });

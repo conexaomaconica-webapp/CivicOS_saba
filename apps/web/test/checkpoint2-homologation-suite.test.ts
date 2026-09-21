@@ -263,6 +263,8 @@ describe('CHECKPOINT 2 — SUÍTE INTEGRADA DE HOMOLOGAÇÃO DO CHECKOUT ASAAS &
 
     const sanitized = JSON.stringify(res);
     expect(sanitized).not.toContain('4532111122223333');
-    expect(sanitized).not.toContain('987');
+    expect(sanitized).not.toContain('"cardNumber"');
+    expect(sanitized).not.toContain('"ccv"');
+    expect(sanitized).not.toContain('12345678900');
   });
 });

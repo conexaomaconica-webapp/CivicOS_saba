@@ -257,7 +257,7 @@ export async function getAdvertiserPlanBillingDTOAction(targetBusinessId?: strin
       },
       plan: {
         code: planCode,
-        name: isOuro ? 'Plano Ouro' : isPrata ? 'Plano Prata' : 'Plano Bronze',
+        name: isOuro ? 'Plano Acácia' : isPrata ? 'Plano Compasso' : 'Plano Esquadro',
         slogan: isOuro ? 'Destaque Prioritário & Cotas Ampliadas' : isPrata ? 'Presença Avançada & Ofertas Fraternas' : 'Cadastro Essencial no Guia',
         description: isOuro
           ? 'Plano completo com prioridade de exibição no Guia Comercial.'

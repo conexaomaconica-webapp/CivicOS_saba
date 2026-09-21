@@ -170,9 +170,9 @@ export function BusinessFilters({
         </label>
 
         {[
-          { id: 'ouro', label: 'Plano Ouro' },
-          { id: 'prata', label: 'Plano Prata' },
-          { id: 'bronze', label: 'Plano Bronze' },
+          { id: 'ouro', label: 'Plano Acácia' },
+          { id: 'prata', label: 'Plano Compasso' },
+          { id: 'bronze', label: 'Plano Esquadro' },
         ].map((plan) => (
           <label key={plan.id} className="flex items-center gap-2 text-xs text-stone-700 cursor-pointer hover:text-amber-900">
             <input

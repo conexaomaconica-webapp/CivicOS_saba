@@ -23,6 +23,7 @@ export const prataBusinessFixture: PublicBusinessPresentation = {
     maxEvents: 0,
     maxPosts: 0,
     maxBenefits: 1,
+    maxVideos: 0,
     canShowBenefits: true,
     canShowEvents: false,
     canShowPosts: false,
@@ -49,6 +50,7 @@ export const prataBusinessFixture: PublicBusinessPresentation = {
     communityVerified: true,
   },
   media: {
+    video: null,
     cover: crop('Oficina mecânica ampla com elevadores automotivos', 23, 102, 521, 280),
     gallery: [
       crop('Área de diagnóstico computadorizado', 282, 719, 52, 52),

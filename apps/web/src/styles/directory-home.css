@@ -110,7 +110,8 @@
   padding: 64px 20px 52px;
   text-align: center;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  z-index: 30;
 }
 .dh-hero::before {
   content: '';
@@ -477,8 +478,8 @@
 .dh-footer {
   background: var(--dh-wine-dark);
   color: #ffffff;
-  margin-top: 64px;
-  padding: 40px 20px 24px;
+  margin-top: 112px;
+  padding: 48px 20px 24px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 .dh-footer__trust-bar {

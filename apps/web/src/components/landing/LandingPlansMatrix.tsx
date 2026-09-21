@@ -176,7 +176,7 @@ export function LandingPlansMatrix() {
         </div>
 
         <div className="text-center text-xs text-slate-400 max-w-3xl mx-auto pt-4 leading-relaxed">
-          ¹ <strong>Condição do Plano Ouro Fundador:</strong> R$ 599/ano garantidos durante os 2 primeiros anos para as 100 primeiras empresas cadastradas. A partir do 3º ano, a renovação passa a seguir o valor vigente do Plano Ouro, mantendo permanentemente o selo Empresa Fundadora.
+          ¹ <strong>Condição do Plano Acácia Fundador:</strong> R$ 599/ano garantidos durante os 2 primeiros anos para as 100 primeiras empresas cadastradas. A partir do 3º ano, a renovação passa a seguir o valor vigente do Plano Acácia, mantendo permanentemente o selo Empresa Fundadora.
         </div>
       </div>
     </section>

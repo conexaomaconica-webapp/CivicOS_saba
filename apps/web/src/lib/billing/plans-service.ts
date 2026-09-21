@@ -42,7 +42,7 @@ export function formatCentsToReais(amountCents: number): string {
 export const CANONICAL_PLANS: Record<PlanTier, Omit<CommercialPlan, 'id'>> = {
   bronze: {
     tier: 'bronze',
-    name: 'Plano Bronze',
+    name: 'Plano Esquadro',
     tagline: 'Entrada gratuita no Guia Maçônico',
     currency: 'BRL',
     annualPriceCents: 0,
@@ -58,7 +58,7 @@ export const CANONICAL_PLANS: Record<PlanTier, Omit<CommercialPlan, 'id'>> = {
   },
   prata: {
     tier: 'prata',
-    name: 'Plano Prata',
+    name: 'Plano Compasso',
     tagline: 'Excelente visibilidade comercial e mídias',
     currency: 'BRL',
     annualPriceCents: 178800,
@@ -77,7 +77,7 @@ export const CANONICAL_PLANS: Record<PlanTier, Omit<CommercialPlan, 'id'>> = {
   },
   ouro: {
     tier: 'ouro',
-    name: 'Plano Ouro',
+    name: 'Plano Acácia',
     tagline: 'Máxima presença, topo do guia e analytics',
     currency: 'BRL',
     annualPriceCents: 238800,
@@ -153,13 +153,17 @@ export async function fetchTenantPlans(
 }
 
 export const CANONICAL_FEATURE_LIMITS: Record<string, Record<string, number>> = {
-  bronze: { ['gallery_photos_limit']: 3, ['services_limit']: 3, ['benefits_limit']: 0, ['events_limit']: 0, ['posts_limit']: 0 },
-  prata: { ['gallery_photos_limit']: 6, ['services_limit']: 5, ['benefits_limit']: 3, ['events_limit']: 2, ['posts_limit']: 2 },
-  ouro: { ['gallery_photos_limit']: 10, ['services_limit']: 10, ['benefits_limit']: 5, ['events_limit']: 10, ['posts_limit']: 10 },
+  bronze: { ['gallery_photos_limit']: 1, ['services_limit']: 2, ['benefits_limit']: 0, ['events_limit']: 0, ['posts_limit']: 0, ['business_video_limit']: 0 },
+  prata: { ['gallery_photos_limit']: 6, ['services_limit']: 5, ['benefits_limit']: 3, ['events_limit']: 2, ['posts_limit']: 2, ['business_video_limit']: 0 },
+  ouro: { ['gallery_photos_limit']: 10, ['services_limit']: 10, ['benefits_limit']: 5, ['events_limit']: 10, ['posts_limit']: 10, ['business_video_limit']: 1 },
 };
 
 export function getCanonicalDefaultLimit(planCode: string, featureCode: string): number {
-  const norm = (planCode || 'bronze').toLowerCase();
-  return CANONICAL_FEATURE_LIMITS[norm]?.[featureCode] ?? 0;
+  if (!planCode) return 0;
+  const norm = planCode.toLowerCase().trim();
+  let key = 'bronze';
+  if (norm === 'prata' || norm === 'silver' || norm === 'compasso') key = 'prata';
+  else if (norm === 'ouro' || norm === 'gold' || norm === 'acacia' || norm === 'acácia' || norm === 'ouro_founder') key = 'ouro';
+  return CANONICAL_FEATURE_LIMITS[key]?.[featureCode] ?? 0;
 }
 

@@ -23,6 +23,7 @@ export const bronzeBusinessFixture: PublicBusinessPresentation = {
     maxEvents: 0,
     maxPosts: 0,
     maxBenefits: 0,
+    maxVideos: 0,
     canShowBenefits: false,
     canShowEvents: false,
     canShowPosts: false,
@@ -49,6 +50,7 @@ export const bronzeBusinessFixture: PublicBusinessPresentation = {
     communityVerified: true,
   },
   media: {
+    video: null,
     cover: crop('Escritório de advocacia usado na homologação visual Bronze', 23, 102, 521, 280),
     gallery: [],
   },

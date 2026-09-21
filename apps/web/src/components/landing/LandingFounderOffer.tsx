@@ -27,13 +27,13 @@ export function LandingFounderOffer() {
         </h2>
 
         <p className="text-base md:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
-          Seja uma das <strong>100 primeiras Empresas Fundadoras</strong> do Conexão Maçônica. Tenha acesso a todos os recursos do Plano Ouro por uma condição histórica de lançamento.
+          Seja uma das <strong>100 primeiras Empresas Fundadoras</strong> do Conexão Maçônica. Tenha acesso a todos os recursos do Plano Acácia por uma condição histórica de lançamento.
         </p>
 
         <div className="p-8 rounded-2xl bg-[#300d11]/90 border border-[#C9A227]/40 shadow-2xl max-w-xl mx-auto space-y-6 text-left relative">
           <div className="flex items-center justify-between border-b border-[#4B161B] pb-4">
             <div>
-              <h3 className="text-2xl font-extrabold text-[#C9A227]">Plano Ouro Fundador</h3>
+              <h3 className="text-2xl font-extrabold text-[#C9A227]">Plano Acácia Fundador</h3>
               <p className="text-xs text-slate-400">Oferta Especial Reservada a 100 Empresas</p>
             </div>
             <div className="text-right">
@@ -44,13 +44,13 @@ export function LandingFounderOffer() {
 
           <div className="!bg-[#C9A227]/10 p-3 rounded-lg border border-[#C9A227]/30 flex items-center justify-center gap-2 text-xs font-semibold text-[#C9A227]">
             <Lightbulb className="w-4 h-4 shrink-0 text-[#C9A227]" />
-            <span>Economia de R$ 401/ano (R$ 802,00 no período de 2 anos) em relação ao preço atual do Plano Ouro!</span>
+            <span>Economia de R$ 401/ano (R$ 802,00 no período de 2 anos) em relação ao preço atual do Plano Acácia!</span>
           </div>
 
           <ul className="space-y-3 text-sm text-slate-200">
             <li className="flex items-start gap-3">
               <CheckCircle2 className="w-5 h-5 text-[#C9A227] shrink-0 mt-0.5" />
-              <span><strong>Todos os benefícios do Plano Ouro</strong> (25 Serviços, 10 Fotos, 3 Ofertas, 5 Eventos e 10 Posts)</span>
+              <span><strong>Todos os benefícios do Plano Acácia</strong> (25 Serviços, 10 Fotos, 3 Ofertas, 5 Eventos e 10 Posts)</span>
             </li>
             <li className="flex items-start gap-3">
               <CheckCircle2 className="w-5 h-5 text-[#C9A227] shrink-0 mt-0.5" />
@@ -62,7 +62,7 @@ export function LandingFounderOffer() {
             </li>
             <li className="flex items-start gap-3">
               <CheckCircle2 className="w-5 h-5 text-[#C9A227] shrink-0 mt-0.5" />
-              <span>Destaque de busca máximo equivalente ao Plano Ouro</span>
+              <span>Destaque de busca máximo equivalente ao Plano Acácia</span>
             </li>
           </ul>
 
@@ -76,7 +76,7 @@ export function LandingFounderOffer() {
               GARANTIR MINHA VAGA DE FUNDADOR
             </Button>
             <p className="text-center text-[11px] text-slate-400 italic">
-              ¹ A partir do 3º ano, a renovação passa a seguir o valor vigente do Plano Ouro, mantendo permanentemente o selo Empresa Fundadora.
+              ¹ A partir do 3º ano, a renovação passa a seguir o valor vigente do Plano Acácia, mantendo permanentemente o selo Empresa Fundadora.
             </p>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import type { Database, Json } from '@/types/database.types';
+import { getCanonicalDefaultLimit } from '@/lib/billing/plans-service';
 
 export type PublicBusinessPlan = 'bronze' | 'prata' | 'ouro' | null;
 export type PublicBusinessTemplate = 'bronze' | 'prata' | 'ouro';
@@ -95,6 +96,7 @@ export type PublicBusinessPresentation = {
     maxEvents: number;
     maxPosts: number;
     maxBenefits: number;
+    maxVideos: number;
     canShowBenefits: boolean;
     canShowEvents: boolean;
     canShowPosts: boolean;
@@ -127,6 +129,7 @@ export type PublicBusinessPresentation = {
   media: {
     cover: PublicMediaAsset | null;
     gallery: PublicMediaAsset[];
+    video: PublicMediaAsset | null;
   };
   owner: {
     name: string;
@@ -185,10 +188,16 @@ export function resolveBusinessProfileTemplate(
   switch (normalized) {
     case 'ouro_founder':
     case 'ouro':
+    case 'gold':
+    case 'acacia':
+    case 'acácia':
       return 'ouro';
     case 'prata':
+    case 'silver':
+    case 'compasso':
       return 'prata';
     case 'bronze':
+    case 'esquadro':
     default:
       return 'bronze';
   }
@@ -233,7 +242,12 @@ function numeric(value: Json | undefined): number | null {
 }
 
 function plan(value: string | null): PublicBusinessPlan {
-  return value === 'bronze' || value === 'prata' || value === 'ouro' ? value : null;
+  if (!value) return null;
+  const norm = value.toLowerCase().trim();
+  if (norm === 'bronze' || norm === 'esquadro') return 'bronze';
+  if (norm === 'prata' || norm === 'silver' || norm === 'compasso') return 'prata';
+  if (norm === 'ouro' || norm === 'gold' || norm === 'acacia' || norm === 'acácia' || norm === 'ouro_founder') return 'ouro';
+  return null;
 }
 
 function publicAsset(url: string | null, alt: string, type: 'image' | 'video' = 'image'): PublicMediaAsset | null {
@@ -260,35 +274,37 @@ export function toPublicBusinessPresentation(
   const commercialPlan: PublicCommercialPlan =
     isLegacyOuroFounder || rawPlanCode === 'ouro' ? 'ouro' : (plan(rawPlanCode) || 'bronze');
 
-  // Fail-closed defaults: se entitlements não vier, assumir 0/false.
-  // A camada de apresentação NÃO deve ser uma segunda tabela de planos.
+  // Cotas de exibição: se entitlements customizados não forem passados, utiliza o padrão canônico do plano.
   const customEntitlements = row.entitlements || {};
 
   const maxPhotos = typeof customEntitlements.gallery_photos_limit === 'number'
     ? customEntitlements.gallery_photos_limit
-    : 0;
+    : getCanonicalDefaultLimit(commercialPlan, 'gallery_photos_limit');
   const maxServices = typeof customEntitlements.services_limit === 'number'
     ? customEntitlements.services_limit
-    : 0;
+    : getCanonicalDefaultLimit(commercialPlan, 'services_limit');
   const maxBenefits = typeof customEntitlements.benefits_limit === 'number'
     ? customEntitlements.benefits_limit
-    : 0;
+    : getCanonicalDefaultLimit(commercialPlan, 'benefits_limit');
   const maxEvents = typeof customEntitlements.events_limit === 'number'
     ? customEntitlements.events_limit
-    : 0;
+    : getCanonicalDefaultLimit(commercialPlan, 'events_limit');
   const maxPosts = typeof customEntitlements.posts_limit === 'number'
     ? customEntitlements.posts_limit
-    : 0;
+    : getCanonicalDefaultLimit(commercialPlan, 'posts_limit');
+  const maxVideos = typeof customEntitlements.business_video_limit === 'number'
+    ? customEntitlements.business_video_limit
+    : getCanonicalDefaultLimit(commercialPlan, 'business_video_limit');
 
   const canShowBenefits = maxBenefits > 0;
   const canShowEvents = maxEvents > 0;
   const canShowPosts = maxPosts > 0;
   const canShowWebsite = typeof customEntitlements.can_show_website === 'boolean'
     ? customEntitlements.can_show_website
-    : false;
+    : (commercialPlan === 'prata' || commercialPlan === 'ouro');
   const canShowSocialLinks = typeof customEntitlements.can_show_social === 'boolean'
     ? customEntitlements.can_show_social
-    : false;
+    : (commercialPlan === 'prata' || commercialPlan === 'ouro');
 
   // Recognitions
   const verified = row.is_verified === true || (row as any).isVerified === true;
@@ -329,6 +345,7 @@ export function toPublicBusinessPresentation(
   const cover = images[0] ?? null;
   // Apply maxPhotos entitlement limit to gallery
   const gallery = images.slice(1, maxPhotos + 1);
+  const video = maxVideos > 0 ? rawMedia.find((item) => item.type === 'video') ?? null : null;
 
   const ownerName = responsible ? text(responsible.name, 180) : null;
   const communityVerified = responsible?.community_verified === true;
@@ -424,6 +441,7 @@ export function toPublicBusinessPresentation(
       maxEvents,
       maxPosts,
       maxBenefits,
+      maxVideos,
       canShowBenefits,
       canShowEvents,
       canShowPosts,
@@ -453,7 +471,7 @@ export function toPublicBusinessPresentation(
       isPedraFundamental: pedraFundamental,
       isColunaDeHonra: colunaDeHonra,
     },
-    media: { cover, gallery },
+    media: { cover, gallery, video },
     owner: (ownerName || commercialPlan === 'ouro' || (responsible && responsible.name) || row.business_name) ? {
       name: text(responsible?.name, 180) || ownerName || text((row as any).owner_name, 180) || row.business_name || 'Anunciante Titular',
       businessRole: text(responsible?.business_role, 120) || 'Proprietário',

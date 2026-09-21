@@ -22,6 +22,23 @@ interface PlanEntitlementsManagerProps {
   initialData: CommercialPlanFullData[];
 }
 
+function formatCentsForInput(amountCents: number): string {
+  return (amountCents / 100).toFixed(2).replace('.', ',');
+}
+
+function parseBrlToCents(value: string): number | null {
+  const raw = value.replace(/R\$|\s/g, '');
+  if (!raw || !/^\d[\d.,]*$/.test(raw)) return null;
+  const separator = Math.max(raw.lastIndexOf(','), raw.lastIndexOf('.'));
+  const decimalDigits = separator >= 0 ? raw.length - separator - 1 : 0;
+  const hasDecimals = separator >= 0 && decimalDigits > 0 && decimalDigits <= 2;
+  const normalized = hasDecimals
+    ? `${raw.slice(0, separator).replace(/[.,]/g, '')}.${raw.slice(separator + 1)}`
+    : raw.replace(/[.,]/g, '');
+  const amount = Number(normalized);
+  return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) : null;
+}
+
 function QuotaControl({
   label,
   value,
@@ -75,6 +92,9 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
   const [selectedPlan, setSelectedPlan] = useState<'bronze' | 'prata' | 'ouro'>('prata');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [priceInputs, setPriceInputs] = useState<Record<string, string>>(() =>
+    Object.fromEntries(initialData.map((plan) => [plan.plan_code, formatCentsForInput(plan.amount_cents)]))
+  );
 
   const activePlanData = plans.find((p) => p.plan_code === selectedPlan) || plans[0]!;
 
@@ -136,12 +156,14 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
     setMessage(null);
 
     try {
+      const parsedAmountCents = parseBrlToCents(priceInputs[activePlanData.plan_code] ?? '');
+      if (parsedAmountCents === null) throw new Error('Informe um valor anual válido. Exemplo: 2388,00.');
       const res = await updateCommercialPlanAction({
         plan_code: activePlanData.plan_code,
         title: activePlanData.title,
         slogan: activePlanData.slogan,
         description: activePlanData.description,
-        amount_cents: Number(activePlanData.amount_cents),
+        amount_cents: parsedAmountCents,
         installments_max: Number(activePlanData.installments_max),
         interest_free_installments: Number(activePlanData.interest_free_installments),
         is_popular: Boolean(activePlanData.is_popular),
@@ -324,21 +346,19 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
                 <span className="absolute left-3 top-2 text-xs text-stone-500 font-bold">R$</span>
                 <input
                   type="text"
-                  value={
-                    (activePlanData.amount_cents / 100).toLocaleString('pt-BR', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })
-                  }
+                  inputMode="decimal"
+                  value={priceInputs[activePlanData.plan_code] ?? ''}
                   onChange={(e) => {
                     const rawVal = e.target.value;
-                    // Remove R$, pontos de milhar e converte vírgula decimal
-                    const cleanStr = rawVal.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
-                    const num = Number(cleanStr);
-                    if (!isNaN(num) && num >= 0) {
-                      handleFieldChange('amount_cents', Math.round(num * 100));
-                    }
+                    if (!/^[\d.,\s]*$/.test(rawVal)) return;
+                    setPriceInputs((current) => ({ ...current, [activePlanData.plan_code]: rawVal }));
+                    const cents = parseBrlToCents(rawVal);
+                    if (cents !== null) handleFieldChange('amount_cents', cents);
                   }}
+                  onBlur={() => setPriceInputs((current) => ({
+                    ...current,
+                    [activePlanData.plan_code]: formatCentsForInput(activePlanData.amount_cents),
+                  }))}
                   className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs text-stone-900 font-mono font-bold outline-none focus:border-[#4B161B]"
                 />
               </div>

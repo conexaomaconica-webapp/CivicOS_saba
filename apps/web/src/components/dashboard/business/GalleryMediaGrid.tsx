@@ -71,7 +71,7 @@ export function GalleryMediaGrid({
         <div>
           <h4 className="text-sm font-semibold text-slate-900">Galeria de Fotos Comercial</h4>
           <p className="text-xs text-slate-500">
-            {items.length} de {maxPhotosLimit === 0 ? '0 (Plano Bronze)' : `${maxPhotosLimit} fotos permitidas no seu plano`}
+            {items.length} de {maxPhotosLimit === 0 ? '0 (Plano Esquadro)' : `${maxPhotosLimit} fotos permitidas no seu plano`}
           </p>
         </div>
 

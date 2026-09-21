@@ -21,9 +21,9 @@ export function QuotaProgressCard({
   const percentage = isUnlimited ? 100 : Math.min(100, Math.round((activeCount / maxLimit) * 100));
 
   const planLabels = {
-    bronze: 'Plano Bronze',
-    prata: 'Plano Prata',
-    ouro: 'Plano Ouro VIP',
+    bronze: 'Plano Esquadro',
+    prata: 'Plano Compasso',
+    ouro: 'Plano Acácia VIP',
   };
 
   return (

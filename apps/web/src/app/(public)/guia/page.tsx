@@ -20,6 +20,9 @@ import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
 import { DirectoryFavoritesModal } from '@/components/public/directory/DirectoryFavoritesModal';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 type Props = {
   searchParams: Promise<{
     q?: string;
@@ -35,7 +38,6 @@ type Props = {
   }>;
 };
 
-
 export const metadata: Metadata = {
   title: 'Guia Comercial e Maçônico — Conexão Maçônica',
   description:
@@ -48,6 +50,14 @@ export const metadata: Metadata = {
     type: 'website',
   },
 };
+
+function SectionDivider() {
+  return (
+    <div className="dh-container py-10 sm:py-16 my-2">
+      <div className="w-full h-px bg-gradient-to-r from-transparent via-amber-900/20 to-transparent" />
+    </div>
+  );
+}
 
 export default async function GuiaPage({ searchParams }: Props) {
   const params = await searchParams;
@@ -173,7 +183,6 @@ export default async function GuiaPage({ searchParams }: Props) {
     } catch (_fallbackErr) {}
   }
 
-
   if (!searchData) {
     searchData = {
       items: [],
@@ -197,26 +206,105 @@ export default async function GuiaPage({ searchParams }: Props) {
   };
 
   const settings = homeData.settings || {};
-  const banners = (homeData.banners as DirectoryBannerItem[]) || [];
-  const categories = (homeData.categories as DirectoryCategoryItem[]) || [];
-  const sponsored = (homeData.sponsored as DirectorySponsoredItem[]) || [];
-  let availableCities = (homeData.available_cities as string[]) || [];
+  let banners = (homeData.banners as DirectoryBannerItem[]) || [];
+  let categories = (homeData.categories as DirectoryCategoryItem[]) || [];
+  let sponsored = (homeData.sponsored as DirectorySponsoredItem[]) || [];
+  
+  // Normalização explícita de available_cities
+  const rawCities = homeData.available_cities || homeData.availableCities;
+  let availableCities: string[] = Array.isArray(rawCities)
+    ? rawCities.filter(
+        (c): c is string => typeof c === 'string' && c.trim().length > 0
+      )
+    : [];
 
+  // Fallback para Banners se a RPC falhar ou retornar vazio
+  if (!banners || banners.length === 0) {
+    try {
+      const { data: dbBanners } = await (supabase as any)
+        .from('directory_banners')
+        .select('id, title, subtitle, cta_text, cta_url, image_desktop_url')
+        .eq('is_active', true)
+        .order('display_order');
 
+      if (dbBanners && dbBanners.length > 0) {
+        banners = dbBanners.map((b: any) => ({
+          id: b.id,
+          title: b.title,
+          subtitle: b.subtitle,
+          cta_text: b.cta_text,
+          cta_url: b.cta_url,
+          image_desktop_url: b.image_desktop_url,
+        }));
+      }
+    } catch (_banErr) {}
+  }
+
+  // Fallback para Categorias se a RPC falhar ou retornar vazio
+  if (!categories || categories.length === 0) {
+    try {
+      const { data: dbCats } = await (supabase as any)
+        .from('categories')
+        .select('id, name, slug, icon')
+        .eq('is_active', true)
+        .order('name');
+
+      if (dbCats && dbCats.length > 0) {
+        categories = dbCats.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          slug: c.slug,
+          icon_name: c.icon,
+        }));
+      }
+    } catch (_catErr) {}
+  }
+
+  // Fallback para Empresas Patrocinadas / Destaques se a RPC falhar ou retornar vazio
+  if (!sponsored || sponsored.length === 0) {
+    try {
+      const { data: dbSponsored } = await (supabase as any)
+        .from('businesses')
+        .select('id, slug, name, description, logo_url, plan_tier, category, business_locations(city, state), business_media(url, media_type, display_order)')
+        .eq('publication_status', 'published')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(6);
+
+      if (dbSponsored && dbSponsored.length > 0) {
+        sponsored = dbSponsored.map((b: any) => {
+          const locs = Array.isArray(b.business_locations) && b.business_locations[0] ? b.business_locations[0] : {};
+          const medias = Array.isArray(b.business_media) ? b.business_media : [];
+          const coverMedia = medias.find((m: any) => m.media_type === 'image') || medias[0];
+          return {
+            id: b.id,
+            slug: b.slug,
+            name: b.name,
+            short_description: b.description ? b.description.slice(0, 200) : '',
+            logo_url: b.logo_url,
+            cover_url: coverMedia ? coverMedia.url : null,
+            category_name: b.category,
+            city: locs.city || null,
+            state: locs.state || null,
+          };
+        });
+      }
+    } catch (_spErr) {}
+  }
+
+  // Fallback exclusivo de empresas comerciais publicadas (SEM incluir organizações/Lojas Maçônicas)
   if (!availableCities || availableCities.length === 0) {
     try {
+      const citySet = new Set<string>();
+
       const { data: activeBiz } = await (supabase as any)
         .from('businesses')
-        .select('id, city, business_locations(city)')
+        .select('id, business_locations(city)')
         .eq('publication_status', 'published')
         .eq('is_active', true);
 
       if (activeBiz && activeBiz.length > 0) {
-        const citySet = new Set<string>();
         activeBiz.forEach((b: any) => {
-          if (b.city && typeof b.city === 'string' && b.city.trim()) {
-            citySet.add(b.city.trim());
-          }
           const locs = Array.isArray(b.business_locations) ? b.business_locations : [];
           locs.forEach((l: any) => {
             if (l.city && typeof l.city === 'string' && l.city.trim()) {
@@ -224,14 +312,15 @@ export default async function GuiaPage({ searchParams }: Props) {
             }
           });
         });
-        availableCities = Array.from(citySet).sort();
       }
+
+      availableCities = Array.from(citySet).sort();
     } catch (_e) {}
   }
 
+  console.log('[GuiaPage Server Log] availableCities immediately before render:', availableCities);
 
   const businessItems = (searchData.items as PublicSearchResultItem[]) || [];
-
   const lodgeItems = (lodgesData.items as PublicMasonicLodgeItem[]) || [];
 
   return (
@@ -265,11 +354,17 @@ export default async function GuiaPage({ searchParams }: Props) {
         {/* Carrossel Destaque da Semana */}
         <DirectoryCarousel banners={banners} />
 
+        <SectionDivider />
+
         {/* Categorias em Destaque */}
         <DirectoryCategories categories={categories} />
 
+        <SectionDivider />
+
         {/* Empresas Patrocinadas */}
         <DirectorySponsored items={sponsored} />
+
+        <SectionDivider />
 
         {/* Diretório Completo "Todas as Empresas" */}
         <DirectoryAllBusinesses
@@ -290,8 +385,12 @@ export default async function GuiaPage({ searchParams }: Props) {
           sortBy={sort}
         />
 
+        <SectionDivider />
+
         {/* Explore perto de você (Mapa) */}
         <DirectoryMapExplore businesses={businessItems} selectedCity={city} />
+
+        <SectionDivider />
 
         {/* Guia de Lojas Maçônicas */}
         <DirectoryLodgesGuide lodges={lodgeItems} availableCities={availableCities} />

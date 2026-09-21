@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import {
   CheckCircle2,
@@ -31,6 +31,7 @@ import {
   Calendar,
   Newspaper,
   UserCheck,
+  Video,
 } from 'lucide-react';
 import {
   upsertBusinessEventAction,
@@ -49,6 +50,10 @@ import {
   manageAdminBenefitAction,
   manageAdminMediaAction,
   updateAdminBusinessPlanAction,
+  uploadAdminResponsibleAvatarAction,
+  listAdminBusinessCategoriesAction,
+  createAdminBusinessCategoryAction,
+  listAdminCanonicalLocationsAction,
 } from '@/lib/admin/admin-businesses-service';
 import { uploadAdvertiserAssetAction } from '@/lib/advertiser/advertiser-profile-service';
 import { compressImageOnClient } from '@/lib/media/client-image-compressor';
@@ -85,6 +90,11 @@ export default function Company360Client({ initialData }: Props) {
   const [phone, setPhone] = useState(formatPhone(data.business.phone || ''));
   const [whatsapp, setWhatsapp] = useState(formatPhone(data.business.whatsapp || ''));
   const [category, setCategory] = useState(data.business.category || '');
+  const [categoryOptions, setCategoryOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [savingCategory, setSavingCategory] = useState(false);
   const [email, setEmail] = useState(data.business.email || '');
   const [website, setWebsite] = useState(data.business.website || '');
   const [instagram, setInstagram] = useState(
@@ -101,6 +111,8 @@ export default function Company360Client({ initialData }: Props) {
   );
   const [city, setCity] = useState(data.business.city || '');
   const [state, setState] = useState(data.business.state || '');
+  const [locationOptions, setLocationOptions] = useState<Array<{ city: string; state: string }>>([]);
+  const [loadingLocations, setLoadingLocations] = useState(true);
   const [address, setAddress] = useState(data.business.address || '');
   const [description, setDescription] = useState(data.business.description || '');
 
@@ -111,6 +123,46 @@ export default function Company360Client({ initialData }: Props) {
   const [respAvatarUrl, setRespAvatarUrl] = useState(data.owner?.avatar_url || '');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    listAdminBusinessCategoriesAction(data.business.tenant_id).then((result) => {
+      if (!active) return;
+      if (result.success) setCategoryOptions(result.categories);
+      else setMessage({ type: 'error', text: result.error || 'Falha ao carregar categorias.' });
+      setLoadingCategories(false);
+    });
+    return () => { active = false; };
+  }, [data.business.tenant_id]);
+
+  useEffect(() => {
+    let active = true;
+    listAdminCanonicalLocationsAction(data.business.tenant_id).then((result) => {
+      if (!active) return;
+      if (result.success) setLocationOptions(result.locations);
+      else setMessage({ type: 'error', text: result.error || 'Falha ao carregar cidades e estados.' });
+      setLoadingLocations(false);
+    });
+    return () => { active = false; };
+  }, [data.business.tenant_id]);
+
+  const availableStates = Array.from(new Set(locationOptions.map((item) => item.state))).sort();
+  const availableCities = locationOptions.filter((item) => item.state === state).map((item) => item.city).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+  const handleCreateCategory = async () => {
+    setSavingCategory(true);
+    const result = await createAdminBusinessCategoryAction(data.business.tenant_id, newCategoryName);
+    if (result.success && result.category) {
+      setCategoryOptions((current) => [...current.filter((item) => item.id !== result.category!.id), result.category!].sort((a, b) => a.name.localeCompare(b.name)));
+      setCategory(result.category.name);
+      setNewCategoryName('');
+      setShowCategoryModal(false);
+      setMessage({ type: 'success', text: 'Categoria criada e selecionada. Salve o cadastro para vinculá-la à empresa.' });
+    } else {
+      setMessage({ type: 'error', text: result.error || 'Falha ao criar categoria.' });
+    }
+    setSavingCategory(false);
+  };
 
   // Modal State para Ações de Risco (Suspender/Reativar)
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -344,6 +396,24 @@ export default function Company360Client({ initialData }: Props) {
   const [editingMediaId, setEditingMediaId] = useState<string | undefined>(undefined);
   const [mediaUrlInput, setMediaUrlInput] = useState('');
   const [mediaTitleInput, setMediaTitleInput] = useState('');
+  const [businessVideoUrl, setBusinessVideoUrl] = useState(initialData.business_video?.url || '');
+  const [savingBusinessVideo, setSavingBusinessVideo] = useState(false);
+
+  const handleBusinessVideo = async (remove = false) => {
+    setSavingBusinessVideo(true);
+    setMessage(null);
+    const res = await manageAdminMediaAction(data.business.id, remove ? 'delete_video' : 'set_video', { url: businessVideoUrl });
+    if (res.success) {
+      setData((current) => ({ ...current, business_video: remove ? undefined : {
+        id: current.business_video?.id || 'video', url: businessVideoUrl.trim(), title: 'Vídeo institucional',
+      } }));
+      if (remove) setBusinessVideoUrl('');
+      setMessage({ type: 'success', text: remove ? 'Vídeo institucional removido.' : 'Vídeo institucional salvo.' });
+    } else {
+      setMessage({ type: 'error', text: res.error || 'Não foi possível atualizar o vídeo.' });
+    }
+    setSavingBusinessVideo(false);
+  };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawFile = e.target.files?.[0];
@@ -356,14 +426,17 @@ export default function Company360Client({ initialData }: Props) {
       const formData = new FormData();
       formData.append('businessId', data.business.id);
       formData.append('file', file);
-      formData.append('assetType', 'avatar');
-      const res = await uploadAdvertiserAssetAction(formData);
+      const res = await uploadAdminResponsibleAvatarAction(formData);
 
       if (res.success && res.url) {
         setRespAvatarUrl(res.url);
-        setMessage({ type: 'success', text: 'Foto enviada ao armazenamento. Clique em “Salvar Alterações de Cadastro” para vinculá-la ao responsável.' });
+        setData((current) => ({
+          ...current,
+          owner: { ...current.owner, avatar_url: res.url },
+        }));
+        setMessage({ type: 'success', text: 'Foto do responsável enviada e salva com sucesso.' });
       } else {
-        setMessage({ type: 'error', text: res.message || 'Erro ao enviar foto do empresário.' });
+        setMessage({ type: 'error', text: res.error || 'Erro ao enviar foto do empresário.' });
       }
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message || 'Falha ao processar arquivo.' });
@@ -1342,12 +1415,21 @@ export default function Company360Client({ initialData }: Props) {
 
               <div>
                 <label className="block font-bold text-stone-800 mb-1">Categoria Principal</label>
-                <input
-                  type="text"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
-                />
+                <div className="flex gap-2">
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    disabled={loadingCategories}
+                    className="min-w-0 flex-1 px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14] disabled:opacity-60"
+                  >
+                    <option value="">{loadingCategories ? 'Carregando categorias...' : 'Selecione uma categoria'}</option>
+                    {category && !categoryOptions.some((item) => item.name === category) && <option value={category}>{category} (categoria atual)</option>}
+                    {categoryOptions.map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
+                  </select>
+                  <button type="button" onClick={() => setShowCategoryModal(true)} className="inline-flex items-center gap-1.5 rounded-xl border border-[#3B0B14] px-3 py-2 text-xs font-bold text-[#3B0B14] hover:bg-[#3B0B14] hover:text-[#C9A227]">
+                    <Plus className="h-4 w-4" /> Nova
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -1361,6 +1443,30 @@ export default function Company360Client({ initialData }: Props) {
                   required
                 />
               </div>
+
+              {showCategoryModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/70 p-4 backdrop-blur-sm">
+                  <div role="dialog" aria-modal="true" aria-labelledby="new-category-title" className="w-full max-w-md rounded-2xl border border-stone-300 bg-white p-6 text-left shadow-2xl">
+                    <div className="mb-4 flex items-center justify-between border-b border-stone-200 pb-3">
+                      <div>
+                        <h3 id="new-category-title" className="font-serif text-lg font-bold text-stone-900">Criar nova categoria</h3>
+                        <p className="mt-1 text-xs text-stone-500">A categoria ficará disponível para outras empresas deste tenant.</p>
+                      </div>
+                      <button type="button" onClick={() => setShowCategoryModal(false)} className="rounded-lg p-1 text-stone-500 hover:bg-stone-100" aria-label="Fechar modal"><XCircle className="h-5 w-5" /></button>
+                    </div>
+                    <label className="block text-xs font-bold text-stone-700">
+                      Nome da categoria
+                      <input autoFocus value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleCreateCategory(); } }} maxLength={80} placeholder="Ex.: Segurança Eletrônica" className="mt-1.5 w-full rounded-xl border border-stone-300 bg-stone-50 px-3 py-2.5 text-sm text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]" />
+                    </label>
+                    <div className="mt-5 flex justify-end gap-2 border-t border-stone-200 pt-4">
+                      <button type="button" onClick={() => setShowCategoryModal(false)} className="rounded-xl bg-stone-100 px-4 py-2 text-xs font-bold text-stone-700 hover:bg-stone-200">Cancelar</button>
+                      <button type="button" onClick={() => void handleCreateCategory()} disabled={savingCategory || newCategoryName.trim().length < 3} className="inline-flex items-center gap-2 rounded-xl bg-[#3B0B14] px-4 py-2 text-xs font-extrabold text-[#C9A227] disabled:opacity-50">
+                        {savingCategory ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Criar categoria
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block font-bold text-stone-800 mb-1">WhatsApp para Contato Direto</label>
@@ -1439,24 +1545,31 @@ export default function Company360Client({ initialData }: Props) {
               </div>
 
               <div>
-                <label className="block font-bold text-stone-800 mb-1">Cidade</label>
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
-                />
+                <label className="block font-bold text-stone-800 mb-1">Estado (UF)</label>
+                <select
+                  value={state}
+                  onChange={(e) => { setState(e.target.value); setCity(''); }}
+                  disabled={loadingLocations}
+                  className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 uppercase font-bold outline-none focus:ring-2 focus:ring-[#3B0B14] disabled:opacity-60"
+                >
+                  <option value="">{loadingLocations ? 'Carregando estados...' : 'Selecione a UF'}</option>
+                  {state && !availableStates.includes(state) && <option value={state}>{state} (atual)</option>}
+                  {availableStates.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
+                </select>
               </div>
 
               <div>
-                <label className="block font-bold text-stone-800 mb-1">Estado (UF)</label>
-                <input
-                  type="text"
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
-                  maxLength={2}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 uppercase font-bold outline-none focus:ring-2 focus:ring-[#3B0B14]"
-                />
+                <label className="block font-bold text-stone-800 mb-1">Cidade</label>
+                <select
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  disabled={loadingLocations || !state}
+                  className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14] disabled:opacity-60"
+                >
+                  <option value="">{state ? 'Selecione a cidade' : 'Selecione primeiro a UF'}</option>
+                  {city && !availableCities.includes(city) && <option value={city}>{city} (atual)</option>}
+                  {availableCities.map((name) => <option key={name} value={name}>{name}</option>)}
+                </select>
               </div>
 
               <div className="md:col-span-2">
@@ -1828,6 +1941,31 @@ export default function Company360Client({ initialData }: Props) {
               </div>
             </div>
           </div>
+
+          {data.subscription.entitlements.video_limit > 0 && (
+            <div className="bg-white border border-stone-300 rounded-2xl p-6 shadow-xs space-y-4">
+              <div className="border-b border-stone-200 pb-3">
+                <h3 className="font-serif font-bold text-base text-stone-900 flex items-center gap-2">
+                  <Video className="w-5 h-5 text-[#3B0B14]" />
+                  <span>Vídeo institucional do Plano Acácia</span>
+                </h3>
+                <p className="text-xs text-stone-500 mt-1">Informe um link público do YouTube ou Vimeo. Limite: 1 vídeo.</p>
+              </div>
+              <div className="flex flex-col md:flex-row gap-3">
+                <input type="url" value={businessVideoUrl} onChange={(event) => setBusinessVideoUrl(event.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  className="flex-1 rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[#3B0B14]" />
+                <button type="button" onClick={() => handleBusinessVideo(false)} disabled={savingBusinessVideo || !businessVideoUrl.trim()}
+                  className="rounded-xl bg-[#3B0B14] px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  {savingBusinessVideo ? 'Salvando...' : 'Salvar vídeo'}
+                </button>
+                {data.business_video && (
+                  <button type="button" onClick={() => handleBusinessVideo(true)} disabled={savingBusinessVideo}
+                    className="rounded-xl border border-rose-300 px-4 py-2 text-xs font-bold text-rose-700 disabled:opacity-50">Remover</button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* SEÇÃO 2: GALERIA DE FOTOS (business_media) */}
           <div className="bg-white border border-stone-300 rounded-2xl p-6 shadow-xs space-y-4">
@@ -2347,19 +2485,19 @@ export default function Company360Client({ initialData }: Props) {
               {[
                 {
                   code: 'bronze',
-                  title: 'Plano Bronze',
+                  title: 'Plano Esquadro',
                   price: 'R$ 49/mês',
                   desc: '1 foto, 2 serviços, sem benefícios fraternos.',
                 },
                 {
                   code: 'prata',
-                  title: 'Plano Prata',
+                  title: 'Plano Compasso',
                   price: 'R$ 99/mês',
                   desc: '3 fotos, 5 serviços, 1 benefício fraterno.',
                 },
                 {
                   code: 'ouro',
-                  title: 'Plano Ouro (Premium)',
+                  title: 'Plano Acácia (Premium)',
                   price: 'R$ 199/mês',
                   desc: '10 fotos, 10 serviços, 5 benefícios, 5 eventos & posts, prioridade visual.',
                 },

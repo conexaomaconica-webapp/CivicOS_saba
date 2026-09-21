@@ -152,7 +152,7 @@ export default function AdvertiserPlanClient({ data }: { data: AdvertiserPlanBil
             {requestingUpgrade ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <span>Solicitar Upgrade para Plano Ouro</span>
+              <span>Solicitar Upgrade para Plano Acácia</span>
             )}
           </button>
         </div>

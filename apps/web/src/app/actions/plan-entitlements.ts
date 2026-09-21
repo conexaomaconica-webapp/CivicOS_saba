@@ -62,7 +62,7 @@ export async function getPlanEntitlementsAction() {
     const defaults: Record<string, CommercialPlanFullData> = {
       bronze: {
         plan_code: 'bronze',
-        title: 'Plano Bronze',
+        title: 'Plano Esquadro',
         slogan: 'Entrada gratuita no Guia Maçônico',
         description: 'Ideal para pequenos negócios fraternos iniciando a presença digital no guia comercial.',
         amount_cents: 0,
@@ -87,7 +87,7 @@ export async function getPlanEntitlementsAction() {
       },
       prata: {
         plan_code: 'prata',
-        title: 'Plano Prata',
+        title: 'Plano Compasso',
         slogan: 'Excelente visibilidade comercial e mídias',
         description: 'Recomendado para empresas estabelecidas buscando destaque fraterno e canal direto no WhatsApp.',
         amount_cents: 178800,
@@ -113,7 +113,7 @@ export async function getPlanEntitlementsAction() {
       },
       ouro: {
         plan_code: 'ouro',
-        title: 'Plano Ouro',
+        title: 'Plano Acácia',
         slogan: 'Máxima presença, topo do guia e analytics',
         description: 'Presença de elite para grandes parceiros com prioridade máxima de busca, mídias e analytics avançado.',
         amount_cents: 238800,

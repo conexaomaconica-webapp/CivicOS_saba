@@ -24,7 +24,7 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
   if (!current) return null;
 
   return (
-    <section className="dh-container">
+    <section className="dh-container py-4">
       <div className="dh-carousel-card">
         <div className="dh-carousel-card__content">
           {current.subtitle && <div className="dh-carousel-card__tag">{current.subtitle}</div>}

@@ -104,7 +104,7 @@ export function DirectoryAllBusinesses({
     searchQuery || selectedCity || selectedCategory || verifiedOnly || hasBenefitsOnly || (sortBy && sortBy !== 'relevance');
 
   return (
-    <section className="dh-container my-12" id="todas">
+    <section className="dh-container py-4" id="todas">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="dh-section-title">Todas as Empresas</h2>

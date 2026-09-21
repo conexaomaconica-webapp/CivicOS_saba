@@ -326,7 +326,7 @@ export function InstitutionalBadges({
       id: 'selo_ouro',
       key: 'selo_ouro',
       title: 'Conexão Ouro',
-      description: 'Reconhecimento e presença comercial de máxima distinção para empresas do Plano Ouro.',
+      description: 'Reconhecimento e presença comercial de máxima distinção para empresas do Plano Acácia.',
       seal_url: sealUrl,
       icon: ConexaoOuroIcon,
       bgClass: 'bg-[#C9A227]/20 text-[#C9A227]',
@@ -357,7 +357,7 @@ export function InstitutionalBadges({
 
   return (
     <>
-      {/* EXIBIÇÃO EM VARIANT GOLD-CARD (Card Lateral Exclusivo Plano Ouro — Apenas os Selos) */}
+      {/* EXIBIÇÃO EM VARIANT GOLD-CARD (Card Lateral Exclusivo Plano Acácia — Apenas os Selos) */}
       {variant === 'gold-card' && (
         <div className={`bg-[#3B0B14] border border-[#C9A227]/40 rounded-2xl p-6 shadow-xl flex flex-wrap items-center justify-center gap-6 ${className}`}>
           {badgeList
