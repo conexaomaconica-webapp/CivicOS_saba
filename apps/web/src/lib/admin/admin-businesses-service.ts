@@ -2148,6 +2148,15 @@ export async function upsertAdminMasonicLinkAction(
 
       if (existingOrg) {
         organizationId = existingOrg.id;
+        if (payload.potency && payload.potency.trim()) {
+          await (supabase as any)
+            .from('organizations')
+            .update({
+              potency: payload.potency.trim(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingOrg.id);
+        }
       } else {
         const { data: newOrg, error: orgCreateError } = await (supabase as any)
           .from('organizations')
@@ -2222,6 +2231,20 @@ export async function upsertAdminMasonicLinkAction(
 
         if (upgradeErr) return { success: false, error: `Falha ao definir status do vínculo maçônico: ${upgradeErr.message}` };
       }
+    }
+
+    // Sincroniza campos denormalizados na tabela businesses
+    if (payload.lodge_name.trim()) {
+      await (supabase as any)
+        .from('businesses')
+        .update({
+          masonic_lodge: payload.lodge_name.trim(),
+          masonic_potency: payload.potency?.trim() || null,
+          masonic_link_type: dbLinkType,
+          masonic_validation_status: dbStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', businessId);
     }
 
     // Mantém o texto do card público sincronizado com a organização escolhida.
