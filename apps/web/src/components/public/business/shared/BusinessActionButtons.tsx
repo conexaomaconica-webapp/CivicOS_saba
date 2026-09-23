@@ -33,8 +33,22 @@ export function QuickActionBar({
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${businessName}, ${location.address}`)}`
     : null;
 
-  const instagramHandle = contacts.instagram ? contacts.instagram.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '') : null;
-  const facebookHandle = contacts.facebook ? contacts.facebook.replace(/^https?:\/\/(www\.)?facebook\.com\//, '') : null;
+  const getSocialUrl = (raw: string | undefined | null, defaultDomain: string): string | null => {
+    if (!raw) return null;
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (trimmed.includes('.') || (defaultDomain && trimmed.toLowerCase().includes(defaultDomain))) {
+      return `https://${trimmed.replace(/^\/+/, '')}`;
+    }
+    const clean = trimmed.replace(/^@/, '').replace(/^\/+/, '');
+    return `https://${defaultDomain}/${clean}`;
+  };
+
+  const instagramUrl = getSocialUrl(contacts.instagram, 'instagram.com');
+  const facebookUrl = getSocialUrl(contacts.facebook, 'facebook.com');
+  const linkedinUrl = getSocialUrl(contacts.linkedin, 'linkedin.com');
+  const youtubeUrl = getSocialUrl(contacts.youtube, 'youtube.com');
 
   const tabs = [
     { id: 'visao-geral', label: 'Visão geral' },
@@ -110,9 +124,9 @@ export function QuickActionBar({
         )}
 
         {/* Instagram */}
-        {instagramHandle && (
+        {instagramUrl && (
           <a
-            href={`https://instagram.com/${instagramHandle}`}
+            href={instagramUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-pink-50 text-stone-800 transition-colors"
@@ -127,9 +141,9 @@ export function QuickActionBar({
         )}
 
         {/* Facebook */}
-        {facebookHandle && (
+        {facebookUrl && (
           <a
-            href={`https://facebook.com/${facebookHandle}`}
+            href={facebookUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-blue-50 text-stone-800 transition-colors"
@@ -140,6 +154,40 @@ export function QuickActionBar({
               </svg>
             </span>
             <span className="font-semibold text-stone-800">Facebook</span>
+          </a>
+        )}
+
+        {/* LinkedIn */}
+        {linkedinUrl && (
+          <a
+            href={linkedinUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-sky-50 text-stone-800 transition-colors"
+          >
+            <span className="w-7 h-7 rounded-full bg-sky-700 flex items-center justify-center text-white shrink-0 shadow-xs">
+              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 10.9v8.37H9.25V10.9H6.46M7.86 6.7a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2z"/>
+              </svg>
+            </span>
+            <span className="font-semibold text-stone-800">LinkedIn</span>
+          </a>
+        )}
+
+        {/* YouTube */}
+        {youtubeUrl && (
+          <a
+            href={youtubeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-rose-50 text-stone-800 transition-colors"
+          >
+            <span className="w-7 h-7 rounded-full bg-rose-600 flex items-center justify-center text-white shrink-0 shadow-xs">
+              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+              </svg>
+            </span>
+            <span className="font-semibold text-stone-800">YouTube</span>
           </a>
         )}
 

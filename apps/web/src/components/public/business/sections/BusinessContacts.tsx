@@ -87,35 +87,40 @@ export function BusinessContacts({
   }
 
   // Helper para normalização e higienização estrita de URLs
-  const toSafeUrl = (raw: string, domain: string): { url: string; display: string } | null => {
+  const toSafeUrl = (raw: string, defaultDomain: string): { url: string; display: string } | null => {
     let input = raw.trim();
     if (!input) return null;
 
     // Bloqueia esquemas perigosos (javascript:, data:, file:)
     if (/^(javascript|data|file):/i.test(input)) return null;
 
-    // Se já é uma URL HTTP/HTTPS
-    if (/^https?:\/\//i.test(input)) {
-      try {
-        const parsed = new URL(input);
-        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
-        return {
-          url: parsed.toString(),
-          display: parsed.pathname.replace(/^\//, '') || parsed.hostname,
-        };
-      } catch {
-        return null;
+    let fullUrl = input;
+    if (!/^https?:\/\//i.test(fullUrl)) {
+      if (fullUrl.includes('.') || (defaultDomain && fullUrl.toLowerCase().includes(defaultDomain))) {
+        fullUrl = `https://${fullUrl.replace(/^\/+/, '')}`;
+      } else if (defaultDomain) {
+        const cleanHandle = fullUrl.replace(/^@/, '').replace(/^\/+/, '');
+        fullUrl = `https://${defaultDomain}/${cleanHandle}`;
+      } else {
+        fullUrl = `https://${fullUrl.replace(/^\/+/, '')}`;
       }
     }
 
-    // Se for handle (@usuario ou caminho relativo)
-    const cleanHandle = input.replace(/^@/, '').replace(/^\/+/, '');
-    if (!cleanHandle) return null;
+    try {
+      const parsed = new URL(fullUrl);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
 
-    return {
-      url: `https://${domain}/${cleanHandle}`,
-      display: `@${cleanHandle}`,
-    };
+      let display = parsed.pathname.replace(/^\//, '') || parsed.hostname;
+      if (display.length > 30) {
+        display = `${display.substring(0, 27)}...`;
+      }
+      return {
+        url: parsed.toString(),
+        display: display || parsed.hostname,
+      };
+    } catch {
+      return null;
+    }
   };
 
   if (contacts.instagram) {
