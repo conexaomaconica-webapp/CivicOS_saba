@@ -118,42 +118,135 @@ export function BusinessBenefits({ benefits, businessName, className = '' }: Bus
   };
 
   return (
-    <section className={`p-5 rounded-2xl bg-white border border-[#E8E5DF] shadow-xs space-y-4 ${className}`}>
-      <div className="flex items-center gap-2 border-b border-stone-100 pb-2.5"><Sparkles className="w-5 h-5 text-[#C9A227]" /><h2 className="text-base font-serif font-bold text-[#4B161B]">Benefícios e Ofertas</h2></div>
+    <section className={`p-4 sm:p-5 rounded-2xl bg-white border border-[#E8E5DF] shadow-xs space-y-4 overflow-hidden ${className}`}>
+      <div className="flex items-center gap-2 border-b border-stone-100 pb-2.5">
+        <Sparkles className="w-5 h-5 text-[#C9A227]" />
+        <h2 className="text-base font-serif font-bold text-[#4B161B]">Benefícios e Ofertas</h2>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {benefits.map((benefit, index) => {
           const itemKey = benefit.id || `benefit-${index}`;
           const result = results[itemKey];
           return (
-            <div key={itemKey} className="p-4 rounded-2xl bg-gradient-to-br from-[#4B161B] to-[#2A070E] text-white border border-[#C9A227]/50 shadow-md space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1"><span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#C9A227]/20 text-[#C9A227] border border-[#C9A227]/30"><Tag className="w-3 h-3" />{inPortuguese(benefit.badgeText || benefit.benefitType || 'Oferta Exclusiva')}</span><h3 className="font-serif font-bold text-base text-[#F3EEDD]">{inPortuguese(benefit.title)}</h3></div>
-                {benefit.discountPercentage ? <div className="px-3 py-1.5 rounded-xl bg-[#C9A227] text-stone-950 font-black text-lg shrink-0">{benefit.discountPercentage}% Desconto</div> : null}
+            <div
+              key={itemKey}
+              className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-[#4B161B] to-[#2A070E] text-white border border-[#C9A227]/50 shadow-md space-y-3 overflow-hidden flex flex-col justify-between"
+            >
+              <div className="space-y-3">
+                {/* CABEÇALHO DO CARD: TITULO E SELO DE DESCONTO */}
+                <div className="flex flex-col sm:flex-row items-start justify-between gap-2.5 sm:gap-3">
+                  <div className="space-y-1.5 min-w-0 flex-1 w-full sm:w-auto">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-[#C9A227]/20 text-[#C9A227] border border-[#C9A227]/30 max-w-full truncate">
+                      <Tag className="w-3 h-3 shrink-0" />
+                      <span className="truncate">{inPortuguese(benefit.badgeText || benefit.benefitType || 'Oferta Exclusiva')}</span>
+                    </span>
+
+                    <h3 className="font-serif font-bold text-sm sm:text-base text-[#F3EEDD] leading-snug break-words">
+                      {inPortuguese(benefit.title)}
+                    </h3>
+                  </div>
+
+                  {benefit.discountPercentage ? (
+                    <div className="inline-flex items-center justify-center px-3 py-1 sm:py-1.5 rounded-xl bg-[#C9A227] text-stone-950 font-black text-xs sm:text-base shrink-0 self-start sm:self-auto shadow-xs whitespace-nowrap">
+                      {benefit.discountPercentage}% Desconto
+                    </div>
+                  ) : null}
+                </div>
+
+                <p className="text-xs text-stone-200 leading-relaxed break-words">
+                  {inPortuguese(benefit.description)}
+                </p>
               </div>
-              <p className="text-xs text-stone-200 leading-relaxed">{inPortuguese(benefit.description)}</p>
-              <div className="pt-2 space-y-2 border-t border-stone-700/60">
-                <div className="flex items-center justify-between gap-2"><span className="text-[11px] text-stone-300">{result?.code ? `Código: ${result.code}` : 'Código pessoal gerado no resgate'}</span><button type="button" onClick={() => result?.code ? setCard({ benefit, code: result.code, expiresAt: benefit.validUntil || null }) : handleRedeem(benefit)} disabled={!benefit.id || redeemingId === itemKey} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A227] disabled:opacity-60 text-stone-950 text-xs font-bold">{redeemingId === itemKey ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : result?.code ? <Check className="w-3.5 h-3.5" /> : null}<span>{redeemingId === itemKey ? 'Resgatando...' : result?.code ? 'Ver comprovante' : 'Resgatar benefício'}</span></button></div>
-                {result?.error && <p className="text-[11px] text-rose-200">{result.error}</p>}
+
+              {/* RODA PÉ DO CARD: BOTÃO RESGATAR & CÓDIGO */}
+              <div className="pt-3 space-y-2 border-t border-stone-700/60 mt-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
+                  <span className="text-[11px] text-stone-300 break-words leading-tight">
+                    {result?.code ? `Código: ${result.code}` : 'Código pessoal gerado no resgate'}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      result?.code
+                        ? setCard({ benefit, code: result.code, expiresAt: benefit.validUntil || null })
+                        : handleRedeem(benefit)
+                    }
+                    disabled={!benefit.id || redeemingId === itemKey}
+                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#C9A227] hover:bg-[#d8b030] active:bg-[#b89420] disabled:opacity-60 text-stone-950 text-xs font-bold transition-all shadow-sm w-full sm:w-auto shrink-0 cursor-pointer"
+                  >
+                    {redeemingId === itemKey ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : result?.code ? (
+                      <Check className="w-3.5 h-3.5" />
+                    ) : null}
+                    <span>
+                      {redeemingId === itemKey
+                        ? 'Resgatando...'
+                        : result?.code
+                          ? 'Ver comprovante'
+                          : 'Resgatar benefício'}
+                    </span>
+                  </button>
+                </div>
+
+                {result?.error && <p className="text-[11px] text-rose-200 break-words">{result.error}</p>}
               </div>
             </div>
           );
         })}
       </div>
 
+      {/* MODAL DE COMPROVANTE DO BENEFÍCIO */}
       {card && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-label="Benefício resgatado">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="relative bg-gradient-to-br from-[#4B161B] to-[#22070C] p-6 text-center text-white border-b-4 border-[#C9A227]">
-              <button onClick={() => setCard(null)} className="absolute right-3 top-3 rounded-full bg-white/10 p-2" aria-label="Fechar"><X className="h-4 w-4" /></button>
-              <img src="/logoconexao_red.png" alt="Conexão Maçônica" className="mx-auto mb-3 h-16 w-auto object-contain" />
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-3 sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Benefício resgatado"
+        >
+          <div className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
+            <div className="relative bg-gradient-to-br from-[#4B161B] to-[#22070C] p-5 sm:p-6 text-center text-white border-b-4 border-[#C9A227]">
+              <button
+                onClick={() => setCard(null)}
+                className="absolute right-3 top-3 rounded-full bg-white/10 p-2 text-stone-300 hover:text-white"
+                aria-label="Fechar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <img src="/logoconexao_red.png" alt="Conexão Maçônica" className="mx-auto mb-3 h-14 sm:h-16 w-auto object-contain" />
               <p className="text-[10px] font-bold tracking-[0.2em] text-[#E7C65D]">BENEFÍCIO RESGATADO</p>
-              <h3 className="mt-2 font-serif text-xl font-bold">{businessName}</h3>
-              <p className="mt-2 text-sm text-stone-100">{inPortuguese(card.benefit.title)}</p>
-              {card.benefit.discountPercentage ? <p className="mt-2 text-2xl font-black text-[#E7C65D]">{card.benefit.discountPercentage}% Desconto</p> : null}
-              <div className="mt-5 rounded-xl bg-white p-4 text-[#4B161B]"><p className="text-[10px] font-bold">CÓDIGO DE UTILIZAÇÃO</p><p className="mt-1 font-mono text-2xl font-black tracking-wider">{card.code}</p></div>
-              <p className="mt-3 flex items-center justify-center gap-1 text-xs"><CalendarDays className="h-4 w-4" />Validade: {formatExpiration(card.expiresAt)}</p>
+              <h3 className="mt-2 font-serif text-lg sm:text-xl font-bold break-words">{businessName}</h3>
+              <p className="mt-2 text-xs sm:text-sm text-stone-100 break-words">{inPortuguese(card.benefit.title)}</p>
+              {card.benefit.discountPercentage ? (
+                <p className="mt-2 text-xl sm:text-2xl font-black text-[#E7C65D]">{card.benefit.discountPercentage}% Desconto</p>
+              ) : null}
+
+              <div className="mt-4 sm:mt-5 rounded-xl bg-white p-3 sm:p-4 text-[#4B161B]">
+                <p className="text-[10px] font-bold">CÓDIGO DE UTILIZAÇÃO</p>
+                <p className="mt-1 font-mono text-xl sm:text-2xl font-black tracking-wider break-all">{card.code}</p>
+              </div>
+
+              <p className="mt-3 flex items-center justify-center gap-1 text-xs text-stone-200">
+                <CalendarDays className="h-4 w-4 text-[#E7C65D]" />
+                Validade: {formatExpiration(card.expiresAt)}
+              </p>
             </div>
-            <div className="space-y-4 p-5"><p className="text-sm text-stone-700">Salve o comprovante e apresente o código na empresa antes da compra ou da execução do serviço.</p><button onClick={downloadCard} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#4B161B] px-4 py-3 text-sm font-bold text-white"><Download className="h-4 w-4" />Baixar comprovante em PNG</button></div>
+
+            <div className="space-y-4 p-4 sm:p-5">
+              <p className="text-xs sm:text-sm text-stone-700 leading-relaxed">
+                Salve o comprovante e apresente o código na empresa antes da compra ou da execução do serviço.
+              </p>
+              <button
+                onClick={downloadCard}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#4B161B] hover:bg-[#3B0B14] px-4 py-3 text-xs sm:text-sm font-bold text-white shadow-md transition-all cursor-pointer"
+              >
+                <Download className="h-4 w-4 text-[#C9A227]" />
+                <span>Baixar comprovante em PNG</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

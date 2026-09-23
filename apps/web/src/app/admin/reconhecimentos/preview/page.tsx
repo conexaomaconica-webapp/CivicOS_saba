@@ -9,6 +9,7 @@ import { prataBusinessFixture } from '@/visual-lab/fixtures/prata-business';
 import { bronzeBusinessFixture } from '@/visual-lab/fixtures/bronze-business';
 import { InstitutionalBadges } from '@/components/public/business/shared/InstitutionalBadges';
 import { canBusinessReceiveRecognition } from '@/lib/business/recognition-eligibility';
+import { FavoritesProvider } from '@/lib/directory/favorites-context';
 
 export default function AdminReconhecimentosPreviewPage() {
   const [selectedPlan, setSelectedPlan] = useState<'bronze' | 'prata' | 'ouro'>('ouro');
@@ -182,7 +183,9 @@ export default function AdminReconhecimentosPreviewPage() {
             className="mb-4"
           />
 
-          <BusinessProfileRenderer business={simulatedBusiness as any} />
+          <FavoritesProvider>
+            <BusinessProfileRenderer business={simulatedBusiness as any} />
+          </FavoritesProvider>
         </div>
       </div>
     </div>
