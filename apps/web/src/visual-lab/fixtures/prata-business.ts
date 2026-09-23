@@ -1,21 +1,19 @@
 import type { PublicBusinessPresentation, PublicMediaAsset } from '@/lib/business/public-business-presentation';
 
-const referenceUrl = '/visual-lab/assets/bronze-reference';
-
-function crop(alt: string, x: number, y: number, width: number, height: number): PublicMediaAsset {
+function img(url: string, alt: string): PublicMediaAsset {
   return {
-    url: referenceUrl,
+    url,
     alt,
     type: 'image',
-    crop: { sourceWidth: 1536, sourceHeight: 1024, x, y, width, height },
   };
 }
 
-/** Fixture exclusiva da rota Visual Lab Prata */
+/** Fixture oficial do Plano Compasso (Prata) para Visual Lab e Simulador de Reconhecimentos */
 export const prataBusinessFixture: PublicBusinessPresentation = {
   plan: {
     commercialPlan: 'prata',
     template: 'prata',
+    sectionOrder: ['about', 'services', 'benefits', 'gallery'],
   },
   entitlements: {
     maxPhotos: 3,
@@ -33,15 +31,18 @@ export const prataBusinessFixture: PublicBusinessPresentation = {
   recognition: {
     verified: true,
     founder: false,
-    pedraFundamental: false,
+    pedraFundamental: true,
     colunaDeHonra: false,
   },
   identity: {
-    slug: 'auto-centro-express-prata',
+    slug: 'auto-centro-express-compasso',
     name: 'Auto Centro Express',
     category: 'Manutenção Automotiva',
-    description: 'Oficina especializada em mecânica geral, alinhamento 3D, balanceamento, injeção eletrônica e revisão preventiva.',
-    logo: crop('Logotipo do Auto Centro Express', 575, 128, 127, 126),
+    description: 'Oficina multimarcas especializada em alinhamento 3D, balanceamento computadorizado, suspensão, injeção eletrônica e freios.',
+    logo: img(
+      'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=300&auto=format&fit=crop&q=80',
+      'Logotipo Auto Centro Express'
+    ),
   },
   authority: {
     effectivePlan: 'prata',
@@ -51,92 +52,94 @@ export const prataBusinessFixture: PublicBusinessPresentation = {
   },
   media: {
     video: null,
-    cover: crop('Oficina mecânica ampla com elevadores automotivos', 23, 102, 521, 280),
+    cover: img(
+      'https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=1200&auto=format&fit=crop&q=80',
+      'Oficina Mecânica Auto Centro'
+    ),
     gallery: [
-      crop('Área de diagnóstico computadorizado', 282, 719, 52, 52),
-      crop('Recepção de atendimento ao cliente', 690, 719, 52, 52),
+      img('https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?w=600&auto=format&fit=crop&q=80', 'Alinhamento 3D de Precisão'),
+      img('https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?w=600&auto=format&fit=crop&q=80', 'Diagnóstico Eletrônico Avançado'),
+      img('https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=600&auto=format&fit=crop&q=80', 'Revisão Preventiva de Freios'),
     ],
   },
   owner: {
-    name: 'Marcos Vasconcelos',
-    businessRole: 'Diretor de Operações',
-    organization: 'A.R.L.S. União e Esperança nº 108',
-    communityLabel: 'Irmão',
-    avatar: {
-      url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&auto=format&fit=crop&q=80',
-      alt: 'Foto de Marcos Vasconcelos',
-      type: 'image',
-    },
+    name: 'Carlos Alberto Santos',
+    businessRole: 'Sócio-Gerente',
+    organization: 'A.R.L.S. Fraternidade Feirense nº 12',
+    communityLabel: 'Ir.·.',
+    avatar: img(
+      'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&auto=format&fit=crop&q=80',
+      'Foto de Carlos Alberto Santos'
+    ),
   },
   contacts: {
-    phone: '(11) 3456-7890',
-    whatsapp: '5511987654321',
+    phone: '(75) 3224-8899',
+    whatsapp: '5575988776655',
     email: 'atendimento@autocentroexpress.com.br',
-    instagram: 'autocentroexpress',
+    instagram: '@autocentroexpress',
     facebook: 'autocentroexpress',
-    website: 'autocentroexpress.com.br',
+    website: 'https://autocentroexpress.com.br',
   },
   location: {
-    address: 'Av. Paulista, 1500 — Bela Vista, São Paulo, SP, 01310-200',
-    city: 'São Paulo',
-    state: 'SP',
-    latitude: -23.5615,
-    longitude: -46.6559,
-    mapImage: crop('Mapa em São Paulo', 1140, 680, 350, 240),
+    address: 'Av. Maria Quitéria, 890 — Brasília, Feira de Santana, BA, 44002-000',
+    city: 'Feira de Santana',
+    state: 'BA',
+    latitude: -12.258,
+    longitude: -38.955,
+    mapImage: null,
   },
-  hours: [
-    { dayOfWeek: 1, openTime: '07:30', closeTime: '18:30', isClosed: false },
-    { dayOfWeek: 2, openTime: '07:30', closeTime: '18:30', isClosed: false },
-    { dayOfWeek: 3, openTime: '07:30', closeTime: '18:30', isClosed: false },
-    { dayOfWeek: 4, openTime: '07:30', closeTime: '18:30', isClosed: false },
-    { dayOfWeek: 5, openTime: '07:30', closeTime: '18:30', isClosed: false },
-    { dayOfWeek: 6, openTime: '08:00', closeTime: '13:00', isClosed: false },
-  ],
   services: [
-    { id: 'ps1', name: 'Alinhamento 3D & Balanceamento', description: 'Regulagem computadorizada com altíssima precisão.', priceInfo: 'R$ 180,00' },
-    { id: 'ps2', name: 'Revisão Preventiva de Freios', description: 'Troca de pastilhas, discos e sangria do fluido de freio.', priceInfo: 'A partir de R$ 250' },
-    { id: 'ps3', name: 'Diagnóstico de Injeção Eletrônica', description: 'Análise completa via scanner automotivo com emissão de laudo.', priceInfo: 'R$ 150,00' },
+    { id: 's1', name: 'Alinhamento 3D e Balanceamento', description: 'Regulagem computadorizada da geometria da suspensão.', priceInfo: 'R$ 120,00' },
+    { id: 's2', name: 'Revisão Sistemática de Injeção', description: 'Diagnóstico via scanner com limpeza de bicos.', priceInfo: 'R$ 180,00' },
+    { id: 's3', name: 'Troca de Óleo & Filtros', description: 'Lubrificantes sintéticos de alto desempenho.', priceInfo: 'A partir de R$ 150,00' },
+    { id: 's4', name: 'Manutenção de Freios & Abs', description: 'Substituição de pastilhas e fluídos de freio.', priceInfo: 'Sob Consulta' },
   ],
-  benefit: {
-    title: 'Desconto de 15% em Peças e Mão de Obra',
-    description: 'Apresente sua comprovação de vínculo e obtenha 15% de desconto em todas as revisões periódicas.',
-    benefitType: 'Desconto Exclusivo',
-    discountPercentage: 15,
-    discountCode: 'FRATERNO15',
-  },
   benefits: [
     {
-      id: 'pb1',
-      title: 'Desconto de 15% em Peças e Mão de Obra',
-      description: 'Apresente sua comprovação de vínculo e obtenha 15% de desconto em todas as revisões periódicas.',
-      benefitType: 'Desconto Exclusivo',
-      discountPercentage: 15,
-      discountCode: 'FRATERNO15',
+      id: 'b1',
+      title: '10% de Desconto em Serviços de Suspensão',
+      description: 'Desconto direto na mão de obra para membros cadastrados no Guia.',
+      benefitType: 'Desconto em Serviços',
+      discountPercentage: 10,
+      badgeText: 'Parceria Comercial',
+      validUntil: '2026-12-31',
     },
   ],
   events: [],
   posts: [],
+  hours: [
+    { dayOfWeek: 1, openTime: '08:00', closeTime: '18:00', isClosed: false },
+    { dayOfWeek: 2, openTime: '08:00', closeTime: '18:00', isClosed: false },
+    { dayOfWeek: 3, openTime: '08:00', closeTime: '18:00', isClosed: false },
+    { dayOfWeek: 4, openTime: '08:00', closeTime: '18:00', isClosed: false },
+    { dayOfWeek: 5, openTime: '08:00', closeTime: '18:00', isClosed: false },
+    { dayOfWeek: 6, openTime: '08:00', closeTime: '12:00', isClosed: false },
+    { dayOfWeek: 0, openTime: null, closeTime: null, isClosed: true },
+  ],
+  benefit: {
+    id: 'b1',
+    title: '10% de Desconto em Serviços de Suspensão',
+    description: 'Desconto direto na mão de obra para membros cadastrados no Guia.',
+    benefitType: 'Desconto em Serviços',
+    discountPercentage: 10,
+    badgeText: 'Parceria Comercial',
+    validUntil: '2026-12-31',
+  },
+  metrics: {
+    views: 650,
+    openingStatus: 'Aberto agora',
+  },
   reviews: {
-    average: 4.8,
-    count: 86,
+    average: 5.0,
+    count: 1,
     items: [
       {
-        id: 'prata-review-1',
+        id: 'r1',
         rating: 5,
-        authorName: 'Fernando Rocha',
-        authorAvatar: crop('Fernando Rocha', 282, 719, 52, 52),
-        publishedAt: '2026-08-01T10:00:00Z',
-        comment: 'Serviço rápido e transparente. Recomendo muito o trabalho do irmão Carlos!',
-      },
-      {
-        id: 'prata-review-2',
-        rating: 5,
-        authorName: 'Gustavo Mendonça',
-        authorAvatar: crop('Gustavo Mendonça', 690, 719, 52, 52),
-        publishedAt: '2026-07-20T14:30:00Z',
-        comment: 'Preço justo e atendimento diferenciado. A oficina é extremamente limpa e organizada.',
+        comment: 'Serviço rápido e de confiança. Preço justo e ótimo atendimento do Irmão Carlos.',
+        publishedAt: '2026-08-10T11:20:00Z',
+        authorName: 'Ir.·. Fernando Souza',
       },
     ],
   },
-  metrics: { views: 4120, openingStatus: 'Aberto agora' },
 };

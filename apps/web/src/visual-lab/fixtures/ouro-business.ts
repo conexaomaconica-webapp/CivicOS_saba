@@ -1,22 +1,19 @@
 import type { PublicBusinessPresentation, PublicMediaAsset } from '@/lib/business/public-business-presentation';
 
-const referenceUrl = '/visual-lab/assets/bronze-reference';
-
-function crop(alt: string, x: number, y: number, width: number, height: number): PublicMediaAsset {
+function img(url: string, alt: string): PublicMediaAsset {
   return {
-    url: referenceUrl,
+    url,
     alt,
     type: 'image',
-    crop: { sourceWidth: 1536, sourceHeight: 1024, x, y, width, height },
   };
 }
 
-/** Fixture exclusiva da rota Visual Lab Ouro */
-/** Fixture exclusiva da rota Visual Lab Ouro */
+/** Fixture oficial do Plano Acácia (Ouro) para Visual Lab e Simulador de Reconhecimentos */
 export const ouroBusinessFixture: PublicBusinessPresentation = {
   plan: {
     commercialPlan: 'ouro',
     template: 'ouro',
+    sectionOrder: ['about', 'services', 'benefits', 'video', 'gallery', 'events', 'posts'],
   },
   entitlements: {
     maxPhotos: 10,
@@ -33,172 +30,158 @@ export const ouroBusinessFixture: PublicBusinessPresentation = {
   },
   recognition: {
     verified: true,
-    founder: false,
-    pedraFundamental: false,
+    founder: true,
+    pedraFundamental: true,
     colunaDeHonra: false,
     goldPlanBadge: true,
   },
   identity: {
-    slug: 'padaria-estrela-ouro',
-    name: 'Padaria & Confeitaria Estrela',
-    category: 'Alimentos e Bebidas',
-    description: 'Padaria artesanal premiada com tradição de 30 anos. Pães de fermentação natural, confeitaria fina e café colonial.',
-    logo: crop('Logotipo da Padaria Estrela', 575, 128, 127, 126),
+    slug: 'comandos-seguranca-acacia',
+    name: 'Comandos Segurança & Terceirização',
+    category: 'Segurança e Terceirização',
+    description: 'Empresa especializada em segurança patrimonial, monitoramento eletrônico 24h, portaria remota e terceirização de serviços com mais de 25 anos de credibilidade.',
+    logo: img(
+      'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=300&auto=format&fit=crop&q=80',
+      'Logotipo Comandos Segurança'
+    ),
   },
   authority: {
     effectivePlan: 'ouro',
     isVerified: true,
-    isFounder: false,
+    isFounder: true,
     communityVerified: true,
   },
   media: {
-    video: null,
-    cover: crop('Fachada e salão principal da Padaria Estrela', 23, 102, 521, 280),
+    video: {
+      url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+      title: 'Apresentação Institucional Comandos Segurança',
+      type: 'video',
+    } as any,
+    cover: img(
+      'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&auto=format&fit=crop&q=80',
+      'Fachada Sede Comandos Segurança'
+    ),
     gallery: [
-      crop('Vitrine de doces finos', 282, 719, 52, 52),
-      crop('Pães artesanais recém saídos do forno', 690, 719, 52, 52),
+      img('https://images.unsplash.com/photo-1557804506-669a67965ba0?w=600&auto=format&fit=crop&q=80', 'Central de Monitoramento 24h'),
+      img('https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=600&auto=format&fit=crop&q=80', 'Equipe de Atendimento e Operações'),
+      img('https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&auto=format&fit=crop&q=80', 'Salão de Treinamento e Segurança'),
+      img('https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=600&auto=format&fit=crop&q=80', 'Frota de Ronda Técnica'),
     ],
   },
   owner: {
-    name: 'Helena Estrela',
-    businessRole: 'Fundadora e Chef Executiva',
-    organization: 'A.R.L.S. Luz e Verdade nº 15',
-    communityLabel: 'Cunhada',
-    avatar: {
-      url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80',
-      alt: 'Foto de Helena Estrela',
-      type: 'image',
-    },
+    name: 'Douglas Ramos',
+    businessRole: 'Diretor Executivo',
+    organization: 'A.R.L.S. 16 de Junho nº 42',
+    communityLabel: 'Ir.·.',
+    avatar: img(
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
+      'Foto de Douglas Ramos'
+    ),
   },
   contacts: {
-    phone: '(11) 2233-4455',
-    whatsapp: '5511977778888',
-    email: 'contato@padariaestrela.com.br',
-    instagram: 'padariaestrela',
-    facebook: 'padariaestrela',
-    website: 'padariaestrela.com.br',
+    phone: '(75) 3622-1010',
+    whatsapp: '5575999881010',
+    email: 'contato@comandosseguranca.com.br',
+    instagram: '@comandosseguranca',
+    facebook: 'comandosseguranca',
+    website: 'https://comandosseguranca.com.br',
   },
   location: {
-    address: 'Rua das Flores, 123 — Moema, São Paulo, SP, 04500-000',
-    city: 'São Paulo',
-    state: 'SP',
-    latitude: -23.6001,
-    longitude: -46.6668,
-    mapImage: crop('Mapa em Moema', 1140, 680, 350, 240),
+    address: 'Av. Getúlio Vargas, 1450 — Centro, Feira de Santana, BA, 44001-075',
+    city: 'Feira de Santana',
+    state: 'BA',
+    latitude: -12.2664,
+    longitude: -38.9663,
+    mapImage: null,
   },
-  hours: [
-    { dayOfWeek: 0, openTime: '06:00', closeTime: '21:00', isClosed: false },
-    { dayOfWeek: 1, openTime: '06:00', closeTime: '21:00', isClosed: false },
-    { dayOfWeek: 2, openTime: '06:00', closeTime: '21:00', isClosed: false },
-    { dayOfWeek: 3, openTime: '06:00', closeTime: '21:00', isClosed: false },
-    { dayOfWeek: 4, openTime: '06:00', closeTime: '21:00', isClosed: false },
-    { dayOfWeek: 5, openTime: '06:00', closeTime: '22:00', isClosed: false },
-    { dayOfWeek: 6, openTime: '06:00', closeTime: '22:00', isClosed: false },
-  ],
   services: [
-    {
-      name: 'Café Colonial Presencial',
-      description: 'Servido aos finais de semana e feriados com grande variedade de pães e doces artesanais.',
-      iconName: 'clock',
-      priceInfo: 'A partir de R$ 45',
-    },
-    {
-      name: 'Encomendas de Kit Festa & Eventos',
-      description: 'Atendimento personalizado para eventos corporativos e comemorações familiares.',
-      iconName: 'gift',
-      priceInfo: 'Sob consulta',
-    },
-    {
-      name: 'Consultoria de Harmonização de Pães',
-      description: 'Treinamento e harmonização exclusiva de pães de fermentação natural para degustações.',
-      iconName: 'desconhecido_fallback_test', // Ícone desconhecido -> testa fallback para Briefcase
-      priceInfo: null, // Sem priceInfo -> não renderiza badge fake
-    },
-    {
-      name: 'Entrega Expressa Fraterna',
-      description: null, // Sem descrição -> renderiza apenas título de forma limpa
-      iconName: 'truck',
-      priceInfo: 'Frete Grátis',
-    },
+    { id: 's1', name: 'Segurança Patrimonial Armada', description: 'Vigilância patrimonial treinada com ronda física e eletrônica.', priceInfo: 'Sob Consulta' },
+    { id: 's2', name: 'Central de Monitoramento 24h', description: 'Monitoramento contínuo com acionamento de apoio tático imediato.', priceInfo: 'A partir de R$ 199/mês' },
+    { id: 's3', name: 'Portaria Remota Inteligente', description: 'Controle de acesso por biometria, leitura facial e tag veicular.', priceInfo: 'Sob Consulta' },
+    { id: 's4', name: 'Terceirização de Limpeza & Recepção', description: 'Equipes qualificadas para condomínios e empresas.', priceInfo: 'Sob Consulta' },
   ],
-  benefit: {
-    title: 'Desconto Ouro VIP 20%',
-    description: '20% de desconto em todo o cardápio + brinde exclusivo no café colonial para membros da comunidade.',
-    discountCode: 'OURO20',
-    redeemInstructions: 'Apresente o código promocional no balanço ou WhatsApp.',
-    validUntil: '2026-12-31T23:59:59Z',
-    badgeText: '20% OFF VIP',
-  },
   benefits: [
     {
-      id: 'b-ouro-1',
-      title: 'Desconto Ouro VIP 20%',
-      description: '20% de desconto em todo o cardápio em compras acima de R$ 50 para membros da comunidade.',
-      discountCode: 'OURO20',
-      redeemInstructions: 'Apresente o código promocional no caixa ou informe pelo WhatsApp Direct.',
-      validUntil: '2026-12-31T23:59:59Z',
-      badgeText: '20% OFF VIP',
+      id: 'b1',
+      title: '15% de Desconto em Monitoramento 24h',
+      description: 'Condição fraterna exclusiva para membros da rede e Irmãos da Ordem.',
+      benefitType: 'Desconto Exclusivo',
+      discountPercentage: 15,
+      badgeText: 'Oferta Fraterna',
+      validUntil: '2026-12-31',
     },
     {
-      id: 'b-ouro-2',
-      title: 'Café Colonial Cortesia',
-      description: 'Ganhe um espresso premiado acompanhado de broa de milho em qualquer consumo presencial.',
-      badgeText: 'CORTESIA DA CASA',
-      // Sem discountCode, sem redeemInstructions -> testa omissão sem botões quebrados
-    },
-    {
-      id: 'b-ouro-3',
-      title: 'Kit Degustação Pães Levain',
-      description: 'Desconto de R$ 30 na compra do kit degustação familiar de pães de fermentação natural.',
-      discountAmount: 30,
-      discountCode: 'LEVAIN30',
-      redeemInstructions: 'Solicite ao atendente antes da emissão da nota.',
-      badgeText: 'R$ 30 OFF',
+      id: 'b2',
+      title: 'Vistoria Técnica Gratuita de Segurança',
+      description: 'Auditoria de vulnerabilidades físicas e eletrônicas sem custo inicial.',
+      benefitType: 'Gratuidade Comercial',
+      discountPercentage: 100,
+      badgeText: 'Cortesia',
+      validUntil: '2026-12-31',
     },
   ],
   events: [
     {
-      id: 'e-ouro-1',
-      title: 'Degustação Guiada de Pães Levain',
-      description: 'Encontro fraterno com harmonização de pães artesanais de fermentação natural e vinhos selecionados.',
-      startDate: '2026-09-15 19:00',
-      endDate: '2026-09-15 22:00',
-      location: 'Salão Privativo — Padaria Estrela Moema',
-      imageUrl: null,
-      externalUrl: null,
+      id: 'e1',
+      title: 'Seminário de Segurança Eletrônica Comercial',
+      description: 'Palestra presencial sobre prevenção de riscos e inteligência patrimonial.',
+      startDate: '2026-10-15T19:00:00Z',
+      endDate: '2026-10-15T21:30:00Z',
+      location: 'Auditório Comandos — Feira de Santana/BA',
+      imageUrl: 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=600&auto=format&fit=crop&q=80',
+      externalUrl: 'https://comandosseguranca.com.br/eventos',
     },
   ],
   posts: [
     {
-      id: 'p-ouro-1',
-      title: 'A Arte da Fermentação Natural de 48 Horas',
-      summary: 'Entenda os benefícios nutricionais e o processo artesanal por trás dos nossos pães de fermentação lenta.',
-      content: 'Nossos pães utilizam fermento natural vivo (levain) cultivado há mais de 25 anos...',
-      publishedAt: '2026-08-20',
-      imageUrl: null,
+      id: 'p1',
+      title: 'Como Proteger Seu Estabelecimento em Períodos Festivos',
+      summary: 'Dicas práticas de integração entre alarmes, inteligência visual e rondas técnicas.',
+      content: 'A segurança preventiva é o pilar fundamental para evitar sinistros comerciais...',
+      publishedAt: '2026-09-01T10:00:00Z',
+      imageUrl: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=600&auto=format&fit=crop&q=80',
     },
   ],
+  hours: [
+    { dayOfWeek: 1, openTime: '08:00', closeTime: '18:00', isClosed: false },
+    { dayOfWeek: 2, openTime: '08:00', closeTime: '18:00', isClosed: false },
+    { dayOfWeek: 3, openTime: '08:00', closeTime: '18:00', isClosed: false },
+    { dayOfWeek: 4, openTime: '08:00', closeTime: '18:00', isClosed: false },
+    { dayOfWeek: 5, openTime: '08:00', closeTime: '18:00', isClosed: false },
+    { dayOfWeek: 6, openTime: '08:00', closeTime: '12:00', isClosed: false },
+    { dayOfWeek: 0, openTime: null, closeTime: null, isClosed: true },
+  ],
+  benefit: {
+    id: 'b1',
+    title: '15% de Desconto em Monitoramento 24h',
+    description: 'Condição fraterna exclusiva para membros da rede e Irmãos da Ordem.',
+    benefitType: 'Desconto Exclusivo',
+    discountPercentage: 15,
+    badgeText: 'Oferta Fraterna',
+    validUntil: '2026-12-31',
+  },
+  metrics: {
+    views: 1240,
+    openingStatus: 'Aberto agora',
+  },
   reviews: {
     average: 5.0,
-    count: 215,
+    count: 2,
     items: [
       {
-        id: 'ouro-review-1',
+        id: 'r1',
         rating: 5,
-        authorName: 'Sérgio Vasconcelos',
-        authorAvatar: crop('Sérgio Vasconcelos', 282, 719, 52, 52),
-        publishedAt: '2026-08-10T08:15:00Z',
-        comment: 'O melhor croissant de São Paulo! Atendimento caloroso do irmão Roberto e equipe sensacional.',
+        comment: 'Excelência em atendimento e segurança. A equipe é muito prestativa e a central 24h funciona com precisão.',
+        publishedAt: '2026-08-20T14:30:00Z',
+        authorName: 'Ir.·. Marcos Aurélio',
       },
       {
-        id: 'ouro-review-2',
+        id: 'r2',
         rating: 5,
-        authorName: 'Alexandre Magno',
-        authorAvatar: crop('Alexandre Magno', 690, 719, 52, 52),
-        publishedAt: '2026-08-05T16:45:00Z',
-        comment: 'Excelente estrutura e produtos de altíssima qualidade. O benefício aos irmãos é muito honrado.',
+        comment: 'Serviço de alta qualidade e compromisso fraterno. Recomendamos com total confiança.',
+        publishedAt: '2026-08-15T09:15:00Z',
+        authorName: 'Dr. Roberto Mendes',
       },
     ],
   },
-  metrics: { views: 8930, openingStatus: 'Aberto agora' },
 };

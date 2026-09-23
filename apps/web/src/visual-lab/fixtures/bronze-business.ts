@@ -1,21 +1,19 @@
 import type { PublicBusinessPresentation, PublicMediaAsset } from '@/lib/business/public-business-presentation';
 
-const referenceUrl = '/visual-lab/assets/bronze-reference';
-
-function crop(alt: string, x: number, y: number, width: number, height: number): PublicMediaAsset {
+function img(url: string, alt: string): PublicMediaAsset {
   return {
-    url: referenceUrl,
+    url,
     alt,
     type: 'image',
-    crop: { sourceWidth: 1536, sourceHeight: 1024, x, y, width, height },
   };
 }
 
-/** Fixture exclusiva da rota Visual Lab, nunca usada pelo fluxo produtivo. */
+/** Fixture oficial do Plano Esquadro (Bronze) para Visual Lab e Simulador de Reconhecimentos */
 export const bronzeBusinessFixture: PublicBusinessPresentation = {
   plan: {
     commercialPlan: 'bronze',
     template: 'bronze',
+    sectionOrder: ['about', 'services'],
   },
   entitlements: {
     maxPhotos: 1,
@@ -33,15 +31,18 @@ export const bronzeBusinessFixture: PublicBusinessPresentation = {
   recognition: {
     verified: true,
     founder: false,
-    pedraFundamental: false,
+    pedraFundamental: true,
     colunaDeHonra: false,
   },
   identity: {
-    slug: 'saba-advocacia-visual-lab',
-    name: 'Saba Advocacia',
+    slug: 'saba-advocacia-esquadro',
+    name: 'Saba Advocacia & Consultoria',
     category: 'Serviços Jurídicos',
-    description: 'Assessoria jurídica empresarial, contratos e consultoria com atendimento próximo e personalizado.',
-    logo: crop('Logotipo de homologação da Saba Advocacia', 575, 128, 127, 126),
+    description: 'Assessoria jurídica empresarial, elaboração de contratos comerciais e consultoria jurídica preventiva com atendimento exclusivo.',
+    logo: img(
+      'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=300&auto=format&fit=crop&q=80',
+      'Logotipo Saba Advocacia'
+    ),
   },
   authority: {
     effectivePlan: 'bronze',
@@ -51,19 +52,21 @@ export const bronzeBusinessFixture: PublicBusinessPresentation = {
   },
   media: {
     video: null,
-    cover: crop('Escritório de advocacia usado na homologação visual Bronze', 23, 102, 521, 280),
+    cover: img(
+      'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&auto=format&fit=crop&q=80',
+      'Escritório de Advocacia Saba'
+    ),
     gallery: [],
   },
   owner: {
     name: 'Eduardo Saba',
-    businessRole: 'Proprietário',
+    businessRole: 'Advogado & Consultor',
     organization: 'A.R.L.S. Harmonia e Sabedoria nº 42',
-    communityLabel: 'Irmão',
-    avatar: {
-      url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&auto=format&fit=crop&q=80',
-      alt: 'Foto de Eduardo Saba',
-      type: 'image',
-    },
+    communityLabel: 'Ir.·.',
+    avatar: img(
+      'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&auto=format&fit=crop&q=80',
+      'Foto de Eduardo Saba'
+    ),
   },
   contacts: {
     phone: '(75) 3025-4242',
@@ -79,50 +82,47 @@ export const bronzeBusinessFixture: PublicBusinessPresentation = {
     state: 'BA',
     latitude: -12.2664,
     longitude: -38.9663,
-    mapImage: crop('Mapa de homologação em Feira de Santana', 1140, 680, 350, 240),
+    mapImage: null,
   },
-  hours: [
-    { dayOfWeek: 1, openTime: '08:00', closeTime: '18:00', isClosed: false },
-    { dayOfWeek: 2, openTime: '08:00', closeTime: '18:00', isClosed: false },
-    { dayOfWeek: 3, openTime: '08:00', closeTime: '18:00', isClosed: false },
-    { dayOfWeek: 4, openTime: '08:00', closeTime: '18:00', isClosed: false },
-    { dayOfWeek: 5, openTime: '08:00', closeTime: '18:00', isClosed: false },
-  ],
   services: [
-    { id: 's1', name: 'Consultoria Jurídica Empresarial', description: 'Elaboração e análise de contratos empresariais com foco em prevenção de riscos.', priceInfo: 'Sob Consulta' },
-    { id: 's2', name: 'Direito Societário & M&A', description: 'Estruturação de acordos de sócios e apoio em operações de reorganização.', priceInfo: 'Sob Consulta' },
+    { id: 's1', name: 'Consultoria Jurídica Empresarial', description: 'Elaboração e revisão de contratos societários e comerciais.', priceInfo: 'Sob Consulta' },
+    { id: 's2', name: 'Assessoria em Negociações', description: 'Intermediação e mediação contratual de negócios corporativos.', priceInfo: 'Sob Consulta' },
   ],
-  benefit: null,
   benefits: [],
   events: [],
   posts: [],
+  hours: [
+    { dayOfWeek: 1, openTime: '08:30', closeTime: '18:00', isClosed: false },
+    { dayOfWeek: 2, openTime: '08:30', closeTime: '18:00', isClosed: false },
+    { dayOfWeek: 3, openTime: '08:30', closeTime: '18:00', isClosed: false },
+    { dayOfWeek: 4, openTime: '08:30', closeTime: '18:00', isClosed: false },
+    { dayOfWeek: 5, openTime: '08:30', closeTime: '18:00', isClosed: false },
+    { dayOfWeek: 6, openTime: null, closeTime: null, isClosed: true },
+    { dayOfWeek: 0, openTime: null, closeTime: null, isClosed: true },
+  ],
+  benefit: null,
+  metrics: {
+    views: 310,
+    openingStatus: 'Aberto agora',
+  },
   reviews: {
-    average: 4.9,
-    count: 128,
+    average: 5.0,
+    count: 1,
     items: [
       {
-        id: 'bronze-review-1',
+        id: 'r1',
         rating: 5,
-        authorName: 'Marcos Almeida',
-        authorAvatar: crop('Marcos Almeida', 282, 719, 52, 52),
-        publishedAt: '2026-07-31T12:00:00Z',
-        comment: 'Atendimento impecável e muita competência. Esclareceu todas as minhas dúvidas e me orientou da melhor forma.',
-      },
-      {
-        id: 'bronze-review-2',
-        rating: 5,
-        authorName: 'Rafael Cardoso',
-        authorAvatar: crop('Rafael Cardoso', 690, 719, 52, 52),
-        publishedAt: '2026-07-14T12:00:00Z',
-        comment: 'Profissional ético, atencioso e muito eficiente. Recomendo a todos os irmãos que precisam de suporte jurídico de confiança.',
+        comment: 'Atendimento jurídico de altíssimo nível, profissionalismo impecável.',
+        publishedAt: '2026-07-28T16:00:00Z',
+        authorName: 'Dr. Paulo Henrique',
       },
     ],
   },
-  metrics: { views: 2847, openingStatus: 'Aberto agora' },
 };
 
 export const bronzeViewerFixture = {
+  id: 'usr_bronze_viewer',
   name: 'Eduardo Saba',
-  location: 'Feira de Santana, BA',
-  avatar: crop('Eduardo Saba', 1257, 16, 46, 46),
+  email: 'eduardo@sabaadvocacia.com.br',
+  role: 'member',
 };
