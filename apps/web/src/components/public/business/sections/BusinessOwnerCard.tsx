@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { UserCheck, Building2, ZoomIn, ShieldCheck } from 'lucide-react';
+import { UserCheck, Building2, ZoomIn, ShieldCheck, MessageCircle } from 'lucide-react';
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
 import { ImageZoomModal } from '../shared/ImageZoomModal';
 
@@ -34,6 +34,10 @@ export function BusinessOwnerCard({
     `https://ui-avatars.com/api/?name=${encodeURIComponent(owner.name || businessName)}&background=4B161B&color=F3EEDD`;
 
   const displayName = `${owner.communityLabel ? `${owner.communityLabel} ` : ''}${owner.name}`;
+  const whatsappDigits = owner.whatsapp?.replace(/\D/g, '') || '';
+  const whatsappUrl = whatsappDigits
+    ? `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(`Olá, ${owner.name}! Encontrei seu perfil no Guia Conexão Maçônica.`)}`
+    : null;
 
   return (
     <>
@@ -44,7 +48,7 @@ export function BusinessOwnerCard({
             {isVerified && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold">
                 <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" />
-                <span>Auditado</span>
+                <span>Verificado</span>
               </span>
             )}
           </h3>
@@ -90,6 +94,19 @@ export function BusinessOwnerCard({
                 {owner.businessRole}
               </p>
             )}
+
+            {whatsappUrl && (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex max-w-full items-center gap-1.5 text-xs font-bold text-emerald-700 transition-colors hover:text-emerald-800 hover:underline"
+                aria-label={`Falar diretamente com ${owner.name} pelo WhatsApp`}
+              >
+                <MessageCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                <span className="truncate">WhatsApp: {owner.whatsapp}</span>
+              </a>
+            )}
           </div>
         </div>
 
@@ -116,8 +133,8 @@ export function BusinessOwnerCard({
         onClose={() => setIsZoomOpen(false)}
         imageUrl={avatarUrl}
         altText={`Foto de ${owner.name}`}
-        title={`Foto Oficial — ${displayName}`}
-        badge="Representante Cadastrado"
+        title={`${displayName}  - ${owner.businessRole}`}
+        badge={`Loja Maçônica: ${owner.organization}`}
       />
     </>
   );

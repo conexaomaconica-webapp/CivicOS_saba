@@ -219,7 +219,7 @@ export default async function AdminDashboardPage() {
           </div>
           <p className="text-3xl font-serif font-bold text-stone-900 mt-2">{data.kpis.activeSubscriptions}</p>
           <p className="text-[11px] text-stone-500 mt-1 flex items-center justify-between">
-            <span>Bronze, Prata e Ouro</span>
+            <span>Esquadro, Compasso e Acácia</span>
             <ArrowIcon className="w-3.5 h-3.5 text-[#C9A227] group-hover:translate-x-1 transition-transform" />
           </p>
         </Link>
@@ -402,7 +402,7 @@ export default async function AdminDashboardPage() {
           <div className="space-y-3 text-xs">
             <div className="space-y-1">
               <div className="flex justify-between font-bold">
-                <span>Bronze (Gratuito)</span>
+                <span>Esquadro (Gratuito)</span>
                 <span>{data.planDistribution.bronzeCount} empresas ({data.planDistribution.bronzePercent}%)</span>
               </div>
               <div className="w-full bg-stone-200 h-2 rounded-full overflow-hidden">
@@ -412,7 +412,7 @@ export default async function AdminDashboardPage() {
 
             <div className="space-y-1">
               <div className="flex justify-between font-bold">
-                <span>Prata (Anual R$ 1.788)</span>
+                <span>Compasso (Anual R$ 1.788)</span>
                 <span>{data.planDistribution.prataCount} empresas ({data.planDistribution.prataPercent}%)</span>
               </div>
               <div className="w-full bg-stone-200 h-2 rounded-full overflow-hidden">
@@ -422,7 +422,7 @@ export default async function AdminDashboardPage() {
 
             <div className="space-y-1">
               <div className="flex justify-between font-bold">
-                <span>Ouro (Anual R$ 2.388)</span>
+                <span>Acácia (Anual R$ 2.388)</span>
                 <span>{data.planDistribution.ouroCount} empresas ({data.planDistribution.ouroPercent}%)</span>
               </div>
               <div className="w-full bg-stone-200 h-2 rounded-full overflow-hidden">

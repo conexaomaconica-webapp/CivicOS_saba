@@ -3,6 +3,7 @@
 export interface PlanPaymentRules {
   planCode: string;
   amountCents: number;
+  pixAmountCents: number;
   paymentMethodsAllowed: string[];
   installmentsMax: number;
   interestFreeInstallments: number;
@@ -12,6 +13,7 @@ export const CANONICAL_PLAN_PAYMENT_RULES: Record<string, PlanPaymentRules> = {
   bronze: {
     planCode: 'bronze',
     amountCents: 0,
+    pixAmountCents: 0,
     paymentMethodsAllowed: ['pix', 'credit_card'],
     installmentsMax: 3,
     interestFreeInstallments: 3,
@@ -19,6 +21,7 @@ export const CANONICAL_PLAN_PAYMENT_RULES: Record<string, PlanPaymentRules> = {
   prata: {
     planCode: 'prata',
     amountCents: 178800, // R$ 1.788,00 / ano (6x R$ 298,00)
+    pixAmountCents: 178800,
     paymentMethodsAllowed: ['pix', 'credit_card'],
     installmentsMax: 6,
     interestFreeInstallments: 6,
@@ -26,6 +29,7 @@ export const CANONICAL_PLAN_PAYMENT_RULES: Record<string, PlanPaymentRules> = {
   ouro: {
     planCode: 'ouro',
     amountCents: 238800, // R$ 2.388,00 / ano (12x R$ 199,00)
+    pixAmountCents: 238800,
     paymentMethodsAllowed: ['pix', 'credit_card'],
     installmentsMax: 12,
     interestFreeInstallments: 12,

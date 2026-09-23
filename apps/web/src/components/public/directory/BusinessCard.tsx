@@ -147,7 +147,7 @@ export function BusinessCard({
     // Prioridade 3: Conexão Ouro
     if (plan === 'ouro' || plan === 'gold' || plan === 'ouro_founder') {
       return {
-        label: 'Conexão Ouro',
+        label: 'Acácia',
         bg: 'bg-[#fdf8eb] text-[#855e10] border-[#e8d7ad] font-semibold',
         icon: Crown,
       };
@@ -156,7 +156,7 @@ export function BusinessCard({
     // Prioridade 4: Conexão Prata
     if (plan === 'prata' || plan === 'silver') {
       return {
-        label: 'Conexão Prata',
+        label: 'Compasso',
         bg: 'bg-slate-100 text-slate-800 border-slate-300 font-semibold',
         icon: Award,
       };
@@ -165,7 +165,7 @@ export function BusinessCard({
     // Prioridade 5: Conexão Bronze
     if (plan === 'bronze') {
       return {
-        label: 'Conexão Bronze',
+        label: 'Esquadro',
         bg: 'bg-orange-50 text-amber-900 border-orange-200 font-semibold',
         icon: Award,
       };
@@ -192,7 +192,7 @@ export function BusinessCard({
 
     // Fallback neutro
     return {
-      label: 'Conexão Bronze',
+      label: 'Esquadro',
       bg: 'bg-amber-50/60 text-amber-900 border-amber-200',
       icon: ShieldCheck,
     };

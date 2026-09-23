@@ -22,4 +22,12 @@ describe('public shell isolation', () => {
     expect(layout).toContain("process.env.VISUAL_LAB_ENABLED === 'true'");
     expect(asset).toContain('status: 404');
   });
+  it('mantém a identidade do menu móvel e a cidade da empresa no cabeçalho', () => {
+    const header = source('components/public/directory/DirectoryHeader.tsx');
+    const businessPage = source('app/(public)/guia/[slug]/page.tsx');
+    expect(header).toContain('bg-[#3b0b14]/98');
+    expect(header).not.toContain('md:hidden bg-amber-950/95');
+    expect(businessPage).toContain("selectedCity={business.location?.city || ''}");
+    expect(businessPage).toContain('availableCities={business.location?.city ? [business.location.city] : []}');
+  });
 });

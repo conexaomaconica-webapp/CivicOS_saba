@@ -1,7 +1,7 @@
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
 import { ouroBusinessFixture } from './ouro-business';
 
-/** Fixture para homologar o cenário Ouro + Selo Pedra Fundamental (10/10) */
+/** Fixture para homologar o cenário Ouro + Selo Pedra Fundamental */
 export const pedraFundamentalBusinessFixture: PublicBusinessPresentation = {
   ...ouroBusinessFixture,
   identity: {

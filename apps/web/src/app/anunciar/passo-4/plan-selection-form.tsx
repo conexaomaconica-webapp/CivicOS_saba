@@ -104,6 +104,16 @@ export default function PlanSelectionForm({ businessId, plans }: PlanSelectionFo
                       ? `anual • até ${plan.installmentsMax || 1}x sem juros`
                       : 'cadastro sem custo'}
                   </span>
+                  {plan.annualPriceCents > 0 && (plan.pixPriceCents ?? plan.annualPriceCents) < plan.annualPriceCents && (
+                    <div className="mt-2 rounded-xl border border-emerald-700/50 bg-emerald-950/40 px-3 py-2">
+                      <span className="block text-sm font-extrabold text-emerald-300">
+                        {((plan.pixPriceCents ?? plan.annualPriceCents) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} no PIX
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-400">
+                        {plan.pixDiscountPercentage}% de desconto
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

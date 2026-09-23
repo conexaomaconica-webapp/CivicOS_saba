@@ -152,24 +152,7 @@ export function DirectoryHeader({
         </div>
 
         {/* Mobile Hamburger Toggle Button */}
-        <div className="flex md:hidden items-center gap-2">
-          {/* Seletor de Cidade Compacto Mobile */}
-          <div className="dh-city-dropdown px-2 py-1">
-            <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <select
-              value={activeCity || ''}
-              onChange={(e) => handleCityChange(e.target.value)}
-              className="bg-transparent text-white border-none outline-none font-medium cursor-pointer text-[11px] max-w-[100px] truncate"
-            >
-              <option value="" className="bg-amber-950 text-white">Cidades</option>
-              {citiesToDisplay.map((c) => (
-                <option key={c} value={c} className="bg-amber-950 text-white">
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-
+        <div className="dh-header__mobile-actions flex items-center gap-2 md:hidden">
           <button
             onClick={() => setIsModalOpen(true)}
             className="dh-header__icon-btn relative p-1.5"
@@ -193,9 +176,27 @@ export function DirectoryHeader({
         </div>
       </div>
 
+      {/* No mobile o filtro ocupa uma linha própria para não comprimir a marca e as ações. */}
+      <div className="dh-header__mobile-city md:hidden">
+        <div className="dh-city-dropdown">
+          <MapPin className="h-4 w-4 shrink-0 text-amber-400" />
+          <select
+            value={activeCity || ''}
+            onChange={(e) => handleCityChange(e.target.value)}
+            aria-label="Filtrar empresas por cidade"
+            className="min-w-0 flex-1 cursor-pointer truncate border-none bg-transparent text-xs font-semibold text-white outline-none"
+          >
+            <option value="" className="bg-amber-950 text-white">Todas as cidades</option>
+            {citiesToDisplay.map((c) => (
+              <option key={c} value={c} className="bg-amber-950 text-white">{c}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {/* Mobile Drawer Menu Overlay */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-amber-950/95 backdrop-blur-xl border-b border-amber-500/20 px-4 py-5 shadow-2xl transition-all animate-fadeIn">
+        <div className="animate-fadeIn border-b border-[#c59b27]/25 bg-[#3b0b14]/98 px-4 py-5 shadow-2xl backdrop-blur-xl transition-all md:hidden">
           <nav className="flex flex-col gap-3 mb-5">
             {navLinks.map((link) => {
               const active = isLinkActive(link.href, link.exact);

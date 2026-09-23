@@ -15,48 +15,53 @@ import {
   updateInstitutionalRecognitionAction,
   uploadRecognitionSealAction,
 } from '@/app/actions/institutional-recognitions';
+import { optimizeImageForUpload } from '@/lib/media/optimize-image';
 import { InstitutionalBadges } from '@/components/public/business/shared/InstitutionalBadges';
 
 const DEFAULT_CATALOG: InstitutionalRecognitionDTO[] = [
   {
     id: 'rec_pedra_fundamental',
     key: 'pedra_fundamental',
-    title: 'Selo Pedra Fundamental (10/10)',
-    description: 'Reconhecimento histórico/institucional permanente dos 10 primeiros apoiadores da rede Conexão Maçônica.',
-    tooltip: 'Concedido exclusivamente aos 10 primeiros apoiadores históricos da plataforma.',
+    title: 'Pedra Fundamental',
+    description: 'Condecoração histórica destinada às empresas fundadoras da Conexão Maçônica.',
+    tooltip: 'Condecoração de fundador, independente do plano comercial.',
     seal_url: '/selos/pedra-fundamental.svg',
     compact_seal_url: '/selos/pedra-fundamental-compact.svg',
     sealUrl: '/selos/pedra-fundamental.svg',
     compactSealUrl: '/selos/pedra-fundamental-compact.svg',
+    header_display: 'badge',
     priority_order: 1,
-    is_active: true,
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'rec_coluna_de_honra',
-    key: 'coluna_de_honra',
-    title: 'Coluna de Honra (Empresa Fundadora)',
-    description: 'Membro fundador e destaque de mérito e contribuição exemplar na fraternidade.',
-    tooltip: 'Reconhecimento institucional aos membros fundadores da comunidade.',
-    seal_url: '/selos/coluna-honra.svg',
-    compact_seal_url: '/selos/coluna-honra-compact.svg',
-    sealUrl: '/selos/coluna-honra.svg',
-    compactSealUrl: '/selos/coluna-honra-compact.svg',
-    priority_order: 2,
     is_active: true,
     updated_at: new Date().toISOString(),
   },
   {
     id: 'rec_selo_ouro',
     key: 'selo_ouro',
-    title: 'Selo Anunciante Ouro',
+    title: 'Selo Acácia',
     description: 'Reconhecimento e presença comercial de máxima distinção para empresas do Plano Acácia.',
     tooltip: 'Concedido a todos os anunciantes ativos no Plano Acácia.',
     seal_url: '/selos/plano-ouro.svg',
     compact_seal_url: '/selos/plano-ouro-compact.svg',
     sealUrl: '/selos/plano-ouro.svg',
     compactSealUrl: '/selos/plano-ouro-compact.svg',
-    priority_order: 3,
+    header_display: 'badge',
+    priority_order: 2,
+    is_active: true,
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'rec_selo_prata', key: 'selo_prata', title: 'Selo Compasso',
+    description: 'Identificação comercial das empresas ativas no Plano Compasso.', tooltip: 'Exibido para anunciantes ativos no Plano Compasso.',
+    seal_url: '/selos/plano-prata.svg', compact_seal_url: '/selos/plano-prata.svg', sealUrl: '/selos/plano-prata.svg', compactSealUrl: '/selos/plano-prata.svg',
+    header_display: 'badge',
+    priority_order: 3, is_active: true, updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'rec_selo_bronze', key: 'selo_bronze', title: 'Selo Esquadro',
+    description: 'Identificação comercial das empresas ativas no Plano Esquadro.', tooltip: 'Exibido para anunciantes ativos no Plano Esquadro.',
+    seal_url: '/selos/plano-bronze.svg', compact_seal_url: '/selos/plano-bronze.svg', sealUrl: '/selos/plano-bronze.svg', compactSealUrl: '/selos/plano-bronze.svg',
+    header_display: 'badge',
+    priority_order: 4,
     is_active: true,
     updated_at: new Date().toISOString(),
   },
@@ -82,6 +87,7 @@ export function RecognitionsAdminClient({
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const mainFileInputRef = useRef<HTMLInputElement>(null);
+  const horizontalFileInputRef = useRef<HTMLInputElement>(null);
 
   const activeRecognition = recognitions.find((r) => r.key === selectedKey) || recognitions[0]!;
 
@@ -91,17 +97,21 @@ export function RecognitionsAdminClient({
     );
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: 'seal_url' | 'compact_seal_url',
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploadingField('seal_url');
+    setUploadingField(field);
     setMessage(null);
 
     try {
+      const optimizedFile = await optimizeImageForUpload(file, { maxBytes: 1.8 * 1024 * 1024, maxDimension: 1800 });
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('sealType', `${selectedKey}-seal`);
+      formData.append('file', optimizedFile);
+      formData.append('sealType', `${selectedKey}-${field === 'compact_seal_url' ? 'horizontal' : 'seal'}`);
 
       const res = await uploadRecognitionSealAction(formData);
       if (!res.success || !res.url) {
@@ -111,17 +121,15 @@ export function RecognitionsAdminClient({
       const newUrl = res.url;
       const updatedRecognition = {
         ...activeRecognition,
-        seal_url: newUrl,
-        compact_seal_url: newUrl,
-        sealUrl: newUrl,
-        compactSealUrl: newUrl,
+        [field]: newUrl,
+        ...(field === 'seal_url' ? { sealUrl: newUrl } : { compactSealUrl: newUrl }),
       };
 
       // Atualizar estado React local
       setRecognitions((prev) =>
         prev.map((r) =>
           r.key === selectedKey
-            ? { ...r, seal_url: newUrl, compact_seal_url: newUrl, sealUrl: newUrl, compactSealUrl: newUrl }
+            ? { ...r, [field]: newUrl, ...(field === 'seal_url' ? { sealUrl: newUrl } : { compactSealUrl: newUrl }) }
             : r
         )
       );
@@ -195,9 +203,9 @@ export function RecognitionsAdminClient({
       </div>
 
       {/* SELETOR DE RECONHECIMENTO (Selos Institucionais & Selo Anunciante Ouro) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {recognitions
-          .filter((r) => r.key === 'pedra_fundamental' || r.key === 'coluna_de_honra' || r.key === 'selo_ouro')
+          .filter((r) => r.key === 'pedra_fundamental' || r.key === 'selo_ouro' || r.key === 'selo_prata' || r.key === 'selo_bronze')
           .map((r) => {
             const isSelected = r.key === selectedKey;
             return (
@@ -205,11 +213,10 @@ export function RecognitionsAdminClient({
                 key={r.key}
                 type="button"
                 onClick={() => setSelectedKey(r.key)}
-                className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-                  isSelected
+                className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${isSelected
                     ? 'bg-[#3B0B14] text-white border-[#C9A227] shadow-xl ring-2 ring-[#C9A227]/40'
                     : 'bg-white text-stone-900 border-stone-300 hover:border-stone-400'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between">
                   <span className={`text-[10px] font-bold uppercase tracking-wider ${isSelected ? 'text-[#C9A227]' : 'text-stone-500'}`}>
@@ -232,11 +239,10 @@ export function RecognitionsAdminClient({
       <form onSubmit={handleSave} className="bg-white border border-stone-300 rounded-2xl p-6 shadow-sm space-y-6">
         {message && (
           <div
-            className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
-              message.type === 'success'
+            className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${message.type === 'success'
                 ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
                 : 'bg-red-100 text-red-900 border border-red-300'
-            }`}
+              }`}
           >
             <ShieldCheck className="w-4 h-4 shrink-0" />
             <span>{message.text}</span>
@@ -308,6 +314,78 @@ export function RecognitionsAdminClient({
               className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs text-stone-900 outline-none focus:border-[#4B161B]"
             />
           </div>
+
+          <fieldset className="md:col-span-2 space-y-3">
+            <legend className="block text-xs font-bold text-stone-700">Exibição & Escala no cabeçalho da empresa:</legend>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className={`p-3 border rounded-xl cursor-pointer ${activeRecognition.header_display === 'badge' ? 'border-[#4B161B] bg-[#4B161B]/5' : 'border-stone-300'}`}>
+                <input
+                  type="radio"
+                  name="header_display"
+                  value="badge"
+                  checked={activeRecognition.header_display === 'badge'}
+                  onChange={() => handleFieldChange('header_display', 'badge')}
+                  className="mr-2 accent-[#4B161B]"
+                />
+                <span className="text-xs font-bold text-stone-900">Badge com nome</span>
+                <span className="block ml-5 mt-1 text-[11px] text-stone-500">Exibe somente o nome em formato compacto.</span>
+              </label>
+              <label className={`p-3 border rounded-xl cursor-pointer ${activeRecognition.header_display === 'horizontal_seal' ? 'border-[#4B161B] bg-[#4B161B]/5' : 'border-stone-300'}`}>
+                <input
+                  type="radio"
+                  name="header_display"
+                  value="horizontal_seal"
+                  checked={activeRecognition.header_display === 'horizontal_seal'}
+                  onChange={() => handleFieldChange('header_display', 'horizontal_seal')}
+                  className="mr-2 accent-[#4B161B]"
+                />
+                <span className="text-xs font-bold text-stone-900">Selo horizontal</span>
+                <span className="block ml-5 mt-1 text-[11px] text-stone-500">Usa a arte horizontal enviada abaixo.</span>
+              </label>
+            </div>
+
+            {/* CONTROLE DE ESCALA DO SELO NO CABEÇALHO */}
+            <div className="p-4 bg-stone-50 border border-stone-200 rounded-xl space-y-2 mt-2">
+              <div className="flex items-center justify-between text-xs font-bold text-stone-800">
+                <label htmlFor="header_scale_slider">Ajuste de Escala do Selo no Cabeçalho:</label>
+                <span className="px-2 py-0.5 bg-[#3B0B14] text-[#C9A227] font-mono text-xs rounded-md">
+                  {activeRecognition.header_scale ?? 100}%
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  id="header_scale_slider"
+                  type="range"
+                  min={60}
+                  max={180}
+                  step={5}
+                  value={activeRecognition.header_scale ?? 100}
+                  onChange={(e) => handleFieldChange('header_scale', Number(e.target.value))}
+                  className="w-full accent-[#3B0B14] cursor-pointer"
+                />
+              </div>
+              <div className="flex items-center justify-between text-[10px] text-stone-500">
+                <span>60% (Compacto)</span>
+                <div className="flex gap-1.5">
+                  {[80, 100, 120, 150].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => handleFieldChange('header_scale', preset)}
+                      className={`px-2 py-0.5 rounded border text-[10px] font-mono cursor-pointer ${
+                        (activeRecognition.header_scale ?? 100) === preset
+                          ? 'bg-[#3B0B14] text-[#C9A227] border-[#C9A227]'
+                          : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-100'
+                      }`}
+                    >
+                      {preset}%
+                    </button>
+                  ))}
+                </div>
+                <span>180% (Destaque)</span>
+              </div>
+            </div>
+          </fieldset>
         </div>
 
         {/* REGRAS DE ASSETS E UPLOAD (Sem exibição de links de texto) */}
@@ -316,7 +394,7 @@ export function RecognitionsAdminClient({
             <h3 className="font-serif font-bold text-sm text-stone-900 flex items-center gap-1.5">
               <Upload className="w-4 h-4 text-[#4B161B]" /> Assets Gráficos & Pré-visualização em Fundos Claro/Bordô
             </h3>
-            <span className="text-[11px] font-mono text-stone-500">Formatos aceitos: SVG, PNG, WebP (Max 2 MB)</span>
+            <span className="text-[11px] font-mono text-stone-500">SVG, PNG, JPEG ou WebP · otimização automática</span>
           </div>
 
           <div className="max-w-2xl">
@@ -343,10 +421,11 @@ export function RecognitionsAdminClient({
                     onClick={() => {
                       const defaults: Record<string, string> = {
                         pedra_fundamental: '/selos/pedra-fundamental.svg',
-                        coluna_de_honra: '/selos/coluna-honra.svg',
                         selo_ouro: '/selos/plano-ouro.svg',
+                        selo_prata: '/selos/plano-prata.svg',
+                        selo_bronze: '/selos/plano-bronze.svg',
                       };
-                      const defaultUrl = defaults[selectedKey] || '/selos/coluna-honra.svg';
+                      const defaultUrl = defaults[selectedKey] || '/selos/pedra-fundamental.svg';
                       handleFieldChange('seal_url', defaultUrl);
                       handleFieldChange('compact_seal_url', defaultUrl);
                     }}
@@ -358,9 +437,9 @@ export function RecognitionsAdminClient({
                 <input
                   ref={mainFileInputRef}
                   type="file"
-                  accept="image/svg+xml,image/png,image/webp,.svg,.png,.webp"
+                  accept="image/svg+xml,image/png,image/jpeg,image/webp,.svg,.png,.jpg,.jpeg,.webp"
                   className="hidden"
-                  onChange={handleFileUpload}
+                  onChange={(event) => handleFileUpload(event, 'seal_url')}
                 />
               </div>
 
@@ -397,24 +476,57 @@ export function RecognitionsAdminClient({
                 </div>
               </div>
             </div>
+
+            <div className="p-5 bg-stone-50 border border-stone-200 rounded-2xl space-y-4 shadow-xs mt-4">
+              <div className="flex flex-wrap justify-between items-center gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-stone-800">Selo horizontal do cabeçalho:</label>
+                  <span className="text-[11px] text-stone-500">Recomendado: arte larga, com fundo transparente.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => horizontalFileInputRef.current?.click()}
+                  disabled={uploadingField === 'compact_seal_url'}
+                  className="px-3 py-1.5 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-60"
+                >
+                  {uploadingField === 'compact_seal_url' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  <span>Enviar selo horizontal</span>
+                </button>
+                <input
+                  ref={horizontalFileInputRef}
+                  type="file"
+                  accept="image/svg+xml,image/png,image/jpeg,image/webp,.svg,.png,.jpg,.jpeg,.webp"
+                  className="hidden"
+                  onChange={(event) => handleFileUpload(event, 'compact_seal_url')}
+                />
+              </div>
+              <div className="h-20 p-3 bg-[#3B0B14] border border-[#C9A227]/40 rounded-xl flex items-center justify-center">
+                <img
+                  key={activeRecognition.compact_seal_url}
+                  src={activeRecognition.compact_seal_url}
+                  alt={`Versão horizontal de ${activeRecognition.title}`}
+                  className="max-h-14 max-w-full object-contain"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
         {/* PREVIEW DO SELO EM TEMPO REAL */}
         <div className="pt-4 border-t border-stone-200 space-y-3">
           <h3 className="font-serif font-bold text-sm text-stone-900 flex items-center gap-1.5">
-            <Eye className="w-4 h-4 text-[#4B161B]" /> Pré-visualização em Tempo Real (Catálogo & Logo Oficial)
+            <Eye className="w-4 h-4 text-[#4B161B]" /> Pré-visualização do Selo no Cabeçalho (Tempo Real)
           </h3>
 
           <div className="p-6 bg-stone-900 rounded-2xl space-y-4">
             <span className="text-[10px] font-mono text-stone-400 uppercase tracking-wider block">
-              Simulação de Exibição no Cabeçalho do Perfil Público:
+              Simulação de Exibição no Cabeçalho do Perfil Público com Escala ({activeRecognition.header_scale ?? 100}%):
             </span>
 
             <InstitutionalBadges
               recognition={{
                 pedraFundamental: true,
-                colunaDeHonra: true,
+                colunaDeHonra: false,
                 founder: true,
                 goldPlanBadge: true,
                 verified: false,
@@ -425,34 +537,70 @@ export function RecognitionsAdminClient({
           </div>
         </div>
 
-        {/* BOTÃO DE GRAVAÇÃO */}
-        <div className="pt-4 border-t border-stone-200 flex justify-between items-center">
-          <Link
-            href="/visual-lab/pedra-fundamental"
-            target="_blank"
-            className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold rounded-xl border border-stone-300 transition-all flex items-center gap-2"
-          >
-            <Eye className="w-4 h-4 text-stone-600" />
-            <span>Ver Visual Lab dos Selos Institucionais (Nova Aba)</span>
-          </Link>
+        {/* BARRA DE BOTÕES DE PRE-VISUALIZAÇÃO E GRAVAÇÃO */}
+        <div className="pt-4 border-t border-stone-200 space-y-4">
+          <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-2">
+            <span className="text-xs font-bold text-stone-800 block">
+              Pré-visualização por Plano (Visual Lab & Matriz Simuladora):
+            </span>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/admin/reconhecimentos/preview"
+                className="px-3 py-1.5 bg-[#3B0B14] text-[#C9A227] border border-[#C9A227]/60 hover:bg-[#4B161B] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-xs"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>Simulador Completo (Matriz Todos os Planos)</span>
+              </Link>
+              <Link
+                href="/visual-lab/bronze"
+                target="_blank"
+                className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
+              >
+                <span>Selo Esquadro (Bronze)</span>
+              </Link>
+              <Link
+                href="/visual-lab/prata"
+                target="_blank"
+                className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
+              >
+                <span>Selo Compasso (Prata)</span>
+              </Link>
+              <Link
+                href="/visual-lab/ouro"
+                target="_blank"
+                className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
+              >
+                <span>Selo Acácia (Ouro)</span>
+              </Link>
+              <Link
+                href="/visual-lab/pedra-fundamental"
+                target="_blank"
+                className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
+              >
+                <span>Pedra Fundamental</span>
+              </Link>
+            </div>
+          </div>
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-6 py-2.5 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl border border-[#C9A227]/60 shadow-md transition-all flex items-center gap-2 cursor-pointer"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-[#C9A227]" />
-                <span>Gravando Catálogo Visual...</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4 text-[#C9A227]" />
-                <span>Salvar Apresentação do {activeRecognition.title}</span>
-              </>
-            )}
-          </button>
+          <div className="flex justify-end items-center">
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-6 py-2.5 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl border border-[#C9A227]/60 shadow-md transition-all flex items-center gap-2 cursor-pointer"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-[#C9A227]" />
+                  <span>Gravando Catálogo Visual...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 text-[#C9A227]" />
+                  <span>Salvar Apresentação do {activeRecognition.title}</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </form>
     </div>

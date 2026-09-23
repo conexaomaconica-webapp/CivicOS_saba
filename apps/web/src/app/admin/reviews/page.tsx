@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button, Card, Badge, Input, Dialog } from '@saas/ui';
-import { moderateReviewAction } from '@/app/actions/admin-audit';
+import { getReviewsForModerationAction, moderateReviewAction } from '@/app/actions/admin-audit';
 
 interface PendingReview {
   id: string;
@@ -10,39 +10,28 @@ interface PendingReview {
   author_name: string;
   rating: number;
   comment: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'published' | 'rejected' | 'hidden';
   created_at: string;
 }
 
 export default function AdminReviewsPage() {
-  const [reviews, setReviews] = useState<PendingReview[]>([
-    {
-      id: 'rev-01',
-      business_name: 'Oficina Mecânica Precision',
-      author_name: 'Irmão Carlos Eduardo',
-      rating: 5,
-      comment: 'Atendimento excepcional e transparência nos orçamentos.',
-      status: 'pending',
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'rev-02',
-      business_name: 'Advocacia Silva & Irmãos',
-      author_name: 'Irmão Roberto',
-      rating: 4,
-      comment: 'Excelente consultoria jurídica prestada.',
-      status: 'pending',
-      created_at: new Date().toISOString(),
-    },
-  ]);
+  const [reviews, setReviews] = useState<PendingReview[]>([]);
 
   const [selectedReview, setSelectedReview] = useState<PendingReview | null>(null);
-  const [targetStatus, setTargetStatus] = useState<'approved' | 'rejected' | null>(null);
+  const [targetStatus, setTargetStatus] = useState<'published' | 'rejected' | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const handleOpenDialog = (rev: PendingReview, status: 'approved' | 'rejected') => {
+  useEffect(() => {
+    getReviewsForModerationAction().then((result) => {
+      if (result.success) setReviews(result.data || []);
+      else setMessage({ type: 'error', text: result.error || 'Falha ao carregar avaliações.' });
+      setLoading(false);
+    });
+  }, []);
+
+  const handleOpenDialog = (rev: PendingReview, status: 'published' | 'rejected') => {
     setSelectedReview(rev);
     setTargetStatus(status);
     setRejectionReason('');
@@ -69,7 +58,7 @@ export default function AdminReviewsPage() {
 
       setMessage({
         type: 'success',
-        text: `Avaliação ${targetStatus === 'approved' ? 'aprovada' : 'rejeitada'} com sucesso! (Histórico preservado)`,
+        text: `Avaliação ${targetStatus === 'published' ? 'publicada' : 'rejeitada'} com sucesso.`,
       });
     } catch (err) {
       setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Erro ao processar moderação.' });
@@ -87,7 +76,7 @@ export default function AdminReviewsPage() {
           Painel de Moderação de Avaliações
         </h1>
         <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-          Aprove ou rejeite avaliações enviadas por usuários. Todas as avaliações nascem como <strong>pending</strong> e preservam histórico sem exclusão física.
+          Aprove ou rejeite avaliações enviadas por membros. Toda avaliação fica pendente e só aparece no perfil após publicação pela plataforma.
         </p>
       </div>
 
@@ -104,11 +93,14 @@ export default function AdminReviewsPage() {
       )}
 
       <div className="grid gap-4">
+        {!loading && reviews.length === 0 && (
+          <Card className="p-6 text-sm text-slate-500">Nenhuma avaliação encontrada.</Card>
+        )}
         {reviews.map((rev) => (
           <Card key={rev.id} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-2 max-w-2xl">
               <div className="flex items-center gap-2">
-                <Badge variant={rev.status === 'approved' ? 'success' : rev.status === 'pending' ? 'warning' : 'danger'}>
+                <Badge variant={rev.status === 'published' ? 'success' : rev.status === 'pending' ? 'warning' : 'danger'}>
                   {rev.status}
                 </Badge>
                 <span className="text-sm font-bold text-amber-500">
@@ -126,8 +118,8 @@ export default function AdminReviewsPage() {
 
             {rev.status === 'pending' && (
               <div className="flex items-center gap-2">
-                <Button variant="primary" size="sm" onClick={() => handleOpenDialog(rev, 'approved')}>
-                  Aprovar Review
+                <Button variant="primary" size="sm" onClick={() => handleOpenDialog(rev, 'published')}>
+                  Publicar
                 </Button>
                 <Button variant="danger" size="sm" onClick={() => handleOpenDialog(rev, 'rejected')}>
                   Rejeitar
@@ -142,7 +134,7 @@ export default function AdminReviewsPage() {
         <Dialog
           isOpen={true}
           onClose={() => setSelectedReview(null)}
-          title={`Confirmar Moderação: ${targetStatus === 'approved' ? 'Aprovar' : 'Rejeitar'}`}
+          title={`Confirmar moderação: ${targetStatus === 'published' ? 'Publicar' : 'Rejeitar'}`}
         >
           <div className="space-y-4 py-2">
             <p className="text-sm text-slate-600 dark:text-slate-300">
@@ -167,7 +159,7 @@ export default function AdminReviewsPage() {
                 Cancelar
               </Button>
               <Button
-                variant={targetStatus === 'approved' ? 'primary' : 'danger'}
+                variant={targetStatus === 'published' ? 'primary' : 'danger'}
                 onClick={handleModerate}
                 disabled={loading}
               >

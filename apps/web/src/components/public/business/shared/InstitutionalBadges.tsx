@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { HelpCircle, X } from 'lucide-react';
 import type { PublicBusinessPresentation, PublicCommercialPlan } from '@/lib/business/public-business-presentation';
 import type { InstitutionalRecognitionDTO } from '@/app/actions/institutional-recognitions';
@@ -31,14 +32,6 @@ function PedraFundamentalIcon({ className = "w-3.5 h-3.5" }: { className?: strin
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
       <path d="M12 2l2.4 6.8 7.2.5-5.5 4.8 1.7 7L12 17.4 6.2 21.1l1.7-7-5.5-4.8 7.2-.5L12 2z" fill="currentColor" fillOpacity="0.25" />
-    </svg>
-  );
-}
-
-function ColunaDeHonraIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M4 21h16M6 18h12M9 18V6M15 18V6M8 6h8M5 3h14" />
     </svg>
   );
 }
@@ -161,6 +154,34 @@ function GoldCardBadgeItem({
   );
 }
 
+function HorizontalHeaderSeal({ src, title, scale = 100, onZoom }: { src: string; title: string; scale?: number; onZoom?: () => void }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  if (imageFailed) return null;
+
+  const scaleFactor = Math.max(0.7, Math.min(2.5, (scale || 100) / 100));
+  const baseHeight = 52;
+  const heightPx = Math.round(baseHeight * scaleFactor);
+
+  return (
+    <div
+      onClick={onZoom}
+      className="relative shrink-0 group cursor-pointer transition-all z-10 hover:z-50"
+      title={`${title} — Clique ou passe o mouse para ampliar`}
+    >
+      <img
+        src={src}
+        alt={title}
+        style={{
+          height: `${heightPx}px`,
+          maxHeight: `${Math.max(52, heightPx)}px`,
+        }}
+        className="w-auto max-w-[220px] sm:max-w-[300px] object-contain drop-shadow-md transition-transform duration-300 ease-out group-hover:scale-[1.85] sm:group-hover:scale-[1.5] group-hover:drop-shadow-2xl shrink-0"
+        onError={() => setImageFailed(true)}
+      />
+    </div>
+  );
+}
+
 
 export function InstitutionalBadges({
 
@@ -179,6 +200,7 @@ export function InstitutionalBadges({
   if (variant === 'compact') {
     const headerBadges: Array<{
       id: string;
+      catalogKey?: InstitutionalRecognitionDTO['key'];
       label: string;
       icon: any;
       bgClass: string;
@@ -190,6 +212,7 @@ export function InstitutionalBadges({
     if (recognition.pedraFundamental) {
       headerBadges.push({
         id: 'pedra_fundamental',
+        catalogKey: 'pedra_fundamental',
         label: 'PEDRA FUNDAMENTAL',
         icon: PedraFundamentalIcon,
         bgClass: 'bg-gradient-to-r from-[#3B0B14] via-[#4B161B] to-[#3B0B14] text-[#F3EEDD] border border-[#C9A227]/70 shadow-xs hover:border-[#C9A227] hover:scale-[1.03] transition-all cursor-default',
@@ -198,47 +221,38 @@ export function InstitutionalBadges({
       });
     }
 
-    // 2. Coluna de Honra (Reconhecimento Histórico — Destaque Nobre)
-    if (recognition.colunaDeHonra || recognition.founder) {
-      headerBadges.push({
-        id: 'coluna_de_honra',
-        label: 'COLUNA DE HONRA',
-        icon: ColunaDeHonraIcon,
-        bgClass: 'bg-gradient-to-r from-[#4B161B] via-[#5C1A21] to-[#4B161B] text-[#F3EEDD] border border-[#C9A227]/50 shadow-xs hover:border-[#C9A227] hover:scale-[1.03] transition-all cursor-default',
-        iconClass: 'text-[#C9A227]',
-        priority: 2,
-      });
-    }
-
-    // 3. Nível Comercial (Conexão Ouro / Conexão Prata / Conexão Bronze — Identificador de Nível Comercial)
+    // 2. Nível Comercial (Conexão Ouro / Conexão Prata / Conexão Bronze)
     const effectivePlan = commercialPlan || (recognition.goldPlanBadge ? 'ouro' : 'bronze');
 
     if (effectivePlan === 'ouro') {
       headerBadges.push({
         id: 'conexao_ouro',
-        label: 'CONEXÃO OURO',
+        catalogKey: 'selo_ouro',
+        label: 'ACÁCIA',
         icon: ConexaoOuroIcon,
         bgClass: 'bg-[#2A2415] text-[#E6C665] border border-[#C9A227]/50 hover:bg-[#342C19] hover:border-[#C9A227] hover:scale-[1.03] transition-all cursor-default',
         iconClass: 'text-[#E6C665]',
-        priority: 3,
+        priority: 2,
       });
     } else if (effectivePlan === 'prata') {
       headerBadges.push({
         id: 'conexao_prata',
-        label: 'CONEXÃO PRATA',
+        catalogKey: 'selo_prata',
+        label: 'COMPASSO',
         icon: ConexaoPrataIcon,
         bgClass: 'bg-[#1A202C] text-[#E2E8F0] border border-[#A0AEC0]/40 hover:bg-[#2D3748] hover:border-[#CBD5E0] hover:scale-[1.03] transition-all cursor-default',
         iconClass: 'text-[#CBD5E0]',
-        priority: 3,
+        priority: 2,
       });
     } else if (effectivePlan === 'bronze') {
       headerBadges.push({
         id: 'conexao_bronze',
-        label: 'CONEXÃO BRONZE',
+        catalogKey: 'selo_bronze',
+        label: 'ESQUADRO',
         icon: ConexaoBronzeIcon,
         bgClass: 'bg-[#251A14] text-[#D69E2E] border border-[#8C6239]/50 hover:bg-[#32231A] hover:border-[#A07044] hover:scale-[1.03] transition-all cursor-default',
         iconClass: 'text-[#D69E2E]',
-        priority: 3,
+        priority: 2,
       });
     }
 
@@ -248,27 +262,90 @@ export function InstitutionalBadges({
         id: 'empresa_verificada',
         label: 'VERIFICADA',
         icon: VerificadaIcon,
-        bgClass: 'bg-emerald-950/70 text-emerald-300 border border-emerald-500/50 hover:border-emerald-400 hover:scale-[1.03] transition-all cursor-default',
+        bgClass: 'bg-emerald-950/70 text-emerald-300 border border-emerald-500/40 hover:border-emerald-400 transition-all cursor-default',
         iconClass: 'text-emerald-400',
         priority: 4,
       });
     }
 
-    headerBadges.sort((a, b) => a.priority - b.priority);
+    const visibleHeaderBadges = headerBadges
+      .filter((badge) => {
+        const item = badge.catalogKey ? catalog?.find((entry) => entry.key === badge.catalogKey) : undefined;
+        return item?.is_active !== false;
+      })
+      .sort((a, b) => {
+        const itemA = a.catalogKey ? catalog?.find((entry) => entry.key === a.catalogKey) : undefined;
+        const itemB = b.catalogKey ? catalog?.find((entry) => entry.key === b.catalogKey) : undefined;
+        return (itemA?.priority_order ?? a.priority) - (itemB?.priority_order ?? b.priority);
+      });
 
-    if (headerBadges.length === 0) return null;
+    if (visibleHeaderBadges.length === 0) return null;
 
     return (
-      <div className={`flex flex-wrap items-center gap-2 ${className}`}>
-        {headerBadges.map((badge) => {
+      <div className={`flex flex-wrap items-center gap-2 sm:gap-3 ${className}`}>
+        {visibleHeaderBadges.map((badge) => {
           const IconComponent = badge.icon;
+          const catalogItem = badge.catalogKey ? catalog?.find((entry) => entry.key === badge.catalogKey) : undefined;
+          const itemScale = catalogItem?.header_scale ?? 100;
+          const scaleFactor = Math.max(0.7, Math.min(1.5, itemScale / 100));
+
+          if (badge.id === 'empresa_verificada') {
+            return (
+              <span
+                key={badge.id}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-serif font-bold uppercase tracking-wider bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 shrink-0 shadow-2xs"
+              >
+                <VerificadaIcon className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0 text-emerald-400" />
+                <span>VERIFICADA</span>
+              </span>
+            );
+          }
+
+          if (catalogItem?.header_display === 'horizontal_seal') {
+            const sealUrl = catalogItem.compactSealUrl || catalogItem.compact_seal_url || catalogItem.sealUrl || catalogItem.seal_url;
+            return (
+              <HorizontalHeaderSeal
+                key={badge.id}
+                src={sealUrl}
+                title={catalogItem.title}
+                scale={itemScale}
+                onZoom={() =>
+                  setZoomedBadge({
+                    id: badge.id,
+                    key: catalogItem.key,
+                    title: catalogItem.title,
+                    description: catalogItem.description,
+                    seal_url: sealUrl,
+                    icon: IconComponent,
+                    bgClass: badge.bgClass,
+                    borderClass: 'border-[#C9A227]',
+                    textClass: 'text-[#C9A227]',
+                    priority: catalogItem.priority_order,
+                  })
+                }
+              />
+            );
+          }
           return (
             <span
               key={badge.id}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-xs font-serif font-bold uppercase tracking-wider ${badge.bgClass}`}
+              style={{
+                fontSize: `${Math.round(Math.max(10, Math.min(14, 11 * scaleFactor)))}px`,
+                paddingTop: `${Math.round(Math.max(2, Math.min(6, 4 * scaleFactor)))}px`,
+                paddingBottom: `${Math.round(Math.max(2, Math.min(6, 4 * scaleFactor)))}px`,
+                paddingLeft: `${Math.round(Math.max(6, Math.min(16, 12 * scaleFactor)))}px`,
+                paddingRight: `${Math.round(Math.max(6, Math.min(16, 12 * scaleFactor)))}px`,
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-full font-serif font-bold uppercase tracking-wider transition-all shrink-0 ${badge.bgClass}`}
             >
-              <IconComponent className={`w-3.5 h-3.5 shrink-0 ${badge.iconClass}`} />
-              <span>{badge.label}</span>
+              <IconComponent
+                style={{
+                  width: `${Math.round(Math.max(12, Math.min(18, 14 * scaleFactor)))}px`,
+                  height: `${Math.round(Math.max(12, Math.min(18, 14 * scaleFactor)))}px`,
+                }}
+                className={`shrink-0 ${badge.iconClass}`}
+              />
+              <span>{catalogItem?.title || badge.label}</span>
             </span>
           );
         })}
@@ -293,8 +370,8 @@ export function InstitutionalBadges({
     badgeList.push({
       id: 'pedra_fundamental',
       key: 'pedra_fundamental',
-      title: 'Pedra Fundamental (10/10)',
-      description: 'Reconhecimento histórico/institucional permanente dos 10 primeiros apoiadores da rede Conexão Maçônica.',
+      title: 'Pedra Fundamental',
+      description: 'Reconhecimento para as empresas que participam do início do projeto. Identificação e reconhecimento especial dentro da plataforma',
       seal_url: sealUrl,
       icon: PedraFundamentalIcon,
       bgClass: 'bg-amber-950/50 text-[#C9A227]',
@@ -304,35 +381,26 @@ export function InstitutionalBadges({
     });
   }
 
-  if (recognition.colunaDeHonra || recognition.founder) {
-    const sealUrl = getSealUrl('coluna_de_honra', '/selos/coluna-honra.svg');
-    badgeList.push({
-      id: 'coluna_de_honra',
-      key: 'coluna_de_honra',
-      title: 'Coluna de Honra (Empresa Fundadora)',
-      description: 'Membro fundador e destaque de mérito e contribuição exemplar na fraternidade.',
-      seal_url: sealUrl,
-      icon: ColunaDeHonraIcon,
-      bgClass: 'bg-[#4B161B] text-[#C9A227]',
-      borderClass: 'border-[#C9A227]/50',
-      textClass: 'text-[#C9A227]',
-      priority: 2,
-    });
-  }
+  const effectivePlan = commercialPlan || (recognition.goldPlanBadge ? 'ouro' : 'bronze');
+  const commercialSeal = effectivePlan === 'ouro'
+    ? { key: 'selo_ouro', title: 'Acácia', description: 'Identificação comercial das empresas ativas no Plano Acácia.', url: '/selos/plano-ouro.svg', icon: ConexaoOuroIcon, bg: 'bg-[#C9A227]/20 text-[#C9A227]', border: 'border-[#C9A227]', text: 'text-[#C9A227] font-extrabold' }
+    : effectivePlan === 'prata'
+      ? { key: 'selo_prata', title: 'Compasso', description: 'Identificação comercial das empresas ativas no Plano Compasso.', url: '/selos/plano-prata.svg', icon: ConexaoPrataIcon, bg: 'bg-slate-700 text-slate-100', border: 'border-slate-400', text: 'text-slate-100 font-extrabold' }
+      : { key: 'selo_bronze', title: 'Esquadro', description: 'Identificação comercial das empresas ativas no Plano Esquadro.', url: '/selos/plano-bronze.svg', icon: ConexaoBronzeIcon, bg: 'bg-amber-950/80 text-amber-300', border: 'border-amber-700', text: 'text-amber-300 font-extrabold' };
 
-  if (recognition.goldPlanBadge) {
-    const sealUrl = getSealUrl('selo_ouro', '/selos/plano-ouro.svg');
+  if (commercialSeal) {
+    const sealUrl = getSealUrl(commercialSeal.key, commercialSeal.url);
     badgeList.push({
-      id: 'selo_ouro',
-      key: 'selo_ouro',
-      title: 'Conexão Ouro',
-      description: 'Reconhecimento e presença comercial de máxima distinção para empresas do Plano Acácia.',
+      id: commercialSeal.key,
+      key: commercialSeal.key,
+      title: commercialSeal.title,
+      description: commercialSeal.description,
       seal_url: sealUrl,
-      icon: ConexaoOuroIcon,
-      bgClass: 'bg-[#C9A227]/20 text-[#C9A227]',
-      borderClass: 'border-[#C9A227]',
-      textClass: 'text-[#C9A227] font-extrabold',
-      priority: 3,
+      icon: commercialSeal.icon,
+      bgClass: commercialSeal.bg,
+      borderClass: commercialSeal.border,
+      textClass: commercialSeal.text,
+      priority: 2,
     });
   }
 
@@ -361,7 +429,7 @@ export function InstitutionalBadges({
       {variant === 'gold-card' && (
         <div className={`bg-[#3B0B14] border border-[#C9A227]/40 rounded-2xl p-6 shadow-xl flex flex-wrap items-center justify-center gap-6 ${className}`}>
           {badgeList
-            .filter((b) => ['selo_ouro', 'pedra_fundamental', 'coluna_de_honra'].includes(b.key))
+            .filter((b) => ['selo_ouro', 'selo_prata', 'selo_bronze', 'pedra_fundamental'].includes(b.key))
             .map((badge) => (
               <GoldCardBadgeItem
                 key={badge.id}
@@ -388,58 +456,120 @@ export function InstitutionalBadges({
       )}
 
       {/* MODAL DE AMPLIAÇÃO / LIGHTBOX DO SELO */}
-      {zoomedBadge && (
-        <div
-          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
-          onClick={() => setZoomedBadge(null)}
-        >
+      {zoomedBadge &&
+        createPortal(
           <div
-            className="bg-[#3B0B14] border border-[#C9A227]/60 rounded-3xl p-6 sm:p-8 max-w-lg w-full text-center space-y-6 shadow-2xl relative animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[9999] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200"
+            onClick={() => setZoomedBadge(null)}
           >
-            {/* BOTÃO FECHAR */}
-            <button
-              type="button"
-              onClick={() => setZoomedBadge(null)}
-              className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-stone-300 hover:text-white border border-stone-700/80 transition-colors cursor-pointer"
-              title="Fechar ampliação"
+            <div
+              className="
+          relative
+          bg-[#3B0B14]
+          border
+          border-[#C9A227]/60
+          rounded-3xl
+          p-5
+          sm:p-8
+          max-w-lg
+          w-full
+          text-center
+          space-y-5
+          shadow-2xl
+          animate-in
+          zoom-in-95
+          duration-200
+        "
+              onClick={(e) => e.stopPropagation()}
             >
-              <X className="w-5 h-5 text-[#C9A227]" />
-            </button>
-
-            {/* SELO AMPLIADO DE ALTA RESOLUÇÃO */}
-            <div className="flex justify-center pt-2">
-              <img
-                src={zoomedBadge.seal_url}
-                alt={zoomedBadge.title}
-                className="w-64 h-64 sm:w-80 sm:h-80 object-contain drop-shadow-2xl filter transition-transform duration-300 hover:scale-105"
-              />
-            </div>
-
-            {/* TÍTULO E DESCRIÇÃO EXPLICATIVA DO RECONHECIMENTO */}
-            <div className="space-y-2 border-t border-stone-800/80 pt-5">
-              <h3 className="font-serif font-bold text-xl sm:text-2xl text-[#C9A227]">
-                {zoomedBadge.title}
-              </h3>
-              <p className="text-xs sm:text-sm text-stone-200 leading-relaxed max-w-md mx-auto font-sans">
-                {zoomedBadge.description}
-              </p>
-            </div>
-
-            {/* BOTÃO DE FECHAMENTO */}
-            <div className="pt-2">
+              {/* BOTÃO FECHAR */}
               <button
                 type="button"
                 onClick={() => setZoomedBadge(null)}
-                className="px-6 py-2.5 rounded-xl bg-[#C9A227] hover:bg-[#b59121] text-stone-950 font-extrabold text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer"
+                className="
+            absolute
+            top-4
+            right-4
+            z-50
+            w-10
+            h-10
+            rounded-full
+            bg-black/50
+            hover:bg-black/70
+            text-stone-300
+            hover:text-white
+            flex
+            items-center
+            justify-center
+            border
+            border-[#C9A227]/40
+            shadow-lg
+            transition-all
+            cursor-pointer
+          "
+                title="Fechar ampliação"
+                aria-label="Fechar ampliação"
               >
-                Fechar Visualização
+                <X className="w-5 h-5 text-[#C9A227]" />
               </button>
+
+              {/* SELO AMPLIADO */}
+              <div className="flex justify-center pt-3">
+                <img
+                  src={zoomedBadge.seal_url}
+                  alt={zoomedBadge.title}
+                  className="
+              w-auto
+              max-w-full
+              max-h-[50vh]
+              object-contain
+              drop-shadow-2xl
+              transition-transform
+              duration-300
+              hover:scale-[1.02]
+            "
+                />
+              </div>
+
+              {/* TÍTULO E DESCRIÇÃO */}
+              <div className="space-y-2 border-t border-stone-800/80 pt-5">
+                <h3 className="font-serif font-bold text-xl sm:text-2xl text-[#C9A227]">
+                  {zoomedBadge.title}
+                </h3>
+
+                <p className="text-xs sm:text-sm text-stone-200 leading-relaxed max-w-md mx-auto font-sans">
+                  {zoomedBadge.description}
+                </p>
+              </div>
+
+              {/* BOTÃO INFERIOR */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setZoomedBadge(null)}
+                  className="
+              px-6
+              py-2.5
+              rounded-xl
+              bg-[#C9A227]
+              hover:bg-[#b59121]
+              text-stone-950
+              font-extrabold
+              text-xs
+              uppercase
+              tracking-wider
+              transition-all
+              shadow-md
+              cursor-pointer
+            "
+                >
+                  Fechar Visualização
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
-

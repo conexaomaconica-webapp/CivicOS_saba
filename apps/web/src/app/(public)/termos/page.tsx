@@ -32,7 +32,7 @@ export default function TermosPage() {
 
           <h2 className="text-xl font-semibold text-[#C9A227] mt-8 mb-4">3. Planos e Assinaturas</h2>
           <p>
-            Alguns recursos são exclusivos para assinantes de planos específicos (Bronze, Prata, Ouro, Ouro Fundador).
+            Alguns recursos são exclusivos para assinantes dos planos Esquadro, Compasso e Acácia. Reconhecimentos históricos são tratados separadamente dos planos comerciais.
             Os detalhes, valores e vigência de cada assinatura estão descritos no momento da contratação e podem
             sofrer reajustes mediante aviso prévio.
           </p>

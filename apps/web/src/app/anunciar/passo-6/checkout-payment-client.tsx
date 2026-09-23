@@ -68,7 +68,7 @@ export default function CheckoutPaymentClient({
         setPixResult({
           pixCopiaECola: res.pixCopiaECola,
           qrCodeBase64: res.qrCodeBase64,
-          amountCents: res.amountCents || rules?.amountCents || 178800,
+          amountCents: res.amountCents || rules?.pixAmountCents || rules?.amountCents || 178800,
           status: res.status,
         });
       } else {
@@ -131,12 +131,16 @@ export default function CheckoutPaymentClient({
     }
   };
 
-  const amountFormatted = (
-    ((pixResult?.amountCents || planRules?.amountCents || 178800) / 100)
+  const pixAmountFormatted = (
+    ((pixResult?.amountCents || planRules?.pixAmountCents || planRules?.amountCents || 178800) / 100)
   ).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const maxInstallments = planRules?.installmentsMax || 6;
   const planAmountCents = planRules?.amountCents || 178800;
+  const installmentAmountFormatted = (planAmountCents / 100).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
 
   return (
     <div className="space-y-6">
@@ -178,7 +182,7 @@ export default function CheckoutPaymentClient({
               <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
                 Total da Anuidade / Assinatura
               </span>
-              <p className="text-2xl font-serif font-bold text-white">{amountFormatted}</p>
+              <p className="text-2xl font-serif font-bold text-white">{pixAmountFormatted}</p>
             </div>
 
             {pixResult?.qrCodeBase64 ? (
@@ -229,7 +233,7 @@ export default function CheckoutPaymentClient({
                 <Lock className="w-3.5 h-3.5" /> Processamento Seguro no Backend
               </span>
               <span className="text-xs text-stone-400 font-serif font-bold">
-                Valor Total: {amountFormatted}
+                Valor Total: {installmentAmountFormatted}
               </span>
             </div>
 

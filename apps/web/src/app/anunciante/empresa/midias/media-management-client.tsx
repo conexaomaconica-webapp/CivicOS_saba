@@ -25,6 +25,7 @@ import {
   updateAdvertiserMediaAction,
   uploadAdvertiserAssetAction,
 } from '@/lib/advertiser/advertiser-profile-service';
+import { optimizeImageForUpload } from '@/lib/media/optimize-image';
 
 export default function AdvertiserMediaManagementClient({ data }: { data: AdvertiserProfileDTO }) {
   const { business, quotas, gallery_photos: initialGallery } = data;
@@ -49,17 +50,13 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setFeedback({ type: 'error', message: 'O arquivo excede o limite máximo permitido de 5MB.' });
-      return;
-    }
-
     setUploadingLogo(true);
     setFeedback(null);
 
     try {
+      const optimizedFile = await optimizeImageForUpload(file, { maxBytes: 4.5 * 1024 * 1024, maxDimension: 1400 });
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', optimizedFile);
       formData.append('businessId', business.id);
       formData.append('assetType', 'logo');
 
@@ -82,17 +79,13 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setFeedback({ type: 'error', message: 'O arquivo excede o limite máximo permitido de 5MB.' });
-      return;
-    }
-
     setUploadingCover(true);
     setFeedback(null);
 
     try {
+      const optimizedFile = await optimizeImageForUpload(file, { maxBytes: 4.5 * 1024 * 1024, maxDimension: 2400 });
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', optimizedFile);
       formData.append('businessId', business.id);
       formData.append('assetType', 'cover');
 
@@ -123,17 +116,13 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setFeedback({ type: 'error', message: 'O arquivo excede o limite máximo permitido de 5MB.' });
-      return;
-    }
-
     setUploadingPhoto(true);
     setFeedback(null);
 
     try {
+      const optimizedFile = await optimizeImageForUpload(file, { maxBytes: 4.5 * 1024 * 1024, maxDimension: 2200 });
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', optimizedFile);
       formData.append('businessId', business.id);
       formData.append('assetType', 'gallery');
       if (newPhotoTitle) formData.append('title', newPhotoTitle);
@@ -330,7 +319,7 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
       {quotas.videos_limit > 0 && (
         <section className="rounded-3xl border border-[#C9A227]/40 bg-white p-6 shadow-sm">
           <h2 className="flex items-center gap-2 font-serif text-lg font-bold text-stone-900"><Video className="h-5 w-5 text-[#C9A227]" /> Vídeo institucional</h2>
-          <p className="mt-1 text-xs text-stone-500">Benefício do Plano Acácia: publique um link do YouTube ou Vimeo no perfil da empresa.</p>
+          <p className="mt-1 text-xs text-stone-500">Benefício do Plano Acácia: publique um link HTTPS de vídeo hospedado, YouTube ou Vimeo.</p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <input type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." className="min-w-0 flex-1 rounded-xl border border-stone-300 bg-stone-50 px-3 py-2.5 text-sm outline-none focus:border-[#C9A227]" />
             <button type="button" onClick={handleSaveVideo} disabled={savingVideo || !videoUrl.trim()} className="rounded-xl bg-[#3B0B14] px-4 py-2.5 text-xs font-bold text-[#C9A227] disabled:opacity-50">{savingVideo ? 'Salvando...' : 'Salvar vídeo'}</button>

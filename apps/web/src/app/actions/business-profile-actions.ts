@@ -32,7 +32,7 @@ async function resolveTenantIdServer(): Promise<string> {
 
   try {
     const supabase = getAdminSupabase();
-    const { data } = await supabase.rpc('_resolve_tenant_by_host', { p_host: cleanHost });
+    const { data } = await supabase.rpc('_resolve_public_tenant_id', { p_host: cleanHost });
     return data || '00000000-0000-0000-0000-000000000001';
   } catch (_e) {
     return '00000000-0000-0000-0000-000000000001';

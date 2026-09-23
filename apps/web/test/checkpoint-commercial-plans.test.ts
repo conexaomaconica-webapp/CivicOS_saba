@@ -5,6 +5,7 @@ import {
 } from '../src/app/actions/plan-entitlements';
 
 vi.mock('../src/lib/supabase/server', () => ({
+  resolveTenantIdServer: vi.fn().mockResolvedValue('tenant-cm-001'),
   createServerSideClient: vi.fn().mockImplementation(() => {
     return Promise.resolve({
       auth: {
@@ -35,6 +36,7 @@ vi.mock('../src/lib/supabase/server', () => ({
                 {
                   plan_code: 'prata',
                   amount_cents: 178800,
+                  pix_amount_cents: 164496,
                   installments_max: 6,
                   interest_free_installments: 6,
                   title: 'Plano Prata',
@@ -107,6 +109,7 @@ describe('Central Comercial de Planos (/admin/planos)', () => {
     const prata = plans.find((p) => p.plan_code === 'prata')!;
     expect(prata.title).toBe('Plano Prata');
     expect(prata.amount_cents).toBe(178800);
+    expect(prata.pix_amount_cents).toBe(164496);
     expect(prata.installments_max).toBe(6);
     expect(prata.is_popular).toBe(true);
     expect(prata.gallery_photos_limit).toBe(6);
@@ -119,6 +122,7 @@ describe('Central Comercial de Planos (/admin/planos)', () => {
       slogan: 'Máxima presença no guia comercial',
       description: 'Plano de elite para parceiros premium',
       amount_cents: 238800,
+      pix_amount_cents: 214920,
       installments_max: 12,
       interest_free_installments: 12,
       is_popular: false,
@@ -129,6 +133,7 @@ describe('Central Comercial de Planos (/admin/planos)', () => {
       benefits_limit: 5,
       events_limit: 10,
       posts_limit: 10,
+      business_video_limit: 1,
     });
 
     expect(res.success).toBe(true);

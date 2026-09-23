@@ -136,7 +136,7 @@ export function FigmaBronzeView({ company = defaultBronzeCompanyFixture }: { com
         </div>
 
         <div className={styles.identityCard}>
-          <span className={styles.tierBadge}>PLANO BRONZE</span>
+          <span className={styles.tierBadge}>PLANO ESQUADRO</span>
 
           <div className={styles.logoNameHeader}>
             <div className={styles.logoBox} style={{ backgroundColor: company.logoColor }}>

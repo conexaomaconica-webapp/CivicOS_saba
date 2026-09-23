@@ -7,6 +7,7 @@ vi.mock('next/headers', () => ({
 }));
 
 vi.mock('../src/lib/supabase/server', () => ({
+  resolveTenantIdServer: vi.fn().mockResolvedValue('tenant-1'),
   createServerSideClient: vi.fn().mockImplementation(() => {
     return Promise.resolve({
       auth: {

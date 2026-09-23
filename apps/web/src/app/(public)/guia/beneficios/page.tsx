@@ -58,18 +58,18 @@ export default async function PublicBenefitsDirectoryPage() {
           </div>
         </section>
 
-        <main className="dh-container py-10 space-y-8">
+        <main className="dh-container space-y-8 py-7 sm:py-10">
           {/* Grid de Ofertas */}
           {items.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3 xl:gap-6">
               {items.map((biz: any) => (
                 <div
                   key={biz.business_id || biz.slug}
-                  className="bg-white border border-[#e8e2d9] rounded-2xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4 group hover:border-[#c59b27]/60"
+                  className="group flex min-w-0 flex-col justify-between space-y-4 rounded-2xl border border-[#e8e2d9] bg-white p-4 shadow-sm transition-all hover:border-[#c59b27]/60 hover:shadow-md sm:p-5 lg:p-6"
                 >
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span className="bg-[#fdf8eb] text-[#3b0b14] font-bold text-[11px] px-3 py-1 rounded-full border border-[#c59b27]/40 flex items-center gap-1.5 shadow-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="flex max-w-full items-center gap-1.5 rounded-full border border-[#c59b27]/40 bg-[#fdf8eb] px-3 py-1 text-[11px] font-bold text-[#3b0b14] shadow-xs">
                         <Tag className="w-3.5 h-3.5 text-[#c59b27]" /> Benefício Ativo
                       </span>
                       {biz.is_founder && (
@@ -80,12 +80,12 @@ export default async function PublicBenefitsDirectoryPage() {
                     </div>
 
                     <div>
-                      <h3 className="font-serif font-bold text-xl text-[#1f1914] group-hover:text-[#3b0b14] transition-colors">
+                      <h3 className="break-words font-serif text-lg font-bold leading-tight text-[#1f1914] transition-colors group-hover:text-[#3b0b14] sm:text-xl">
                         {biz.business_name || biz.name}
                       </h3>
-                      <p className="text-xs text-[#6b625b] flex items-center gap-1.5 mt-1">
-                        <Store className="w-3.5 h-3.5 text-[#c59b27]" />
-                        <span>{biz.primary_category_name || biz.category || 'Empresa Parceira'}</span>
+                      <p className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-[#6b625b]">
+                        <Store className="h-3.5 w-3.5 shrink-0 text-[#c59b27]" />
+                        <span className="break-words">{biz.primary_category_name || biz.category || 'Empresa Parceira'}</span>
                         {biz.city && <span>• {biz.city}</span>}
                       </p>
                     </div>
@@ -97,7 +97,7 @@ export default async function PublicBenefitsDirectoryPage() {
 
                   <Link
                     href={`/guia/${biz.business_slug || biz.slug}`}
-                    className="w-full py-2.5 bg-[#3b0b14] hover:bg-[#c59b27] text-white hover:text-[#1f1914] text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 group shadow-sm mt-2"
+                    className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#3b0b14] px-3 py-2.5 text-center text-xs font-bold text-white shadow-sm transition-all hover:bg-[#c59b27] hover:text-[#1f1914]"
                   >
                     <span>Ver Benefício no Perfil</span>
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

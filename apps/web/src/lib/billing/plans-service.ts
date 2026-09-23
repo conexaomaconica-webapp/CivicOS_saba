@@ -15,6 +15,8 @@ export interface CommercialPlan {
   tagline: string;
   currency: 'BRL';
   annualPriceCents: number;
+  pixPriceCents?: number;
+  pixDiscountPercentage?: number;
   monthlyPriceCents: number;
   badge?: string;
   isPopular?: boolean;
@@ -52,7 +54,6 @@ export const CANONICAL_PLANS: Record<PlanTier, Omit<CommercialPlan, 'id'>> = {
       { text: 'Presença básica no Guia Comercial', included: true },
       { text: 'Até 3 Fotos na Galeria', included: true },
       { text: 'Até 2 Serviços cadastrados', included: true },
-      { text: '1 Oferta/Benefício ativo', included: true },
       { text: 'Parcelamento em até 3x sem juros', included: true },
     ],
   },
@@ -109,7 +110,7 @@ export async function fetchTenantPlans(
   // Busca regras financeiras e apresentação comercial da fonte única (plan_payment_rules)
   const { data: rulesData, error } = await supabase
     .from('plan_payment_rules')
-    .select('plan_code, amount_cents, installments_max, interest_free_installments, title, slogan, is_popular, commercial_features')
+    .select('plan_code, amount_cents, pix_amount_cents, installments_max, interest_free_installments, title, slogan, is_popular, commercial_features')
     .in('plan_code', ['bronze', 'prata', 'ouro']);
 
   if (error) {
@@ -131,6 +132,8 @@ export async function fetchTenantPlans(
     const dbRule = rulesData.find((r) => r.plan_code === plan.tier);
     if (dbRule) {
       const annualCents = dbRule.amount_cents ?? plan.annualPriceCents;
+      const pixPriceCents = Math.min(annualCents, Math.max(0, dbRule.pix_amount_cents ?? annualCents));
+      const pixDiscountPercentage = annualCents > 0 ? Math.round((1 - pixPriceCents / annualCents) * 100) : 0;
       const monthlyCents = Math.round(annualCents / 12);
       const customFeatures: PlanFeature[] =
         dbRule.commercial_features && dbRule.commercial_features.length > 0
@@ -142,6 +145,8 @@ export async function fetchTenantPlans(
         name: dbRule.title || plan.name,
         tagline: dbRule.slogan || plan.tagline,
         annualPriceCents: annualCents,
+        pixPriceCents,
+        pixDiscountPercentage,
         monthlyPriceCents: monthlyCents,
         isPopular: dbRule.is_popular ?? plan.isPopular,
         installmentsMax: dbRule.installments_max ?? plan.installmentsMax,
@@ -165,5 +170,12 @@ export function getCanonicalDefaultLimit(planCode: string, featureCode: string):
   if (norm === 'prata' || norm === 'silver' || norm === 'compasso') key = 'prata';
   else if (norm === 'ouro' || norm === 'gold' || norm === 'acacia' || norm === 'acácia' || norm === 'ouro_founder') key = 'ouro';
   return CANONICAL_FEATURE_LIMITS[key]?.[featureCode] ?? 0;
+}
+
+export function getCommercialPlanName(planCode: string): string {
+  const normalized = (planCode || '').toLowerCase().trim();
+  if (['ouro', 'gold', 'acacia', 'acácia', 'ouro_founder'].includes(normalized)) return 'Acácia';
+  if (['prata', 'silver', 'compasso'].includes(normalized)) return 'Compasso';
+  return 'Esquadro';
 }
 

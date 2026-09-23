@@ -314,6 +314,14 @@ function validateImageMagicBytes(buffer: Uint8Array): boolean {
   return false;
 }
 
+function isValidPublicVideoUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export async function uploadAdvertiserAssetAction(formData: FormData): Promise<{
   success: boolean;
   message: string;
@@ -517,13 +525,13 @@ export async function updateAdvertiserMediaAction(
       const { data: b } = await (supabase as any).from('businesses').select('tenant_id, plan_code, plan_tier, owner_id').eq('id', businessId).maybeSingle();
       if (!userData?.user || b?.owner_id !== userData.user.id) return { success: false, message: 'Empresa não autorizada.' };
       const url = String(payload.url).trim();
-      if (!/^https:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|vimeo\.com\/)\S+$/i.test(url)) return { success: false, message: 'Informe um link válido do YouTube ou Vimeo.' };
+      if (!isValidPublicVideoUrl(url)) return { success: false, message: 'Informe um link público válido iniciado por https://.' };
       const planCode = b.plan_code || b.plan_tier || 'bronze';
       const { data: entitlement } = await (supabase as any).from('plan_entitlements').select('max_limit').eq('tenant_id', b.tenant_id).eq('plan_code', planCode).eq('feature_code', 'business_video_limit').maybeSingle();
       const limit = entitlement?.max_limit ?? getCanonicalDefaultLimit(planCode, 'business_video_limit');
       if (limit < 1) return { success: false, message: 'O vídeo institucional está disponível somente em planos com essa permissão.' };
       const { data: existing } = await (supabase as any).from('business_media').select('id').eq('business_id', businessId).eq('media_type', 'video').maybeSingle();
-      const values = { url, title: payload.title || 'Vídeo institucional', updated_at: new Date().toISOString() };
+      const values = { url, title: payload.title || 'Vídeo institucional' };
       const { error } = existing
         ? await (supabase as any).from('business_media').update(values).eq('id', existing.id)
         : await (supabase as any).from('business_media').insert({ ...values, tenant_id: b.tenant_id, business_id: businessId, media_type: 'video', display_order: 0 });

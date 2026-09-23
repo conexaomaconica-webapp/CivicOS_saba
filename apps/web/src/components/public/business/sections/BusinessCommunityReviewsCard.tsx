@@ -1,22 +1,31 @@
 import React from 'react';
-import { Star, ThumbsUp, MessageSquareQuote } from 'lucide-react';
+import { Star, ThumbsUp, MessageSquareQuote, UserRound } from 'lucide-react';
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
+import { BusinessReviewForm } from './BusinessReviewForm';
+import { CollapsibleReviewComment } from './CollapsibleReviewComment';
 
 type BusinessCommunityReviewsCardProps = {
   reviews: PublicBusinessPresentation['reviews'];
   owner: PublicBusinessPresentation['owner'];
+  businessSlug: string;
   className?: string;
 };
 
 export function BusinessCommunityReviewsCard({
   reviews,
   owner,
+  businessSlug,
   className = '',
 }: BusinessCommunityReviewsCardProps) {
   const count = reviews.count || (reviews.items ? reviews.items.length : 0);
   const average = count > 0 ? (reviews.average ?? 5.0) : 0;
   const endorsedCount = owner?.endorsedByCount || 0;
   const endorserAvatars = owner?.endorserAvatars || [];
+  const ratingCounts = [5, 4, 3, 2, 1].map((stars) => ({
+    stars,
+    count: reviews.items.filter((review) => review.rating === stars).length,
+  }));
+  const distributionTotal = ratingCounts.reduce((total, row) => total + row.count, 0);
 
   return (
     <div id="comentarios" className={`space-y-6 ${className}`}>
@@ -53,10 +62,10 @@ export function BusinessCommunityReviewsCard({
       )}
 
       {/* SEÇÃO AVALIAÇÕES E DEPOIMENTOS */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="flex flex-col gap-4">
         
         {/* LADO ESQUERDO: Pontuação Média e Distribuição de Estrelas */}
-        <div className="lg:col-span-4 p-5 rounded-2xl bg-white border border-[#E8E5DF] shadow-xs space-y-4">
+        <div className="p-5 rounded-2xl bg-white border border-[#E8E5DF] shadow-xs space-y-4">
           <h3 className="font-serif font-bold text-sm text-[#4B161B]">
             Avaliações
           </h3>
@@ -86,29 +95,25 @@ export function BusinessCommunityReviewsCard({
 
           {/* Barras de Progresso por Estrela */}
           <div className="space-y-1.5 text-xs text-stone-600 pt-2 border-t border-stone-100">
-            {[
-              { stars: 5, label: '5 ★', pct: 90, val: count > 0 ? Math.round(count * 0.9) : 0 },
-              { stars: 4, label: '4 ★', pct: 7, val: count > 0 ? Math.round(count * 0.07) : 0 },
-              { stars: 3, label: '3 ★', pct: 2, val: count > 0 ? Math.round(count * 0.02) : 0 },
-              { stars: 2, label: '2 ★', pct: 1, val: count > 0 ? Math.round(count * 0.01) : 0 },
-              { stars: 1, label: '1 ★', pct: 0, val: 0 },
-            ].map((row) => (
+            {ratingCounts.map((row) => (
               <div key={row.stars} className="flex items-center gap-2">
-                <span className="w-6 text-right text-[11px] font-medium text-stone-700">{row.label}</span>
+                <span className="w-6 text-right text-[11px] font-medium text-stone-700">{row.stars} ★</span>
                 <div className="flex-1 h-2 bg-[#FDFBF7] border border-[#E8E5DF] rounded-full overflow-hidden">
                   <div
                     className="h-full bg-[#C9A227] rounded-full"
-                    style={{ width: `${count > 0 ? row.pct : 0}%` }}
+                    style={{ width: `${distributionTotal > 0 ? (row.count / distributionTotal) * 100 : 0}%` }}
                   />
                 </div>
-                <span className="w-6 text-right text-[11px] font-medium text-stone-600">{row.val}</span>
+                <span className="w-6 text-right text-[11px] font-medium text-stone-600">{row.count}</span>
               </div>
             ))}
           </div>
         </div>
 
+        <BusinessReviewForm businessSlug={businessSlug} />
+
         {/* LADO DIREITO: O que os membros estão dizendo (Depoimentos) */}
-        <div className="lg:col-span-8 p-5 rounded-2xl bg-white border border-[#E8E5DF] shadow-xs space-y-4">
+        <div className="p-5 rounded-2xl bg-white border border-[#E8E5DF] shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-stone-100 pb-2">
             <h3 className="font-serif font-bold text-sm text-[#4B161B] flex items-center gap-1.5">
               <MessageSquareQuote className="w-4 h-4 text-[#C9A227]" />
@@ -126,11 +131,13 @@ export function BusinessCommunityReviewsCard({
               reviews.items.map((item) => (
                 <div key={item.id} className="p-3.5 rounded-xl bg-[#FDFBF7] border border-[#E8E5DF] space-y-2">
                   <div className="flex items-center gap-2.5">
-                    <img
-                      src={item.authorAvatar?.url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80'}
-                      alt={item.authorName || 'Membro'}
-                      className="w-8 h-8 rounded-full object-cover shadow-xs shrink-0"
-                    />
+                    {item.authorAvatar?.url ? (
+                      <img src={item.authorAvatar.url} alt={item.authorName || 'Membro'} className="w-8 h-8 rounded-full object-cover shadow-xs shrink-0" />
+                    ) : (
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-200 text-stone-600 shadow-xs" aria-label="Avatar padrão">
+                        <UserRound className="h-4 w-4" />
+                      </span>
+                    )}
                     <div className="min-w-0 flex-1">
                       <h4 className="font-bold text-xs text-stone-900 truncate">
                         {item.authorName || 'Membro da Comunidade'}
@@ -144,9 +151,7 @@ export function BusinessCommunityReviewsCard({
                   </div>
 
                   {item.comment && (
-                    <p className="text-xs text-stone-700 leading-relaxed italic line-clamp-3">
-                      "{item.comment}"
-                    </p>
+                    <CollapsibleReviewComment comment={item.comment} />
                   )}
                 </div>
               ))

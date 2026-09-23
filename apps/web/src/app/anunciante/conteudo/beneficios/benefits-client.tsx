@@ -290,7 +290,7 @@ export default function AdvertiserBenefitsClient({ data }: { data: AdvertiserCon
                     value={discountCondition}
                     onChange={(e) => setDiscountCondition(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
-                    placeholder="Ex: 15% OFF ou 1ª Mensalidade Grátis"
+                    placeholder="Ex: 15% de desconto ou 1ª mensalidade grátis"
                     required
                   />
                 </div>

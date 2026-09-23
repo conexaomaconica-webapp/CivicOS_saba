@@ -139,7 +139,7 @@ export default function ProfileForm({ user, profile }: ProfileFormData) {
     master: 'Master',
     socio_admin: 'Sócio Administrador',
     anunciante: 'Anunciante',
-    usuario_comum: 'Usuário Comum',
+    member: 'Membro',
   };
 
   const handleProfileSubmit = async (e: React.FormEvent) => {

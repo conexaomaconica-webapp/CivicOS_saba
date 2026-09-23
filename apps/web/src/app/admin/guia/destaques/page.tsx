@@ -178,7 +178,7 @@ export default function AdminGuiaDestaquesPage() {
       <div className="bg-white border rounded-lg overflow-hidden shadow-sm">
         {sponsoredList.length === 0 ? (
           <div className="p-8 text-center text-gray-500 text-sm">
-            Nenhum override manual cadastrado. As empresas Ouro/Prata estão sendo exibidas pela regra comercial padrão.
+            Nenhum override manual cadastrado. As empresas Acácia/Compasso estão sendo exibidas pela regra comercial padrão.
           </div>
         ) : (
           <table className="w-full text-left text-sm">

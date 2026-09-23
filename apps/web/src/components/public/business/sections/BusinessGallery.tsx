@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Image as ImageIcon, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { PublicMediaAsset } from '@/lib/business/public-business-presentation';
 
@@ -17,6 +18,8 @@ export function BusinessGallery({
 
   useEffect(() => {
     if (selectedIndex === null) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') {
         setSelectedIndex((prev) => (prev !== null ? (prev === 0 ? gallery.length - 1 : prev - 1) : null));
@@ -27,7 +30,10 @@ export function BusinessGallery({
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [selectedIndex, gallery.length]);
 
   if (!gallery || gallery.length === 0) return null;
@@ -77,11 +83,22 @@ export function BusinessGallery({
       </div>
 
       {/* Modal de ampliação de imagem com navegação anterior / próximo */}
-      {selectedImage && selectedIndex !== null && (
+      {selectedImage && selectedIndex !== null && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-stone-950/90 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden bg-stone-950/90 p-2 backdrop-blur-sm sm:p-4"
           onClick={() => setSelectedIndex(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Visualização ampliada da foto"
         >
+          <button
+            type="button"
+            onClick={() => setSelectedIndex(null)}
+            className="fixed right-3 top-3 z-[10001] flex h-11 w-11 items-center justify-center rounded-full border border-[#C9A227]/60 bg-[#4B161B] text-[#F3EEDD] shadow-xl transition-all hover:bg-[#C9A227] hover:text-stone-950 sm:right-5 sm:top-5"
+            aria-label="Fechar foto ampliada"
+          >
+            <X className="h-6 w-6" />
+          </button>
           {/* Botão Anteriores */}
           {gallery.length > 1 && (
             <button
@@ -107,23 +124,15 @@ export function BusinessGallery({
           )}
 
           <div
-            className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl bg-stone-950 border-2 border-[#C9A227]/60 shadow-2xl flex flex-col"
+            className="relative flex max-h-[calc(100dvh-1rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border-2 border-[#C9A227]/60 bg-stone-950 shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Botão Fechar */}
-            <button
-              type="button"
-              onClick={() => setSelectedIndex(null)}
-              className="absolute top-3 right-3 z-50 p-2 rounded-full bg-[#4B161B] text-[#F3EEDD] hover:bg-[#C9A227] hover:text-stone-950 transition-all cursor-pointer shadow-md border border-[#C9A227]/40"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="relative flex-1 min-h-[300px] flex items-center justify-center p-2 bg-black">
+            <div className="relative flex min-h-0 flex-1 items-center justify-center bg-black p-2">
               <img
                 src={selectedImage.url}
                 alt={selectedImage.alt || `Foto ${selectedIndex + 1}`}
-                className="max-w-full max-h-[75vh] object-contain mx-auto rounded-lg"
+                className="block max-h-[calc(100dvh-6.5rem)] max-w-full object-contain"
               />
             </div>
 
@@ -137,7 +146,8 @@ export function BusinessGallery({
               </span>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </section>
   );

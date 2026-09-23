@@ -7,18 +7,13 @@ import type { PublicBusinessPresentation } from '@/lib/business/public-business-
 import { getObjectPosition } from '@/lib/business/public-business-presentation';
 import { InstitutionalBadges } from '../shared/InstitutionalBadges';
 import { QuickActionBar } from '../shared/BusinessActionButtons';
-import { BusinessAbout } from '../sections/BusinessAbout';
-import { BusinessServices } from '../sections/BusinessServices';
-import { BusinessGallery } from '../sections/BusinessGallery';
-import { BusinessBenefits } from '../sections/BusinessBenefits';
-import { BusinessEvents } from '../sections/BusinessEvents';
-import { BusinessPosts } from '../sections/BusinessPosts';
 import { BusinessOwnerCard } from '../sections/BusinessOwnerCard';
 import { CompanyLogoWithZoom } from '../shared/CompanyLogoWithZoom';
 import { BusinessLocationCard } from '../sections/BusinessLocationCard';
-import { BusinessCommunityReviewsCard } from '../sections/BusinessCommunityReviewsCard';
 import { BusinessHours } from '../sections/BusinessHours';
 import { BusinessContacts } from '../sections/BusinessContacts';
+import { BusinessProfileSections } from '../sections/BusinessProfileSections';
+import { BusinessCommunityReviewsCard } from '../sections/BusinessCommunityReviewsCard';
 
 type BronzeBusinessProfileProps = {
   profile: PublicBusinessPresentation;
@@ -48,7 +43,7 @@ export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F7F5] text-stone-900 font-sans pb-16">
+    <div className="min-h-screen overflow-x-clip bg-[#F8F7F5] pb-16 font-sans text-stone-900">
       
       {/* HERO BANNER BRONZE - Composição Horizontal Split em 2 Colunas no Desktop */}
       <header className="relative w-full bg-white text-stone-900 border-b border-[#E8E5DF] shadow-xs">
@@ -58,7 +53,7 @@ export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
             
             {/* COLUNA ESQUERDA: Identidade e Informações Resumidas da Empresa (7 cols: ~58%) */}
             <div className="lg:col-span-7 flex flex-col justify-between space-y-4">
-              <div className="flex items-start gap-4 sm:gap-5">
+              <div className="flex min-w-0 items-start gap-3 sm:gap-5">
                 
                 {/* Logo da Empresa com Ampliação em Lightbox */}
                 <CompanyLogoWithZoom logo={identity.logo} businessName={identity.name} />
@@ -68,7 +63,7 @@ export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
 
 
 
-                  <h1 className="font-serif font-bold text-2xl sm:text-3xl text-[#4B161B] tracking-tight truncate mt-1">
+                  <h1 className="mt-1 break-words font-serif text-2xl font-bold leading-tight tracking-tight text-[#4B161B] sm:text-3xl">
                     {identity.name}
                   </h1>
 
@@ -113,27 +108,27 @@ export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/20 pointer-events-none" />
 
               {/* Botões Compartilhar e Favoritar Sobrepostos no Canto Superior Direito da Foto */}
-              <div className="absolute top-3 right-3 z-10 flex items-center gap-2 text-xs font-medium">
+              <div className="absolute right-2 top-2 z-10 flex items-center gap-2 text-xs font-medium sm:right-3 sm:top-3">
                 <button
                   type="button"
                   onClick={handleShare}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 hover:bg-white text-stone-800 font-semibold border border-stone-200 transition-all shadow-xs cursor-pointer backdrop-blur-xs text-xs"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full border border-stone-200 bg-white/90 px-2.5 text-xs font-semibold text-stone-800 shadow-xs backdrop-blur-xs transition-all hover:bg-white sm:h-auto sm:px-3 sm:py-1.5"
                 >
                   <Share2 className="w-3.5 h-3.5 text-stone-600" />
-                  <span>{copiedShare ? 'Copiado!' : 'Compartilhar'}</span>
+                  <span className="hidden sm:inline">{copiedShare ? 'Copiado!' : 'Compartilhar'}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => toggleFavorite(identity.slug)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all shadow-xs cursor-pointer backdrop-blur-xs text-xs ${
+                  className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 text-xs shadow-xs backdrop-blur-xs transition-all sm:h-auto sm:px-3 sm:py-1.5 ${
                     isFavorited
                       ? 'bg-rose-600 text-white border-rose-600 font-bold'
                       : 'bg-white/90 hover:bg-white text-stone-800 font-semibold border-stone-200'
                   }`}
                 >
                   <Heart className={`w-3.5 h-3.5 ${isFavorited ? 'fill-white text-white' : 'text-stone-600'}`} />
-                  <span>{isFavorited ? 'Favoritado' : 'Favoritar'}</span>
+                  <span className="hidden sm:inline">{isFavorited ? 'Favoritado' : 'Favoritar'}</span>
                 </button>
               </div>
             </div>
@@ -161,28 +156,7 @@ export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
           {/* COLUNA ESQUERDA (Conteúdo Principal - 8 cols no desktop) */}
           <main className="lg:col-span-8 space-y-6">
             
-            <div id="visao-geral">
-              <BusinessAbout identity={identity} />
-            </div>
-
-            <div id="beneficios">
-              <BusinessBenefits benefits={profile.benefits} />
-            </div>
-
-            <div id="servicos">
-              <BusinessServices services={profile.services} />
-            </div>
-
-            <div id="fotos-videos">
-              <BusinessGallery gallery={profile.media.gallery} />
-            </div>
-
-            <BusinessEvents events={profile.events} />
-            <BusinessPosts posts={profile.posts} />
-
-            <div id="comentarios">
-              <BusinessCommunityReviewsCard reviews={profile.reviews} owner={owner} />
-            </div>
+            <BusinessProfileSections profile={profile} />
 
           </main>
 
@@ -201,6 +175,10 @@ export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
             {/* Card de Contatos Directos */}
             <div id="contato">
               <BusinessContacts contacts={profile.contacts} />
+            </div>
+
+            <div id="comentarios">
+              <BusinessCommunityReviewsCard reviews={profile.reviews} owner={owner} businessSlug={profile.identity.slug} />
             </div>
 
           </aside>

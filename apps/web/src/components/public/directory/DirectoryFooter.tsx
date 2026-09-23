@@ -12,21 +12,21 @@ export function DirectoryFooter() {
         {/* Trust Badges Bar */}
         <div className="dh-footer__trust-bar">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-amber-500" />
+            <ShieldCheck className="h-5 w-5 shrink-0 text-amber-500" />
             <span>Ambiente protegido</span>
           </div>
           <div className="flex items-center gap-2 border-x border-white/10 px-6">
-            <Lock className="w-5 h-5 text-amber-500" />
+            <Lock className="h-5 w-5 shrink-0 text-amber-500" />
             <span>Privacidade e LGPD</span>
           </div>
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-amber-500" />
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-amber-500" />
             <span>Rede verificada</span>
           </div>
         </div>
 
         {/* Footer Main Content */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-8 py-6">
+        <div className="flex flex-col items-center justify-between gap-6 py-6 md:flex-row md:gap-8">
           {/* Logo & Rights */}
           <div className="flex flex-col items-center md:items-start text-xs space-y-2">
             <Image
@@ -40,7 +40,7 @@ export function DirectoryFooter() {
           </div>
 
           {/* Links & Menu */}
-          <div className="flex flex-wrap items-center justify-center gap-6 text-sm font-medium">
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-center text-sm font-medium">
             <Link href="/guia" className="text-gray-300 hover:text-amber-400 transition-colors">
               Início
             </Link>

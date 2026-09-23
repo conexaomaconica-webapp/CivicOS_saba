@@ -3,6 +3,10 @@ export interface RegistrationFields {
   email: string;
   password: string;
   confirmPassword: string;
+  city: string;
+  state: string;
+  acceptedTerms: boolean;
+  acceptedPrivacy: boolean;
 }
 
 export interface RegistrationErrors {
@@ -10,6 +14,10 @@ export interface RegistrationErrors {
   email?: string;
   password?: string;
   confirmPassword?: string;
+  city?: string;
+  state?: string;
+  acceptedTerms?: string;
+  acceptedPrivacy?: string;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -59,7 +67,9 @@ export function validateConfirmPassword(password: string, confirmPassword: strin
   return null;
 }
 
-export function validateRegistration(fields: RegistrationFields): RegistrationErrors {
+type LegacyRegistrationFields = Pick<RegistrationFields, 'name' | 'email' | 'password' | 'confirmPassword'>;
+
+export function validateRegistration(fields: RegistrationFields | LegacyRegistrationFields): RegistrationErrors {
   const errors: RegistrationErrors = {};
 
   const name = validateName(fields.name);
@@ -74,6 +84,11 @@ export function validateRegistration(fields: RegistrationFields): RegistrationEr
   const confirmPassword = validateConfirmPassword(fields.password, fields.confirmPassword);
   if (confirmPassword) errors.confirmPassword = confirmPassword;
 
+  if ('city' in fields && fields.city.trim().length < 2) errors.city = 'Informe sua cidade.';
+  if ('state' in fields && !/^[A-Za-z]{2}$/.test(fields.state.trim())) errors.state = 'Informe a UF com duas letras.';
+  if ('acceptedTerms' in fields && !fields.acceptedTerms) errors.acceptedTerms = 'Aceite os Termos de Uso para continuar.';
+  if ('acceptedPrivacy' in fields && !fields.acceptedPrivacy) errors.acceptedPrivacy = 'Aceite a Política de Privacidade para continuar.';
+
   return errors;
 }
 
@@ -82,6 +97,10 @@ export function hasErrors(errors: RegistrationErrors): boolean {
     errors.name ||
     errors.email ||
     errors.password ||
-    errors.confirmPassword,
+    errors.confirmPassword ||
+    errors.city ||
+    errors.state ||
+    errors.acceptedTerms ||
+    errors.acceptedPrivacy,
   );
 }

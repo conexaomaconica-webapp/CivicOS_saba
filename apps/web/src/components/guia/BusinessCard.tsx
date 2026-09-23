@@ -77,17 +77,17 @@ export function BusinessCard({
           {isOuro && (
             <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md bg-highlight px-2 py-1 text-[0.65rem] font-bold text-gray-900">
               <Star className="h-3 w-3 fill-current" aria-hidden="true" />
-              DESTAQUE OURO
+              PLANO ACÁCIA
             </span>
           )}
           {isPrata && (
             <span className="absolute right-3 top-3 rounded-md border border-default bg-secondary px-2 py-1 text-[0.65rem] font-bold text-primary">
-              PLANO PRATA
+              PLANO COMPASSO
             </span>
           )}
           {isBronze && (
             <span className="absolute right-3 top-3 rounded-md border border-amber-800/20 bg-amber-50 dark:bg-amber-950/30 px-2 py-1 text-[0.65rem] font-bold text-amber-900 dark:text-amber-300">
-              PLANO BRONZE
+              PLANO ESQUADRO
             </span>
           )}
           {verified && (

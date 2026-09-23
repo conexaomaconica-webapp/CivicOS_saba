@@ -5,7 +5,7 @@ import { createServerSideClient } from '@/lib/supabase/server';
 
 export interface InstitutionalRecognitionDTO {
   id: string;
-  key: 'pedra_fundamental' | 'coluna_de_honra' | 'selo_ouro';
+  key: 'pedra_fundamental' | 'selo_ouro' | 'selo_prata' | 'selo_bronze';
   title: string;
   description: string;
   tooltip?: string;
@@ -13,6 +13,8 @@ export interface InstitutionalRecognitionDTO {
   compact_seal_url: string;
   sealUrl?: string;
   compactSealUrl?: string;
+  header_display: 'badge' | 'horizontal_seal';
+  header_scale?: number;
   priority_order: number;
   is_active: boolean;
   updated_at: string;
@@ -22,42 +24,61 @@ const DEFAULT_RECOGNITIONS: InstitutionalRecognitionDTO[] = [
   {
     id: 'rec_pedra_fundamental',
     key: 'pedra_fundamental',
-    title: 'Selo Pedra Fundamental (10/10)',
-    description: 'Reconhecimento histórico/institucional permanente dos 10 primeiros apoiadores da rede Conexão Maçônica.',
-    tooltip: 'Concedido exclusivamente aos 10 primeiros apoiadores históricos da plataforma. Não é um plano nem entitlement de upgrade.',
+    title: 'Pedra Fundamental',
+    description: 'Condecoração histórica destinada às empresas fundadoras da Conexão Maçônica.',
+    tooltip: 'Condecoração de fundador, independente do plano comercial e sem natureza de benefício ou entitlement.',
     seal_url: '/selos/pedra-fundamental.svg',
     compact_seal_url: '/selos/pedra-fundamental-compact.svg',
     sealUrl: '/selos/pedra-fundamental.svg',
     compactSealUrl: '/selos/pedra-fundamental-compact.svg',
+    header_display: 'badge',
+    header_scale: 100,
     priority_order: 1,
-    is_active: true,
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'rec_coluna_de_honra',
-    key: 'coluna_de_honra',
-    title: 'Coluna de Honra (Empresa Fundadora)',
-    description: 'Membro fundador e destaque de mérito e contribuição exemplar na fraternidade.',
-    tooltip: 'Reconhecimento institucional aos membros fundadores da comunidade.',
-    seal_url: '/selos/coluna-honra.svg',
-    compact_seal_url: '/selos/coluna-honra-compact.svg',
-    sealUrl: '/selos/coluna-honra.svg',
-    compactSealUrl: '/selos/coluna-honra-compact.svg',
-    priority_order: 2,
     is_active: true,
     updated_at: new Date().toISOString(),
   },
   {
     id: 'rec_selo_ouro',
     key: 'selo_ouro',
-    title: 'Selo Anunciante Ouro',
+    title: 'Selo Acácia',
     description: 'Reconhecimento e presença comercial de máxima distinção para empresas do Plano Acácia.',
     tooltip: 'Concedido a todos os anunciantes ativos no Plano Acácia.',
     seal_url: '/selos/plano-ouro.svg',
     compact_seal_url: '/selos/plano-ouro-compact.svg',
     sealUrl: '/selos/plano-ouro.svg',
     compactSealUrl: '/selos/plano-ouro-compact.svg',
+    header_display: 'badge',
+    priority_order: 2,
+    is_active: true,
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'rec_selo_prata',
+    key: 'selo_prata',
+    title: 'Selo Compasso',
+    description: 'Identificação comercial das empresas ativas no Plano Compasso.',
+    tooltip: 'Exibido para anunciantes ativos no Plano Compasso.',
+    seal_url: '/selos/plano-prata.svg',
+    compact_seal_url: '/selos/plano-prata.svg',
+    sealUrl: '/selos/plano-prata.svg',
+    compactSealUrl: '/selos/plano-prata.svg',
+    header_display: 'badge',
     priority_order: 3,
+    is_active: true,
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'rec_selo_bronze',
+    key: 'selo_bronze',
+    title: 'Selo Esquadro',
+    description: 'Identificação comercial das empresas ativas no Plano Esquadro.',
+    tooltip: 'Exibido para anunciantes ativos no Plano Esquadro.',
+    seal_url: '/selos/plano-bronze.svg',
+    compact_seal_url: '/selos/plano-bronze.svg',
+    sealUrl: '/selos/plano-bronze.svg',
+    compactSealUrl: '/selos/plano-bronze.svg',
+    header_display: 'badge',
+    priority_order: 4,
     is_active: true,
     updated_at: new Date().toISOString(),
   },
@@ -70,7 +91,7 @@ export async function getInstitutionalRecognitionsAction() {
     const { data: dbRows, error } = await (supabase as any)
       .from('institutional_recognitions')
       .select('*')
-      .in('key', ['pedra_fundamental', 'coluna_de_honra', 'selo_ouro'])
+      .in('key', ['pedra_fundamental', 'selo_ouro', 'selo_prata', 'selo_bronze'])
       .order('priority_order', { ascending: true });
 
     if (error || !dbRows || dbRows.length === 0) {
@@ -92,6 +113,8 @@ export async function getInstitutionalRecognitionsAction() {
         compact_seal_url: compactSealUrl,
         sealUrl: sealUrl,
         compactSealUrl: compactSealUrl,
+        header_display: dbItem.header_display === 'horizontal_seal' ? 'horizontal_seal' : 'badge',
+        header_scale: typeof dbItem.header_scale === 'number' ? dbItem.header_scale : (defItem.header_scale || 100),
         priority_order: typeof dbItem.priority_order === 'number' ? dbItem.priority_order : defItem.priority_order,
         is_active: typeof dbItem.is_active === 'boolean' ? dbItem.is_active : defItem.is_active,
       };
@@ -106,6 +129,10 @@ export async function getInstitutionalRecognitionsAction() {
 export async function uploadRecognitionSealAction(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
     const supabase = await createServerSideClient();
+    const { data: userRes } = await supabase.auth.getUser();
+    if (!userRes?.user) {
+      return { success: false, error: 'Usuário não autenticado.' };
+    }
     const file = formData.get('file') as File | null;
     const sealType = (formData.get('sealType') as string) || 'seal';
 
@@ -177,6 +204,8 @@ export async function updateInstitutionalRecognitionAction(input: InstitutionalR
       tooltip: input.tooltip || null,
       seal_url: sealUrl,
       compact_seal_url: compactSealUrl,
+      header_display: input.header_display === 'horizontal_seal' ? 'horizontal_seal' : 'badge',
+      header_scale: typeof input.header_scale === 'number' ? input.header_scale : 100,
       priority_order: typeof input.priority_order === 'number' ? input.priority_order : 1,
       is_active: typeof input.is_active === 'boolean' ? input.is_active : true,
       updated_at: new Date().toISOString(),
@@ -189,7 +218,16 @@ export async function updateInstitutionalRecognitionAction(input: InstitutionalR
 
     let saveErr = upsertErr;
 
-    // 2. Se upsert nativo falhar, tentar update/insert por id como fallback
+    // 2. Se upsert nativo falhar por ausência da coluna no PostgREST schema (PGRST204), tentar sem header_scale
+    if (saveErr && (saveErr.code === 'PGRST204' || saveErr.message?.includes('header_scale'))) {
+      const { header_scale: _scale, ...fallbackPayload } = dbPayload;
+      const { error: retryErr } = await (supabase as any)
+        .from('institutional_recognitions')
+        .upsert(fallbackPayload, { onConflict: 'key' });
+      saveErr = retryErr;
+    }
+
+    // 3. Se ainda houver erro, tentar update/insert por id como fallback
     if (saveErr) {
       const { data: existingRow } = await (supabase as any)
         .from('institutional_recognitions')
@@ -203,11 +241,28 @@ export async function updateInstitutionalRecognitionAction(input: InstitutionalR
           .update(dbPayload)
           .eq('id', existingRow.id);
         saveErr = updateErr;
+
+        if (saveErr && (saveErr.code === 'PGRST204' || saveErr.message?.includes('header_scale'))) {
+          const { header_scale: _scale, ...fallbackPayload } = dbPayload;
+          const { error: retryUpdateErr } = await (supabase as any)
+            .from('institutional_recognitions')
+            .update(fallbackPayload)
+            .eq('id', existingRow.id);
+          saveErr = retryUpdateErr;
+        }
       } else {
         const { error: insertErr } = await (supabase as any)
           .from('institutional_recognitions')
           .insert(dbPayload);
         saveErr = insertErr;
+
+        if (saveErr && (saveErr.code === 'PGRST204' || saveErr.message?.includes('header_scale'))) {
+          const { header_scale: _scale, ...fallbackPayload } = dbPayload;
+          const { error: retryInsertErr } = await (supabase as any)
+            .from('institutional_recognitions')
+            .insert(fallbackPayload);
+          saveErr = retryInsertErr;
+        }
       }
     }
 

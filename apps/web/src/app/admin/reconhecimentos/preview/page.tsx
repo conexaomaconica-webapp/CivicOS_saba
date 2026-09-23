@@ -7,27 +7,38 @@ import { BusinessProfileRenderer } from '@/components/public/business/BusinessPr
 import { ouroBusinessFixture } from '@/visual-lab/fixtures/ouro-business';
 import { prataBusinessFixture } from '@/visual-lab/fixtures/prata-business';
 import { bronzeBusinessFixture } from '@/visual-lab/fixtures/bronze-business';
-import { RecognitionPresentation } from '@/components/public/business/RecognitionPresentation';
+import { InstitutionalBadges } from '@/components/public/business/shared/InstitutionalBadges';
 import { canBusinessReceiveRecognition } from '@/lib/business/recognition-eligibility';
 
 export default function AdminReconhecimentosPreviewPage() {
   const [selectedPlan, setSelectedPlan] = useState<'bronze' | 'prata' | 'ouro'>('ouro');
   const [hasPedraFundamental, setHasPedraFundamental] = useState(true);
   const [hasFundadora, setHasFundadora] = useState(true);
-  const [hasColunaHonra, setHasColunaHonra] = useState(false);
   const [hasVerificada, setHasVerificada] = useState(true);
+  const selectedPlanName = selectedPlan === 'ouro' ? 'Acácia' : selectedPlan === 'prata' ? 'Compasso' : 'Esquadro';
 
   // Selecionar fixture base do plano
   const baseFixture =
     selectedPlan === 'bronze'
       ? bronzeBusinessFixture
       : selectedPlan === 'prata'
-      ? prataBusinessFixture
-      : ouroBusinessFixture;
+        ? prataBusinessFixture
+        : ouroBusinessFixture;
 
   // Injetar camada de reconhecimento na autoridade sem alterar banco de dados
   const simulatedBusiness = {
     ...baseFixture,
+    plan: {
+      ...baseFixture.plan,
+      commercialPlan: selectedPlan,
+      template: selectedPlan,
+    },
+    recognition: {
+      ...baseFixture.recognition,
+      pedraFundamental: hasPedraFundamental,
+      goldPlanBadge: selectedPlan === 'ouro',
+      verified: hasVerificada,
+    },
     authority: {
       ...baseFixture.authority,
       isVerified: hasVerificada,
@@ -52,7 +63,7 @@ export default function AdminReconhecimentosPreviewPage() {
             Matriz de Pré-visualização de Combinações
           </h1>
           <p className="text-xs text-stone-600 mt-1">
-            Simule como o perfil público se apresenta visualmente ao combinar planos comerciais (Bronze, Prata, Ouro) com recohecimentos institucionais independentes.
+            Simule como o perfil público se apresenta visualmente ao combinar os planos Esquadro, Compasso e Acácia com reconhecimentos institucionais independentes.
           </p>
         </div>
       </div>
@@ -73,13 +84,12 @@ export default function AdminReconhecimentosPreviewPage() {
                   key={plan}
                   type="button"
                   onClick={() => setSelectedPlan(plan)}
-                  className={`py-2 px-3 rounded-xl border text-xs font-bold uppercase transition-all cursor-pointer ${
-                    selectedPlan === plan
+                  className={`py-2 px-3 rounded-xl border text-xs font-bold uppercase transition-all cursor-pointer ${selectedPlan === plan
                       ? 'bg-[#3B0B14] text-[#C9A227] border-[#C9A227] shadow-md'
                       : 'bg-stone-50 text-stone-700 border-stone-300 hover:border-stone-400'
-                  }`}
+                    }`}
                 >
-                  Plano {plan}
+                  {plan === 'ouro' ? 'Acácia' : plan === 'prata' ? 'Compasso' : 'Esquadro'}
                 </button>
               ))}
             </div>
@@ -88,15 +98,14 @@ export default function AdminReconhecimentosPreviewPage() {
           {/* TOGGLES DE RECONHECIMENTO INSTITUCIONAL (COM VALIDAÇÃO DE ELEGIBILIDADE) */}
           <div className="space-y-2">
             <label className="block text-xs font-bold text-stone-700">
-              2. Camada de Reconhecimentos Elegíveis para o Plano {selectedPlan.toUpperCase()}:
+              2. Camada de reconhecimentos para o Plano {selectedPlanName}:
             </label>
             <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
               <label
-                className={`flex items-center gap-2 p-2 rounded-xl border ${
-                  canBusinessReceiveRecognition(selectedPlan, 'pedra_fundamental')
+                className={`flex items-center gap-2 p-2 rounded-xl border ${canBusinessReceiveRecognition(selectedPlan, 'pedra_fundamental')
                     ? 'bg-stone-50 border-stone-200 cursor-pointer'
                     : 'bg-stone-100 border-stone-200 opacity-50 cursor-not-allowed'
-                }`}
+                  }`}
               >
                 <input
                   type="checkbox"
@@ -105,15 +114,14 @@ export default function AdminReconhecimentosPreviewPage() {
                   onChange={(e) => setHasPedraFundamental(e.target.checked)}
                   className="accent-[#C9A227]"
                 />
-                <span>Pedra Fundamental {selectedPlan !== 'ouro' && '(Exclusivo Ouro)'}</span>
+                <span>Pedra Fundamental</span>
               </label>
 
               <label
-                className={`flex items-center gap-2 p-2 rounded-xl border ${
-                  canBusinessReceiveRecognition(selectedPlan, 'empresa_fundadora')
+                className={`flex items-center gap-2 p-2 rounded-xl border ${canBusinessReceiveRecognition(selectedPlan, 'empresa_fundadora')
                     ? 'bg-stone-50 border-stone-200 cursor-pointer'
                     : 'bg-stone-100 border-stone-200 opacity-50 cursor-not-allowed'
-                }`}
+                  }`}
               >
                 <input
                   type="checkbox"
@@ -123,23 +131,6 @@ export default function AdminReconhecimentosPreviewPage() {
                   className="accent-[#C9A227]"
                 />
                 <span>Empresa Fundadora</span>
-              </label>
-
-              <label
-                className={`flex items-center gap-2 p-2 rounded-xl border ${
-                  canBusinessReceiveRecognition(selectedPlan, 'coluna_de_honra')
-                    ? 'bg-stone-50 border-stone-200 cursor-pointer'
-                    : 'bg-stone-100 border-stone-200 opacity-50 cursor-not-allowed'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  disabled={!canBusinessReceiveRecognition(selectedPlan, 'coluna_de_honra')}
-                  checked={canBusinessReceiveRecognition(selectedPlan, 'coluna_de_honra') && hasColunaHonra}
-                  onChange={(e) => setHasColunaHonra(e.target.checked)}
-                  className="accent-[#C9A227]"
-                />
-                <span>Coluna de Honra {selectedPlan !== 'ouro' && '(Exclusivo Ouro)'}</span>
               </label>
 
               <label className="flex items-center gap-2 p-2 bg-stone-50 border border-stone-200 rounded-xl cursor-pointer">
@@ -160,25 +151,33 @@ export default function AdminReconhecimentosPreviewPage() {
       <div className="bg-stone-900 rounded-3xl p-6 border border-stone-800 space-y-4">
         <div className="flex items-center justify-between border-b border-stone-800 pb-3">
           <span className="text-xs font-mono text-amber-400 font-bold uppercase tracking-wider">
-            Resultado Visual: Plano {selectedPlan.toUpperCase()} + Reconhecimentos Ativos
+            Resultado Visual: Plano {selectedPlanName} + Reconhecimentos Ativos
           </span>
 
-          <RecognitionPresentation
-            isPedraFundamental={hasPedraFundamental}
-            isFounder={hasFundadora}
-            isColunaDeHonra={hasColunaHonra}
-            isVerified={hasVerificada}
+          <InstitutionalBadges
+            recognition={{
+              pedraFundamental: hasPedraFundamental,
+              colunaDeHonra: false,
+              founder: hasFundadora,
+              goldPlanBadge: selectedPlan === 'ouro',
+              verified: hasVerificada,
+            }}
+            commercialPlan={selectedPlan}
             variant="compact"
           />
         </div>
 
         {/* COMPOSIÇÃO INDEPENDENTE DE RECONHECIMENTO SOBRE O PERFIL */}
         <div className="bg-[#FDFBF7] rounded-2xl p-4 overflow-hidden border border-stone-700 text-stone-900">
-          <RecognitionPresentation
-            isPedraFundamental={hasPedraFundamental}
-            isFounder={hasFundadora}
-            isColunaDeHonra={hasColunaHonra}
-            isVerified={hasVerificada}
+          <InstitutionalBadges
+            recognition={{
+              pedraFundamental: hasPedraFundamental,
+              colunaDeHonra: false,
+              founder: hasFundadora,
+              goldPlanBadge: selectedPlan === 'ouro',
+              verified: hasVerificada,
+            }}
+            commercialPlan={selectedPlan}
             variant="full"
             className="mb-4"
           />

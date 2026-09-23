@@ -527,9 +527,9 @@ export default function AdminBusinessesDirectoryPage() {
                 { id: 'inadimplentes', label: `Inadimplentes (${counts.inadimplentes})` },
                 { id: 'suspensas', label: `Suspensas (${counts.suspensas})` },
                 { id: 'incompletas', label: `Incompletas (${counts.incompletas})` },
-                { id: 'bronze', label: `Bronze (${counts.bronze})` },
-                { id: 'prata', label: `Prata (${counts.prata})` },
-                { id: 'ouro', label: `Ouro (${counts.ouro})` },
+                { id: 'bronze', label: `Esquadro (${counts.bronze})` },
+                { id: 'prata', label: `Compasso (${counts.prata})` },
+                { id: 'ouro', label: `Acácia (${counts.ouro})` },
                 { id: 'pedra_fundamental', label: `Pedra Fundamental (${counts.pedraFundamental})` },
               ].map((f) => (
                 <button

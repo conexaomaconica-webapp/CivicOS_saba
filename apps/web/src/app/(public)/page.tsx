@@ -59,10 +59,10 @@ const faqSchema = {
     },
     {
       '@type': 'Question',
-      name: 'Qual a diferença entre os planos Bronze, Prata, Ouro e Fundador?',
+      name: 'Qual a diferença entre os planos Esquadro, Compasso e Acácia?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'O plano Bronze oferece presença básica. O Prata inclui galeria de fotos. O Ouro adiciona eventos, novidades/posts e destaque comercial máximo. O Ouro Fundador traz todas as vantagens do Ouro acrescido do Selo Empresa Fundadora.',
+        text: 'O Plano Esquadro oferece presença básica. O Compasso inclui galeria de fotos. O Acácia adiciona eventos, novidades/posts e destaque comercial máximo. A condição Acácia Fundador traz todos os recursos do Acácia acrescidos da identificação de Empresa Fundadora.',
       },
     },
   ],

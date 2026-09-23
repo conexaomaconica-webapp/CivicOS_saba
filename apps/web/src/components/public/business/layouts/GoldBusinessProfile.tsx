@@ -7,19 +7,13 @@ import type { PublicBusinessPresentation } from '@/lib/business/public-business-
 import { getObjectPosition } from '@/lib/business/public-business-presentation';
 import { InstitutionalBadges } from '../shared/InstitutionalBadges';
 import { QuickActionBar } from '../shared/BusinessActionButtons';
-import { BusinessAbout } from '../sections/BusinessAbout';
-import { BusinessServices } from '../sections/BusinessServices';
-import { BusinessGallery } from '../sections/BusinessGallery';
-import { BusinessBenefits } from '../sections/BusinessBenefits';
-import { BusinessEvents } from '../sections/BusinessEvents';
-import { BusinessPosts } from '../sections/BusinessPosts';
 import { BusinessOwnerCard } from '../sections/BusinessOwnerCard';
 import { CompanyLogoWithZoom } from '../shared/CompanyLogoWithZoom';
 import { BusinessLocationCard } from '../sections/BusinessLocationCard';
-import { BusinessCommunityReviewsCard } from '../sections/BusinessCommunityReviewsCard';
 import { BusinessHours } from '../sections/BusinessHours';
 import { BusinessContacts } from '../sections/BusinessContacts';
-import { BusinessVideo } from '../sections/BusinessVideo';
+import { BusinessProfileSections } from '../sections/BusinessProfileSections';
+import { BusinessCommunityReviewsCard } from '../sections/BusinessCommunityReviewsCard';
 
 type GoldBusinessProfileProps = {
   profile: PublicBusinessPresentation;
@@ -50,7 +44,7 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F7F5] text-stone-900 font-sans pb-16">
+    <div className="min-h-screen overflow-x-clip bg-[#F8F7F5] pb-16 font-sans text-stone-900">
       
       {/* 1. HERO HEADER INTERATIVO DO PLANO OURO (Altura equivalente ao Plano Prata) */}
       <section className="relative w-full bg-[#4B161B] text-white overflow-hidden shadow-xl border-b-2 border-[#C9A227] min-h-[380px] sm:min-h-[420px] lg:min-h-[440px] flex flex-col justify-center">
@@ -86,30 +80,30 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
           <button
             type="button"
             onClick={handleShare}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white font-semibold border border-white/20 transition-all shadow-xs cursor-pointer backdrop-blur-md"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/20 bg-black/40 px-2.5 font-semibold text-white shadow-xs backdrop-blur-md transition-all hover:bg-black/60 sm:h-auto sm:px-3.5 sm:py-1.5"
           >
             <Share2 className="w-3.5 h-3.5 text-white" />
-            <span>{copiedShare ? 'Copiado!' : 'Compartilhar'}</span>
+            <span className="hidden sm:inline">{copiedShare ? 'Copiado!' : 'Compartilhar'}</span>
           </button>
 
           <button
             type="button"
             onClick={() => toggleFavorite(identity.slug)}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border transition-all shadow-xs cursor-pointer backdrop-blur-md ${
+            className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 shadow-xs backdrop-blur-md transition-all sm:h-auto sm:px-3.5 sm:py-1.5 ${
               isFavorited
                 ? 'bg-rose-600 text-white border-rose-500 font-bold'
                 : 'bg-black/40 hover:bg-black/60 text-white font-semibold border-white/20'
             }`}
           >
             <Heart className={`w-3.5 h-3.5 ${isFavorited ? 'fill-white text-white' : 'text-white'}`} />
-            <span>{isFavorited ? 'Favoritado' : 'Favoritar'}</span>
+            <span className="hidden sm:inline">{isFavorited ? 'Favoritado' : 'Favoritar'}</span>
           </button>
         </div>
 
         {/* Conteúdo Institucional do Hero Banner com Altura Ampliada */}
-        <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 pb-20 sm:pb-28 w-full">
+        <div className="relative z-20 mx-auto w-full max-w-7xl px-4 pb-16 pt-20 sm:px-6 sm:py-20 sm:pb-28 lg:px-8">
           
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-6 sm:gap-8">
+          <div className="flex flex-col items-center gap-6 text-center sm:gap-8 md:flex-row md:items-center md:text-left">
             
             {/* Logo da Empresa com Moldura Dourada Ornamentada, Brilho #C9A227 e Ampliação Lightbox */}
             <div className="relative group shrink-0">
@@ -122,10 +116,10 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
             </div>
 
             {/* Informações da Empresa */}
-            <div className="space-y-2 min-w-0 flex-1 relative z-20">
+            <div className="relative z-20 min-w-0 flex-1 space-y-2">
               
               {/* Nome da Empresa */}
-              <h1 className="font-serif font-bold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight leading-tight drop-shadow-sm">
+              <h1 className="break-words font-serif text-2xl font-bold leading-tight tracking-tight text-white drop-shadow-sm sm:text-3xl lg:text-4xl">
                 {identity.name}
               </h1>
 
@@ -188,29 +182,7 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
           {/* COLUNA ESQUERDA (Conteúdo Principal - 8 cols no desktop) */}
           <main className="lg:col-span-8 space-y-6">
             
-            <div id="visao-geral">
-              <BusinessAbout identity={identity} />
-            </div>
-
-            <div id="beneficios">
-              <BusinessBenefits benefits={profile.benefits} />
-            </div>
-
-            <div id="servicos">
-              <BusinessServices services={profile.services} />
-            </div>
-
-            <div id="fotos-videos">
-              <BusinessVideo video={profile.media.video} />
-              <BusinessGallery gallery={profile.media.gallery} />
-            </div>
-
-            <BusinessEvents events={profile.events} />
-            <BusinessPosts posts={profile.posts} />
-
-            <div id="comentarios">
-              <BusinessCommunityReviewsCard reviews={profile.reviews} owner={owner} />
-            </div>
+            <BusinessProfileSections profile={profile} />
 
           </main>
 
@@ -234,6 +206,10 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
             {/* Card de Contatos Directos */}
             <div id="contato">
               <BusinessContacts contacts={profile.contacts} />
+            </div>
+
+            <div id="comentarios">
+              <BusinessCommunityReviewsCard reviews={profile.reviews} owner={owner} businessSlug={profile.identity.slug} />
             </div>
 
           </aside>

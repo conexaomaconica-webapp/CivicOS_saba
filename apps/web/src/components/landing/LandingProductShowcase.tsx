@@ -25,7 +25,7 @@ export function LandingProductShowcase() {
                   <Monitor className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-300">Perfil Ouro em Desktop</p>
+                  <p className="text-xs font-bold text-slate-300">Perfil Acácia em Desktop</p>
                   <p className="text-[10px] text-slate-500">Banner, Galeria, Serviços e Avaliações</p>
                 </div>
               </div>

@@ -13,7 +13,7 @@ RETURNS TRIGGER LANGUAGE plpgsql SET search_path = '' AS $$
 DECLARE v_plan_code TEXT; v_limit INTEGER; v_used INTEGER;
 BEGIN
   IF NEW.media_type <> 'video' THEN RETURN NEW; END IF;
-  SELECT COALESCE(s.plan_code, b.plan_code, b.plan_tier, 'bronze') INTO v_plan_code
+  SELECT COALESCE(s.plan_code, b.plan_tier, 'bronze') INTO v_plan_code
   FROM public.businesses b
   LEFT JOIN LATERAL (
     SELECT p.code AS plan_code

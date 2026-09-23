@@ -5,11 +5,10 @@ import { Button, Input } from '@saas/ui';
 import { submitBusinessReviewAction } from '@/app/actions/reviews';
 
 interface PublicReviewFormProps {
-  tenantId: string;
-  businessId: string;
+  businessSlug: string;
 }
 
-export function PublicReviewForm({ tenantId, businessId }: PublicReviewFormProps) {
+export function PublicReviewForm({ businessSlug }: PublicReviewFormProps) {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -22,8 +21,7 @@ export function PublicReviewForm({ tenantId, businessId }: PublicReviewFormProps
 
     try {
       const res = await submitBusinessReviewAction({
-        tenantId,
-        businessId,
+        businessSlug,
         rating,
         comment,
       });

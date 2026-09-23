@@ -52,6 +52,7 @@ const ADVERTISER_NAV_GROUPS: NavigationGroup[] = [
     items: [
       { label: 'Serviços', href: '/anunciante/conteudo/servicos', icon: Briefcase },
       { label: 'Benefícios e Ofertas', href: '/anunciante/conteudo/beneficios', icon: Award },
+      { label: 'Validar benefício', href: '/anunciante/beneficios/validar', icon: FileCheck2 },
       { label: 'Eventos', href: '/anunciante/conteudo/eventos', icon: Calendar },
       { label: 'Publicações', href: '/anunciante/conteudo/posts', icon: FileText },
     ],

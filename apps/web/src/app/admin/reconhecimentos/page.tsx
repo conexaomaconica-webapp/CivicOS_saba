@@ -28,15 +28,15 @@ export default async function AdminReconhecimentosPage() {
             Gestão de Selos Institucionais
           </span>
           <span className="text-xs text-stone-500 font-semibold">
-            Camada Visual Desacoplada dos Planos Comerciais
+            Selos Comerciais e Condecoração Histórica
           </span>
         </div>
 
         <h1 className="text-2xl font-serif font-bold text-stone-900 mt-1">
-          Catálogo & Assets dos Selos de Reconhecimento
+          Catálogo & Assets dos Selos
         </h1>
         <p className="text-xs text-stone-600 mt-1 max-w-3xl leading-relaxed">
-          Configure a apresentação visual, textos explicativos, tooltips e URLs dos selos gráficos (Pedra Fundamental 10/10, Empresa Fundadora, Coluna de Honra e Empresa Verificada).
+          Configure a <span className="font-bold">Pedra Fundamental</span> para fundadores e os selos comerciais dos planos Acácia, Compasso e Esquadro. Coluna de Honra não integra mais o catálogo ativo.
         </p>
       </div>
 

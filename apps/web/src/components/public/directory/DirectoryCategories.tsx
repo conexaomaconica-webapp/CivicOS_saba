@@ -3,60 +3,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import {
-  Briefcase,
-  Building2,
-  Hand,
-  Heart,
-  ShoppingBasket,
-  Store,
-  Utensils,
-  ChevronRight,
-  Tag,
-  Star,
-  Award,
-  ShieldCheck,
-  Compass,
-  Landmark,
-  Phone,
-  Car,
-  Home,
-  Scale,
-  Stethoscope,
-  Wrench,
-  Palette,
-  Globe,
-  Sparkles,
-  type LucideIcon,
-} from 'lucide-react';
-
-const ICON_MAP: Record<string, LucideIcon> = {
-  utensils: Utensils,
-  hand: Hand,
-  building: Building2,
-  heart: Heart,
-  briefcase: Briefcase,
-  store: Store,
-  shopping: ShoppingBasket,
-  tag: Tag,
-  star: Star,
-  award: Award,
-  shield: ShieldCheck,
-  compass: Compass,
-  landmark: Landmark,
-  phone: Phone,
-  car: Car,
-  home: Home,
-  scale: Scale,
-  juridico: Scale,
-  stethoscope: Stethoscope,
-  saude: Stethoscope,
-  wrench: Wrench,
-  servicos: Wrench,
-  palette: Palette,
-  globe: Globe,
-  sparkles: Sparkles,
-};
+import { ChevronRight } from 'lucide-react';
+import { resolveCategoryIcon } from '@/lib/directory/category-icons';
 
 export type DirectoryCategoryItem = {
   id: string;
@@ -106,7 +54,7 @@ export function DirectoryCategories({ categories = [], onCategorySelect }: Direc
         {categories.map((cat) => {
           const rawIcon = (cat.icon_name || '').toLowerCase().trim();
           // Dynamic icon resolution with elegant fallback if icon is not mapped or missing
-          const IconComp = ICON_MAP[rawIcon] || Briefcase;
+          const IconComp = resolveCategoryIcon(rawIcon);
 
           return (
             <button

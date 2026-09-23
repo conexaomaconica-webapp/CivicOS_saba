@@ -39,7 +39,7 @@ const getPublicBusiness = cache(async (slug: string) => {
     try {
       const [detailResult, reviewsResult, recognitionsResult] = await Promise.all([
         supabase.rpc('public_business_detail', { p_business_slug: slug, p_host: host }),
-        supabase.rpc('public_business_reviews', { p_host: host, p_business_slug: slug, p_limit: 5 }),
+        supabase.rpc('public_business_reviews', { p_host: host, p_business_slug: slug, p_limit: 50 }),
         getInstitutionalRecognitionsAction(),
       ]);
       const detail: DetailRow | undefined = Array.isArray(detailResult.data) ? detailResult.data[0] : undefined;
@@ -68,7 +68,7 @@ const getPublicBusiness = cache(async (slug: string) => {
         if (bizId) {
           const { data: resp } = await (supabase as any)
             .from('business_responsibles')
-            .select('name, business_role, community_label, organization, avatar_url')
+            .select('name, business_role, community_label, organization, whatsapp, avatar_url')
             .eq('business_id', bizId)
             .maybeSingle();
 
@@ -78,6 +78,7 @@ const getPublicBusiness = cache(async (slug: string) => {
               business_role: resp.business_role || 'Proprietário',
               community_label: resp.community_label || 'Ir.\'.',
               organization: resp.organization,
+              whatsapp: resp.whatsapp,
               avatar_url: resp.avatar_url,
             };
           }
@@ -164,6 +165,20 @@ const getPublicBusiness = cache(async (slug: string) => {
           } catch (_e) {}
         }
 
+        try {
+          const planCode = detailObj.effective_plan_code === 'ouro_founder'
+            ? 'ouro'
+            : detailObj.effective_plan_code || 'bronze';
+          const { data: planRule } = await (supabase as any)
+            .from('plan_payment_rules')
+            .select('profile_section_order')
+            .eq('plan_code', planCode)
+            .maybeSingle();
+          if (Array.isArray(planRule?.profile_section_order)) {
+            detailObj.profile_section_order = planRule.profile_section_order;
+          }
+        } catch (_e) {}
+
         return toPublicBusinessPresentation(detailObj, reviews, catalog);
       }
 
@@ -228,14 +243,16 @@ const getPublicBusiness = cache(async (slug: string) => {
       { data: respRow },
       { data: recRows },
       { data: linkRow },
+      { data: categoryRows },
     ] = await Promise.all([
       (supabase as any).from('business_media').select('*').eq('business_id', bizId).order('display_order', { ascending: true }),
       (supabase as any).from('business_services').select('*').eq('business_id', bizId).eq('is_active', true).order('display_order', { ascending: true }),
       (supabase as any).from('business_benefits').select('*').eq('business_id', bizId).eq('is_active', true).order('display_order', { ascending: true }),
       (supabase as any).from('business_contacts').select('*').eq('business_id', bizId),
-      (supabase as any).from('business_responsibles').select('name, business_role, community_label, organization, avatar_url').eq('business_id', bizId).maybeSingle(),
+      (supabase as any).from('business_responsibles').select('name, business_role, community_label, organization, whatsapp, avatar_url').eq('business_id', bizId).maybeSingle(),
       (supabase as any).from('business_recognitions').select('recognition_key, is_active').eq('business_id', bizId).eq('is_active', true),
       (supabase as any).from('business_masonic_links').select('status, organizations(name)').eq('business_id', bizId).maybeSingle(),
+      (supabase as any).from('business_categories').select('is_primary, categories(name)').eq('business_id', bizId).order('is_primary', { ascending: false }).limit(1),
     ]);
 
     const lodgeNameFromLink = linkRow?.organizations?.name || bObj.masonic_lodge || null;
@@ -246,6 +263,7 @@ const getPublicBusiness = cache(async (slug: string) => {
           business_role: respRow.business_role || 'Proprietário',
           community_label: respRow.community_label || 'Ir.\'.',
           organization: respRow.organization || lodgeNameFromLink,
+          whatsapp: respRow.whatsapp,
           avatar_url: respRow.avatar_url,
         }
       : bObj.owner_name
@@ -269,7 +287,7 @@ const getPublicBusiness = cache(async (slug: string) => {
       business_id: bObj.id,
       business_slug: bObj.slug,
       business_name: bObj.name,
-      primary_category_name: bObj.category || 'Empresa Maçônica',
+      primary_category_name: categoryRows?.[0]?.categories?.name || bObj.category || 'Empresa Maçônica',
       description: bObj.description,
       effective_plan_code: effectivePlanCode,
       logo_url: bObj.logo_url,
@@ -307,9 +325,23 @@ const getPublicBusiness = cache(async (slug: string) => {
       })) as any,
       business_hours: [] as any,
       responsible: responsibleObj as any,
-      rating_average: 5.0,
-      rating_count: 12,
+      rating_average: null,
+      rating_count: 0,
     } as any;
+
+    try {
+      const planCode = detailObj.effective_plan_code === 'ouro_founder'
+        ? 'ouro'
+        : detailObj.effective_plan_code || 'bronze';
+      const { data: planRule } = await (supabase as any)
+        .from('plan_payment_rules')
+        .select('profile_section_order')
+        .eq('plan_code', planCode)
+        .maybeSingle();
+      if (Array.isArray(planRule?.profile_section_order)) {
+        (detailObj as any).profile_section_order = planRule.profile_section_order;
+      }
+    } catch (_e) {}
 
     const recognitionsResult = await getInstitutionalRecognitionsAction();
     return toPublicBusinessPresentation(detailObj, [], recognitionsResult?.data);
@@ -420,7 +452,10 @@ export default async function CompanyDetailsPage(props: Props & { searchParams?:
     <FavoritesProvider>
       <StructuredData schema={breadcrumbSchema} />
       <StructuredData schema={businessSchema} />
-      <DirectoryHeader />
+      <DirectoryHeader
+        selectedCity={business.location?.city || ''}
+        availableCities={business.location?.city ? [business.location.city] : []}
+      />
       <BusinessProfileRenderer business={business} />
       <DirectoryFavoritesModal />
       <DirectoryFooter />

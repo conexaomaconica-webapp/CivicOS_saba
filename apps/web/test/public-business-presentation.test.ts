@@ -77,6 +77,20 @@ describe('toPublicBusinessPresentation', () => {
     expect(result.contacts.website).toBeNull();
   });
 
+  it('keeps the owner direct WhatsApp separate from the business WhatsApp', () => {
+    const result = toPublicBusinessPresentation({
+      ...baseDetailRow,
+      responsible: {
+        name: 'João Silva',
+        community_verified: true,
+        whatsapp: '(11) 98888-7777',
+      },
+    });
+
+    expect(result.owner?.whatsapp).toBe('(11) 98888-7777');
+    expect(result.contacts.whatsapp).toBe('(11) 99999-8888');
+  });
+
   it('should transform Prata company with medium quotas and website enabled', () => {
     const result = toPublicBusinessPresentation({
       ...baseDetailRow,
@@ -125,6 +139,28 @@ describe('toPublicBusinessPresentation', () => {
     expect(result.posts.length).toBe(1);
     expect(result.recognition.founder).toBe(false);
     expect(result.recognition.pedraFundamental).toBe(false);
+  });
+
+  it('preserves the configured profile section order for the commercial plan template', () => {
+    const profileSectionOrder = ['about', 'services', 'video', 'gallery', 'benefits', 'events', 'posts'];
+    const result = toPublicBusinessPresentation({
+      ...baseDetailRow,
+      effective_plan_code: 'ouro',
+      profile_section_order: profileSectionOrder,
+    });
+
+    expect(result.plan.sectionOrder).toEqual(profileSectionOrder);
+  });
+
+  it('falls back to the canonical section order when persisted configuration is invalid', () => {
+    const result = toPublicBusinessPresentation({
+      ...baseDetailRow,
+      profile_section_order: ['benefits', 'benefits'],
+    });
+
+    expect(result.plan.sectionOrder).toEqual([
+      'about', 'services', 'video', 'gallery', 'benefits', 'events', 'posts',
+    ]);
   });
 
   it('should map legacy ouro_founder code to commercialPlan ouro, template ouro, and founder badge', () => {

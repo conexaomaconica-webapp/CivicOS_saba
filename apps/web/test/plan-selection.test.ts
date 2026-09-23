@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   CANONICAL_PLANS,
+  getCanonicalDefaultLimit,
   fetchTenantPlans,
   computeMonthlyEquivalenceText,
   formatCentsToReais,
@@ -29,6 +30,12 @@ function makeStorage(): StorageLike {
 }
 
 describe('CANONICAL_PLANS & Formatação Monetária · ADV-003 (CRIT-VSC-005)', () => {
+  it('mantém a cota canônica de 10 serviços para Ouro/Acácia quando não há entitlement específico', () => {
+    expect(getCanonicalDefaultLimit('ouro', 'services_limit')).toBe(10);
+    expect(getCanonicalDefaultLimit('acacia', 'services_limit')).toBe(10);
+    expect(getCanonicalDefaultLimit('acácia', 'services_limit')).toBe(10);
+  });
+
   it('contém os preços oficiais em centavos inteiros alinhados aos documentos do produto', () => {
     expect(CANONICAL_PLANS.bronze.annualPriceCents).toBe(0);         // R$ 0 / Gratuito
     expect(CANONICAL_PLANS.bronze.monthlyPriceCents).toBe(0);

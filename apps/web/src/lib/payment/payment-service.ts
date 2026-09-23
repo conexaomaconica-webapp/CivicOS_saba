@@ -134,6 +134,7 @@ export async function processPixCheckoutAction(payload: {
 
   const planCode = (payload.planCode || 'prata').toLowerCase();
   const rules = await getPlanPaymentRulesAction(planCode);
+  const pixAmountCents = rules.pixAmountCents;
 
   const { data: planVersion } = supabase
     ? await (supabase as any)
@@ -169,7 +170,7 @@ export async function processPixCheckoutAction(payload: {
             tenant_id: tenantId,
             business_id: payload.businessId,
             invoice_number: `INV-${Date.now()}`,
-            amount_due: rules.amountCents / 100,
+            amount_due: pixAmountCents / 100,
             amount_paid: 0.00,
             currency: 'BRL',
             status: 'open',
@@ -213,7 +214,7 @@ export async function processPixCheckoutAction(payload: {
             idempotency_key: idempotencyKey,
             plan_version_id: planVersionId,
             plan_code: rules.planCode,
-            amount_cents: rules.amountCents,
+            amount_cents: pixAmountCents,
             payment_method: 'pix',
             installments: 1,
           },
@@ -231,7 +232,7 @@ export async function processPixCheckoutAction(payload: {
     {
       businessId: payload.businessId,
       planCode: rules.planCode,
-      amountCents: rules.amountCents,
+      amountCents: pixAmountCents,
       description: `Assinatura Guia Conexão Maçônica - ${rules.planCode.toUpperCase()}`,
       idempotencyKey,
     },
@@ -448,6 +449,7 @@ export async function getPlanPaymentRulesAction(planCode: string): Promise<PlanP
       return {
         planCode: data.plan_code,
         amountCents: data.amount_cents ?? defaultRule.amountCents,
+        pixAmountCents: data.pix_amount_cents ?? data.amount_cents ?? defaultRule.pixAmountCents,
         paymentMethodsAllowed: data.payment_methods_allowed ?? defaultRule.paymentMethodsAllowed,
         installmentsMax: data.installments_max ?? defaultRule.installmentsMax,
         interestFreeInstallments: data.interest_free_installments ?? defaultRule.interestFreeInstallments,

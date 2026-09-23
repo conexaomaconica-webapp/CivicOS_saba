@@ -4,16 +4,19 @@
  * Regra Central de Elegibilidade de Reconhecimentos Institucionais por Plano Comercial.
  * 
  * MATRIZ OFICIAL:
- * - Bronze: Sem reconhecimento | Empresa Verificada (pedra_fundamental e coluna_de_honra BLOQUEADOS)
- * - Prata:  Sem reconhecimento | Empresa Verificada (pedra_fundamental e coluna_de_honra BLOQUEADOS)
- * - Ouro:   Sem reconhecimento | Empresa Verificada | Pedra Fundamental (10/10) | Coluna de Honra
+ * - Todo plano ativo possui seu próprio selo comercial.
+ * - Pedra Fundamental é condecoração histórica de fundador, independente do plano.
+ * - Coluna de Honra foi descontinuada.
  */
 
 export type RecognitionKey =
   | 'empresa_verificada'
   | 'pedra_fundamental'
   | 'coluna_de_honra'
-  | 'empresa_fundadora';
+  | 'empresa_fundadora'
+  | 'selo_ouro'
+  | 'selo_prata'
+  | 'selo_bronze';
 
 export function canBusinessReceiveRecognition(
   planCode: string | undefined | null,
@@ -27,15 +30,17 @@ export function canBusinessReceiveRecognition(
     return true;
   }
 
-  // Empresa Fundadora é permitida para Ouro e Prata no lançamento inicial
-  if (normalizedKey === 'empresa_fundadora') {
-    return normalizedPlan === 'ouro' || normalizedPlan === 'prata';
+  if (normalizedKey === 'coluna_de_honra') {
+    return false;
   }
 
-  // Pedra Fundamental e Coluna de Honra são permitidas EXCLUSIVAMENTE para o Plano Ouro
-  if (normalizedKey === 'pedra_fundamental' || normalizedKey === 'coluna_de_honra') {
-    return normalizedPlan === 'ouro';
+  if (normalizedKey === 'empresa_fundadora' || normalizedKey === 'pedra_fundamental') {
+    return true;
   }
+
+  if (normalizedKey === 'selo_ouro') return normalizedPlan === 'ouro';
+  if (normalizedKey === 'selo_prata') return normalizedPlan === 'prata';
+  if (normalizedKey === 'selo_bronze') return normalizedPlan === 'bronze';
 
   return false;
 }

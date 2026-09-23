@@ -136,7 +136,7 @@ export function DirectoryAllBusinesses({
 
       {/* Filter Bar */}
       <div className="dh-filter-bar">
-        <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 flex-1 min-w-[240px]">
+        <form onSubmit={handleSearchSubmit} className="flex min-w-0 flex-1 basis-full items-center gap-2 sm:min-w-[240px] sm:basis-auto">
           <Search className="w-4 h-4 text-gray-400 shrink-0" />
           <input
             type="text"

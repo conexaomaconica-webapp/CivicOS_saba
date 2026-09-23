@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { uploadBusinessAssetAction } from '@/app/actions/business-profile-actions';
+import { optimizeImageForUpload } from '@/lib/media/optimize-image';
 
 interface MediaUploadZoneProps {
   businessId: string;
@@ -34,15 +35,14 @@ export function MediaUploadZone({
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMsg('O tamanho da imagem não deve exceder 5MB.');
-      return;
-    }
-
     setErrorMsg(null);
     setIsUploading(true);
 
     try {
+      const optimizedFile = await optimizeImageForUpload(file, {
+        maxBytes: 4.5 * 1024 * 1024,
+        maxDimension: assetType === 'logo' ? 1400 : 2400,
+      });
       const reader = new FileReader();
       reader.onload = async () => {
         const fileDataUrl = reader.result as string;
@@ -53,7 +53,7 @@ export function MediaUploadZone({
         }
         setIsUploading(false);
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(optimizedFile);
     } catch (err: any) {
       setErrorMsg(err.message || 'Erro ao enviar imagem.');
       setIsUploading(false);

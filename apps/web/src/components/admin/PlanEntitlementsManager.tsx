@@ -12,6 +12,10 @@ import {
   Save,
   Loader2,
   Sparkles,
+  Plus,
+  Trash2,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import {
   CommercialPlanFullData,
@@ -21,6 +25,16 @@ import {
 interface PlanEntitlementsManagerProps {
   initialData: CommercialPlanFullData[];
 }
+
+const PROFILE_SECTION_LABELS: Record<string, string> = {
+  about: 'Sobre a empresa',
+  services: 'Serviços',
+  video: 'Vídeo institucional',
+  gallery: 'Fotos',
+  benefits: 'Benefícios e ofertas',
+  events: 'Eventos',
+  posts: 'Publicações',
+};
 
 function formatCentsForInput(amountCents: number): string {
   return (amountCents / 100).toFixed(2).replace('.', ',');
@@ -41,10 +55,12 @@ function parseBrlToCents(value: string): number | null {
 
 function QuotaControl({
   label,
+  description,
   value,
   onChange,
 }: {
   label: string;
+  description: string;
   value: number;
   onChange: (val: number) => void;
 }) {
@@ -57,7 +73,10 @@ function QuotaControl({
 
   return (
     <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-1.5">
-      <label className="font-bold text-stone-700 block text-xs">{label}</label>
+      <div>
+        <label className="font-bold text-stone-800 block text-xs">{label}</label>
+        <p className="text-[10px] leading-snug text-stone-500">{description}</p>
+      </div>
       <div className="flex items-center gap-1">
         <button
           type="button"
@@ -95,6 +114,9 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
   const [priceInputs, setPriceInputs] = useState<Record<string, string>>(() =>
     Object.fromEntries(initialData.map((plan) => [plan.plan_code, formatCentsForInput(plan.amount_cents)]))
   );
+  const [pixPriceInputs, setPixPriceInputs] = useState<Record<string, string>>(() =>
+    Object.fromEntries(initialData.map((plan) => [plan.plan_code, formatCentsForInput(plan.pix_amount_cents)]))
+  );
 
   const activePlanData = plans.find((p) => p.plan_code === selectedPlan) || plans[0]!;
 
@@ -119,14 +141,29 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
     handleFieldChange('commercial_features', updatedFeatures);
   };
 
+  const handleMoveFeature = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= activePlanData.commercial_features.length) return;
+    const updatedFeatures = [...activePlanData.commercial_features];
+    [updatedFeatures[index], updatedFeatures[target]] = [updatedFeatures[target]!, updatedFeatures[index]!];
+    handleFieldChange('commercial_features', updatedFeatures);
+  };
+
+  const handleMoveProfileSection = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= activePlanData.profile_section_order.length) return;
+    const nextOrder = [...activePlanData.profile_section_order];
+    [nextOrder[index], nextOrder[target]] = [nextOrder[target]!, nextOrder[index]!];
+    handleFieldChange('profile_section_order', nextOrder);
+  };
+
   const handleRestoreDefaultFeatures = () => {
     const DEFAULT_FEATURES_BY_PLAN: Record<string, string[]> = {
       bronze: [
         'Presença básica no Guia Comercial',
         'Até 3 Fotos na Galeria',
         'Até 2 Serviços cadastrados',
-        '1 Oferta/Benefício ativo',
-        'Parcelamento em até 2x sem juros',
+        'Parcelamento em até 3x sem juros',
       ],
       prata: [
         'Destaque no Guia Comercial',
@@ -134,7 +171,7 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
         'Até 5 Serviços cadastrados',
         'Até 3 Ofertas/Benefícios ativos',
         'Publicação de Eventos e Comunicados',
-        'Parcelamento em até 4x sem juros',
+        'Parcelamento em até 6x sem juros',
       ],
       ouro: [
         'Topo das Buscas e Maior Destaque',
@@ -143,7 +180,7 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
         'Até 5 Ofertas/Benefícios ativos',
         'Publicação Ilimitada de Eventos',
         'Analytics Avançado (7, 30 e 90 dias)',
-        'Parcelamento em até 6x sem juros',
+        'Parcelamento em até 12x sem juros',
       ],
     };
     const defaults = DEFAULT_FEATURES_BY_PLAN[selectedPlan] || [];
@@ -158,22 +195,31 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
     try {
       const parsedAmountCents = parseBrlToCents(priceInputs[activePlanData.plan_code] ?? '');
       if (parsedAmountCents === null) throw new Error('Informe um valor anual válido. Exemplo: 2388,00.');
+      const parsedPixAmountCents = parseBrlToCents(pixPriceInputs[activePlanData.plan_code] ?? '');
+      if (parsedPixAmountCents === null || parsedPixAmountCents > parsedAmountCents) {
+        throw new Error('Informe um valor PIX válido, igual ou menor que o valor a prazo.');
+      }
+      const commercialFeatures = activePlanData.commercial_features.map((feature) => feature.trim()).filter(Boolean);
+      if (commercialFeatures.length === 0) throw new Error('Cadastre ao menos um diferencial comercial.');
       const res = await updateCommercialPlanAction({
         plan_code: activePlanData.plan_code,
         title: activePlanData.title,
         slogan: activePlanData.slogan,
         description: activePlanData.description,
         amount_cents: parsedAmountCents,
+        pix_amount_cents: parsedPixAmountCents,
         installments_max: Number(activePlanData.installments_max),
         interest_free_installments: Number(activePlanData.interest_free_installments),
         is_popular: Boolean(activePlanData.is_popular),
         is_active: Boolean(activePlanData.is_active),
-        commercial_features: activePlanData.commercial_features,
+        commercial_features: commercialFeatures,
         services_limit: Number(activePlanData.services_limit),
         gallery_photos_limit: Number(activePlanData.gallery_photos_limit),
         benefits_limit: Number(activePlanData.benefits_limit),
         events_limit: Number(activePlanData.events_limit),
         posts_limit: Number(activePlanData.posts_limit),
+        business_video_limit: Number(activePlanData.business_video_limit),
+        profile_section_order: activePlanData.profile_section_order,
       });
 
       if (!res.success) throw new Error(res.error || 'Erro ao salvar alterações.');
@@ -198,7 +244,7 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
           <span>Plano Comercial ≠ Reconhecimento Institucional</span>
         </div>
         <p className="text-xs text-stone-300 leading-relaxed">
-          Os planos comerciais (<strong>Bronze, Prata e Ouro</strong>) definem o valor de assinatura e cotas numéricas de mídias/serviços. Os reconhecimentos fraternos (<strong>Pedra Fundamental 1/10, Empresa Fundadora e Coluna de Honra</strong>) são atribuições institucionais de governança e <strong>não são cotas editáveis dos planos</strong>.
+          Os planos comerciais (<strong>Esquadro, Compasso e Acácia</strong>) definem assinatura e cotas de recursos. A <strong>Pedra Fundamental</strong> e o reconhecimento de <strong>Empresa Fundadora</strong> são institucionais e não são benefícios editáveis dos planos.
         </p>
       </div>
 
@@ -229,11 +275,10 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
               key={p.plan_code}
               type="button"
               onClick={() => setSelectedPlan(p.plan_code)}
-              className={`p-5 rounded-2xl border text-left transition-all relative cursor-pointer ${
-                isSelected
-                  ? 'bg-[#3B0B14] text-white border-[#C9A227] shadow-xl ring-2 ring-[#C9A227]/40'
-                  : 'bg-white text-stone-900 border-stone-300 hover:border-stone-400'
-              }`}
+              className={`p-5 rounded-2xl border text-left transition-all relative cursor-pointer ${isSelected
+                ? 'bg-[#3B0B14] text-white border-[#C9A227] shadow-xl ring-2 ring-[#C9A227]/40'
+                : 'bg-white text-stone-900 border-stone-300 hover:border-stone-400'
+                }`}
             >
               {p.is_popular && (
                 <span className="absolute top-3 right-3 px-2.5 py-0.5 rounded-full bg-[#C9A227] text-[#3B0B14] font-bold text-[10px] uppercase tracking-wider flex items-center gap-1">
@@ -257,6 +302,12 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
                   Até {p.installments_max}x sem juros
                 </span>
               </div>
+              {p.amount_cents > 0 && p.pix_amount_cents < p.amount_cents && (
+                <p className={`mt-1 text-[11px] font-bold ${isSelected ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                  R$ {(p.pix_amount_cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} no PIX
+                  {' '}({Math.round((1 - p.pix_amount_cents / p.amount_cents) * 100)}% de desconto)
+                </p>
+              )}
             </button>
           );
         })}
@@ -266,11 +317,10 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
       <form onSubmit={handleSave} className="bg-white border border-stone-300 rounded-2xl p-6 shadow-sm space-y-6">
         {message && (
           <div
-            className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
-              message.type === 'success'
-                ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                : 'bg-red-100 text-red-900 border border-red-300'
-            }`}
+            className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${message.type === 'success'
+              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+              : 'bg-red-100 text-red-900 border border-red-300'
+              }`}
           >
             <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
             <span>{message.text}</span>
@@ -339,9 +389,9 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
             <DollarSign className="w-4 h-4 text-[#4B161B]" /> Preço & Regras de Parcelamento (Fonte Única de Dados)
           </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <div className="space-y-1">
-              <label className="block text-xs font-bold text-stone-700">Valor Anual (BRL):</label>
+              <label className="block text-xs font-bold text-stone-700">Valor a prazo (BRL):</label>
               <div className="relative">
                 <span className="absolute left-3 top-2 text-xs text-stone-500 font-bold">R$</span>
                 <input
@@ -363,7 +413,36 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
                 />
               </div>
               <span className="text-[11px] text-stone-500 font-semibold block">
-                Valor bruto gravado: {activePlanData.amount_cents} centavos BRL
+                Total parcelado sem juros
+              </span>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-stone-700">Valor à vista no PIX:</label>
+              <div className="relative">
+                <span className="absolute left-3 top-2 text-xs text-stone-500 font-bold">R$</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={pixPriceInputs[activePlanData.plan_code] ?? ''}
+                  onChange={(e) => {
+                    const rawVal = e.target.value;
+                    if (!/^[\d.,\s]*$/.test(rawVal)) return;
+                    setPixPriceInputs((current) => ({ ...current, [activePlanData.plan_code]: rawVal }));
+                    const cents = parseBrlToCents(rawVal);
+                    if (cents !== null) handleFieldChange('pix_amount_cents', cents);
+                  }}
+                  onBlur={() => setPixPriceInputs((current) => ({
+                    ...current,
+                    [activePlanData.plan_code]: formatCentsForInput(activePlanData.pix_amount_cents),
+                  }))}
+                  className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs text-stone-900 font-mono font-bold outline-none focus:border-[#4B161B]"
+                />
+              </div>
+              <span className="text-[11px] text-stone-500 font-semibold block">
+                {activePlanData.amount_cents > 0 && activePlanData.pix_amount_cents < activePlanData.amount_cents
+                  ? `${Math.round((1 - activePlanData.pix_amount_cents / activePlanData.amount_cents) * 100)}% de desconto no PIX`
+                  : 'Sem desconto no PIX'}
               </span>
             </div>
 
@@ -375,7 +454,9 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
                 className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs text-stone-900 outline-none focus:border-[#4B161B]"
               >
                 <option value={1}>1x (À vista)</option>
+                <option value={2}>Até 2x</option>
                 <option value={3}>Até 3x</option>
+                <option value={4}>Até 4x</option>
                 <option value={6}>Até 6x</option>
                 <option value={12}>Até 12x</option>
               </select>
@@ -389,7 +470,9 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
                 className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs text-stone-900 outline-none focus:border-[#4B161B]"
               >
                 <option value={1}>1x sem juros</option>
+                <option value={2}>2x sem juros</option>
                 <option value={3}>3x sem juros</option>
+                <option value={4}>4x sem juros</option>
                 <option value={6}>6x sem juros</option>
                 <option value={12}>12x sem juros</option>
               </select>
@@ -403,41 +486,82 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
             <Layers className="w-4 h-4 text-[#4B161B]" /> Cotas de Recursos Numéricas (Entitlements)
           </h3>
 
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+          <p className="text-xs text-stone-500">Defina o máximo que cada empresa pode publicar. Use zero para bloquear o recurso neste plano.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 text-xs">
             <QuotaControl
-              label="Fotos Galeria:"
+              label="Fotos na galeria"
+              description="Imagens públicas do portfólio"
               value={activePlanData.gallery_photos_limit}
               onChange={(val) => handleFieldChange('gallery_photos_limit', val)}
             />
             <QuotaControl
-              label="Serviços:"
+              label="Serviços"
+              description="Itens no catálogo de serviços"
               value={activePlanData.services_limit}
               onChange={(val) => handleFieldChange('services_limit', val)}
             />
             <QuotaControl
-              label="Benefícios:"
+              label="Benefícios"
+              description="Ofertas exclusivas publicadas"
               value={activePlanData.benefits_limit}
               onChange={(val) => handleFieldChange('benefits_limit', val)}
             />
             <QuotaControl
-              label="Eventos:"
+              label="Eventos"
+              description="Eventos publicados pela empresa"
               value={activePlanData.events_limit}
               onChange={(val) => handleFieldChange('events_limit', val)}
             />
             <QuotaControl
-              label="Posts:"
+              label="Publicações"
+              description="Comunicados e conteúdos"
               value={activePlanData.posts_limit}
               onChange={(val) => handleFieldChange('posts_limit', val)}
+            />
+            <QuotaControl
+              label="Vídeo institucional"
+              description="Quantidade de vídeos no perfil"
+              value={activePlanData.business_video_limit}
+              onChange={(val) => handleFieldChange('business_video_limit', val)}
             />
           </div>
         </div>
 
-        {/* 4. DIFERENCIAIS COMERCIAIS VISÍVEIS NO ONBOARDING (/anunciar/passo-3) */}
+        {/* 4. ORDEM DAS SEÇÕES DO PERFIL PÚBLICO */}
+        <div className="pt-4 border-t border-stone-200 space-y-3">
+          <div>
+            <h3 className="font-serif font-bold text-sm text-stone-900 flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-[#4B161B]" /> Ordem das seções do perfil
+            </h3>
+            <p className="mt-1 text-xs text-stone-500">
+              Ajuste a sequência exibida no template público do {activePlanData.title}.
+            </p>
+          </div>
+          <div className="space-y-2">
+            {activePlanData.profile_section_order.map((sectionKey, index) => (
+              <div key={sectionKey} className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 p-2">
+                <span className="w-7 text-center text-[11px] font-bold text-stone-400">{index + 1}</span>
+                <span className="flex-1 text-xs font-bold text-stone-800">
+                  {PROFILE_SECTION_LABELS[sectionKey] ?? sectionKey}
+                </span>
+                <button type="button" disabled={index === 0} onClick={() => handleMoveProfileSection(index, -1)} className="rounded-lg p-1.5 text-stone-500 hover:bg-white disabled:opacity-25" title="Mover para cima">
+                  <ArrowUp className="h-3.5 w-3.5" />
+                </button>
+                <button type="button" disabled={index === activePlanData.profile_section_order.length - 1} onClick={() => handleMoveProfileSection(index, 1)} className="rounded-lg p-1.5 text-stone-500 hover:bg-white disabled:opacity-25" title="Mover para baixo">
+                  <ArrowDown className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 5. DIFERENCIAIS COMERCIAIS VISÍVEIS NO ONBOARDING (/anunciar/passo-3) */}
         <div className="pt-4 border-t border-stone-200 space-y-3">
           <div className="flex justify-between items-center flex-wrap gap-2">
             <h3 className="font-serif font-bold text-sm text-stone-900 flex items-center gap-1.5">
               <ImageIcon className="w-4 h-4 text-[#4B161B]" /> Lista de Diferenciais Comerciais ({activePlanData.title})
             </h3>
+            <span className="text-[11px] font-semibold text-stone-500">{activePlanData.commercial_features.length} diferenciais</span>
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -449,28 +573,36 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
               <button
                 type="button"
                 onClick={handleAddFeature}
-                className="text-xs font-bold text-[#4B161B] hover:underline cursor-pointer"
+                className="inline-flex items-center gap-1 rounded-lg bg-[#3B0B14] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#4B161B] cursor-pointer"
               >
-                + Adicionar Diferencial
+                <Plus className="h-3.5 w-3.5" /> Adicionar diferencial
               </button>
             </div>
           </div>
 
           <div className="space-y-2">
             {activePlanData.commercial_features.map((feat, idx) => (
-              <div key={idx} className="flex items-center gap-2">
+              <div key={idx} className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 p-2">
+                <span className="w-6 text-center text-[11px] font-bold text-stone-400">{idx + 1}</span>
                 <input
                   type="text"
                   value={feat}
                   onChange={(e) => handleFeatureChange(idx, e.target.value)}
-                  className="flex-1 px-3 py-1.5 bg-stone-50 border border-stone-300 rounded-xl text-xs text-stone-900 outline-none focus:border-[#4B161B]"
+                  className="flex-1 px-3 py-1.5 bg-white border border-stone-300 rounded-lg text-xs text-stone-900 outline-none focus:border-[#4B161B]"
                 />
+                <button type="button" disabled={idx === 0} onClick={() => handleMoveFeature(idx, -1)} className="rounded-lg p-1.5 text-stone-500 hover:bg-white disabled:opacity-25" title="Mover para cima">
+                  <ArrowUp className="h-3.5 w-3.5" />
+                </button>
+                <button type="button" disabled={idx === activePlanData.commercial_features.length - 1} onClick={() => handleMoveFeature(idx, 1)} className="rounded-lg p-1.5 text-stone-500 hover:bg-white disabled:opacity-25" title="Mover para baixo">
+                  <ArrowDown className="h-3.5 w-3.5" />
+                </button>
                 <button
                   type="button"
                   onClick={() => handleRemoveFeature(idx)}
-                  className="text-xs text-red-600 font-bold px-2 py-1 hover:bg-red-50 rounded-lg"
+                  className="text-red-600 p-1.5 hover:bg-red-50 rounded-lg"
+                  title="Remover diferencial"
                 >
-                  Remover
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
             ))}

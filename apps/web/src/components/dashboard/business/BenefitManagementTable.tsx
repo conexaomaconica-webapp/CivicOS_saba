@@ -347,7 +347,7 @@ export function BenefitManagementTable({ businessId, benefits }: Props) {
                   required
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
-                  placeholder="Ex: 20% OFF no Cardápio de Almoço"
+                  placeholder="Ex: 20% de desconto no cardápio de almoço"
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
                   data-testid="input-benefit-title"
                 />
@@ -385,7 +385,7 @@ export function BenefitManagementTable({ businessId, benefits }: Props) {
                     type="text"
                     value={formBadgeText}
                     onChange={(e) => setFormBadgeText(e.target.value)}
-                    placeholder="Ex: 20% OFF VIP"
+                    placeholder="Ex: 20% de desconto exclusivo"
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
                     data-testid="input-benefit-badge"
                   />

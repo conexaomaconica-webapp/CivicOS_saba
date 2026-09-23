@@ -12,7 +12,7 @@ export function LandingPlansMatrix() {
   const plans = [
     {
       code: 'bronze',
-      name: 'BRONZE',
+      name: 'ESQUADRO',
       tagline: 'Esteja presente',
       priceText: 'R$ 500 / ano',
       priceSubtext: 'Presença essencial no Guia',
@@ -27,7 +27,7 @@ export function LandingPlansMatrix() {
     },
     {
       code: 'prata',
-      name: 'PRATA',
+      name: 'COMPASSO',
       tagline: 'Mostre melhor sua empresa',
       priceText: 'R$ 800 / ano',
       priceSubtext: 'Mais conteúdo e galeria de fotos',
@@ -42,7 +42,7 @@ export function LandingPlansMatrix() {
     },
     {
       code: 'ouro',
-      name: 'OURO',
+      name: 'ACÁCIA',
       tagline: 'Amplie sua presença e gere oportunidades',
       priceText: 'R$ 1.000 / ano',
       priceSubtext: 'Recursos completos + Eventos e Posts',
@@ -52,13 +52,13 @@ export function LandingPlansMatrix() {
       events: 'Até 5 Eventos no Guia',
       posts: 'Até 10 Posts / Novidades',
       highlight: 'Máximo na Busca',
-      founderBadge: 'Selo Ouro',
+      founderBadge: 'Selo Acácia',
       hasFounderBadge: true,
       border: 'border-[#C9A227]/50',
     },
     {
       code: 'ouro_founder',
-      name: 'OURO FUNDADOR',
+      name: 'ACÁCIA FUNDADOR',
       tagline: 'Faça parte da história',
       priceText: 'R$ 599 / ano¹',
       priceSubtext: 'Garantido nos 2 primeiros anos (100 Vagas)',
@@ -67,7 +67,7 @@ export function LandingPlansMatrix() {
       benefits: 'Até 3 Ofertas / Benefícios',
       events: 'Até 5 Eventos no Guia',
       posts: 'Até 10 Posts / Novidades',
-      highlight: 'Máximo na Busca (Igual ao Ouro)',
+      highlight: 'Máximo na Busca (Igual ao Acácia)',
       founderBadge: 'Selo Empresa Fundadora',
       hasFounderBadge: true,
       border: 'border-[#C9A227] !bg-[#C9A227]/10 shadow-xl shadow-[#C9A227]/10',

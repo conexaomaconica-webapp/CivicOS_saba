@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, Building2, LayoutDashboard, Crown, LogOut, ArrowRight, Loader2, Lock, Mail } from 'lucide-react';
+import { ShieldCheck, Building2, LayoutDashboard, Crown, LogOut, ArrowRight, Loader2, Lock, Mail, User } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
+import { sanitizeInternalRedirect } from '@/lib/auth/internal-redirect';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,7 +33,7 @@ export default function LoginPage() {
         .eq('id', userId)
         .maybeSingle();
 
-      const role = profile?.role || 'anunciante';
+      const role = profile?.role || 'member';
       setUserRole(role);
 
       // 2. Fetch Businesses owned by this user
@@ -42,13 +43,18 @@ export default function LoginPage() {
         .eq('owner_id', userId)
         .limit(1);
 
-      const isOwner = Boolean(biz && biz.length > 0);
+      const { data: memberships } = await (supabase as any)
+        .from('business_members')
+        .select('id')
+        .eq('user_id', userId)
+        .limit(1);
+      const isOwner = Boolean((biz && biz.length > 0) || (memberships && memberships.length > 0));
       setHasBusinesses(isOwner);
 
       return { role, isOwner };
     } catch (_err) {
-      setUserRole('anunciante');
-      return { role: 'anunciante', isOwner: false };
+      setUserRole('member');
+      return { role: 'member', isOwner: false };
     }
   };
 
@@ -101,15 +107,10 @@ export default function LoginPage() {
         const { role, isOwner } = await checkUserPermissions(data.user.id);
 
         const params = new URLSearchParams(window.location.search);
-        const redirectParam = params.get('redirect');
+        const redirectTarget = sanitizeInternalRedirect(params.get('redirect'));
 
-        if (
-          redirectParam &&
-          redirectParam.startsWith('/') &&
-          !redirectParam.startsWith('//') &&
-          !redirectParam.includes('\\')
-        ) {
-          router.push(redirectParam);
+        if (redirectTarget) {
+          router.push(redirectTarget);
           return;
         }
 
@@ -120,8 +121,10 @@ export default function LoginPage() {
           if (!isOwner) {
             router.push('/admin');
           }
-        } else {
+        } else if (isOwner || role === 'anunciante') {
           router.push('/anunciante');
+        } else {
+          router.push('/minha-conta');
         }
       }
     } catch (err: unknown) {
@@ -144,7 +147,7 @@ export default function LoginPage() {
   if (activeUser) {
     const isMaster = userRole === 'master';
     const isAdmin = isPlatformAdminRole(userRole);
-    const isAdvertiserOnly = !isAdmin;
+    const canAccessAdvertiser = hasBusinesses || userRole === 'anunciante' || isMaster;
 
     return (
       <div className="space-y-5 w-full text-left">
@@ -154,7 +157,7 @@ export default function LoginPage() {
               <ShieldCheck className="w-5 h-5 text-[#C9A227]" /> Central de Acessos
             </h2>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#C9A227]/20 text-[#C9A227] border border-[#C9A227]/40 uppercase">
-              {isMaster ? 'Superadmin Master' : isAdmin ? 'Administrador' : 'Anunciante'}
+              {isMaster ? 'Superadmin Master' : isAdmin ? 'Administrador' : canAccessAdvertiser ? 'Anunciante' : 'Membro'}
             </span>
           </div>
           <p className="text-xs text-stone-300">
@@ -169,6 +172,9 @@ export default function LoginPage() {
         )}
 
         <div className="space-y-2.5">
+          <Link href="/minha-conta" className="p-3.5 bg-[#F3EEDD]/10 hover:bg-[#F3EEDD]/15 border border-[#C9A227]/40 rounded-2xl transition-all flex items-center justify-between group shadow-sm">
+            <div className="flex items-center gap-3"><div className="p-2 bg-[#C9A227]/20 rounded-xl text-[#C9A227]"><User className="w-5 h-5" /></div><div><h3 className="text-xs font-bold text-white group-hover:text-[#C9A227]">Minha Conta</h3><p className="text-[11px] text-stone-400">Perfil, benefícios e atividades</p></div></div><ArrowRight className="w-4 h-4 text-[#C9A227]" />
+          </Link>
           {/* OPÇÃO MASTER 1: TORRE DE CONTROLE MASTER */}
           {isMaster && (
             <Link
@@ -212,7 +218,7 @@ export default function LoginPage() {
           )}
 
           {/* OPÇÃO 3: PAINEL DO ANUNCIANTE */}
-          {(isAdvertiserOnly || hasBusinesses || isMaster) && (
+          {canAccessAdvertiser && (
             <Link
               href="/anunciante"
               className="p-3.5 bg-stone-900/90 hover:bg-stone-800 border border-stone-700 rounded-2xl transition-all flex items-center justify-between group shadow-sm"

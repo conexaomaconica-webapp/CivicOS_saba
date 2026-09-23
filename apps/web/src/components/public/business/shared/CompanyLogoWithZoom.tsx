@@ -46,8 +46,7 @@ export function CompanyLogoWithZoom({
         onClose={() => setIsOpen(false)}
         imageUrl={logoUrl}
         altText={altText}
-        title={`Logomarca Oficial — ${businessName}`}
-        badge="Identidade Visual da Empresa"
+        imageOnly
       />
     </>
   );

@@ -161,16 +161,26 @@ export async function allocateFounderStatusAction(input: {
 
 export async function moderateReviewAction(input: {
   reviewId: string;
-  status: 'approved' | 'rejected' | 'hidden';
+  status: 'published' | 'rejected' | 'hidden';
   rejectionReason?: string;
 }): Promise<AdminActionResult> {
   try {
     const supabase = await createServerSideClient();
-    const { data, error } = await (supabase as any).rpc('moderate_business_review', {
-      p_review_id: input.reviewId,
-      p_status: input.status,
-      p_rejection_reason: input.rejectionReason || null,
-    });
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Sessão administrativa expirada.' };
+
+    const { data, error } = await supabase
+      .from('business_reviews')
+      .update({
+        status: input.status === 'published' ? 'approved' : input.status,
+        moderation_status: input.status,
+        moderation_reason: input.rejectionReason?.trim() || null,
+        moderated_by: user.id,
+        moderated_at: new Date().toISOString(),
+      })
+      .eq('id', input.reviewId)
+      .select('id, moderation_status')
+      .single();
 
     if (error) {
       return { success: false, error: error.message };
@@ -182,5 +192,52 @@ export async function moderateReviewAction(input: {
       success: false,
       error: err instanceof Error ? err.message : 'Erro ao moderar avaliação.',
     };
+  }
+}
+
+export type ReviewModerationItem = {
+  id: string;
+  business_name: string;
+  author_name: string;
+  rating: number;
+  comment: string;
+  status: 'pending' | 'published' | 'rejected' | 'hidden';
+  created_at: string;
+};
+
+export async function getReviewsForModerationAction(): Promise<AdminActionResult<ReviewModerationItem[]>> {
+  try {
+    const supabase = await createServerSideClient();
+    const { data: reviews, error } = await supabase
+      .from('business_reviews')
+      .select('id, business_id, author_id, rating, comment, status, moderation_status, created_at')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) return { success: false, error: error.message };
+
+    const userIds = [...new Set((reviews || []).map((review) => review.author_id))];
+    const businessIds = [...new Set((reviews || []).map((review) => review.business_id))];
+    const [{ data: profiles }, { data: businesses }] = await Promise.all([
+      userIds.length ? supabase.from('profiles').select('id, name').in('id', userIds) : Promise.resolve({ data: [] }),
+      businessIds.length ? supabase.from('businesses').select('id, name').in('id', businessIds) : Promise.resolve({ data: [] }),
+    ]);
+    const names = new Map((profiles || []).map((profile) => [profile.id, profile.name || 'Membro']));
+    const businessNames = new Map((businesses || []).map((business) => [business.id, business.name]));
+
+    return {
+      success: true,
+      data: (reviews || []).map((review) => ({
+        id: review.id,
+        business_name: businessNames.get(review.business_id) || 'Empresa',
+        author_name: names.get(review.author_id) || 'Membro',
+        rating: review.rating,
+        comment: review.comment || '',
+        status: review.moderation_status as ReviewModerationItem['status'],
+        created_at: review.created_at,
+      })),
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Erro ao carregar avaliações.' };
   }
 }

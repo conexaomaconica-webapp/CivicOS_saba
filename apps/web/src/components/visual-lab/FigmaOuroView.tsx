@@ -182,7 +182,7 @@ export function FigmaOuroView({ company = defaultOuroCompanyFixture }: { company
             <div className={styles.heroInfoCol}>
               <div className={styles.badgesRow} data-testid="ouro-badges-row">
                 {company.verified && <span className={styles.badgeVerified}>✓ Empresa Verificada</span>}
-                <span className={styles.badgeOuro}>👑 PLANO OURO</span>
+                <span className={styles.badgeOuro}>👑 PLANO ACÁCIA</span>
                 {company.isFounder && <span className={styles.badgeFundadora}>⭐ EMPRESA FUNDADORA</span>}
 
                 <div className={styles.heroShareFavBtns}>
@@ -225,7 +225,7 @@ export function FigmaOuroView({ company = defaultOuroCompanyFixture }: { company
                   📱 WhatsApp
                 </a>
                 <a
-                  href={`https://wa.me/${company.whatsapp}?text=${encodeURIComponent('Olá! Gostaria de solicitar um orçamento no plano Ouro.')}`}
+                  href={`https://wa.me/${company.whatsapp}?text=${encodeURIComponent('Olá! Gostaria de solicitar um orçamento pelo Plano Acácia.')}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={styles.heroBtnOrçamento}
@@ -449,7 +449,7 @@ export function FigmaOuroView({ company = defaultOuroCompanyFixture }: { company
 
           {/* Quote Card Gold */}
           <div className={styles.quoteCardGold}>
-            ⭐ <strong>Empresa Ouro / Fundadora:</strong> Destaque máximo na rede fraterna com selo de excelência e compromisso de atendimento de alta prioridade.
+            ⭐ <strong>Empresa Acácia / Fundadora:</strong> Destaque máximo na rede fraterna com selo de excelência e compromisso de atendimento de alta prioridade.
           </div>
         </div>
       </div>

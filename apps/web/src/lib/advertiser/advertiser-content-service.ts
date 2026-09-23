@@ -249,7 +249,7 @@ export async function getAdvertiserContentDataAction(): Promise<AdvertiserConten
       title: ben.title,
       description: ben.description || '',
       benefit_type: ben.benefit_type || undefined,
-      discount_condition: ben.discount_percentage ? `${ben.discount_percentage}% OFF` : ben.benefit_type || 'Benefício Exclusivo',
+      discount_condition: ben.discount_percentage ? `${ben.discount_percentage}% Desconto` : ben.benefit_type || 'Benefício Exclusivo',
       expiration_date: ben.valid_until ? new Date(ben.valid_until).toLocaleDateString('pt-BR') : undefined,
       rules: ben.redeem_instructions || undefined,
       promo_code: ben.discount_code || undefined,

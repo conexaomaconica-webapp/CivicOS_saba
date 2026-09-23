@@ -11,10 +11,10 @@ export function FloatingWhatsApp() {
       href={whatsappUrl}
       target="_blank"
       rel="noopener noreferrer"
-      className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 bg-green-500 hover:bg-green-600 text-white rounded-full shadow-2xl hover:scale-110 transition-all duration-300"
+      className="fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom))] right-3 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-white shadow-2xl transition-all duration-300 hover:bg-green-600 sm:bottom-6 sm:right-6 sm:h-14 sm:w-14 sm:hover:scale-110 print:hidden"
       aria-label="Falar conosco no WhatsApp"
     >
-      <MessageCircle className="w-7 h-7" />
+      <MessageCircle className="h-6 w-6 sm:h-7 sm:w-7" />
     </a>
   );
 }

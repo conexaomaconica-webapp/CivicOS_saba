@@ -2,6 +2,15 @@ import type { NextConfig } from 'next';
 
 const isMobileExport = process.env.NEXT_OUTPUT === 'export';
 
+const supabaseImageRemotePatterns: NonNullable<NextConfig['images']>['remotePatterns'] = (() => {
+  try {
+    const supabaseUrl = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '');
+    return [{ protocol: supabaseUrl.protocol.replace(':', '') as 'http' | 'https', hostname: supabaseUrl.hostname, pathname: '/storage/v1/object/public/**' }];
+  } catch {
+    return [];
+  }
+})();
+
 const securityHeaders = [
   {
     key: 'Strict-Transport-Security',
@@ -25,7 +34,8 @@ const securityHeaders = [
   },
   {
     key: 'Content-Security-Policy-Report-Only',
-    value: "default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' https:;",
+    value:
+      "default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' https:; frame-src 'self' https:;",
   },
 ];
 
@@ -34,7 +44,6 @@ const nextConfig: NextConfig = {
   ...(isMobileExport
     ? {
         output: 'export',
-        images: { unoptimized: true },
         trailingSlash: true,
       }
     : {
@@ -47,6 +56,10 @@ const nextConfig: NextConfig = {
           ];
         },
       }),
+
+  images: isMobileExport
+    ? { unoptimized: true }
+    : { remotePatterns: supabaseImageRemotePatterns },
 
   // Transpile workspace packages
   transpilePackages: ['@saas/core', '@saas/shared', '@saas/ui'],

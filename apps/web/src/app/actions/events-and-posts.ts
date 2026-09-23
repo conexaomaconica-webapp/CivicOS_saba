@@ -1,6 +1,7 @@
 'use server';
 
 import { createServerSideClient } from '@/lib/supabase/server';
+import { getCanonicalDefaultLimit } from '@/lib/billing/plans-service';
 
 export interface ActionResponse<T = unknown> {
   success: boolean;
@@ -46,7 +47,7 @@ export async function getBusinessEntitlementQuotaAction(
       .eq('feature_code', featureCode)
       .maybeSingle();
 
-    const maxLimit = entitlement?.max_limit ?? 0;
+    const maxLimit = entitlement?.max_limit ?? getCanonicalDefaultLimit(planCode, featureCode);
 
     const table = featureCode === 'events_limit' ? 'business_events' : 'business_posts';
     const { count } = await supabase
@@ -167,12 +168,12 @@ export async function createBusinessEventAction(input: {
       .eq('feature_code', 'events_limit')
       .maybeSingle();
 
-    const maxLimit = entitlement?.max_limit ?? 0;
+    const maxLimit = entitlement?.max_limit ?? getCanonicalDefaultLimit(planCode, 'events_limit');
 
     if (maxLimit <= 0) {
       return {
         success: false,
-        error: `O plano ${planCode.toUpperCase()} não possui permissão para publicar eventos. Faça upgrade para o plano Ouro.`,
+        error: `Seu plano não possui permissão para publicar eventos. Faça upgrade para o Plano Acácia.`,
       };
     }
 
@@ -353,12 +354,12 @@ export async function createBusinessPostAction(input: {
       .eq('feature_code', 'posts_limit')
       .maybeSingle();
 
-    const maxLimit = entitlement?.max_limit ?? 0;
+    const maxLimit = entitlement?.max_limit ?? getCanonicalDefaultLimit(planCode, 'posts_limit');
 
     if (maxLimit <= 0) {
       return {
         success: false,
-        error: `O plano ${planCode.toUpperCase()} não possui permissão para publicar novidades. Faça upgrade para o plano Ouro.`,
+        error: `Seu plano não possui permissão para publicar novidades. Faça upgrade para o Plano Acácia.`,
       };
     }
 

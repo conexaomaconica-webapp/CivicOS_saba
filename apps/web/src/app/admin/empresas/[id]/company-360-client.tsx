@@ -32,6 +32,8 @@ import {
   Newspaper,
   UserCheck,
   Video,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import {
   upsertBusinessEventAction,
@@ -51,11 +53,11 @@ import {
   manageAdminMediaAction,
   updateAdminBusinessPlanAction,
   uploadAdminResponsibleAvatarAction,
+  uploadAdminBusinessAssetAction,
   listAdminBusinessCategoriesAction,
   createAdminBusinessCategoryAction,
   listAdminCanonicalLocationsAction,
 } from '@/lib/admin/admin-businesses-service';
-import { uploadAdvertiserAssetAction } from '@/lib/advertiser/advertiser-profile-service';
 import { compressImageOnClient } from '@/lib/media/client-image-compressor';
 import { formatCpfCnpj, formatPhone } from '@/lib/onboarding/onboarding-validation';
 
@@ -83,13 +85,24 @@ export default function Company360Client({ initialData }: Props) {
   const [savingForm, setSavingForm] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  useEffect(() => {
+    if (!message) return;
+    const timeoutId = window.setTimeout(
+      () => setMessage(null),
+      message.type === 'success' ? 5000 : 8000,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [message]);
+
   // Form States para a Aba Cadastro
   const [name, setName] = useState(data.business.name || '');
+  const [slug, setSlug] = useState(data.business.slug || '');
   const [legalName, setLegalName] = useState(data.business.legal_name || '');
   const [cnpjCpf, setCnpjCpf] = useState(formatCpfCnpj(data.business.cnpj_cpf || ''));
   const [phone, setPhone] = useState(formatPhone(data.business.phone || ''));
   const [whatsapp, setWhatsapp] = useState(formatPhone(data.business.whatsapp || ''));
   const [category, setCategory] = useState(data.business.category || '');
+  const [categoryId, setCategoryId] = useState(data.business.category_id || '');
   const [categoryOptions, setCategoryOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -120,6 +133,7 @@ export default function Company360Client({ initialData }: Props) {
   const [respName, setRespName] = useState(data.owner?.full_name || '');
   const [respRole, setRespRole] = useState(data.owner?.business_role || 'Proprietário');
   const [respCommunityLabel, setRespCommunityLabel] = useState(data.owner?.community_label || 'Irmão');
+  const [respWhatsapp, setRespWhatsapp] = useState(data.owner?.whatsapp || '');
   const [respAvatarUrl, setRespAvatarUrl] = useState(data.owner?.avatar_url || '');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
@@ -128,7 +142,13 @@ export default function Company360Client({ initialData }: Props) {
     let active = true;
     listAdminBusinessCategoriesAction(data.business.tenant_id).then((result) => {
       if (!active) return;
-      if (result.success) setCategoryOptions(result.categories);
+      if (result.success) {
+        setCategoryOptions(result.categories);
+        if (!categoryId) {
+          const currentCategory = result.categories.find((item) => item.name === category);
+          if (currentCategory) setCategoryId(currentCategory.id);
+        }
+      }
       else setMessage({ type: 'error', text: result.error || 'Falha ao carregar categorias.' });
       setLoadingCategories(false);
     });
@@ -155,6 +175,7 @@ export default function Company360Client({ initialData }: Props) {
     if (result.success && result.category) {
       setCategoryOptions((current) => [...current.filter((item) => item.id !== result.category!.id), result.category!].sort((a, b) => a.name.localeCompare(b.name)));
       setCategory(result.category.name);
+      setCategoryId(result.category.id);
       setNewCategoryName('');
       setShowCategoryModal(false);
       setMessage({ type: 'success', text: 'Categoria criada e selecionada. Salve o cadastro para vinculá-la à empresa.' });
@@ -213,7 +234,8 @@ export default function Company360Client({ initialData }: Props) {
 
     try {
       const res = await updateAdminBusinessPlanAction(data.business.id, selectedPlanCode, planJustification.trim());
-      if (!res.success) throw new Error(res.error);
+      if (!res.success || !res.data) throw new Error(res.error);
+      const updatedPlan = res.data;
 
       // Atualização otimista parcial — cotas reais vêm do plan_entitlements
       // via revalidatePath no server action. Forçar reload para dados frescos.
@@ -226,18 +248,31 @@ export default function Company360Client({ initialData }: Props) {
         subscription: {
           ...prev.subscription,
           plan_code: selectedPlanCode,
-          plan_name: `Plano ${selectedPlanCode.toUpperCase()}`,
+          plan_name: updatedPlan.plan_name,
+          entitlements: {
+            services_limit: updatedPlan.entitlements.services_limit ?? 0,
+            benefits_limit: updatedPlan.entitlements.benefits_limit ?? 0,
+            gallery_limit: updatedPlan.entitlements.gallery_photos_limit ?? 0,
+            video_limit: updatedPlan.entitlements.business_video_limit ?? 0,
+            events_limit: updatedPlan.entitlements.events_limit ?? 0,
+            posts_limit: updatedPlan.entitlements.posts_limit ?? 0,
+          },
+        },
+        content_summary: {
+          ...prev.content_summary,
+          services_limit: updatedPlan.entitlements.services_limit ?? 0,
+          benefits_limit: updatedPlan.entitlements.benefits_limit ?? 0,
+          gallery_limit: updatedPlan.entitlements.gallery_photos_limit ?? 0,
+          events_limit: updatedPlan.entitlements.events_limit ?? 0,
         },
       }));
 
+      const selectedPlanName = updatedPlan.plan_name.replace('Plano ', '');
       setPlanMessage({
         type: 'success',
-        text: `Plano comercial alterado para ${selectedPlanCode.toUpperCase()} com sucesso! Recarregando cotas...`,
+        text: `Plano comercial alterado para ${selectedPlanName} com sucesso. As cotas já foram atualizadas.`,
       });
       setPlanJustification('');
-
-      // Reload para obter cotas canônicas de plan_entitlements
-      setTimeout(() => window.location.reload(), 1200);
     } catch (err: any) {
       setPlanMessage({ type: 'error', text: err.message || 'Erro ao alterar plano comercial.' });
     } finally {
@@ -392,6 +427,11 @@ export default function Company360Client({ initialData }: Props) {
 
   // Modal de Mídia (Logo, Capa, Galeria)
   const [showMediaModal, setShowMediaModal] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{
+    kind: 'media' | 'service' | 'benefit' | 'event' | 'post';
+    id: string;
+    label: string;
+  } | null>(null);
   const [mediaMode, setMediaMode] = useState<'update_logo' | 'update_cover' | 'add_gallery' | 'update_gallery_title'>('add_gallery');
   const [editingMediaId, setEditingMediaId] = useState<string | undefined>(undefined);
   const [mediaUrlInput, setMediaUrlInput] = useState('');
@@ -404,9 +444,11 @@ export default function Company360Client({ initialData }: Props) {
     setMessage(null);
     const res = await manageAdminMediaAction(data.business.id, remove ? 'delete_video' : 'set_video', { url: businessVideoUrl });
     if (res.success) {
-      setData((current) => ({ ...current, business_video: remove ? undefined : {
-        id: current.business_video?.id || 'video', url: businessVideoUrl.trim(), title: 'Vídeo institucional',
-      } }));
+      setData((current) => ({
+        ...current, business_video: remove ? undefined : {
+          id: current.business_video?.id || 'video', url: businessVideoUrl.trim(), title: 'Vídeo institucional',
+        }
+      }));
       if (remove) setBusinessVideoUrl('');
       setMessage({ type: 'success', text: remove ? 'Vídeo institucional removido.' : 'Vídeo institucional salvo.' });
     } else {
@@ -454,10 +496,12 @@ export default function Company360Client({ initialData }: Props) {
     try {
       const res = await updateAdminBusinessDetailsAction(data.business.id, {
         name,
+        slug,
         legal_name: legalName,
         cnpj_cpf: cnpjCpf,
         phone,
         whatsapp,
+        category_id: categoryId,
         category,
         email,
         website,
@@ -472,22 +516,26 @@ export default function Company360Client({ initialData }: Props) {
         responsible_name: respName,
         responsible_role: respRole,
         responsible_community_label: respCommunityLabel,
+        responsible_whatsapp: respWhatsapp,
         responsible_avatar_url: respAvatarUrl,
       });
 
       if (res.success && res.data) {
         const savedCnpj = res.data.cnpj_cpf || res.data.cnpj || cnpjCpf;
         setCnpjCpf(formatCpfCnpj(savedCnpj));
+        setSlug(res.data.slug || slug);
         setData((prev) => ({
           ...prev,
           business: {
             ...prev.business,
             name: res.data.name,
+            slug: res.data.slug || slug,
             legal_name: res.data.legal_name,
             cnpj_cpf: savedCnpj,
             phone: res.data.phone,
 
             whatsapp: res.data.whatsapp || whatsapp,
+            category_id: res.data.category_id || categoryId,
             category: res.data.category,
             email: res.data.email,
             website: res.data.website,
@@ -508,6 +556,7 @@ export default function Company360Client({ initialData }: Props) {
             business_role: res.data.responsible?.business_role ?? respRole,
             community_label: res.data.responsible?.community_label ?? respCommunityLabel,
             organization: res.data.responsible?.organization ?? prev.owner?.organization,
+            whatsapp: res.data.responsible?.whatsapp ?? (respWhatsapp || undefined),
             avatar_url: res.data.responsible?.avatar_url ?? (respAvatarUrl || undefined),
           },
           audit_timeline: [
@@ -655,10 +704,20 @@ export default function Company360Client({ initialData }: Props) {
         description: serviceDesc,
         price_info: servicePrice,
       });
-      if (res.success) {
+      if (res.success && res.data) {
+        setData((prev) => {
+          const exists = prev.services_items.some((item) => item.id === res.data!.id);
+          const services = exists
+            ? prev.services_items.map((item) => item.id === res.data!.id ? res.data! : item)
+            : [...prev.services_items, res.data!];
+          return {
+            ...prev,
+            services_items: services,
+            content_summary: { ...prev.content_summary, services_count: services.length },
+          };
+        });
         setMessage({ type: 'success', text: 'Serviço salvo com sucesso!' });
         setShowServiceModal(false);
-        window.location.reload();
       } else {
         setMessage({ type: 'error', text: res.error || 'Erro ao salvar serviço.' });
       }
@@ -689,7 +748,6 @@ export default function Company360Client({ initialData }: Props) {
   };
 
   const handleDeleteService = async (serviceId: string) => {
-    if (!confirm('Deseja realmente excluir este serviço do anunciante?')) return;
     setLoading(true);
     setMessage(null);
     const res = await manageAdminServiceAction(data.business.id, 'delete', { service_id: serviceId });
@@ -717,10 +775,20 @@ export default function Company360Client({ initialData }: Props) {
         description: benefitDesc,
         discount_percentage: benefitDiscount === '' ? null : Number(benefitDiscount),
       });
-      if (res.success) {
+      if (res.success && res.data) {
+        setData((prev) => {
+          const exists = prev.benefits_items.some((item) => item.id === res.data!.id);
+          const benefits = exists
+            ? prev.benefits_items.map((item) => item.id === res.data!.id ? res.data! : item)
+            : [...prev.benefits_items, res.data!];
+          return {
+            ...prev,
+            benefits_items: benefits,
+            content_summary: { ...prev.content_summary, benefits_count: benefits.length },
+          };
+        });
         setMessage({ type: 'success', text: 'Benefício fraterno salvo com sucesso!' });
         setShowBenefitModal(false);
-        window.location.reload();
       } else {
         setMessage({ type: 'error', text: res.error || 'Erro ao salvar benefício.' });
       }
@@ -751,7 +819,6 @@ export default function Company360Client({ initialData }: Props) {
   };
 
   const handleDeleteBenefit = async (benefitId: string) => {
-    if (!confirm('Deseja realmente excluir este benefício fraterno?')) return;
     setLoading(true);
     setMessage(null);
     const res = await manageAdminBenefitAction(data.business.id, 'delete', { benefit_id: benefitId });
@@ -813,7 +880,6 @@ export default function Company360Client({ initialData }: Props) {
   };
 
   const handleDeleteEvent = async (eventId: string) => {
-    if (!confirm('Deseja realmente excluir este evento?')) return;
     setLoading(true);
     const res = await deleteBusinessEventAction({ eventId, businessId: data.business.id });
     if (res.success) {
@@ -874,7 +940,6 @@ export default function Company360Client({ initialData }: Props) {
   };
 
   const handleDeletePost = async (postId: string) => {
-    if (!confirm('Deseja realmente excluir esta publicação?')) return;
     setLoading(true);
     const res = await deleteBusinessPostAction({ postId, businessId: data.business.id });
     if (res.success) {
@@ -951,17 +1016,10 @@ export default function Company360Client({ initialData }: Props) {
           formData.append('businessId', data.business.id);
           formData.append('assetType', 'gallery');
 
-          const res = await uploadAdvertiserAssetAction(formData);
-          if (res.success && res.url) {
+          const res = await uploadAdminBusinessAssetAction(formData);
+          if (res.success && res.url && res.media) {
             successCount++;
-            newMediaItems.push({
-              id: `media-${Date.now()}-${i}`,
-              media_type: 'gallery',
-              url: res.url,
-              title: mediaTitleInput || null,
-              display_order: data.gallery_items.length + newMediaItems.length + 1,
-              created_at: new Date().toISOString(),
-            });
+            newMediaItems.push(res.media);
           }
 
           setUploadProgress({
@@ -1014,7 +1072,7 @@ export default function Company360Client({ initialData }: Props) {
         formData.append('assetType', assetType);
         if (mediaTitleInput) formData.append('title', mediaTitleInput);
 
-        const res = await uploadAdvertiserAssetAction(formData);
+        const res = await uploadAdminBusinessAssetAction(formData);
 
         setUploadProgress({
           current: 1,
@@ -1025,18 +1083,10 @@ export default function Company360Client({ initialData }: Props) {
 
         if (res.success && res.url) {
           setMediaUrlInput(res.url);
-          if (mediaMode === 'add_gallery') {
-            const newPhoto: AdminBusiness360DTO['gallery_items'][number] = {
-              id: `media-${Date.now()}`,
-              media_type: 'gallery',
-              url: res.url,
-              title: mediaTitleInput || null,
-              display_order: data.gallery_items.length + 1,
-              created_at: new Date().toISOString(),
-            };
+          if (mediaMode === 'add_gallery' && res.media) {
             setData((prev) => ({
               ...prev,
-              gallery_items: [...prev.gallery_items, newPhoto],
+              gallery_items: [...prev.gallery_items, res.media!],
             }));
             setMessage({ type: 'success', text: 'Foto otimizada e adicionada com sucesso à galeria!' });
             setShowMediaModal(false);
@@ -1044,7 +1094,7 @@ export default function Company360Client({ initialData }: Props) {
             setMessage({ type: 'success', text: 'Imagem otimizada e enviada com sucesso! Clique em "Salvar Mídia" para confirmar.' });
           }
         } else {
-          setMessage({ type: 'error', text: res.message || 'Falha ao realizar upload da imagem.' });
+          setMessage({ type: 'error', text: res.error || 'Falha ao realizar upload da imagem.' });
         }
       }
     } catch (err: any) {
@@ -1060,40 +1110,33 @@ export default function Company360Client({ initialData }: Props) {
     setLoading(true);
     setMessage(null);
     try {
+      const normalizedMediaUrl = mediaUrlInput.trim();
       const res = await manageAdminMediaAction(data.business.id, mediaMode, {
         media_id: editingMediaId,
-        url: mediaUrlInput,
+        url: normalizedMediaUrl,
         title: mediaTitleInput,
       });
       if (res.success) {
         if (mediaMode === 'update_logo') {
           setData((prev) => ({
             ...prev,
-            business: { ...prev.business, logo_url: mediaUrlInput },
+            business: { ...prev.business, logo_url: normalizedMediaUrl },
           }));
         } else if (mediaMode === 'update_cover') {
           setData((prev) => ({
             ...prev,
-            business: { ...prev.business, cover_url: mediaUrlInput },
+            business: { ...prev.business, cover_url: normalizedMediaUrl },
           }));
-        } else if (mediaMode === 'add_gallery') {
-          const newPhoto = {
-            id: `media-${Date.now()}`,
-            media_type: 'gallery' as const,
-            url: mediaUrlInput,
-            title: mediaTitleInput || null,
-            display_order: data.gallery_items.length + 1,
-            created_at: new Date().toISOString(),
-          };
+        } else if (mediaMode === 'add_gallery' && res.media) {
           setData((prev) => ({
             ...prev,
-            gallery_items: [...prev.gallery_items, newPhoto],
+            gallery_items: [...prev.gallery_items, res.media!],
           }));
         } else if (mediaMode === 'update_gallery_title' && editingMediaId) {
           setData((prev) => ({
             ...prev,
             gallery_items: prev.gallery_items.map((item) =>
-              item.id === editingMediaId ? { ...item, title: mediaTitleInput || null } : item
+              item.id === editingMediaId ? (res.media || { ...item, title: mediaTitleInput || null }) : item
             ),
           }));
         }
@@ -1110,7 +1153,6 @@ export default function Company360Client({ initialData }: Props) {
   };
 
   const handleDeleteMedia = async (mediaId: string) => {
-    if (!confirm('Deseja realmente excluir esta foto da galeria? O arquivo de mídia será removido.')) return;
     setLoading(true);
     setMessage(null);
     const res = await manageAdminMediaAction(data.business.id, 'delete_media', { media_id: mediaId });
@@ -1124,6 +1166,40 @@ export default function Company360Client({ initialData }: Props) {
       setMessage({ type: 'error', text: res.error || 'Erro ao excluir foto.' });
     }
     setLoading(false);
+  };
+
+  const handleReorderMedia = async (mediaId: string, direction: 'up' | 'down') => {
+    setLoading(true);
+    setMessage(null);
+    const res = await manageAdminMediaAction(data.business.id, 'reorder_gallery', { media_id: mediaId, direction });
+    if (res.success) {
+      setData((prev) => {
+        const items = [...prev.gallery_items].sort((a, b) => a.display_order - b.display_order);
+        const currentIndex = items.findIndex((item) => item.id === mediaId);
+        const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+        if (currentIndex < 0 || targetIndex < 0 || targetIndex >= items.length) return prev;
+        const currentOrder = items[currentIndex]!.display_order;
+        items[currentIndex] = { ...items[currentIndex]!, display_order: items[targetIndex]!.display_order };
+        items[targetIndex] = { ...items[targetIndex]!, display_order: currentOrder };
+        items.sort((a, b) => a.display_order - b.display_order);
+        return { ...prev, gallery_items: items };
+      });
+      setMessage({ type: 'success', text: 'Ordem da galeria atualizada.' });
+    } else {
+      setMessage({ type: 'error', text: res.error || 'Não foi possível alterar a ordem da foto.' });
+    }
+    setLoading(false);
+  };
+
+  const confirmPendingDelete = async () => {
+    const target = pendingDelete;
+    if (!target) return;
+    setPendingDelete(null);
+    if (target.kind === 'media') await handleDeleteMedia(target.id);
+    else if (target.kind === 'service') await handleDeleteService(target.id);
+    else if (target.kind === 'benefit') await handleDeleteBenefit(target.id);
+    else if (target.kind === 'event') await handleDeleteEvent(target.id);
+    else await handleDeletePost(target.id);
   };
 
   return (
@@ -1164,17 +1240,27 @@ export default function Company360Client({ initialData }: Props) {
 
       {message && (
         <div
-          className={`p-3.5 rounded-2xl text-xs font-bold flex items-center gap-2.5 shadow-xs ${message.type === 'success'
-            ? 'bg-emerald-50 text-emerald-900 border border-emerald-300'
-            : 'bg-rose-50 text-rose-900 border border-rose-300'
+          role={message.type === 'error' ? 'alert' : 'status'}
+          aria-live={message.type === 'error' ? 'assertive' : 'polite'}
+          className={`fixed top-4 right-4 left-4 sm:left-auto z-[100] sm:w-full sm:max-w-md p-4 rounded-2xl text-sm font-bold flex items-start gap-3 shadow-2xl animate-in slide-in-from-top-2 fade-in ${message.type === 'success'
+            ? 'bg-emerald-50 text-emerald-950 border border-emerald-400'
+            : 'bg-rose-50 text-rose-950 border border-rose-400'
             }`}
         >
           {message.type === 'success' ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" />
           ) : (
-            <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <AlertTriangle className="w-5 h-5 text-rose-700 shrink-0" />
           )}
-          <span>{message.text}</span>
+          <span className="flex-1 leading-relaxed">{message.text}</span>
+          <button
+            type="button"
+            onClick={() => setMessage(null)}
+            className="shrink-0 rounded-lg p-0.5 opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-current"
+            aria-label="Fechar mensagem"
+          >
+            <XCircle className="w-5 h-5" />
+          </button>
         </div>
       )}
 
@@ -1206,10 +1292,16 @@ export default function Company360Client({ initialData }: Props) {
               Plano: <strong className="text-[#C9A227] uppercase">{data.business.plan_code}</strong>
             </div>
             <div className="px-3 py-1.5 rounded-xl bg-stone-900/60 border border-stone-700 text-stone-200">
-              Vigência: <strong className="text-emerald-400">Até 24/08/2027</strong>
+              Vigência: <strong className="text-emerald-400">
+                {data.subscription.next_billing_date
+                  ? `Até ${new Date(data.subscription.next_billing_date).toLocaleDateString('pt-BR')}`
+                  : 'Não disponível'}
+              </strong>
             </div>
             <div className="px-3 py-1.5 rounded-xl bg-stone-900/60 border border-stone-700 text-stone-200">
-              Pagamento: <strong className="text-emerald-400">Confirmado</strong>
+              Assinatura: <strong className={data.subscription.status === 'active' ? 'text-emerald-400' : 'text-amber-300'}>
+                {{ active: 'Ativa', pending: 'Pendente', past_due: 'Em atraso', canceled: 'Cancelada', expired: 'Expirada', not_found: 'Não cadastrada' }[data.subscription.status]}
+              </strong>
             </div>
             <div className="px-3 py-1.5 rounded-xl bg-stone-900/60 border border-stone-700 text-stone-200">
               Status do cadastro: <strong className="text-emerald-400">{data.business.completeness_percent}%</strong>
@@ -1402,6 +1494,26 @@ export default function Company360Client({ initialData }: Props) {
                 />
               </div>
 
+              <div className="md:col-span-2">
+                <label className="block font-bold text-stone-800 mb-1">Link público da empresa</label>
+                <div className="flex overflow-hidden rounded-xl border border-stone-300 bg-stone-50 focus-within:ring-2 focus-within:ring-[#3B0B14]">
+                  <span className="flex items-center border-r border-stone-300 bg-stone-100 px-3 text-xs text-stone-500">/guia/</span>
+                  <input
+                    type="text"
+                    value={slug}
+                    onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-{2,}/g, '-'))}
+                    onBlur={() => setSlug((current) => current.replace(/^-+|-+$/g, ''))}
+                    minLength={3}
+                    maxLength={100}
+                    pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                    placeholder="nome-da-empresa"
+                    className="min-w-0 flex-1 bg-transparent px-3 py-2 font-mono text-stone-900 outline-none"
+                    required
+                  />
+                </div>
+                <p className="mt-1 text-[10px] text-stone-500">Use letras minúsculas, números e hífens. O sistema impede links duplicados.</p>
+              </div>
+
               <div>
                 <label className="block font-bold text-stone-800 mb-1">CNPJ ou CPF</label>
                 <input
@@ -1417,14 +1529,18 @@ export default function Company360Client({ initialData }: Props) {
                 <label className="block font-bold text-stone-800 mb-1">Categoria Principal</label>
                 <div className="flex gap-2">
                   <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
+                    value={categoryId}
+                    onChange={(e) => {
+                      const nextCategory = categoryOptions.find((item) => item.id === e.target.value);
+                      setCategoryId(e.target.value);
+                      setCategory(nextCategory?.name || '');
+                    }}
                     disabled={loadingCategories}
                     className="min-w-0 flex-1 px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14] disabled:opacity-60"
                   >
                     <option value="">{loadingCategories ? 'Carregando categorias...' : 'Selecione uma categoria'}</option>
-                    {category && !categoryOptions.some((item) => item.name === category) && <option value={category}>{category} (categoria atual)</option>}
-                    {categoryOptions.map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
+                    {category && !categoryId && <option value="">{category} (categoria atual)</option>}
+                    {categoryOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                   </select>
                   <button type="button" onClick={() => setShowCategoryModal(true)} className="inline-flex items-center gap-1.5 rounded-xl border border-[#3B0B14] px-3 py-2 text-xs font-bold text-[#3B0B14] hover:bg-[#3B0B14] hover:text-[#C9A227]">
                     <Plus className="h-4 w-4" /> Nova
@@ -1693,6 +1809,18 @@ export default function Company360Client({ initialData }: Props) {
                       </div>
                     </div>
 
+                    <div>
+                      <label className="block text-xs font-bold text-stone-800 mb-1">WhatsApp direto do empresário(a)</label>
+                      <input
+                        type="tel"
+                        value={respWhatsapp}
+                        onChange={(e) => setRespWhatsapp(formatPhone(e.target.value))}
+                        placeholder="Ex: (11) 99999-9999"
+                        className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-white text-stone-900 text-xs outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                      />
+                      <p className="text-[10px] text-stone-500 mt-1">Exibido no card público do empresário(a), separado do WhatsApp comercial da empresa.</p>
+                    </div>
+
                     <div className="p-3 bg-white rounded-xl border border-stone-200 text-xs flex items-center justify-between gap-2 shadow-2xs">
                       <div className="flex items-center gap-2 min-w-0">
                         <Building2 className="w-4 h-4 text-[#C9A227] shrink-0" />
@@ -1949,7 +2077,7 @@ export default function Company360Client({ initialData }: Props) {
                   <Video className="w-5 h-5 text-[#3B0B14]" />
                   <span>Vídeo institucional do Plano Acácia</span>
                 </h3>
-                <p className="text-xs text-stone-500 mt-1">Informe um link público do YouTube ou Vimeo. Limite: 1 vídeo.</p>
+                <p className="text-xs text-stone-500 mt-1">Informe um link público HTTPS do vídeo, incluindo arquivos hospedados, YouTube ou Vimeo. Limite: 1 vídeo.</p>
               </div>
               <div className="flex flex-col md:flex-row gap-3">
                 <input type="url" value={businessVideoUrl} onChange={(event) => setBusinessVideoUrl(event.target.value)}
@@ -2001,19 +2129,47 @@ export default function Company360Client({ initialData }: Props) {
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {data.gallery_items.map((item) => (
+                {data.gallery_items.map((item, index) => (
                   <div key={item.id} className="bg-stone-50 border border-stone-200 rounded-2xl overflow-hidden shadow-xs space-y-2 p-2">
-                    <img
-                      src={item.url}
-                      alt={item.title || 'Foto da Galeria'}
-                      className="w-full h-28 object-cover rounded-xl bg-stone-200"
-                    />
+                    {item.url?.trim() ? (
+                      <img
+                        src={item.url}
+                        alt={item.title || 'Foto da Galeria'}
+                        className="w-full h-28 object-cover rounded-xl bg-stone-200"
+                      />
+                    ) : (
+                      <div className="w-full h-28 rounded-xl bg-stone-200 flex items-center justify-center text-stone-400">
+                        <ImageIcon className="w-7 h-7" aria-hidden="true" />
+                        <span className="sr-only">Imagem indisponível</span>
+                      </div>
+                    )}
                     <div className="text-[11px] space-y-1">
                       <p className="font-bold text-stone-900 truncate">{item.title || `Foto ${item.display_order}`}</p>
-                      <span className="text-[10px] text-stone-400 block font-mono">Ordem: #{item.display_order}</span>
                     </div>
 
                     <div className="flex justify-between items-center pt-1 border-t border-stone-200">
+                      <div className="flex items-center gap-1" aria-label="Alterar ordem da foto">
+                        <button
+                          type="button"
+                          onClick={() => handleReorderMedia(item.id, 'up')}
+                          disabled={loading || index === 0}
+                          className="p-1 rounded-lg text-stone-600 hover:bg-stone-200 hover:text-stone-900 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Mover foto para cima"
+                          aria-label="Mover foto para cima"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleReorderMedia(item.id, 'down')}
+                          disabled={loading || index === data.gallery_items.length - 1}
+                          className="p-1 rounded-lg text-stone-600 hover:bg-stone-200 hover:text-stone-900 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Mover foto para baixo"
+                          aria-label="Mover foto para baixo"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                       <button
                         type="button"
                         onClick={() => {
@@ -2029,7 +2185,7 @@ export default function Company360Client({ initialData }: Props) {
 
                       <button
                         type="button"
-                        onClick={() => handleDeleteMedia(item.id)}
+                        onClick={() => setPendingDelete({ kind: 'media', id: item.id, label: 'esta foto da galeria' })}
                         className="text-rose-700 hover:text-rose-900 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
                       >
                         <Trash2 className="w-3 h-3" /> Excluir
@@ -2128,7 +2284,7 @@ export default function Company360Client({ initialData }: Props) {
 
                       <button
                         type="button"
-                        onClick={() => handleDeleteService(svc.id)}
+                        onClick={() => setPendingDelete({ kind: 'service', id: svc.id, label: 'este serviço' })}
                         className="text-rose-700 hover:text-rose-900 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" /> Excluir
@@ -2186,7 +2342,7 @@ export default function Company360Client({ initialData }: Props) {
                         <strong className="font-serif font-bold text-sm text-stone-900 block">{ben.title}</strong>
                         {ben.discount_percentage && (
                           <span className="px-2 py-0.5 bg-amber-100 text-amber-900 rounded-full font-bold text-[10px] inline-block mt-1">
-                            {ben.discount_percentage}% OFF
+                            {ben.discount_percentage}% Desconto
                           </span>
                         )}
                       </div>
@@ -2229,7 +2385,7 @@ export default function Company360Client({ initialData }: Props) {
 
                       <button
                         type="button"
-                        onClick={() => handleDeleteBenefit(ben.id)}
+                        onClick={() => setPendingDelete({ kind: 'benefit', id: ben.id, label: 'este benefício fraterno' })}
                         className="text-rose-700 hover:text-rose-900 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" /> Excluir
@@ -2318,7 +2474,7 @@ export default function Company360Client({ initialData }: Props) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDeleteEvent(ev.id)}
+                        onClick={() => setPendingDelete({ kind: 'event', id: ev.id, label: 'este evento' })}
                         className="text-rose-700 hover:text-rose-900 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" /> Excluir
@@ -2397,7 +2553,7 @@ export default function Company360Client({ initialData }: Props) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDeletePost(post.id)}
+                        onClick={() => setPendingDelete({ kind: 'post', id: post.id, label: 'esta publicação' })}
                         className="text-rose-700 hover:text-rose-900 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" /> Excluir
@@ -2472,8 +2628,8 @@ export default function Company360Client({ initialData }: Props) {
             {planMessage && (
               <div
                 className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${planMessage.type === 'success'
-                    ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                    : 'bg-red-100 text-red-900 border border-red-300'
+                  ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                  : 'bg-red-100 text-red-900 border border-red-300'
                   }`}
               >
                 <ShieldCheck className="w-4 h-4 shrink-0" />
@@ -2482,26 +2638,7 @@ export default function Company360Client({ initialData }: Props) {
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[
-                {
-                  code: 'bronze',
-                  title: 'Plano Esquadro',
-                  price: 'R$ 49/mês',
-                  desc: '1 foto, 2 serviços, sem benefícios fraternos.',
-                },
-                {
-                  code: 'prata',
-                  title: 'Plano Compasso',
-                  price: 'R$ 99/mês',
-                  desc: '3 fotos, 5 serviços, 1 benefício fraterno.',
-                },
-                {
-                  code: 'ouro',
-                  title: 'Plano Acácia (Premium)',
-                  price: 'R$ 199/mês',
-                  desc: '10 fotos, 10 serviços, 5 benefícios, 5 eventos & posts, prioridade visual.',
-                },
-              ].map((p) => {
+              {data.available_plans.map((p) => {
                 const isCurrent = data.business.plan_code === p.code;
                 const isSelected = selectedPlanCode === p.code;
                 return (
@@ -2510,8 +2647,8 @@ export default function Company360Client({ initialData }: Props) {
                     type="button"
                     onClick={() => setSelectedPlanCode(p.code as any)}
                     className={`p-4 rounded-xl border text-left transition-all cursor-pointer relative ${isSelected
-                        ? 'bg-[#3B0B14] text-white border-[#C9A227] shadow-md ring-2 ring-[#C9A227]/40'
-                        : 'bg-white text-stone-900 border-stone-300 hover:border-stone-400'
+                      ? 'bg-[#3B0B14] text-white border-[#C9A227] shadow-md ring-2 ring-[#C9A227]/40'
+                      : 'bg-white text-stone-900 border-stone-300 hover:border-stone-400'
                       }`}
                   >
                     {isCurrent && (
@@ -2520,10 +2657,10 @@ export default function Company360Client({ initialData }: Props) {
                       </span>
                     )}
                     <span className={`text-[10px] font-bold uppercase tracking-wider block ${isSelected ? 'text-[#C9A227]' : 'text-stone-500'}`}>
-                      {p.price}
+                      {p.amount_brl === 0 ? 'Gratuito' : `R$ ${p.amount_brl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / ano`}
                     </span>
                     <h5 className="font-serif font-bold text-sm mt-1">{p.title}</h5>
-                    <p className={`text-xs mt-1 ${isSelected ? 'text-stone-300' : 'text-stone-500'}`}>{p.desc}</p>
+                    <p className={`text-xs mt-1 ${isSelected ? 'text-stone-300' : 'text-stone-500'}`}>{p.description || `Parcelamento em até ${p.installments_max}x.`}</p>
                   </button>
                 );
               })}
@@ -2695,9 +2832,9 @@ export default function Company360Client({ initialData }: Props) {
               </p>
             </div>
 
-            <span className="px-3 py-1 bg-emerald-100 text-emerald-900 font-bold text-xs rounded-full flex items-center gap-1.5 border border-emerald-300 shadow-xs">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Assinatura Em Dia ({data.subscription.plan_name})</span>
+            <span className={`px-3 py-1 font-bold text-xs rounded-full flex items-center gap-1.5 border shadow-xs ${data.subscription.status === 'active' ? 'bg-emerald-100 text-emerald-900 border-emerald-300' : 'bg-amber-100 text-amber-900 border-amber-300'}`}>
+              {data.subscription.status === 'active' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <History className="w-4 h-4 text-amber-700" />}
+              <span>{{ active: 'Assinatura ativa', pending: 'Assinatura pendente', past_due: 'Assinatura em atraso', canceled: 'Assinatura cancelada', expired: 'Assinatura expirada', not_found: 'Sem assinatura registrada' }[data.subscription.status]} ({data.subscription.plan_name})</span>
             </span>
           </div>
 
@@ -2709,24 +2846,26 @@ export default function Company360Client({ initialData }: Props) {
                 {data.subscription.plan_name}
               </strong>
               <span className="text-stone-500 block">
-                R$ {data.subscription.amount_brl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / ano
+                {data.subscription.amount_brl !== null
+                  ? `R$ ${data.subscription.amount_brl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / ano`
+                  : 'Valor contratado não disponível'}
               </span>
             </div>
 
             <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl space-y-1">
-              <span className="text-stone-500 font-bold block">Data do Primeiro Aceite/Pagamento:</span>
+              <span className="text-stone-500 font-bold block">Início da vigência:</span>
               <strong className="text-stone-900 font-serif text-sm block">
-                {new Date(data.subscription.start_date).toLocaleDateString('pt-BR')} às {new Date(data.subscription.start_date).toLocaleTimeString('pt-BR')}
+                {data.subscription.start_date ? new Date(data.subscription.start_date).toLocaleString('pt-BR') : 'Não disponível'}
               </strong>
-              <span className="text-emerald-700 font-bold text-[11px] block">✓ Transação Homologada</span>
+              <span className="text-stone-500 text-[11px] block">Período registrado na assinatura</span>
             </div>
 
             <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl space-y-1">
               <span className="text-stone-500 font-bold block">Próximo Vencimento / Renovação:</span>
               <strong className="text-stone-900 font-serif text-sm block">
-                {new Date(data.subscription.next_billing_date).toLocaleDateString('pt-BR')}
+                {data.subscription.next_billing_date ? new Date(data.subscription.next_billing_date).toLocaleDateString('pt-BR') : 'Não disponível'}
               </strong>
-              <span className="text-stone-500 text-[11px] block">Renovação Anual Recorrente</span>
+              <span className="text-stone-500 text-[11px] block">Fim do período vigente</span>
             </div>
           </div>
 
@@ -2742,7 +2881,7 @@ export default function Company360Client({ initialData }: Props) {
                 <table className="w-full text-left text-xs text-stone-800">
                   <thead className="bg-stone-100 text-stone-700 uppercase font-serif text-[10px] tracking-wider border-b border-stone-200">
                     <tr>
-                      <th className="py-3 px-4">Plano / Descrição</th>
+                      <th className="py-3 px-4">Fatura</th>
                       <th className="py-3 px-4">Data do Pagamento</th>
                       <th className="py-3 px-4">Forma de Pagamento</th>
                       <th className="py-3 px-4">Valor</th>
@@ -2753,23 +2892,26 @@ export default function Company360Client({ initialData }: Props) {
                     {data.payments_history.map((pay) => (
                       <tr key={pay.id} className="hover:bg-stone-50/80 transition-colors">
                         <td className="py-3.5 px-4 font-bold text-stone-900">
-                          {data.subscription.plan_name}
+                          {pay.invoice_number}
                         </td>
                         <td className="py-3.5 px-4 text-stone-700">
-                          {new Date(pay.date).toLocaleDateString('pt-BR')} às {new Date(pay.date).toLocaleTimeString('pt-BR')}
+                          {pay.date ? new Date(pay.date).toLocaleString('pt-BR') : `Sem pagamento (vence em ${new Date(`${pay.due_date}T12:00:00`).toLocaleDateString('pt-BR')})`}
                         </td>
                         <td className="py-3.5 px-4">
-                          <span className="px-2.5 py-1 bg-stone-100 text-stone-800 font-bold rounded-lg border border-stone-300 inline-flex items-center gap-1.5 text-[11px]">
-                            <CreditCard className="w-3.5 h-3.5 text-stone-600" />
-                            {pay.payment_method}
-                          </span>
+                          {pay.payment_method ? (
+                            <span className="px-2.5 py-1 bg-stone-100 text-stone-800 font-bold rounded-lg border border-stone-300 inline-flex items-center gap-1.5 text-[11px]">
+                              <CreditCard className="w-3.5 h-3.5 text-stone-600" />
+                              {{ pix: 'PIX', credit_card: 'Cartão de crédito', bank_slip: 'Boleto', manual_transfer: 'Transferência manual' }[pay.payment_method] || pay.payment_method}
+                              {pay.provider_code ? ` · ${pay.provider_code}` : ''}
+                            </span>
+                          ) : <span className="text-stone-500">Não informado</span>}
                         </td>
                         <td className="py-3.5 px-4 font-bold text-[#3B0B14]">
                           R$ {pay.amount_brl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </td>
                         <td className="py-3.5 px-4 text-right">
-                          <span className="px-2.5 py-1 bg-emerald-100 text-emerald-900 font-bold rounded-full text-[11px] inline-flex items-center gap-1 border border-emerald-300">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className={`px-2.5 py-1 font-bold rounded-full text-[11px] inline-flex items-center gap-1 border ${pay.status === 'paid' ? 'bg-emerald-100 text-emerald-900 border-emerald-300' : pay.status === 'overdue' || pay.status === 'uncollectible' ? 'bg-rose-100 text-rose-900 border-rose-300' : 'bg-amber-100 text-amber-900 border-amber-300'}`}>
+                            {pay.status === 'paid' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
                             {pay.status_label}
                           </span>
                         </td>
@@ -2780,7 +2922,7 @@ export default function Company360Client({ initialData }: Props) {
               </div>
             ) : (
               <div className="p-6 bg-stone-50 border border-stone-200 rounded-2xl text-center text-xs text-stone-500">
-                Nenhum histórico adicional de cobrança registrado.
+                Nenhuma fatura ou transação financeira registrada para esta empresa.
               </div>
             )}
           </div>
@@ -2842,19 +2984,13 @@ export default function Company360Client({ initialData }: Props) {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
               {
                 key: 'pedra_fundamental',
-                title: 'Pedra Fundamental (10/10)',
+                title: 'Pedra Fundamental',
                 active: data.business.is_pedra_fundamental,
                 subtitle: data.business.is_pedra_fundamental ? '✓ Ativo no Perfil Público' : 'Não Concedido',
-              },
-              {
-                key: 'coluna_de_honra',
-                title: 'Coluna de Honra',
-                active: data.business.is_coluna_honra,
-                subtitle: data.business.is_coluna_honra ? '✓ Ativo no Perfil Público' : 'Não Concedido',
               },
               {
                 key: 'empresa_verificada',
@@ -2930,6 +3066,45 @@ export default function Company360Client({ initialData }: Props) {
       )}
 
       {/* MODAL: SUSPENDER / REATIVAR COM JUSTIFICATIVA MANDATÓRIA */}
+      {pendingDelete && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-stone-950/75 p-4 backdrop-blur-sm">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-confirmation-title"
+            className="w-full max-w-md rounded-2xl border border-stone-300 bg-white p-6 shadow-2xl"
+          >
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-rose-100 p-2 text-rose-700">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h2 id="delete-confirmation-title" className="font-serif text-lg font-bold text-stone-900">Confirmar exclusão</h2>
+                <p className="text-sm leading-relaxed text-stone-600">
+                  Deseja realmente excluir {pendingDelete.label}? Esta ação não poderá ser desfeita.
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingDelete(null)}
+                className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-xs font-bold text-stone-700 hover:bg-stone-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmPendingDelete}
+                className="rounded-xl bg-rose-700 px-4 py-2 text-xs font-bold text-white hover:bg-rose-800"
+              >
+                Excluir definitivamente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showStatusModal && (
         <div className="fixed inset-0 bg-stone-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white border border-stone-300 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl text-left">
@@ -3008,8 +3183,7 @@ export default function Company360Client({ initialData }: Props) {
               <label className="block font-bold text-stone-800">Selecione o Selo:</label>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { key: 'is_pedra_fundamental', label: 'Pedra Fundamental (10/10)' },
-                  { key: 'is_coluna_honra', label: 'Coluna de Honra (Empresa Fundadora)' },
+                  { key: 'is_pedra_fundamental', label: 'Pedra Fundamental' },
                   { key: 'is_verified', label: 'Selo de Verificação' },
                 ].map((rec) => (
                   <button

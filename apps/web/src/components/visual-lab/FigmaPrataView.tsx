@@ -150,7 +150,7 @@ export function FigmaPrataView({ company = defaultPrataCompanyFixture }: { compa
 
           <div className={styles.badgesWrap}>
             {company.verified && <span className={`${styles.badgeItem} ${styles.badgeVerified}`}>✓ Empresa Verificada</span>}
-            <span className={`${styles.badgeItem} ${styles.badgePrata}`}>PLANO PRATA</span>
+            <span className={`${styles.badgeItem} ${styles.badgePrata}`}>PLANO COMPASSO</span>
           </div>
 
           <div className={styles.infoRow}>
@@ -466,7 +466,7 @@ export function FigmaPrataView({ company = defaultPrataCompanyFixture }: { compa
 
           {/* Quote Card */}
           <div className={styles.quoteCard}>
-            🤝 <strong>Compromisso Fraternal Prata:</strong> Empresa credenciada e verificada, oferecendo atendimento especializado para nossa rede.
+            🤝 <strong>Compromisso Fraternal Compasso:</strong> Empresa credenciada e verificada, oferecendo atendimento especializado para nossa rede.
           </div>
         </div>
       </div>

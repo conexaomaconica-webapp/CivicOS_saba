@@ -41,7 +41,7 @@ export default async function AdminPlanosPage() {
           Central Comercial de Planos & Benefícios
         </h1>
         <p className="text-xs text-stone-600 mt-1 max-w-3xl leading-relaxed">
-          Configure a identidade comercial, slogans, preços anuais em BRL, regras de parcelamento Asaas e cotas numéricas dos planos <strong>Bronze, Prata e Ouro</strong>. As alterações alimentam diretamente o onboarding dos novos anunciantes.
+          Configure identidade, preços, desconto à vista, parcelamento, cotas e diferenciais dos planos <strong>Esquadro, Compasso e Acácia</strong>. As alterações alimentam diretamente o onboarding dos novos anunciantes.
         </p>
       </div>
 

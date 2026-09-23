@@ -96,7 +96,7 @@ export function GalleryMediaGrid({
 
       {maxPhotosLimit === 0 ? (
         <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
-          O plano Bronze não inclui galeria de fotos comercial. Faça upgrade para o plano Prata ou Ouro para publicar imagens do seu estabelecimento.
+          O Plano Esquadro não inclui galeria de fotos comercial. Faça upgrade para o Plano Compasso ou Acácia para publicar imagens do seu estabelecimento.
         </div>
       ) : items.length === 0 ? (
         <div className="p-8 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">

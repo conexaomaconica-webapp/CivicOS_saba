@@ -409,7 +409,7 @@ export default function DashboardPage() {
 
           {banners.length === 0 ? (
             <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', textAlign: 'center' }}>
-              Sem campanhas de banner ativas. Banners requerem assinatura Ouro.
+              Sem campanhas de banner ativas. Banners requerem assinatura Acácia.
             </p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>

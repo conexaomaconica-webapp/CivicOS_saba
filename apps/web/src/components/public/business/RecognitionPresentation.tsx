@@ -1,5 +1,5 @@
 import React from 'react';
-import { Award, ShieldCheck, Sparkles, Building2, HelpCircle } from 'lucide-react';
+import { Award, ShieldCheck, Sparkles, HelpCircle } from 'lucide-react';
 import { canBusinessReceiveRecognition } from '@/lib/business/recognition-eligibility';
 
 export type InstitutionalRecognitionItem = {
@@ -20,7 +20,6 @@ type RecognitionPresentationProps = {
   isVerified?: boolean;
   isFounder?: boolean;
   isPedraFundamental?: boolean;
-  isColunaDeHonra?: boolean;
   variant?: 'full' | 'compact' | 'badge_list';
   className?: string;
 };
@@ -31,7 +30,6 @@ export function RecognitionPresentation({
   isVerified = true,
   isFounder = false,
   isPedraFundamental = false,
-  isColunaDeHonra = false,
   variant = 'badge_list',
   className = '',
 }: RecognitionPresentationProps) {
@@ -49,7 +47,7 @@ export function RecognitionPresentation({
     priority: number;
   }> = [];
 
-  // 1. Pedra Fundamental (Permitida SOMENTE para Plano Ouro)
+  // 1. Pedra Fundamental (condecoração histórica de fundador, independente do plano)
   if (
     canBusinessReceiveRecognition(planCode, 'pedra_fundamental') &&
     (isPedraFundamental || recognitions?.some((r) => r.key === 'pedra_fundamental' && r.is_active))
@@ -57,8 +55,8 @@ export function RecognitionPresentation({
     const custom = recognitions?.find((r) => r.key === 'pedra_fundamental');
     badgeList.push({
       id: 'pedra_fundamental',
-      title: custom?.title || 'Selo Pedra Fundamental (10/10)',
-      description: custom?.description || 'Reconhecimento histórico/institucional permanente dos 10 primeiros apoiadores da rede Conexão Maçônica.',
+      title: custom?.title || 'Selo Pedra Fundamental',
+      description: custom?.description || 'Reconhecimento para as empresas que participam do início do projeto. Identificação e reconhecimento especial dentro da plataforma',
       seal_url: custom?.seal_url || '/selos/pedra-fundamental.svg',
       compact_seal_url: custom?.compact_seal_url || '/selos/pedra-fundamental-compact.svg',
       icon: Sparkles,
@@ -89,27 +87,7 @@ export function RecognitionPresentation({
     });
   }
 
-  // 3. Coluna de Honra (Permitida SOMENTE para Plano Ouro)
-  if (
-    canBusinessReceiveRecognition(planCode, 'coluna_de_honra') &&
-    (isColunaDeHonra || recognitions?.some((r) => r.key === 'coluna_de_honra' && r.is_active))
-  ) {
-    const custom = recognitions?.find((r) => r.key === 'coluna_de_honra');
-    badgeList.push({
-      id: 'coluna_de_honra',
-      title: custom?.title || 'Coluna de Honra',
-      description: custom?.description || 'Destaque de mérito e contribuição exemplar na fraternidade.',
-      seal_url: custom?.seal_url || '/selos/coluna-honra.svg',
-      compact_seal_url: custom?.compact_seal_url || '/selos/coluna-honra-compact.svg',
-      icon: Building2,
-      bgClass: 'bg-stone-900 text-[#C9A227]',
-      borderClass: 'border-amber-600/40',
-      textClass: 'text-amber-400',
-      priority: custom?.priority_order ?? 3,
-    });
-  }
-
-  // 4. Empresa Verificada (Permitida para Bronze, Prata e Ouro)
+  // 3. Empresa Verificada (Permitida para Bronze, Prata e Ouro)
   if (
     canBusinessReceiveRecognition(planCode, 'empresa_verificada') &&
     (isVerified || recognitions?.some((r) => r.key === 'empresa_verificada' && r.is_active))

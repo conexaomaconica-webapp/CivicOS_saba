@@ -333,6 +333,18 @@ export default function PlanSelectionForm({
                       Equivale a {computeMonthlyEquivalenceText(plan.annualPriceCents)}
                     </div>
                   )}
+                  {billingCycle === 'annual' && (plan.pixPriceCents ?? plan.annualPriceCents) < plan.annualPriceCents && (
+                    <div
+                      style={{
+                        fontSize: 'var(--text-xs)',
+                        color: '#047857',
+                        marginTop: 'var(--space-2)',
+                        fontWeight: 'var(--font-weight-bold)',
+                      }}
+                    >
+                      {formatCentsToReais(plan.pixPriceCents ?? plan.annualPriceCents)} no PIX ({plan.pixDiscountPercentage}% de desconto)
+                    </div>
+                  )}
                 </div>
 
                 <ul

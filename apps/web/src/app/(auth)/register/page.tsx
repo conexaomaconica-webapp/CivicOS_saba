@@ -11,6 +11,7 @@ import {
   type RegistrationErrors,
   type RegistrationFields,
 } from '@/lib/auth/validation';
+import { sanitizeInternalRedirect } from '@/lib/auth/internal-redirect';
 
 const FIELD_ERROR_STYLE = {
   marginTop: 'var(--space-1)',
@@ -33,6 +34,10 @@ export default function RegisterPage() {
     email: '',
     password: '',
     confirmPassword: '',
+    city: '',
+    state: '',
+    acceptedTerms: false,
+    acceptedPrivacy: false,
   });
   const [errors, setErrors] = useState<RegistrationErrors>({});
   const [tenantName, setTenantName] = useState<string | null>(null);
@@ -77,7 +82,7 @@ export default function RegisterPage() {
     void resolveTenant();
   }, [supabase]);
 
-  const updateField = (key: keyof RegistrationFields, value: string) => {
+  const updateField = (key: keyof RegistrationFields, value: string | boolean) => {
     const nextFields = { ...fields, [key]: value };
     setFields(nextFields);
     // CRIT-TRN-023 — validate in real time, error next to the field.
@@ -90,15 +95,7 @@ export default function RegisterPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      const redirectParam = params.get('redirect');
-      if (
-        redirectParam &&
-        redirectParam.startsWith('/') &&
-        !redirectParam.startsWith('//') &&
-        !redirectParam.includes('\\')
-      ) {
-        setRedirectTarget(redirectParam);
-      }
+      setRedirectTarget(sanitizeInternalRedirect(params.get('redirect')));
     }
   }, []);
 
@@ -118,7 +115,10 @@ export default function RegisterPage() {
     try {
       const result = await signUp(supabase, fields.email.trim(), fields.password, {
         name: fields.name.trim(),
-        role: 'usuario_comum',
+        city: fields.city.trim(),
+        state: fields.state.trim().toUpperCase(),
+        terms_accepted_at: new Date().toISOString(),
+        privacy_accepted_at: new Date().toISOString(),
         tenant_id: tenantId,
       });
 
@@ -249,6 +249,20 @@ export default function RegisterPage() {
       </div>
 
       {/* Password Input */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 90px', gap: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+          <label htmlFor="city" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-secondary)' }}>Cidade</label>
+          <input id="city" required value={fields.city} onChange={(e) => updateField('city', e.target.value)} placeholder="Sua cidade" style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }} />
+          <FieldError message={errors.city} />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+          <label htmlFor="state" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-secondary)' }}>UF</label>
+          <input id="state" required maxLength={2} value={fields.state} onChange={(e) => updateField('state', e.target.value.toUpperCase())} placeholder="BA" style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', textTransform: 'uppercase' }} />
+          <FieldError message={errors.state} />
+        </div>
+      </div>
+
+      {/* Password Input */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
         <label
           htmlFor="password"
@@ -279,6 +293,19 @@ export default function RegisterPage() {
           }}
         />
         <FieldError message={errors.password} />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+          <input type="checkbox" checked={fields.acceptedTerms} onChange={(e) => updateField('acceptedTerms', e.target.checked)} />
+          <span>Li e aceito os <Link href="/termos" target="_blank">Termos de Uso</Link>.</span>
+        </label>
+        <FieldError message={errors.acceptedTerms} />
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+          <input type="checkbox" checked={fields.acceptedPrivacy} onChange={(e) => updateField('acceptedPrivacy', e.target.checked)} />
+          <span>Li e aceito a <Link href="/privacidade" target="_blank">Política de Privacidade</Link>.</span>
+        </label>
+        <FieldError message={errors.acceptedPrivacy} />
       </div>
 
       {/* Confirm Password Input */}

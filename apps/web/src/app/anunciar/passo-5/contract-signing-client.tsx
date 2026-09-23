@@ -22,7 +22,7 @@ export default function ContractSigningClient({
   businessName = 'Comandos - Terceirização e Segurança Eletrônica',
   documentNumber = '12.345.678/0001-90',
   cityState = 'São Paulo / SP',
-  planName = 'Plano Prata (Anual)',
+  planName = 'Plano Compasso (Anual)',
   planPrice = 'R$ 1.788,00 / ano (ou 12x de R$ 149,00 sem juros)',
   masonicAffiliation = 'Loja Maçônica de Origem Verificada',
 }: ContractSigningProps) {

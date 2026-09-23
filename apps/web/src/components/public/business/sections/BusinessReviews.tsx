@@ -1,6 +1,7 @@
 import React from 'react';
 import { Star } from 'lucide-react';
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
+import { CollapsibleReviewComment } from './CollapsibleReviewComment';
 
 type BusinessReviewsProps = {
   reviews: PublicBusinessPresentation['reviews'];
@@ -60,9 +61,7 @@ export function BusinessReviews({
               </div>
 
               {review.comment && (
-                <p className="text-xs text-stone-300 leading-relaxed italic">
-                  "{review.comment}"
-                </p>
+                <CollapsibleReviewComment comment={review.comment} tone="dark" />
               )}
             </div>
           ))}

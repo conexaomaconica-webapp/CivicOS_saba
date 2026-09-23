@@ -4,6 +4,7 @@ import { getCanonicalDefaultLimit } from '@/lib/billing/plans-service';
 export type PublicBusinessPlan = 'bronze' | 'prata' | 'ouro' | null;
 export type PublicBusinessTemplate = 'bronze' | 'prata' | 'ouro';
 export type PublicCommercialPlan = 'bronze' | 'prata' | 'ouro';
+export type PublicProfileSectionKey = 'about' | 'services' | 'video' | 'gallery' | 'benefits' | 'events' | 'posts';
 
 export type PublicMediaAsset = {
   url: string;
@@ -89,6 +90,7 @@ export type PublicBusinessPresentation = {
   plan: {
     commercialPlan: PublicCommercialPlan;
     template: PublicBusinessTemplate;
+    sectionOrder?: PublicProfileSectionKey[];
   };
   entitlements: {
     maxPhotos: number;
@@ -136,6 +138,7 @@ export type PublicBusinessPresentation = {
     businessRole: string | null;
     organization: string | null;
     communityLabel: string | null;
+    whatsapp?: string | null;
     avatar: PublicMediaAsset | null;
     endorsedByCount?: number;
     endorserAvatars?: string[];
@@ -211,8 +214,10 @@ type DetailRow = Database['public']['Functions']['public_business_detail']['Retu
   is_pedra_fundamental?: boolean;
   is_coluna_honra?: boolean;
   entitlements?: Record<string, number | boolean>;
+  profile_section_order?: string[];
 };
 type ReviewRow = Database['public']['Functions']['public_business_reviews']['Returns'][number];
+type PublicReviewRow = ReviewRow & { author_name?: string | null; author_avatar_url?: string | null; is_anonymous?: boolean | null };
 
 function records(value: Json | undefined): Record<string, Json>[] {
   return Array.isArray(value)
@@ -276,6 +281,13 @@ export function toPublicBusinessPresentation(
 
   // Cotas de exibição: se entitlements customizados não forem passados, utiliza o padrão canônico do plano.
   const customEntitlements = row.entitlements || {};
+  const validSectionKeys: PublicProfileSectionKey[] = ['about', 'services', 'video', 'gallery', 'benefits', 'events', 'posts'];
+  const sectionOrder = Array.isArray(row.profile_section_order)
+    && row.profile_section_order.length === validSectionKeys.length
+    && new Set(row.profile_section_order).size === validSectionKeys.length
+    && row.profile_section_order.every((key): key is PublicProfileSectionKey => validSectionKeys.includes(key as PublicProfileSectionKey))
+      ? row.profile_section_order
+      : validSectionKeys;
 
   const maxPhotos = typeof customEntitlements.gallery_photos_limit === 'number'
     ? customEntitlements.gallery_photos_limit
@@ -434,6 +446,7 @@ export function toPublicBusinessPresentation(
     plan: {
       commercialPlan,
       template,
+      sectionOrder,
     },
     entitlements: {
       maxPhotos,
@@ -486,6 +499,7 @@ export function toPublicBusinessPresentation(
         if (raw.toLowerCase().includes('cunhada')) return 'Cunhada';
         return raw;
       })(),
+      whatsapp: text(responsible?.whatsapp, 32),
       avatar: publicAsset(
         text(responsible?.avatar_url, 2048) || text((row as any).avatar_url, 2048) || text((row as any).owner_avatar_url, 2048),
         `Foto do responsável`
@@ -531,11 +545,15 @@ export function toPublicBusinessPresentation(
     reviews: {
       average: row.rating_average,
       count: row.rating_count,
-      items: reviewRows.map((review) => ({
+      items: (reviewRows as PublicReviewRow[]).map((review) => ({
         id: review.review_public_id,
         rating: review.rating,
         comment: review.comment,
         publishedAt: review.published_at,
+        authorName: review.is_anonymous ? 'Anônimo' : text(review.author_name, 120) || 'Membro da Comunidade',
+        authorAvatar: review.is_anonymous
+          ? null
+          : publicAsset(text(review.author_avatar_url, 2048), `Foto de ${text(review.author_name, 120) || 'membro'}`),
       })),
     },
     metrics: { views: null, openingStatus: null },

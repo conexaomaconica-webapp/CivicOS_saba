@@ -35,10 +35,11 @@ export async function middleware(request: NextRequest) {
   const isDashboardRoute = path.startsWith('/dashboard');
   const isProfileRoute = path.startsWith('/perfil') || path.startsWith('/profile');
   const isUserAreaRoute = path.startsWith('/usuario');
+  const isMemberAreaRoute = path.startsWith('/minha-conta');
   const isAuthRoute = path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/forgot-password');
 
   // If trying to access protected routes
-  if (isAdminRoute || isDashboardRoute || isProfileRoute || isUserAreaRoute) {
+  if (isAdminRoute || isDashboardRoute || isProfileRoute || isUserAreaRoute || isMemberAreaRoute) {
     const mockRole = process.env.NODE_ENV !== 'production' ? request.cookies.get('e2e-mock-role')?.value : null;
 
     if (mockRole === 'master' || mockRole === 'socio_admin') {
@@ -70,7 +71,7 @@ export async function middleware(request: NextRequest) {
       .select('role, tenant_id')
       .eq('id', user.id)
       .maybeSingle();
-    const userRole = profile?.role ?? 'usuario_comum';
+    const userRole = profile?.role ?? 'member';
     const userTenantId = profile?.tenant_id ?? null;
 
     // RBAC: Admin Routes (/admin/*)

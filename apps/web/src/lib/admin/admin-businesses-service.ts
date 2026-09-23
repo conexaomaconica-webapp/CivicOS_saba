@@ -5,7 +5,7 @@ import { createServerSideClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { resolveLogoUrl } from '@/lib/business/business-media-helpers';
 import { validatePhone, sanitizeCnpj } from '@/lib/onboarding/onboarding-validation';
-import { getCanonicalDefaultLimit } from '@/lib/billing/plans-service';
+import { getCanonicalDefaultLimit, getCommercialPlanName } from '@/lib/billing/plans-service';
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database.types';
 
@@ -20,6 +20,26 @@ function isSupportedImage(buffer: Uint8Array): boolean {
   if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return true;
   if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return true;
   return buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46;
+}
+
+function isValidPublicVideoUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function normalizeBusinessSlug(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 100)
+    .replace(/-+$/g, '');
 }
 
 export async function listAdminBusinessCategoriesAction(tenantId: string): Promise<{
@@ -64,7 +84,7 @@ export async function createAdminBusinessCategoryAction(tenantId: string, rawNam
     const { data: existing } = await adminClient
       .from('categories')
       .select('id, name')
-      .or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
+      .is('tenant_id', null)
       .ilike('name', name)
       .maybeSingle();
     if (existing) return { success: true, category: existing };
@@ -72,7 +92,7 @@ export async function createAdminBusinessCategoryAction(tenantId: string, rawNam
     const slug = `${baseSlug}-${crypto.randomUUID().slice(0, 8)}`;
     const { data: created, error } = await adminClient
       .from('categories')
-      .insert({ tenant_id: tenantId, name, slug, is_active: true })
+      .insert({ tenant_id: null, name, slug, is_active: true })
       .select('id, name')
       .single();
     if (error || !created) return { success: false, error: error?.message ?? 'Não foi possível criar a categoria.' };
@@ -83,9 +103,10 @@ export async function createAdminBusinessCategoryAction(tenantId: string, rawNam
       entity_id: created.id,
       action: 'CREATE_BUSINESS_CATEGORY',
       after_value: { name, slug },
-      reason: 'Categoria criada durante edição administrativa da empresa.',
+      reason: 'Categoria global criada durante edição administrativa da empresa.',
     });
     revalidatePath('/admin/empresas');
+    revalidatePath('/admin/guia/categorias');
     return { success: true, category: created };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Erro ao criar categoria.' };
@@ -136,7 +157,7 @@ export async function uploadAdminResponsibleAvatarAction(formData: FormData): Pr
   error?: string;
 }> {
   try {
-    const { supabase, user } = await assertPlatformAdminAccess();
+    const { user } = await assertPlatformAdminAccess();
     const businessId = String(formData.get('businessId') ?? '').trim();
     const file = formData.get('file');
     if (!businessId || !(file instanceof File)) {
@@ -152,15 +173,6 @@ export async function uploadAdminResponsibleAvatarAction(formData: FormData): Pr
     const hashBytes = new Uint8Array(await crypto.subtle.digest('SHA-256', fileBytes));
     const sha256 = Array.from(hashBytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 
-    const { data: business, error: businessError } = await (supabase as any)
-      .from('businesses')
-      .select('id, tenant_id, name')
-      .eq('id', businessId)
-      .maybeSingle();
-    if (businessError || !business) {
-      return { success: false, error: 'Empresa não localizada.' };
-    }
-
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !serviceRoleKey) {
@@ -169,6 +181,16 @@ export async function uploadAdminResponsibleAvatarAction(formData: FormData): Pr
     const adminClient = createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+
+    const { data: business, error: businessError } = await (adminClient as any)
+      .from('businesses')
+      .select('id, tenant_id, name')
+      .eq('id', businessId)
+      .maybeSingle();
+    if (businessError || !business) {
+      return { success: false, error: 'Empresa não localizada.' };
+    }
+
     const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
     const storagePath = `${business.tenant_id}/${businessId}/avatar/${crypto.randomUUID()}.${extension}`;
     const { error: uploadError } = await adminClient.storage
@@ -219,6 +241,77 @@ export async function uploadAdminResponsibleAvatarAction(formData: FormData): Pr
   }
 }
 
+export async function uploadAdminBusinessAssetAction(formData: FormData): Promise<{
+  success: boolean;
+  url?: string;
+  media?: AdminBusiness360DTO['gallery_items'][number];
+  error?: string;
+}> {
+  try {
+    await assertPlatformAdminAccess();
+    const businessId = String(formData.get('businessId') ?? '').trim();
+    const assetType = String(formData.get('assetType') ?? 'gallery') as 'logo' | 'cover' | 'gallery';
+    const title = String(formData.get('title') ?? '').trim();
+    const file = formData.get('file');
+    if (!businessId || !(file instanceof File) || !['logo', 'cover', 'gallery'].includes(assetType)) {
+      return { success: false, error: 'Empresa, arquivo e tipo de imagem são obrigatórios.' };
+    }
+    if (file.size <= 0 || file.size > 5 * 1024 * 1024) return { success: false, error: 'A imagem deve possuir no máximo 5 MB.' };
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (!isSupportedImage(bytes)) return { success: false, error: 'Envie uma imagem JPG, PNG ou WebP válida.' };
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) return { success: false, error: 'Configuração segura do Storage indisponível.' };
+    const adminClient = createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+    const { data: business, error: businessError } = await (adminClient as any).from('businesses')
+      .select('id, tenant_id, plan_tier, plan_code').eq('id', businessId).maybeSingle();
+    if (businessError || !business) return { success: false, error: 'Empresa não localizada.' };
+
+    let galleryOrder = 0;
+    if (assetType === 'gallery') {
+      const { data: activeSubscription } = await (adminClient as any).from('subscriptions')
+        .select('plan_versions!inner(plans!inner(code))')
+        .eq('tenant_id', business.tenant_id).eq('business_id', businessId)
+        .in('status', ['active', 'trialing', 'past_due', 'canceled'])
+        .order('created_at', { ascending: false }).limit(1).maybeSingle();
+      const planCode = activeSubscription?.plan_versions?.plans?.code || business.plan_tier || business.plan_code || 'bronze';
+      const { data: entitlement } = await (adminClient as any).from('plan_entitlements').select('max_limit')
+        .eq('tenant_id', business.tenant_id).eq('plan_code', planCode).eq('feature_code', 'gallery_photos_limit').maybeSingle();
+      const limit = entitlement?.max_limit ?? getCanonicalDefaultLimit(planCode, 'gallery_photos_limit');
+      const { count } = await (adminClient as any).from('business_media').select('*', { count: 'exact', head: true })
+        .eq('business_id', businessId).eq('media_type', 'image').gt('display_order', 0);
+      if ((count || 0) >= limit) return { success: false, error: `Cota de galeria atingida (${count || 0}/${limit}).` };
+      galleryOrder = (count || 0) + 1;
+    }
+
+    const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+    const storagePath = `${business.tenant_id}/${businessId}/${assetType}/${crypto.randomUUID()}.${extension}`;
+    const { error: uploadError } = await adminClient.storage.from('business-assets')
+      .upload(storagePath, bytes, { contentType: file.type || `image/${extension}`, upsert: false });
+    if (uploadError) return { success: false, error: `Falha no upload: ${uploadError.message}` };
+    const url = adminClient.storage.from('business-assets').getPublicUrl(storagePath).data.publicUrl;
+
+    let createdMedia: AdminBusiness360DTO['gallery_items'][number] | undefined;
+    if (assetType === 'gallery') {
+      const { data: insertedMedia, error: insertError } = await (adminClient as any).from('business_media').insert({
+        tenant_id: business.tenant_id, business_id: businessId, media_type: 'image', url,
+        title: title || `Foto ${galleryOrder}`, display_order: galleryOrder,
+      }).select('id, media_type, url, title, display_order, created_at').single();
+      if (insertError) {
+        await adminClient.storage.from('business-assets').remove([storagePath]);
+        return { success: false, error: `Falha ao salvar foto: ${insertError.message}` };
+      }
+      createdMedia = { ...insertedMedia, media_type: 'gallery' };
+    }
+    revalidatePath(`/admin/empresas/${businessId}`);
+    revalidatePath('/guia', 'layout');
+    return { success: true, url, media: createdMedia };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Erro inesperado no upload.' };
+  }
+}
+
 export interface AdminBusinessListItem {
   id: string;
   tenant_id: string;
@@ -251,6 +344,7 @@ export interface AdminBusiness360DTO {
     slug?: string;
     legal_name?: string;
     cnpj_cpf?: string;
+    category_id?: string;
     category: string;
     description?: string;
     city: string;
@@ -289,6 +383,7 @@ export interface AdminBusiness360DTO {
     business_role?: string;
     community_label?: string;
     organization?: string;
+    whatsapp?: string;
     avatar_url?: string;
   };
   masonic_link_detail?: {
@@ -312,11 +407,11 @@ export interface AdminBusiness360DTO {
   subscription: {
     plan_code: string;
     plan_name: string;
-    amount_brl: number;
-    periodicity: string;
-    status: 'paid' | 'pending' | 'overdue';
-    start_date: string;
-    next_billing_date: string;
+    amount_brl: number | null;
+    periodicity: string | null;
+    status: 'active' | 'pending' | 'past_due' | 'canceled' | 'expired' | 'not_found';
+    start_date: string | null;
+    next_billing_date: string | null;
     entitlements: {
       services_limit: number;
       benefits_limit: number;
@@ -326,12 +421,23 @@ export interface AdminBusiness360DTO {
       posts_limit: number;
     };
   };
+  available_plans: Array<{
+    code: 'bronze' | 'prata' | 'ouro';
+    title: string;
+    description: string | null;
+    amount_brl: number;
+    pix_amount_brl: number | null;
+    installments_max: number;
+  }>;
   payments_history: Array<{
     id: string;
-    date: string;
+    invoice_number: string;
+    date: string | null;
+    due_date: string;
     amount_brl: number;
-    payment_method: string;
-    installments: number;
+    payment_method: string | null;
+    provider_code: string | null;
+    status: string;
     status_label: string;
   }>;
   content_summary: {
@@ -631,12 +737,25 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
     if (!bRaw) return null;
     const b = bRaw as any;
 
+    let primaryCategory: { id: string; name: string } | null = null;
+    try {
+      const { data: businessCategoryRows } = await (supabase as any)
+        .from('business_categories')
+        .select('category_id, is_primary, categories(id, name)')
+        .eq('business_id', businessId)
+        .order('is_primary', { ascending: false });
+      const selectedCategory = businessCategoryRows?.[0]?.categories;
+      if (selectedCategory?.id && selectedCategory?.name) {
+        primaryCategory = { id: selectedCategory.id, name: selectedCategory.name };
+      }
+    } catch (_e) { }
+
     // 0. Buscar dados reais do responsável na tabela business_responsibles
     let respData: any = null;
     try {
       const { data: respRow } = await (supabase as any)
         .from('business_responsibles')
-        .select('name, business_role, community_label, organization, avatar_url')
+        .select('name, business_role, community_label, organization, whatsapp, avatar_url')
         .eq('business_id', businessId)
         .maybeSingle();
       respData = respRow;
@@ -649,15 +768,37 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
     try {
       const res = await (supabase as any)
         .from('subscriptions')
-        .select('id, status, current_period_end, plan_versions!inner(id, plan_id, price_annual, plans!inner(code, name))')
+        .select('id, status, contract_term, payment_schedule, current_period_start, current_period_end, created_at, plan_versions!inner(id, plan_id, price_annual, plans!inner(code, name))')
         .eq('business_id', businessId)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
       subData = res?.data;
     } catch (_e) {
       subData = null;
     }
 
-    const planCode = subData?.plan_versions?.plans?.code || b.plan_code || 'ouro';
+    const planCode = subData?.plan_versions?.plans?.code || b.plan_tier || b.plan_code || 'bronze';
+
+    let availablePlans: AdminBusiness360DTO['available_plans'] = [];
+    try {
+      const { data: paymentRulesRaw } = await (supabase as any)
+        .from('plan_payment_rules')
+        .select('plan_code, title, description, amount_cents, pix_amount_cents, installments_max, is_active, display_order')
+        .in('plan_code', ['bronze', 'prata', 'ouro'])
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+      availablePlans = (paymentRulesRaw || []).map((rule: any) => ({
+        code: rule.plan_code,
+        title: `Plano ${getCommercialPlanName(rule.plan_code)}`,
+        description: rule.description || null,
+        amount_brl: Number(rule.amount_cents) / 100,
+        pix_amount_brl: rule.pix_amount_cents === null ? null : Number(rule.pix_amount_cents) / 100,
+        installments_max: Number(rule.installments_max) || 1,
+      }));
+    } catch (_error) {
+      availablePlans = [];
+    }
 
     // Resolver cotas via plan_entitlements (fonte canônica)
     const { data: entRows360 } = await (supabase as any)
@@ -993,46 +1134,47 @@ DOSSIÊ DE ACEITE E ASSINATURA DIGITAL (AUDITADO):
     try {
       const { data: invoicesRaw } = await (supabase as any)
         .from('invoices')
-        .select('id, amount, status, due_date, created_at')
+        .select('id, invoice_number, amount_due, amount_paid, status, due_date, paid_at, created_at')
         .eq('business_id', businessId)
         .order('created_at', { ascending: false });
 
-      if (invoicesRaw && invoicesRaw.length > 0) {
-        payments_history = invoicesRaw.map((inv: any) => ({
-          id: inv.id,
-          date: inv.created_at || b.created_at,
-          amount_brl: Number(inv.amount || (planCode === 'ouro' ? 2388.0 : 1788.0)),
-          payment_method: 'Cartão / PIX',
-          installments: 1,
-          status_label: inv.status === 'paid' ? 'Pago (Confirmado)' : inv.status === 'canceled' ? 'Cancelado' : 'Pendente',
-        }));
-      } else {
-        const planAmount = planCode === 'ouro' ? 2388.0 : 1788.0;
-        const isPaid = subData?.status === 'active' || b.is_active;
-        payments_history = [
-          {
-            id: `pay-init-${b.id}`,
-            date: b.created_at,
-            amount_brl: planAmount,
-            payment_method: 'Cartão / PIX (Asaas)',
-            installments: 1,
-            status_label: isPaid ? 'Pago (Confirmado)' : 'Pendente de Confirmação',
-          },
-        ];
+      const invoiceIds = (invoicesRaw || []).map((invoice: any) => invoice.id);
+      const paymentsByInvoice = new Map<string, any>();
+      if (invoiceIds.length > 0) {
+        const { data: paymentsRaw } = await (supabase as any)
+          .from('payments')
+          .select('id, invoice_id, amount, payment_method, provider_code, status, paid_at, created_at')
+          .in('invoice_id', invoiceIds)
+          .order('paid_at', { ascending: false });
+        (paymentsRaw || []).forEach((payment: any) => {
+          if (!paymentsByInvoice.has(payment.invoice_id)) paymentsByInvoice.set(payment.invoice_id, payment);
+        });
       }
+
+      payments_history = (invoicesRaw || []).map((inv: any) => {
+        const payment = paymentsByInvoice.get(inv.id);
+        const statusLabels: Record<string, string> = {
+          draft: 'Rascunho',
+          open: 'Em aberto',
+          paid: 'Paga',
+          overdue: 'Vencida',
+          uncollectible: 'Inadimplente',
+          void: 'Cancelada',
+        };
+        return {
+          id: inv.id,
+          invoice_number: inv.invoice_number,
+          date: payment?.paid_at || inv.paid_at || null,
+          due_date: inv.due_date,
+          amount_brl: Number(inv.status === 'paid' ? inv.amount_paid : inv.amount_due),
+          payment_method: payment?.payment_method || null,
+          provider_code: payment?.provider_code || null,
+          status: inv.status,
+          status_label: statusLabels[inv.status] || inv.status,
+        };
+      });
     } catch (_e) {
-      const planAmount = planCode === 'ouro' ? 2388.0 : 1788.0;
-      const isPaid = subData?.status === 'active' || b.is_active;
-      payments_history = [
-        {
-          id: `pay-init-${b.id}`,
-          date: b.created_at,
-          amount_brl: planAmount,
-          payment_method: 'Cartão / PIX (Asaas)',
-          installments: 1,
-          status_label: isPaid ? 'Pago (Confirmado)' : 'Pendente de Confirmação',
-        },
-      ];
+      payments_history = [];
     }
 
     // 8. Query Factual de Analytics (Últimos 30 Dias)
@@ -1094,9 +1236,11 @@ DOSSIÊ DE ACEITE E ASSINATURA DIGITAL (AUDITADO):
         id: b.id,
         tenant_id: b.tenant_id,
         name: b.name,
+        slug: b.slug || undefined,
         legal_name: b.legal_name || b.name,
         cnpj_cpf: b.cnpj || b.cnpj_cpf || undefined,
-        category: b.category || 'Geral',
+        category_id: primaryCategory?.id,
+        category: primaryCategory?.name || b.category || 'Geral',
         description: b.description || undefined,
         city: locationData.city || b.city || 'São Paulo',
         state: locationData.state || b.state || 'SP',
@@ -1130,6 +1274,7 @@ DOSSIÊ DE ACEITE E ASSINATURA DIGITAL (AUDITADO):
         business_role: (respData?.business_role || b.responsible?.business_role || 'Proprietário') as string,
         community_label: (respData?.community_label || b.responsible?.community_label || 'Irmão') as string,
         organization: (respData?.organization || b.responsible?.organization || undefined) as string | undefined,
+        whatsapp: (respData?.whatsapp || b.responsible?.whatsapp || undefined) as string | undefined,
         avatar_url: (respData?.avatar_url || b.responsible?.avatar_url || undefined) as string | undefined,
       },
 
@@ -1137,12 +1282,12 @@ DOSSIÊ DE ACEITE E ASSINATURA DIGITAL (AUDITADO):
       contract: contractDetail,
       subscription: {
         plan_code: planCode,
-        plan_name: planCode === 'ouro' ? 'Plano Acácia Anual' : planCode === 'prata' ? 'Plano Compasso Anual' : 'Plano Esquadro',
-        amount_brl: planCode === 'ouro' ? 2388.0 : 1788.0,
-        periodicity: 'anual',
-        status: subData?.status === 'active' ? 'paid' : 'pending',
-        start_date: b.created_at,
-        next_billing_date: subData?.current_period_end || b.created_at,
+        plan_name: `Plano ${getCommercialPlanName(planCode)}`,
+        amount_brl: subData ? Number(subData.plan_versions?.price_annual) : null,
+        periodicity: subData?.contract_term || null,
+        status: subData?.status || 'not_found',
+        start_date: subData?.current_period_start || null,
+        next_billing_date: subData?.current_period_end || null,
         entitlements: {
           services_limit: servicesLimit,
           benefits_limit: benefitsLimit,
@@ -1152,6 +1297,7 @@ DOSSIÊ DE ACEITE E ASSINATURA DIGITAL (AUDITADO):
           posts_limit: 10,
         },
       },
+      available_plans: availablePlans,
       payments_history,
       content_summary: {
         logo_url: resolveLogoUrl(b.logo_url),
@@ -1263,6 +1409,10 @@ export async function toggleRecognitionAction(
   }
 
   try {
+    if (badgeKey === 'is_coluna_honra') {
+      return { success: false, error: 'Coluna de Honra foi descontinuada e não pode mais ser concedida.' };
+    }
+
     const { data: bData } = await (supabase as any)
       .from('businesses')
       .select('id, tenant_id, slug')
@@ -1308,8 +1458,8 @@ export async function toggleRecognitionAction(
       }
       auditAction = newValue ? 'VERIFY_BUSINESS_LINK' : 'REVOKE_BUSINESS_LINK';
     } else {
-      // Reconhecimento Institucional (pedra_fundamental ou coluna_de_honra)
-      const recKey = badgeKey === 'is_pedra_fundamental' ? 'pedra_fundamental' : 'coluna_de_honra';
+      // Condecoração histórica Pedra Fundamental, separada dos planos comerciais.
+      const recKey = 'pedra_fundamental';
       auditAction = newValue ? `GRANT_RECOGNITION_${recKey.toUpperCase()}` : `REVOKE_RECOGNITION_${recKey.toUpperCase()}`;
 
       if (newValue) {
@@ -1374,6 +1524,7 @@ export async function updateAdminBusinessDetailsAction(
   businessId: string,
   payload: {
     name?: string;
+    slug?: string;
     legal_name?: string;
     cnpj_cpf?: string;
     phone?: string;
@@ -1382,6 +1533,7 @@ export async function updateAdminBusinessDetailsAction(
     city?: string;
     state?: string;
     description?: string;
+    category_id?: string;
     category?: string;
     email?: string;
     website?: string;
@@ -1393,6 +1545,7 @@ export async function updateAdminBusinessDetailsAction(
     responsible_role?: string;
     responsible_community_label?: string;
     responsible_organization?: string;
+    responsible_whatsapp?: string;
     responsible_avatar_url?: string;
   }
 ): Promise<{ success: boolean; data?: any; error?: string }> {
@@ -1414,6 +1567,33 @@ export async function updateAdminBusinessDetailsAction(
     };
 
     if (payload.name !== undefined) updateData.name = payload.name.trim();
+    let nextSlug = existing.slug as string | null;
+    if (payload.slug !== undefined) {
+      nextSlug = normalizeBusinessSlug(payload.slug);
+      if (nextSlug.length < 3) {
+        return { success: false, error: 'O slug deve ter pelo menos 3 caracteres válidos.' };
+      }
+      if (nextSlug === 'empresas' || nextSlug === 'lojas') {
+        return { success: false, error: 'Este slug é reservado pelo sistema. Escolha outro endereço.' };
+      }
+
+      if (nextSlug !== existing.slug) {
+        const { data: slugOwner, error: slugLookupError } = await (supabase as any)
+          .from('businesses')
+          .select('id')
+          .eq('slug', nextSlug)
+          .neq('id', businessId)
+          .maybeSingle();
+
+        if (slugLookupError) {
+          return { success: false, error: `Não foi possível validar o slug: ${slugLookupError.message}` };
+        }
+        if (slugOwner) {
+          return { success: false, error: 'Este link já está sendo usado por outra empresa.' };
+        }
+      }
+      updateData.slug = nextSlug;
+    }
     if (payload.legal_name !== undefined) updateData.legal_name = payload.legal_name.trim();
     if (payload.cnpj_cpf !== undefined) {
       const rawDoc = payload.cnpj_cpf.trim();
@@ -1436,7 +1616,23 @@ export async function updateAdminBusinessDetailsAction(
     }
     if (payload.address !== undefined) updateData.address = payload.address.trim();
     if (payload.description !== undefined) updateData.description = payload.description.trim();
-    if (payload.category !== undefined) updateData.category = payload.category.trim();
+    let selectedCategory: { id: string; name: string } | null = null;
+    if (payload.category_id) {
+      const categoryQuery = (supabase as any)
+        .from('categories')
+        .select('id, name, tenant_id')
+        .or(`tenant_id.is.null,tenant_id.eq.${existing.tenant_id}`)
+        .eq('is_active', true)
+        .eq('id', payload.category_id);
+      const { data: categoryRow, error: categoryLookupError } = await categoryQuery.maybeSingle();
+      if (categoryLookupError || !categoryRow) {
+        return { success: false, error: 'A categoria selecionada não foi localizada para esta empresa.' };
+      }
+      selectedCategory = { id: categoryRow.id, name: categoryRow.name };
+      updateData.category = categoryRow.name;
+    } else if (payload.category !== undefined) {
+      updateData.category = payload.category.trim();
+    }
     if (payload.email !== undefined) updateData.email = payload.email.trim();
     if (payload.website !== undefined) {
       let web = payload.website.trim();
@@ -1453,11 +1649,12 @@ export async function updateAdminBusinessDetailsAction(
       payload.responsible_role !== undefined ||
       payload.responsible_community_label !== undefined ||
       payload.responsible_organization !== undefined ||
+      payload.responsible_whatsapp !== undefined ||
       payload.responsible_avatar_url !== undefined
     ) {
       const { data: existingResp, error: existingRespError } = await (supabase as any)
         .from('business_responsibles')
-        .select('id, name, business_role, community_label, organization, avatar_url')
+        .select('id, name, business_role, community_label, organization, whatsapp, avatar_url')
         .eq('business_id', businessId)
         .maybeSingle();
 
@@ -1467,11 +1664,16 @@ export async function updateAdminBusinessDetailsAction(
       }
 
       const currentResp = existingResp || {};
+      if (payload.responsible_whatsapp !== undefined && payload.responsible_whatsapp.trim()) {
+        const whatsappError = validatePhone(payload.responsible_whatsapp.trim());
+        if (whatsappError) return { success: false, error: `WhatsApp do empresário(a): ${whatsappError}` };
+      }
       const newResp = {
         name: payload.responsible_name !== undefined ? payload.responsible_name.trim() : (currentResp.name || existing.name),
         business_role: payload.responsible_role !== undefined ? payload.responsible_role.trim() : (currentResp.business_role || 'Proprietário'),
         community_label: payload.responsible_community_label !== undefined ? payload.responsible_community_label.trim() : (currentResp.community_label || 'Ir.\'.'),
         organization: payload.responsible_organization !== undefined ? (payload.responsible_organization.trim() || null) : (currentResp.organization || null),
+        whatsapp: payload.responsible_whatsapp !== undefined ? (payload.responsible_whatsapp.trim() || null) : (currentResp.whatsapp || null),
         avatar_url: payload.responsible_avatar_url !== undefined ? (payload.responsible_avatar_url.trim() || null) : (currentResp.avatar_url || null),
       };
 
@@ -1487,12 +1689,12 @@ export async function updateAdminBusinessDetailsAction(
           .from('business_responsibles')
           .update(respPayload)
           .eq('id', existingResp.id)
-          .select('id, name, business_role, community_label, organization, avatar_url')
+          .select('id, name, business_role, community_label, organization, whatsapp, avatar_url')
           .single()
         : await (supabase as any)
           .from('business_responsibles')
           .insert(respPayload)
-          .select('id, name, business_role, community_label, organization, avatar_url')
+          .select('id, name, business_role, community_label, organization, whatsapp, avatar_url')
           .single();
 
       if (respWrite.error) {
@@ -1578,7 +1780,34 @@ export async function updateAdminBusinessDetailsAction(
 
     if (updateError) {
       console.error('[updateAdminBusinessDetailsAction] DB Error:', updateError);
+      if (updateError.code === '23505') {
+        return { success: false, error: 'Este link já está sendo usado por outra empresa.' };
+      }
       return { success: false, error: `Falha ao salvar no banco: ${updateError.message || 'Erro de banco de dados.'}` };
+    }
+
+    if (selectedCategory) {
+      const { error: demoteCategoryError } = await (supabase as any)
+        .from('business_categories')
+        .update({ is_primary: false })
+        .eq('tenant_id', existing.tenant_id)
+        .eq('business_id', businessId)
+        .eq('is_primary', true);
+      if (demoteCategoryError) {
+        return { success: false, error: `Falha ao atualizar categoria principal: ${demoteCategoryError.message}` };
+      }
+
+      const { error: categoryLinkError } = await (supabase as any)
+        .from('business_categories')
+        .upsert({
+          tenant_id: existing.tenant_id,
+          business_id: businessId,
+          category_id: selectedCategory.id,
+          is_primary: true,
+        }, { onConflict: 'business_id,category_id' });
+      if (categoryLinkError) {
+        return { success: false, error: `Falha ao vincular categoria principal: ${categoryLinkError.message}` };
+      }
     }
 
     const upsertContact = async (contactType: string, contactVal?: string) => {
@@ -1631,6 +1860,9 @@ export async function updateAdminBusinessDetailsAction(
     if (existing.slug) {
       revalidatePath(`/guia/${existing.slug}`);
     }
+    if (nextSlug && nextSlug !== existing.slug) {
+      revalidatePath(`/guia/${nextSlug}`);
+    }
     revalidatePath('/guia', 'layout');
 
     if (payload.city !== undefined || payload.state !== undefined) {
@@ -1664,19 +1896,27 @@ export async function updateAdminBusinessDetailsAction(
         .eq('business_id', businessId);
 
       const primaryLoc = (locs || []).find((l: any) => l.is_headquarters === true) || (locs || [])[0];
+      const canonicalAddress = payload.address?.trim() || 'Endereço não informado';
 
       if (primaryLoc) {
-        await (supabase as any)
+        const { error: locationUpdateError } = await (supabase as any)
           .from('business_locations')
           .update({
             city_ibge_code: canonicalCity.ibge_code,
             city: canonicalCity.name,
             state: stateVal,
+            street: canonicalAddress,
+            number: null,
             updated_at: new Date().toISOString(),
           })
           .eq('id', primaryLoc.id);
+
+        if (locationUpdateError) {
+          console.error('[updateAdminBusinessDetailsAction] Location update error:', locationUpdateError);
+          return { success: false, error: `Falha ao atualizar endereço: ${locationUpdateError.message}` };
+        }
       } else {
-        await (supabase as any)
+        const { error: locationInsertError } = await (supabase as any)
           .from('business_locations')
           .insert({
             tenant_id: existing.tenant_id,
@@ -1685,9 +1925,14 @@ export async function updateAdminBusinessDetailsAction(
             city: canonicalCity.name,
             state: stateVal,
             postal_code: '00000-000',
-            street: payload.address?.trim() || 'Endereço não informado',
+            street: canonicalAddress,
             is_headquarters: true,
           });
+
+        if (locationInsertError) {
+          console.error('[updateAdminBusinessDetailsAction] Location insert error:', locationInsertError);
+          return { success: false, error: `Falha ao cadastrar endereço: ${locationInsertError.message}` };
+        }
       }
     }
 
@@ -1709,6 +1954,9 @@ export async function updateAdminBusinessDetailsAction(
       success: true,
       data: {
         ...updated,
+        slug: nextSlug,
+        category_id: selectedCategory?.id,
+        category: selectedCategory?.name || updated.category,
         cnpj_cpf: updated.cnpj || payload.cnpj_cpf,
         whatsapp: payload.whatsapp || updated.phone,
         city: payload.city,
@@ -2033,19 +2281,25 @@ export async function manageAdminServiceAction(
     price_info?: string;
     is_active?: boolean;
   }
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; data?: AdminBusiness360DTO['services_items'][number]; error?: string }> {
   try {
     const { supabase, user } = await assertPlatformAdminAccess();
 
     const { data: biz } = await (supabase as any)
       .from('businesses')
-      .select('id, tenant_id, plan_tier')
+      .select('id, tenant_id, plan_tier, plan_code')
       .eq('id', businessId)
       .single();
 
     if (!biz) return { success: false, error: 'Empresa não localizada.' };
 
-    const planCode = biz.plan_tier || 'prata';
+    const { data: activeSubscription } = await (supabase as any).from('subscriptions')
+      .select('plan_versions!inner(plans!inner(code))')
+      .eq('tenant_id', biz.tenant_id).eq('business_id', businessId)
+      .in('status', ['active', 'trialing', 'past_due', 'canceled'])
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const planCode = activeSubscription?.plan_versions?.plans?.code || biz.plan_tier || biz.plan_code || 'bronze';
+    let savedService: AdminBusiness360DTO['services_items'][number] | undefined;
     if (action === 'create') {
       // Resolver cota de serviços via plan_entitlements (fonte canônica)
       const { data: svcEntRows } = await (supabase as any)
@@ -2055,14 +2309,14 @@ export async function manageAdminServiceAction(
         .eq('plan_code', planCode)
         .eq('feature_code', 'services_limit')
         .maybeSingle();
-      const servicesLimit = svcEntRows?.max_limit ?? 0;
+      const servicesLimit = svcEntRows?.max_limit ?? getCanonicalDefaultLimit(planCode, 'services_limit');
       const { count } = await (supabase as any)
         .from('business_services')
         .select('*', { count: 'exact', head: true })
         .eq('business_id', businessId);
 
       if ((count || 0) >= servicesLimit) {
-        return { success: false, error: `Cota de serviços excedida para o plano ${planCode} (${count}/${servicesLimit}).` };
+        return { success: false, error: `Cota de serviços excedida para o Plano ${getCommercialPlanName(planCode)} (${count}/${servicesLimit}).` };
       }
 
       const { data: newService, error } = await (supabase as any)
@@ -2079,6 +2333,7 @@ export async function manageAdminServiceAction(
         .single();
 
       if (error) return { success: false, error: error.message };
+      savedService = newService;
 
       await (supabase as any).from('admin_audit_logs').insert({
         tenant_id: biz.tenant_id,
@@ -2109,6 +2364,7 @@ export async function manageAdminServiceAction(
         .single();
 
       if (error) return { success: false, error: error.message };
+      savedService = updated;
 
       await (supabase as any).from('admin_audit_logs').insert({
         tenant_id: biz.tenant_id,
@@ -2177,7 +2433,7 @@ export async function manageAdminServiceAction(
     }
 
     revalidatePath(`/admin/empresas/${businessId}`);
-    return { success: true };
+    return { success: true, data: savedService };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao gerenciar serviço.' };
   }
@@ -2193,7 +2449,7 @@ export async function manageAdminBenefitAction(
     discount_percentage?: number | null;
     is_active?: boolean;
   }
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; data?: AdminBusiness360DTO['benefits_items'][number]; error?: string }> {
   try {
     const { supabase, user } = await assertPlatformAdminAccess();
 
@@ -2204,6 +2460,8 @@ export async function manageAdminBenefitAction(
       .single();
 
     if (!biz) return { success: false, error: 'Empresa não localizada.' };
+
+    let savedBenefit: AdminBusiness360DTO['benefits_items'][number] | undefined;
 
     if (action === 'create') {
       const { data: newBenefit, error } = await (supabase as any)
@@ -2220,6 +2478,8 @@ export async function manageAdminBenefitAction(
         .single();
 
       if (error) return { success: false, error: error.message };
+
+      savedBenefit = newBenefit;
 
       await (supabase as any).from('admin_audit_logs').insert({
         tenant_id: biz.tenant_id,
@@ -2250,6 +2510,8 @@ export async function manageAdminBenefitAction(
         .single();
 
       if (error) return { success: false, error: error.message };
+
+      savedBenefit = updated;
 
       await (supabase as any).from('admin_audit_logs').insert({
         tenant_id: biz.tenant_id,
@@ -2356,7 +2618,7 @@ export async function manageAdminBenefitAction(
     }
 
     revalidatePath(`/admin/empresas/${businessId}`);
-    return { success: true };
+    return { success: true, data: savedBenefit };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao gerenciar benefício.' };
   }
@@ -2364,30 +2626,48 @@ export async function manageAdminBenefitAction(
 
 export async function manageAdminMediaAction(
   businessId: string,
-  action: 'update_logo' | 'update_cover' | 'add_gallery' | 'update_gallery_title' | 'delete_media' | 'set_video' | 'delete_video',
+  action: 'update_logo' | 'update_cover' | 'add_gallery' | 'update_gallery_title' | 'reorder_gallery' | 'delete_media' | 'set_video' | 'delete_video',
   payload: {
     media_id?: string;
     url?: string;
     title?: string;
+    direction?: 'up' | 'down';
   }
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; media?: AdminBusiness360DTO['gallery_items'][number]; error?: string }> {
   try {
-    const { supabase, user } = await assertPlatformAdminAccess();
+    const { user } = await assertPlatformAdminAccess();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) {
+      return { success: false, error: 'Configuração segura do Supabase indisponível.' };
+    }
+    const supabase = createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
 
-    const { data: biz } = await (supabase as any)
+    const { data: biz, error: businessLookupError } = await (supabase as any)
       .from('businesses')
-      .select('id, tenant_id, plan_code, plan_tier, logo_url')
+      .select('id, tenant_id, plan_tier, logo_url')
       .eq('id', businessId)
-      .single();
+      .maybeSingle();
 
+    if (businessLookupError) return { success: false, error: `Falha ao consultar empresa: ${businessLookupError.message}` };
     if (!biz) return { success: false, error: 'Empresa não localizada.' };
-
-    const planCode = biz.plan_code || biz.plan_tier || 'prata';
+    const { data: activeSubscription } = await (supabase as any)
+      .from('subscriptions')
+      .select('plan_versions!inner(plans!inner(code))')
+      .eq('tenant_id', biz.tenant_id)
+      .eq('business_id', businessId)
+      .in('status', ['active', 'past_due', 'canceled'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const planCode = activeSubscription?.plan_versions?.plans?.code || biz.plan_tier || 'bronze';
 
     if (action === 'set_video' && payload.url) {
       const url = payload.url.trim();
-      if (!/^https:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|vimeo\.com\/)\S+$/i.test(url)) {
-        return { success: false, error: 'Informe um link válido do YouTube ou Vimeo.' };
+      if (!isValidPublicVideoUrl(url)) {
+        return { success: false, error: 'Informe um link público válido iniciado por https://.' };
       }
       const { data: entitlement } = await (supabase as any).from('plan_entitlements').select('max_limit')
         .eq('tenant_id', biz.tenant_id).eq('plan_code', planCode).eq('feature_code', 'business_video_limit').maybeSingle();
@@ -2395,11 +2675,19 @@ export async function manageAdminMediaAction(
       if (limit < 1) return { success: false, error: 'O plano desta empresa não permite vídeo institucional.' };
       const { data: existing } = await (supabase as any).from('business_media').select('id, url, title')
         .eq('business_id', businessId).eq('media_type', 'video').maybeSingle();
-      const values = { url, title: payload.title?.trim() || 'Vídeo institucional', updated_at: new Date().toISOString() };
+      const values = { url, title: payload.title?.trim() || 'Vídeo institucional' };
       const result = existing
         ? await (supabase as any).from('business_media').update(values).eq('id', existing.id)
         : await (supabase as any).from('business_media').insert({ ...values, tenant_id: biz.tenant_id, business_id: businessId, media_type: 'video', display_order: 0 });
-      if (result.error) return { success: false, error: result.error.message };
+      if (result.error) {
+        const isVideoQuotaError = result.error.message?.includes('Video quota exceeded');
+        return {
+          success: false,
+          error: isVideoQuotaError
+            ? 'A cota de vídeo do Plano Acácia não está configurada para este tenant. Aplique a migration 101 e tente novamente.'
+            : result.error.message,
+        };
+      }
       await (supabase as any).from('admin_audit_logs').insert({ tenant_id: biz.tenant_id, actor_id: user.id,
         action: 'SET_BUSINESS_VIDEO', entity_type: 'business_media', entity_id: existing?.id || businessId,
         before_value: existing || null, after_value: values, reason: 'Vídeo institucional atualizado via Admin 360º' });
@@ -2448,7 +2736,6 @@ export async function manageAdminMediaAction(
             media_type: 'image',
             url: payload.url.trim(),
             title: payload.title || 'Imagem de Capa',
-            updated_at: new Date().toISOString(),
           })
           .eq('id', existingCover.id);
       } else {
@@ -2487,11 +2774,11 @@ export async function manageAdminMediaAction(
         .from('business_media')
         .select('id')
         .eq('business_id', businessId)
-        .eq('media_type', 'image')
+        .in('media_type', ['image', 'gallery'])
         .gt('display_order', 0);
 
       if ((galleryItems?.length || 0) >= galleryLimit) {
-        return { success: false, error: `Cota de galeria excedida para o plano ${planCode} (${galleryItems?.length}/${galleryLimit}).` };
+        return { success: false, error: `Cota de galeria excedida para o Plano ${getCommercialPlanName(planCode)} (${galleryItems?.length}/${galleryLimit}).` };
       }
 
       const nextOrder = (galleryItems?.length || 0) + 1;
@@ -2520,13 +2807,47 @@ export async function manageAdminMediaAction(
         after_value: newMedia,
         reason: 'Foto adicionada à galeria via Admin 360º',
       });
+      revalidatePath(`/admin/empresas/${businessId}`);
+      revalidatePath('/guia', 'layout');
+      return { success: true, media: { ...newMedia, media_type: 'gallery' } };
+    } else if (action === 'reorder_gallery' && payload.media_id && payload.direction) {
+      const { data: galleryItems, error: galleryError } = await (supabase as any)
+        .from('business_media')
+        .select('id, display_order')
+        .eq('tenant_id', biz.tenant_id)
+        .eq('business_id', businessId)
+        .in('media_type', ['image', 'gallery'])
+        .gt('display_order', 0)
+        .order('display_order', { ascending: true });
+      if (galleryError) return { success: false, error: galleryError.message };
+
+      const currentIndex = (galleryItems || []).findIndex((item: any) => item.id === payload.media_id);
+      const targetIndex = payload.direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      if (currentIndex < 0 || targetIndex < 0 || targetIndex >= (galleryItems || []).length) {
+        return { success: false, error: 'Não é possível mover esta foto nessa direção.' };
+      }
+      const current = galleryItems[currentIndex];
+      const target = galleryItems[targetIndex];
+      const { error: currentError } = await (supabase as any).from('business_media')
+        .update({ display_order: target.display_order }).eq('id', current.id)
+        .eq('business_id', businessId).eq('tenant_id', biz.tenant_id);
+      if (currentError) return { success: false, error: currentError.message };
+      const { error: targetError } = await (supabase as any).from('business_media')
+        .update({ display_order: current.display_order }).eq('id', target.id)
+        .eq('business_id', businessId).eq('tenant_id', biz.tenant_id);
+      if (targetError) return { success: false, error: targetError.message };
     } else if (action === 'update_gallery_title' && payload.media_id) {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.media_id)) {
+        return { success: false, error: 'A foto ainda não possui um identificador válido. Recarregue o prontuário e tente novamente.' };
+      }
       const { data: updated, error } = await (supabase as any)
         .from('business_media')
         .update({
           title: payload.title !== undefined ? payload.title.trim() : null,
         })
         .eq('id', payload.media_id)
+        .eq('business_id', businessId)
+        .eq('tenant_id', biz.tenant_id)
         .select()
         .single();
 
@@ -2541,6 +2862,9 @@ export async function manageAdminMediaAction(
         after_value: updated,
         reason: 'Edição de legenda da foto via Admin 360º',
       });
+      revalidatePath(`/admin/empresas/${businessId}`);
+      revalidatePath('/guia', 'layout');
+      return { success: true, media: { ...updated, media_type: 'gallery' } };
     } else if (action === 'delete_media' && payload.media_id) {
       const { data: existing } = await (supabase as any)
         .from('business_media')
@@ -2595,13 +2919,17 @@ export async function updateAdminBusinessPlanAction(
   businessId: string,
   newPlanCode: 'bronze' | 'prata' | 'ouro',
   justification: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{
+  success: boolean;
+  data?: { plan_code: 'bronze' | 'prata' | 'ouro'; plan_name: string; entitlements: Record<string, number> };
+  error?: string;
+}> {
   try {
     const { supabase, user } = await assertPlatformAdminAccess();
 
     const { data: bData, error: findErr } = await (supabase as any)
       .from('businesses')
-      .select('id, tenant_id, slug, plan_code')
+      .select('id, tenant_id, slug, plan_code, plan_tier')
       .eq('id', businessId)
       .single();
 
@@ -2609,12 +2937,13 @@ export async function updateAdminBusinessPlanAction(
       return { success: false, error: 'Empresa não localizada.' };
     }
 
-    const oldPlan = bData.plan_code || 'bronze';
+    const oldPlan = bData.plan_tier || bData.plan_code || 'bronze';
 
     const { error: updateErr } = await (supabase as any)
       .from('businesses')
       .update({
         plan_code: newPlanCode,
+        plan_tier: newPlanCode,
         updated_at: new Date().toISOString(),
       })
       .eq('id', businessId);
@@ -2641,7 +2970,27 @@ export async function updateAdminBusinessPlanAction(
     }
     revalidatePath('/guia', 'layout');
 
-    return { success: true };
+    const { data: entitlementRows } = await (supabase as any)
+      .from('plan_entitlements')
+      .select('feature_code, max_limit')
+      .eq('tenant_id', bData.tenant_id)
+      .eq('plan_code', newPlanCode);
+    const entitlements = Object.fromEntries(
+      (entitlementRows || []).map((row: any) => [row.feature_code, Number(row.max_limit) || 0]),
+    );
+    for (const featureCode of ['services_limit', 'benefits_limit', 'gallery_photos_limit', 'business_video_limit', 'events_limit', 'posts_limit']) {
+      if (entitlements[featureCode] === undefined) {
+        entitlements[featureCode] = getCanonicalDefaultLimit(newPlanCode, featureCode);
+      }
+    }
+    return {
+      success: true,
+      data: {
+        plan_code: newPlanCode,
+        plan_name: newPlanCode === 'ouro' ? 'Plano Acácia' : newPlanCode === 'prata' ? 'Plano Compasso' : 'Plano Esquadro',
+        entitlements,
+      },
+    };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao alterar plano comercial.' };
   }
