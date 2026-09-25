@@ -25,6 +25,7 @@ import {
   Award,
   Scale,
   X,
+  CalendarDays,
 } from 'lucide-react';
 import { getApprovalDirectoryListAction } from '@/lib/admin/admin-approval-service';
 
@@ -140,6 +141,12 @@ export const adminNavSections: NavSection[] = [
         label: 'Notificações Operacionais',
         path: '/admin/notificacoes',
         icon: Bell,
+      },
+      {
+        id: 'eventos',
+        label: 'Eventos & RSVP',
+        path: '/admin/eventos',
+        icon: CalendarDays,
       },
     ],
   },

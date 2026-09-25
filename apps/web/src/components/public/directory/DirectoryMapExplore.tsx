@@ -103,9 +103,9 @@ export function DirectoryMapExplore({ businesses = [], selectedCity }: Directory
             <div className="relative z-20 m-3 bg-white/95 backdrop-blur-md p-3.5 rounded-2xl border border-amber-900/15 shadow-xl max-w-[310px] self-end mt-auto transition-all animate-fade-in">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-10 h-10 rounded-xl border bg-amber-950 text-amber-400 font-bold flex items-center justify-center shrink-0 overflow-hidden text-xs shadow-2xs">
+                  <div className="w-10 h-10 rounded-xl border border-gray-200 bg-white text-amber-950 font-bold flex items-center justify-center shrink-0 overflow-hidden text-xs shadow-2xs">
                     {selectedBiz.logo_url ? (
-                      <img src={selectedBiz.logo_url} alt={selectedBiz.name} className="w-full h-full object-cover" />
+                      <img src={selectedBiz.logo_url} alt={selectedBiz.name} className="w-full h-full object-contain p-0.5" />
                     ) : (
                       selectedBiz.name.slice(0, 2).toUpperCase()
                     )}
@@ -209,9 +209,9 @@ export function DirectoryMapExplore({ businesses = [], selectedCity }: Directory
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-9 h-9 rounded-lg border bg-amber-950 text-amber-400 font-bold flex items-center justify-center shrink-0 overflow-hidden text-[11px]">
+                        <div className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-amber-950 font-bold flex items-center justify-center shrink-0 overflow-hidden text-[11px]">
                           {b.logo_url ? (
-                            <img src={b.logo_url} alt={b.name} className="w-full h-full object-cover" />
+                            <img src={b.logo_url} alt={b.name} className="w-full h-full object-contain p-0.5" />
                           ) : (
                             b.name.slice(0, 2).toUpperCase()
                           )}
@@ -249,4 +249,3 @@ export function DirectoryMapExplore({ businesses = [], selectedCity }: Directory
     </section>
   );
 }
-

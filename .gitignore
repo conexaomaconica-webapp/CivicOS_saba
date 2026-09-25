@@ -51,3 +51,5 @@ session-ses_*.md
 COMPATIBILITY_ANALYSIS_*.md
 scratch/
 
+
+.pnpm-store/
