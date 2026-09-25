@@ -218,7 +218,7 @@ Cenário: Interrupção do cadastro para representante sem autorização anexada
 
 ```gherkin
 Cenário: Prosseguimento direto para Proprietário ou Sócio
-  Dado que o anunciante declarou ser "Proprietário / Sócio Direto"
+  Dado que o anunciante declarou ser "Proprietário / Sócio Diretor"
   Quando confirmar os dados empresariais
   Então o sistema deve liberar o avanço direto para a etapa de Escolha do Plano Comercial
 ```

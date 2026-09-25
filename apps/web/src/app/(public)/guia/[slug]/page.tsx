@@ -279,8 +279,8 @@ const getPublicBusiness = cache(async (slug: string) => {
     const effectivePlanCode = bObj.plan_tier || bObj.plan_code || 'ouro';
 
     const activeRecKeys = (recRows || []).map((r: any) => r.recognition_key);
-    const isPedraFund = activeRecKeys.includes('pedra_fundamental');
-    const isColunaHonra = activeRecKeys.includes('coluna_de_honra');
+    const isPedraFund = activeRecKeys.includes('pedra_fundamental') || Boolean(bObj.is_pedra_fundamental);
+    const isColunaHonra = activeRecKeys.includes('coluna_de_honra') || Boolean(bObj.is_founder);
     const isVerified = linkRow?.status === 'approved' || linkRow?.status === 'active' || linkRow?.status === 'verified' || Boolean(bObj.is_verified);
 
     const detailObj: DetailRow = {

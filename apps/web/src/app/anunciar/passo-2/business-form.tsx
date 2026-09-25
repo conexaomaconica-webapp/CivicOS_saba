@@ -192,7 +192,7 @@ export default function BusinessForm({ categories, tenantId }: BusinessFormProps
         >
           <span>
             Responsável: <strong>{responsibleDraft.name}</strong> ·{' '}
-            {responsibleDraft.relationship === 'owner' ? 'Proprietário / Sócio Direto' : 'Representante Comercial / Procurador'}
+            {responsibleDraft.relationship === 'owner' ? 'Proprietário / Sócio Diretor' : 'Representante Comercial / Procurador'}
           </span>
           {responsibleDraft.masonic && (
             <span>

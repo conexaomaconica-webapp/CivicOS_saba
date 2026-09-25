@@ -56,7 +56,7 @@ export function getBillingCycleLabel(cycle: BillingCycle): string {
 }
 
 export const RESPONSIBLE_RELATIONSHIP_SHORT: Record<'owner' | 'representative', string> = {
-  owner: 'Proprietário / Sócio Direto',
+  owner: 'Proprietário / Sócio Diretor',
   representative: 'Representante Comercial / Procurador',
 };
 

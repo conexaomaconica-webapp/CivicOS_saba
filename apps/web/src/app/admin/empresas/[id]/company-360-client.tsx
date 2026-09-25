@@ -1920,7 +1920,7 @@ export default function Company360Client({ initialData }: Props) {
                   <span className="text-stone-500 block font-bold">Tipo de Relação:</span>
                   <strong className="text-stone-900 font-bold block mt-0.5">
                     {data.masonic_link_detail.link_type === 'owner'
-                      ? 'Proprietário / Sócio Direto'
+                      ? 'Proprietário / Sócio Diretor'
                       : data.masonic_link_detail.link_type === 'equity_partner'
                         ? 'Sócio Cotista'
                         : data.masonic_link_detail.link_type === 'family_owner'
@@ -3839,7 +3839,7 @@ export default function Company360Client({ initialData }: Props) {
                   onChange={(e) => setMasonicLinkTypeInput(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14] font-semibold"
                 >
-                  <option value="owner">Proprietário / Sócio Direto</option>
+                  <option value="owner">Proprietário / Sócio Diretor</option>
                   <option value="equity_partner">Sócio Cotista</option>
                   <option value="family_owner">Empresa Familiar</option>
                   <option value="sales_representative">Representante Comercial</option>

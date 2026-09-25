@@ -7,7 +7,7 @@ import { validateName, validateEmail } from '@/lib/auth/validation';
 export type ResponsibleRelationship = 'owner' | 'representative';
 
 export const RESPONSIBLE_RELATIONSHIP_LABELS: Record<ResponsibleRelationship, string> = {
-  owner: 'Proprietário / Sócio Direto',
+  owner: 'Proprietário / Sócio Diretor',
   representative: 'Representante Comercial / Procurador',
 };
 
