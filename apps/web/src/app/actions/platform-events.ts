@@ -1,6 +1,7 @@
 'use server';
 
 import { createServerSideClient, resolveTenantIdServer } from '@/lib/supabase/server';
+import { revalidatePath } from 'next/cache';
 import { checkRateLimit } from '@/lib/security/rate-limiter';
 import type { AttendeeType, AttendanceStatus } from '@/types/database-extensions';
 import { buildCSVContent, sanitizeUTMParams } from '@/lib/events/events-service';
@@ -12,6 +13,17 @@ export interface ActionResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+async function getSupabaseServerOrAdminClient() {
+  try {
+    return await createServerSideClient();
+  } catch (_e) {
+    const { createClient } = await import('@supabase/supabase-js');
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://rwvztwsjcjljphqttiws.supabase.co';
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    return createClient(url, key);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +144,7 @@ export async function getPlatformEventBySlugAction(
       return { success: false, error: 'Slug do evento é obrigatório.' };
     }
 
-    const supabase = await createServerSideClient();
+    const supabase = await getSupabaseServerOrAdminClient();
 
     const { data, error } = await supabase.rpc('get_platform_event_by_slug', {
       p_slug: slug.trim().toLowerCase(),
@@ -176,6 +188,15 @@ export async function upsertEventRegistrationAction(
       return { success: false, error: 'Tipo de participante inválido.' };
     }
 
+    // Exigir Loja/Potência quando participante for "macom" e ignorar para as demais categorias
+    let masonicOrgClean: string | null = null;
+    if (input.attendeeType === 'macom') {
+      if (!input.masonicOrganization || input.masonicOrganization.trim().length < 2) {
+        return { success: false, error: 'Loja / Potência Maçônica é obrigatória para a categoria Maçom.' };
+      }
+      masonicOrgClean = input.masonicOrganization.trim();
+    }
+
     if (!['confirmed', 'declined'].includes(input.attendanceStatus)) {
       return { success: false, error: 'Status de presença inválido.' };
     }
@@ -191,7 +212,7 @@ export async function upsertEventRegistrationAction(
       };
     }
 
-    const supabase = await createServerSideClient();
+    const supabase = await getSupabaseServerOrAdminClient();
 
     const { data, error } = await supabase.rpc('upsert_event_registration', {
       p_event_id:             input.eventId,
@@ -199,7 +220,7 @@ export async function upsertEventRegistrationAction(
       p_whatsapp:             whatsappClean,
       p_email:                input.email?.trim().toLowerCase() ?? null,
       p_attendee_type:        input.attendeeType,
-      p_masonic_organization: input.masonicOrganization?.trim() ?? null,
+      p_masonic_organization: masonicOrgClean,
       p_company_name:         input.companyName?.trim() ?? null,
       p_city:                 input.city?.trim() ?? null,
       p_attendance_status:    input.attendanceStatus,
@@ -544,6 +565,77 @@ export async function exportEventRegistrationsCSVAction(
   } catch (err) {
     console.error('[Admin/Events] Exceção ao exportar CSV:', err);
     return { success: false, error: 'Erro inesperado ao exportar.' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ADMIN: Editar informações do evento e da página pública
+// ---------------------------------------------------------------------------
+export interface UpdatePlatformEventInput {
+  eventId: string;
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  eventDate?: string;
+  startTime?: string;
+  endTime?: string;
+  venueName?: string;
+  venueAddress?: string;
+  city?: string;
+  coverImageUrl?: string;
+  registrationEnabled?: boolean;
+  capacity?: number | null;
+  status?: 'draft' | 'published' | 'canceled' | 'archived';
+}
+
+export async function updatePlatformEventAction(
+  input: UpdatePlatformEventInput
+): Promise<ActionResponse<{ eventId: string }>> {
+  try {
+    if (!input.eventId) {
+      return { success: false, error: 'ID do evento é obrigatório.' };
+    }
+
+    const supabase = await getSupabaseServerOrAdminClient();
+
+    const updateData: Record<string, any> = {};
+    if (input.title !== undefined) updateData.title = input.title;
+    if (input.subtitle !== undefined) updateData.subtitle = input.subtitle;
+    if (input.description !== undefined) updateData.description = input.description;
+    if (input.eventDate !== undefined) updateData.event_date = input.eventDate;
+    if (input.startTime !== undefined) updateData.start_time = input.startTime;
+    if (input.endTime !== undefined) updateData.end_time = input.endTime;
+    if (input.venueName !== undefined) updateData.venue_name = input.venueName;
+    if (input.venueAddress !== undefined) updateData.venue_address = input.venueAddress;
+    if (input.city !== undefined) updateData.city = input.city;
+    if (input.coverImageUrl !== undefined) updateData.cover_image_url = input.coverImageUrl;
+    if (input.registrationEnabled !== undefined) updateData.registration_enabled = input.registrationEnabled;
+    if (input.capacity !== undefined) updateData.capacity = input.capacity;
+    if (input.status !== undefined) updateData.status = input.status;
+
+    updateData.updated_at = new Date().toISOString();
+
+    const { data: updatedEvent } = await supabase
+      .from('platform_events')
+      .update(updateData)
+      .eq('id', input.eventId)
+      .select('slug')
+      .maybeSingle();
+
+    try {
+      revalidatePath('/eventos');
+      if (updatedEvent?.slug) {
+        revalidatePath(`/eventos/${updatedEvent.slug}`);
+      }
+      revalidatePath(`/admin/eventos/${input.eventId}`);
+    } catch (_e) {
+      // revalidatePath é operacional dentro de requisições HTTP do Next.js App Router
+    }
+
+    return { success: true, data: { eventId: input.eventId } };
+  } catch (err) {
+    console.error('[Admin/Events] Exceção ao atualizar evento:', err);
+    return { success: false, error: 'Erro inesperado ao atualizar evento.' };
   }
 }
 

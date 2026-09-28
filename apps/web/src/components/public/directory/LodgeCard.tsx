@@ -77,7 +77,7 @@ export function LodgeCard({ data, variant: _variant = 'compact' }: LodgeCardProp
         {/* Avatar / Brasão da Loja */}
         <div className="absolute -bottom-5 left-4 w-14 h-14 rounded-2xl bg-white border-2 border-stone-100 shadow-md flex items-center justify-center overflow-hidden">
           {data.logo_url ? (
-            <img src={data.logo_url} alt={data.name} className="w-full h-full object-cover" />
+            <img src={data.logo_url} alt={data.name} className="w-full h-full object-contain p-1" />
           ) : (
             <Landmark className="w-7 h-7 text-[#3b0b14]" />
           )}

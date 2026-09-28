@@ -238,7 +238,7 @@ export function DirectoryMapExplore({ businesses = [], selectedCity }: Directory
 
           <div className="pt-3 border-t border-gray-100 mt-3">
             <Link
-              href="#todas"
+              href="/guia/empresas"
               className="w-full text-center block text-xs font-bold bg-amber-900 text-white py-2.5 rounded-xl hover:bg-amber-800 transition-colors shadow-2xs"
             >
               Ver todas as empresas da rede

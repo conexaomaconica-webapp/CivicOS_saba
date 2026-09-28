@@ -258,7 +258,7 @@ export function BusinessCard({
           <div className={`relative mb-2.5 flex items-end justify-between ${isFeatured ? '-mt-10' : '-mt-8'}`}>
             <div className={`rounded-2xl border-2 border-white bg-white shadow-md overflow-hidden shrink-0 ${isFeatured ? 'w-16 h-16' : 'w-14 h-14'}`}>
               {data.logo_url ? (
-                <img src={data.logo_url} alt={data.name} className="w-full h-full object-cover" />
+                <img src={data.logo_url} alt={data.name} className="w-full h-full object-contain p-1" />
               ) : (
                 <div className="w-full h-full bg-[#3b0b14] text-amber-400 font-bold flex items-center justify-center text-sm">
                   {data.name.slice(0, 2).toUpperCase()}

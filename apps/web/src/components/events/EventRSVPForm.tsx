@@ -256,19 +256,23 @@ export function EventRSVPForm({ event }: EventRSVPFormProps) {
               )}
             </div>
 
-            {/* Loja / Potência */}
-            <div className="rsvp-field">
-              <label htmlFor="rsvp-lodge" className="rsvp-label">Loja / Potência Maçônica</label>
-              <input
-                id="rsvp-lodge"
-                type="text"
-                placeholder="Ex.: Loja Virtude e Sabedoria — GOB"
-                value={formData.masonicOrganization}
-                onChange={(e) => updateField('masonicOrganization', e.target.value)}
-                className="rsvp-input"
-                disabled={isSubmitting}
-              />
-            </div>
+            {/* Loja / Potência — Exibido EXCLUSIVAMENTE quando selecionado "Maçom" */}
+            {formData.attendeeType === 'macom' && (
+              <div className="rsvp-field rsvp-field--masonic">
+                <label htmlFor="rsvp-lodge" className="rsvp-label">
+                  Loja / Potência Maçônica <span className="rsvp-required" aria-hidden="true">*</span>
+                </label>
+                <input
+                  id="rsvp-lodge"
+                  type="text"
+                  placeholder="Ex.: Loja Virtude e Sabedoria — GOB"
+                  value={formData.masonicOrganization}
+                  onChange={(e) => updateField('masonicOrganization', e.target.value)}
+                  className="rsvp-input"
+                  disabled={isSubmitting}
+                />
+              </div>
+            )}
 
             {/* Empresa / Profissão */}
             <div className="rsvp-field">
@@ -284,18 +288,45 @@ export function EventRSVPForm({ event }: EventRSVPFormProps) {
               />
             </div>
 
-            {/* Cidade */}
+            {/* Cidade com Seleção Rápida e Auto-sugestão */}
             <div className="rsvp-field">
-              <label htmlFor="rsvp-city" className="rsvp-label">Cidade</label>
+              <label htmlFor="rsvp-city" className="rsvp-label">Cidade / Município</label>
               <input
                 id="rsvp-city"
                 type="text"
-                placeholder="Ex.: Feira de Santana – BA"
+                list="rsvp-city-list"
+                placeholder="Selecione ou digite sua cidade (ex.: Feira de Santana - BA)"
                 value={formData.city}
                 onChange={(e) => updateField('city', e.target.value)}
                 className="rsvp-input"
                 disabled={isSubmitting}
               />
+              <datalist id="rsvp-city-list">
+                <option value="Feira de Santana - BA" />
+                <option value="Salvador - BA" />
+                <option value="Vitória da Conquista - BA" />
+                <option value="Camaçari - BA" />
+                <option value="Juazeiro - BA" />
+                <option value="Itabuna - BA" />
+                <option value="Ilhéus - BA" />
+                <option value="Lauro de Freitas - BA" />
+                <option value="Jequié - BA" />
+                <option value="Alagoinhas - BA" />
+                <option value="Barreiras - BA" />
+                <option value="Porto Seguro - BA" />
+                <option value="Simões Filho - BA" />
+                <option value="Paulo Afonso - BA" />
+                <option value="Santo Antônio de Jesus - BA" />
+                <option value="Serrinha - BA" />
+                <option value="Conceição do Coité - BA" />
+                <option value="Cruz das Almas - BA" />
+                <option value="Valença - BA" />
+                <option value="Brumado - BA" />
+                <option value="Guanambi - BA" />
+                <option value="Itapetinga - BA" />
+                <option value="Jacobina - BA" />
+                <option value="Senhor do Bonfim - BA" />
+              </datalist>
             </div>
           </fieldset>
 

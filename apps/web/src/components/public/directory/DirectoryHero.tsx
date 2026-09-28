@@ -161,9 +161,9 @@ export function DirectoryHero({
                       className="w-full p-3.5 flex items-center justify-between hover:bg-amber-50/80 transition-colors text-left group"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg border bg-amber-950 text-amber-400 font-bold flex items-center justify-center shrink-0 overflow-hidden text-xs">
+                        <div className={`w-10 h-10 rounded-lg border flex items-center justify-center shrink-0 overflow-hidden text-xs ${biz.logo_url ? 'bg-white border-stone-200' : 'bg-amber-950 text-amber-400 font-bold border-amber-900'}`}>
                           {biz.logo_url ? (
-                            <img src={biz.logo_url} alt={biz.name} className="w-full h-full object-cover" />
+                            <img src={biz.logo_url} alt={biz.name} className="w-full h-full object-contain p-0.5" />
                           ) : (
                             biz.name.slice(0, 2).toUpperCase()
                           )}

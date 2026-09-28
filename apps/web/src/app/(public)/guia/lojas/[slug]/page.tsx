@@ -156,7 +156,7 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             <div className="w-24 h-24 rounded-2xl bg-white p-2 shadow-xl shrink-0 overflow-hidden flex items-center justify-center border-2 border-amber-300">
               {lodge.logo_url ? (
-                <img src={lodge.logo_url} alt={lodge.name} className="w-full h-full object-cover rounded-xl" />
+                <img src={lodge.logo_url} alt={lodge.name} className="w-full h-full object-contain rounded-xl" />
               ) : (
                 <Landmark className="w-12 h-12 text-[#3b0b14]" />
               )}

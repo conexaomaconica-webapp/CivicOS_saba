@@ -155,12 +155,29 @@ const getPublicBusiness = cache(async (slug: string) => {
               .eq('is_public', true);
 
             if (bContacts && bContacts.length > 0) {
+              detailObj.contacts = bContacts;
               bContacts.forEach((c: any) => {
                 if (c.type === 'phone' && !detailObj.phone) detailObj.phone = c.value;
                 if (c.type === 'whatsapp' && !detailObj.whatsapp) detailObj.whatsapp = c.value;
                 if (c.type === 'email' && !detailObj.email) detailObj.email = c.value;
                 if (c.type === 'website' && !detailObj.website) detailObj.website = c.value;
+                if (c.type === 'youtube' && !detailObj.youtube) detailObj.youtube = c.value;
+                if (c.type === 'instagram' && !detailObj.instagram) detailObj.instagram = c.value;
+                if (c.type === 'facebook' && !detailObj.facebook) detailObj.facebook = c.value;
+                if (c.type === 'linkedin' && !detailObj.linkedin) detailObj.linkedin = c.value;
               });
+            }
+          } catch (_e) {}
+
+          try {
+            const { data: bMedia } = await (supabase as any)
+              .from('business_media')
+              .select('*')
+              .eq('business_id', bizId)
+              .order('display_order', { ascending: true });
+
+            if (bMedia && bMedia.length > 0) {
+              detailObj.media = bMedia;
             }
           } catch (_e) {}
         }

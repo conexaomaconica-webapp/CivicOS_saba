@@ -7,6 +7,7 @@ import {
 } from '@/app/actions/platform-events';
 import { AdminEventRegistrationsTable } from './page-client';
 import { EventRSVPDivulgacao } from '@/components/events/admin/EventRSVPDivulgacao';
+import { AdminEventHeaderActions } from '@/components/events/admin/AdminEventHeaderActions';
 import {
   Users, CheckCircle2, XCircle, CalendarCheck, Clock, Percent, ChevronLeft, ScanLine,
 } from 'lucide-react';
@@ -145,12 +146,26 @@ export default async function AdminEventDashboardPage({ params }: PageProps) {
               {event.venue_name ? ` · ${event.venue_name}` : ''}
             </p>
           </div>
-          <div className="evd-header-actions">
-            <Link href={`/admin/eventos/${id}/check-in`} className="evd-btn-checkin">
-              <ScanLine size={16} />
-              Recepção / Check-in
-            </Link>
-          </div>
+          <AdminEventHeaderActions
+            eventId={id}
+            event={{
+              id,
+              slug: event.slug,
+              title: event.title,
+              subtitle: (event as any).subtitle || null,
+              description: (event as any).description || null,
+              event_date: event.event_date,
+              start_time: event.start_time,
+              end_time: (event as any).end_time || null,
+              timezone: (event as any).timezone || 'America/Bahia',
+              venue_name: event.venue_name,
+              venue_address: (event as any).venue_address || null,
+              city: event.city,
+              cover_image_url: (event as any).cover_image_url || null,
+              registration_enabled: event.registration_enabled,
+              capacity: event.capacity,
+            }}
+          />
         </div>
       </div>
 

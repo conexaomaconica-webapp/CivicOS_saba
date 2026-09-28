@@ -33,7 +33,8 @@ export function DirectoryCategories({ categories = [], onCategorySelect }: Direc
     const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
     params.set('cat', catSlug);
     params.set('page', '1');
-    router.push(`${pathname}?${params.toString()}#todas`);
+    const targetPath = pathname === '/guia' || pathname === '/guia/' ? '/guia/empresas' : pathname;
+    router.push(`${targetPath}?${params.toString()}`);
   };
 
   return (
@@ -41,7 +42,7 @@ export function DirectoryCategories({ categories = [], onCategorySelect }: Direc
       {/* Botão 'Ver todas' alinhado à direita */}
       <div className="flex justify-end mb-4">
         <Link
-          href="/guia#todas"
+          href="/guia/empresas"
           className="text-xs font-bold text-amber-900 flex items-center gap-1 hover:underline bg-white/60 px-3 py-1.5 rounded-full border border-amber-900/10 shadow-2xs"
         >
           <span>Ver todas</span>

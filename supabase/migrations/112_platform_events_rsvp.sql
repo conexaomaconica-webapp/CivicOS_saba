@@ -479,37 +479,43 @@ BEGIN
     END IF;
 
     RETURN QUERY
+    WITH metrics AS (
+        SELECT
+            COUNT(*)::BIGINT                                                   AS total_registrations,
+            COUNT(*) FILTER (WHERE r.attendance_status = 'confirmed')::BIGINT  AS total_confirmed,
+            COUNT(*) FILTER (WHERE r.attendance_status = 'declined')::BIGINT   AS total_declined,
+            COUNT(*) FILTER (WHERE r.checked_in_at IS NOT NULL)::BIGINT        AS total_checkins
+        FROM public.event_registrations r
+        WHERE r.event_id = p_event_id
+    ),
+    types AS (
+        SELECT jsonb_object_agg(attendee_type, cnt) AS by_attendee_type
+        FROM (
+            SELECT attendee_type, COUNT(*)::BIGINT AS cnt
+            FROM public.event_registrations
+            WHERE event_id = p_event_id
+            GROUP BY attendee_type
+        ) t
+    ),
+    sources AS (
+        SELECT jsonb_object_agg(source, cnt) AS by_source
+        FROM (
+            SELECT COALESCE(source, 'direto') AS source, COUNT(*)::BIGINT AS cnt
+            FROM public.event_registrations
+            WHERE event_id = p_event_id
+            GROUP BY COALESCE(source, 'direto')
+        ) s
+    )
     SELECT
-        COUNT(*)                                          AS total_registrations,
-        COUNT(*) FILTER (WHERE r.attendance_status = 'confirmed')  AS total_confirmed,
-        COUNT(*) FILTER (WHERE r.attendance_status = 'declined')   AS total_declined,
-        COUNT(*) FILTER (WHERE r.checked_in_at IS NOT NULL)        AS total_checkins,
-        -- Por tipo de participante
-        jsonb_object_agg(
-            agg_type.attendee_type,
-            agg_type.cnt
-        ) FILTER (WHERE agg_type.attendee_type IS NOT NULL)        AS by_attendee_type,
-        -- Por origem
-        jsonb_object_agg(
-            COALESCE(agg_src.source, 'direto'),
-            agg_src.cnt
-        ) FILTER (WHERE agg_src.source IS NOT NULL OR agg_src.cnt > 0) AS by_source
-    FROM public.event_registrations r
-    -- Subquery para agrupamento por tipo
-    LEFT JOIN LATERAL (
-        SELECT attendee_type, COUNT(*)::BIGINT AS cnt
-        FROM public.event_registrations
-        WHERE event_id = p_event_id
-        GROUP BY attendee_type
-    ) agg_type ON true
-    -- Subquery para agrupamento por origem
-    LEFT JOIN LATERAL (
-        SELECT COALESCE(source, 'direto') AS source, COUNT(*)::BIGINT AS cnt
-        FROM public.event_registrations
-        WHERE event_id = p_event_id
-        GROUP BY COALESCE(source, 'direto')
-    ) agg_src ON true
-    WHERE r.event_id = p_event_id;
+        m.total_registrations,
+        m.total_confirmed,
+        m.total_declined,
+        m.total_checkins,
+        COALESCE(t.by_attendee_type, '{}'::jsonb),
+        COALESCE(s.by_source, '{}'::jsonb)
+    FROM metrics m
+    CROSS JOIN types t
+    CROSS JOIN sources s;
 END;
 $$;
 

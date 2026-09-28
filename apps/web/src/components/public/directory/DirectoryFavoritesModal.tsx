@@ -156,10 +156,10 @@ export function DirectoryFavoritesModal() {
               >
                 <div className="flex items-center gap-3">
                   <div className={`w-12 h-12 rounded-lg border font-bold flex items-center justify-center shrink-0 overflow-hidden text-xs ${
-                    biz.isUnavailable ? 'bg-stone-200 text-stone-500 border-stone-300' : 'bg-amber-950 text-amber-400 border-amber-900'
+                    biz.isUnavailable ? 'bg-stone-200 text-stone-500 border-stone-300' : biz.logo_url ? 'bg-white border-stone-200' : 'bg-amber-950 text-amber-400 border-amber-900'
                   }`}>
                     {biz.logo_url && !biz.isUnavailable ? (
-                      <img src={biz.logo_url} alt={biz.name} className="w-full h-full object-cover" />
+                      <img src={biz.logo_url} alt={biz.name} className="w-full h-full object-contain p-0.5" />
                     ) : (
                       biz.name.slice(0, 2).toUpperCase()
                     )}

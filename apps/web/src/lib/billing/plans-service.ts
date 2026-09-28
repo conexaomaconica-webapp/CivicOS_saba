@@ -10,6 +10,10 @@ export interface PlanFeature {
 
 export interface CommercialPlan {
   id: string;
+  code?: 'esquadro' | 'compasso' | 'acacia';
+  payInFullCents?: number;
+  installmentTotalCents?: number;
+  installmentValueCents?: number;
   tier: PlanTier;
   name: string;
   tagline: string;
@@ -45,11 +49,15 @@ export const CANONICAL_PLANS: Record<PlanTier, Omit<CommercialPlan, 'id'>> = {
   bronze: {
     tier: 'bronze',
     name: 'Plano Esquadro',
-    tagline: 'Entrada gratuita no Guia Maçônico',
+    code: 'esquadro',
+    tagline: 'Presença no Guia Maçônico Oficial',
     currency: 'BRL',
-    annualPriceCents: 0,
-    monthlyPriceCents: 0,
-    installmentsMax: 3,
+    payInFullCents: 60000,
+    installmentTotalCents: 63500,
+    annualPriceCents: 60000,
+    monthlyPriceCents: 5000,
+    installmentsMax: 2,
+    installmentValueCents: 31750,
     features: [
       { text: 'Presença básica no Guia Comercial', included: true },
       { text: 'Até 3 Fotos na Galeria', included: true },
@@ -60,13 +68,17 @@ export const CANONICAL_PLANS: Record<PlanTier, Omit<CommercialPlan, 'id'>> = {
   prata: {
     tier: 'prata',
     name: 'Plano Compasso',
+    code: 'compasso',
     tagline: 'Excelente visibilidade comercial e mídias',
     currency: 'BRL',
-    annualPriceCents: 178800,
-    monthlyPriceCents: 14900,
+    payInFullCents: 80000,
+    installmentTotalCents: 85500,
+    annualPriceCents: 80000,
+    monthlyPriceCents: 6667,
     badge: 'Mais Escolhido',
     isPopular: true,
-    installmentsMax: 6,
+    installmentsMax: 3,
+    installmentValueCents: 28500,
     features: [
       { text: 'Destaque no Guia Comercial', included: true },
       { text: 'Até 6 Fotos na Galeria', included: true },
@@ -79,12 +91,16 @@ export const CANONICAL_PLANS: Record<PlanTier, Omit<CommercialPlan, 'id'>> = {
   ouro: {
     tier: 'ouro',
     name: 'Plano Acácia',
+    code: 'acacia',
     tagline: 'Máxima presença, topo do guia e analytics',
     currency: 'BRL',
-    annualPriceCents: 238800,
-    monthlyPriceCents: 19900,
+    payInFullCents: 100000,
+    installmentTotalCents: 108000,
+    annualPriceCents: 100000,
+    monthlyPriceCents: 8333,
     badge: 'Máxima Visibilidade',
-    installmentsMax: 12,
+    installmentsMax: 4,
+    installmentValueCents: 27000,
     features: [
       { text: 'Topo das Buscas e Maior Destaque', included: true },
       { text: 'Até 10 Fotos na Galeria', included: true },
@@ -173,9 +189,24 @@ export function getCanonicalDefaultLimit(planCode: string, featureCode: string):
 }
 
 export function getCommercialPlanName(planCode: string): string {
-  const normalized = (planCode || '').toLowerCase().trim();
-  if (['ouro', 'gold', 'acacia', 'acácia', 'ouro_founder'].includes(normalized)) return 'Acácia';
-  if (['prata', 'silver', 'compasso'].includes(normalized)) return 'Compasso';
+  const code = normalizeCanonicalPlanCode(planCode);
+  if (code === 'acacia') return 'Acácia';
+  if (code === 'compasso') return 'Compasso';
   return 'Esquadro';
+}
+
+export function normalizeCanonicalPlanCode(planCode: string | null | undefined): 'esquadro' | 'compasso' | 'acacia' {
+  if (!planCode) return 'esquadro';
+  const norm = planCode.toLowerCase().trim();
+  if (['ouro', 'gold', 'acacia', 'acácia', 'ouro_founder'].includes(norm)) return 'acacia';
+  if (['prata', 'silver', 'compasso'].includes(norm)) return 'compasso';
+  return 'esquadro';
+}
+
+export function getCanonicalPlanByCode(planCode: string | null | undefined): Omit<CommercialPlan, 'id'> {
+  const code = normalizeCanonicalPlanCode(planCode);
+  if (code === 'acacia') return CANONICAL_PLANS.ouro;
+  if (code === 'compasso') return CANONICAL_PLANS.prata;
+  return CANONICAL_PLANS.bronze;
 }
 

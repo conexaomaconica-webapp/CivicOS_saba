@@ -20,6 +20,9 @@ import {
   Send,
   Eye,
   Download,
+  Copy,
+  ExternalLink,
+  Link2,
 } from 'lucide-react';
 import {
   ApprovalDossier360,
@@ -28,6 +31,7 @@ import {
   validateMasonicLinkAction,
   requestBusinessCorrectionAction,
   finalizeApprovalDecisionAction,
+  approveEligibilityAndGenerateLinkAction,
 } from '@/lib/admin/admin-approval-service';
 
 interface Props {
@@ -59,6 +63,36 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
 
   // Modal State para Pré-visualização do Anúncio Público
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+
+  // State para Link Individual Seguro de Adesão
+  const [onboardingLink, setOnboardingLink] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const handleApproveEligibilityAndGenerateLink = async () => {
+    setLoading(true);
+    setMessage(null);
+    try {
+      const res = await approveEligibilityAndGenerateLinkAction(dossier.business_id);
+      if (res.success && res.onboardingUrl) {
+        setOnboardingLink(res.onboardingUrl);
+        setMessage({ type: 'success', text: 'Elegibilidade Aprovada com Sucesso! Link individual e seguro de adesão gerado.' });
+      } else {
+        setMessage({ type: 'error', text: res.error || 'Falha ao aprovar elegibilidade e gerar link.' });
+      }
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Erro inesperado.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (onboardingLink) {
+      navigator.clipboard.writeText(onboardingLink);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
+  };
 
   // Salvar Edição da Empresa Pré-Aprovação
   const handleSaveCompanyData = async (e: React.FormEvent) => {
@@ -268,8 +302,58 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
           </div>
         )}
 
+        {/* LINK INDIVIDUAL DE ADESÃO GERADO */}
+        {onboardingLink && (
+          <div className="bg-amber-500/10 border border-amber-500/40 rounded-xl p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                <Link2 className="w-4 h-4 text-amber-400" />
+                Link Individual de Adesão Comercial Gerado:
+              </span>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30">
+                Ativo & Seguro
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                readOnly
+                value={onboardingLink}
+                className="flex-1 bg-stone-950/80 border border-stone-700/80 rounded-lg px-3 py-2 text-xs text-amber-200 font-mono select-all focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs rounded-lg flex items-center gap-1.5 transition-all"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>{copiedLink ? 'Copiado!' : 'Copiar Link'}</span>
+              </button>
+              <a
+                href={onboardingLink}
+                target="_blank"
+                rel="noreferrer"
+                className="p-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg border border-stone-700"
+                title="Abrir jornada em nova aba"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+        )}
+
         {/* AÇÕES EXECUTIVAS DIRETAS (DESKTOP) */}
         <div className="hidden lg:flex items-center justify-end gap-3 pt-2">
+          <button
+            type="button"
+            onClick={handleApproveEligibilityAndGenerateLink}
+            disabled={loading}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+            <span>Aprovar Elegibilidade & Gerar Link</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setShowPreviewModal(true)}

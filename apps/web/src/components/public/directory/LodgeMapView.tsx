@@ -42,7 +42,7 @@ export function LodgeMapView({ items }: LodgeMapViewProps) {
             >
               <div className="w-10 h-10 rounded-xl bg-white border border-stone-200 shadow-2xs flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
                 {lodge.logo_url ? (
-                  <img src={lodge.logo_url} alt={lodge.name} className="w-full h-full object-cover" />
+                  <img src={lodge.logo_url} alt={lodge.name} className="w-full h-full object-contain p-0.5" />
                 ) : (
                   <Landmark className="w-5 h-5 text-[#3b0b14]" />
                 )}

@@ -332,8 +332,9 @@ export function toPublicBusinessPresentation(
   const rawMedia = records(row.media)
     .map((item): PublicMediaAsset | null => {
       const url = text(item.url, 512);
-      const type = text(item.media_type, 24);
-      if (!url || (type !== 'image' && type !== 'video')) return null;
+      const rawType = text(item.media_type, 24)?.toLowerCase() || 'image';
+      const type: 'image' | 'video' = rawType === 'video' ? 'video' : 'image';
+      if (!url) return null;
       const focal = (item as any).focal_position || (item as any).focalPosition;
       const objPos = text((item as any).object_position || (item as any).objectPosition, 60);
       return {
@@ -349,8 +350,8 @@ export function toPublicBusinessPresentation(
     .filter((item): item is PublicMediaAsset => item !== null);
 
   const contact = (kind: string) => {
-    const item = contacts.find((candidate) => text(candidate.type, 40) === kind);
-    return item ? text(item.value, 512) : null;
+    const item = contacts.find((candidate) => text(candidate.type, 40)?.toLowerCase() === kind.toLowerCase());
+    return (item ? text(item.value, 512) : null) || text((row as any)[kind], 512) || null;
   };
 
   const images = rawMedia.filter((item) => item.type === 'image');

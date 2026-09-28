@@ -80,9 +80,9 @@ export function BusinessMapView({ items }: BusinessMapViewProps) {
             <div className="absolute bottom-6 left-6 right-6 bg-white rounded-2xl p-4 border border-stone-300 shadow-2xl z-30 animate-in slide-in-from-bottom duration-300 text-left">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl border bg-amber-950 text-amber-400 font-bold flex items-center justify-center shrink-0 overflow-hidden text-xs">
+                  <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 overflow-hidden text-xs ${selectedBiz.logo_url ? 'bg-white border-stone-200' : 'bg-amber-950 border-amber-900 text-amber-400 font-bold'}`}>
                     {selectedBiz.logo_url ? (
-                      <img src={selectedBiz.logo_url} alt={selectedBiz.name} className="w-full h-full object-cover" />
+                      <img src={selectedBiz.logo_url} alt={selectedBiz.name} className="w-full h-full object-contain p-0.5" />
                     ) : (
                       selectedBiz.name.slice(0, 2).toUpperCase()
                     )}

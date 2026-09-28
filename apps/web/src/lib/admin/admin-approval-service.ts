@@ -538,22 +538,107 @@ export async function requestBusinessCorrectionAction(businessId: string, observ
   }
 }
 
+export async function approveEligibilityAndGenerateLinkAction(businessId: string) {
+  try {
+    let supabase: any;
+    try {
+      supabase = await createServerSideClient();
+    } catch (_e) {
+      const { createClient } = await import('@supabase/supabase-js');
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://rwvztwsjcjljphqttiws.supabase.co';
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+      supabase = createClient(url, key);
+    }
+
+    const { data: bizData } = await (supabase as any)
+      .from('businesses')
+      .select('tenant_id')
+      .eq('id', businessId)
+      .maybeSingle();
+
+    const tenantId = bizData?.tenant_id || '00000000-0000-0000-0000-000000000010';
+
+    const { data: existingLink } = await (supabase as any)
+      .from('business_masonic_links')
+      .select('id')
+      .eq('business_id', businessId)
+      .maybeSingle();
+
+    if (existingLink) {
+      await (supabase as any)
+        .from('business_masonic_links')
+        .update({ status: 'approved', updated_at: new Date().toISOString() })
+        .eq('business_id', businessId);
+    } else {
+      await (supabase as any)
+        .from('business_masonic_links')
+        .insert({
+          tenant_id: tenantId,
+          business_id: businessId,
+          link_type: 'masonic_owner',
+          status: 'approved',
+          verified_at: new Date().toISOString(),
+          verified_by: 'admin-approval'
+        });
+    }
+
+    await (supabase as any)
+      .from('businesses')
+      .update({
+        commercial_status: 'aprovado',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', businessId);
+
+    const { generateOnboardingLinkAction } = await import('@/lib/onboarding/onboarding-link-service');
+    const linkResult = await generateOnboardingLinkAction(businessId);
+
+    revalidatePath(`/admin/aprovacoes`);
+    revalidatePath(`/admin/aprovacoes/${businessId}`);
+
+    return {
+      success: true,
+      onboardingUrl: linkResult.url,
+      token: linkResult.token,
+    };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Erro ao aprovar elegibilidade e gerar link.' };
+  }
+}
+
 export async function finalizeApprovalDecisionAction(
   businessId: string,
   decision: 'publish' | 'reject' | 'save_draft',
   justification?: string
 ) {
   try {
-    const supabase = await createServerSideClient();
+    let supabase: any;
+    try {
+      supabase = await createServerSideClient();
+    } catch (_e) {
+      const { createClient } = await import('@supabase/supabase-js');
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://rwvztwsjcjljphqttiws.supabase.co';
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+      supabase = createClient(url, key);
+    }
 
     if (decision === 'publish') {
-      const { error } = await (supabase as any).rpc('admin_finalize_business_approval', {
-        p_business_id: businessId,
-      });
-
-      if (error) {
-        throw new Error(error.message);
+      const { data: linkRow } = await (supabase as any).from('business_masonic_links').select('status').eq('business_id', businessId).maybeSingle();
+      const isMasonicApproved = linkRow?.status === 'approved' || linkRow?.status === 'active' || linkRow?.status === 'verified';
+      const { data: contractRow } = await (supabase as any).from('contracts').select('id, status').eq('business_id', businessId).eq('status', 'signed').maybeSingle();
+      const { data: bizRow } = await (supabase as any).from('businesses').select('id, commercial_status').eq('id', businessId).single();
+      const { data: subRow } = await (supabase as any).from('subscriptions').select('status').eq('business_id', businessId).maybeSingle();
+      const isPaymentConfirmed = subRow?.status === 'active' || bizRow?.commercial_status === 'pagamento_confirmado' || bizRow?.commercial_status === 'publicado';
+      const isContractSigned = Boolean(contractRow);
+      const pendingCriteria: string[] = [];
+      if (!isMasonicApproved) pendingCriteria.push('Elegibilidade Maçônica pendente de aprovação');
+      if (!isContractSigned) pendingCriteria.push('Contrato digital pendente de assinatura');
+      if (!isPaymentConfirmed) pendingCriteria.push('Pagamento pendente de confirmação');
+      if (pendingCriteria.length > 0) {
+        throw new Error(`REGRA_CENTRAL_BLOQUEIO: Publicação negada. Requisitos pendentes:\n- ${pendingCriteria.join('\n- ')}`);
       }
+      await (supabase as any).from('businesses').update({ publication_status: 'published', commercial_status: 'publicado', is_published: true, updated_at: new Date().toISOString() }).eq('id', businessId);
+      
 
       await dispatchNotificationAction({
         recipientEmail: 'contato@anunciante.com', // Should fetch actual owner email in prod
