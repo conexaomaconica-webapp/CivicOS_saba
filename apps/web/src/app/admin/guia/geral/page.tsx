@@ -41,6 +41,7 @@ export default function AdminGuiaGeralPage() {
   const [heroSearchPlaceholder, setHeroSearchPlaceholder] = useState('Pergunte à busca inteligente...');
   const [defaultPageSize, setDefaultPageSize] = useState(12);
   const [sections, setSections] = useState<SectionConfig[]>(DEFAULT_SECTIONS);
+  const [sponsoredDisplayMode, setSponsoredDisplayMode] = useState<'cards' | 'logos'>('cards');
 
   useEffect(() => {
     async function loadSettings() {
@@ -60,6 +61,9 @@ export default function AdminGuiaGeralPage() {
           if (data.hero_subtitle) setHeroSubtitle(data.hero_subtitle);
           if (data.hero_search_placeholder) setHeroSearchPlaceholder(data.hero_search_placeholder);
           if (data.default_page_size) setDefaultPageSize(data.default_page_size);
+          if (data.sponsored_display_mode === 'logos' || data.sponsored_display_mode === 'cards') {
+            setSponsoredDisplayMode(data.sponsored_display_mode);
+          }
           if (Array.isArray(data.sections_config) && data.sections_config.length > 0) {
             setSections(data.sections_config as SectionConfig[]);
           }
@@ -102,6 +106,7 @@ export default function AdminGuiaGeralPage() {
         hero_search_placeholder: heroSearchPlaceholder,
         default_page_size: defaultPageSize,
         sections_config: sections,
+        sponsored_display_mode: sponsoredDisplayMode,
       });
 
       if (!res.success) throw new Error(res.error);
@@ -179,6 +184,72 @@ export default function AdminGuiaGeralPage() {
               onChange={(e) => setDefaultPageSize(parseInt(e.target.value) || 12)}
               className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-amber-800"
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Formato de Exibição de Empresas Patrocinadas */}
+      <div className="bg-white p-6 rounded-lg border shadow-sm space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-lg font-bold text-gray-900">Formato de Exibição de Empresas Patrocinadas</h2>
+          <p className="text-xs text-gray-500">Escolha como o bloco de empresas patrocinadas/destacadas será apresentado na página principal pública do Guia.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div
+            onClick={() => setSponsoredDisplayMode('cards')}
+            className={`p-4 border-2 rounded-xl cursor-pointer transition-all flex items-start gap-3 ${
+              sponsoredDisplayMode === 'cards'
+                ? 'border-amber-700 bg-amber-50/60 text-amber-950 shadow-sm'
+                : 'border-gray-200 hover:border-gray-300 bg-white text-gray-700'
+            }`}
+          >
+            <input
+              type="radio"
+              name="sponsoredDisplayMode"
+              checked={sponsoredDisplayMode === 'cards'}
+              onChange={() => setSponsoredDisplayMode('cards')}
+              className="mt-1 accent-amber-800"
+            />
+            <div>
+              <div className="font-bold text-sm flex items-center gap-2">
+                <span>🎴 Cards Completos</span>
+                {sponsoredDisplayMode === 'cards' && (
+                  <span className="text-[10px] bg-amber-800 text-white px-2 py-0.5 rounded-full font-semibold">Ativo</span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Exibe as empresas em grade de 3 colunas com cards completos (imagem de capa, descrição, endereço e categorias).
+              </p>
+            </div>
+          </div>
+
+          <div
+            onClick={() => setSponsoredDisplayMode('logos')}
+            className={`p-4 border-2 rounded-xl cursor-pointer transition-all flex items-start gap-3 ${
+              sponsoredDisplayMode === 'logos'
+                ? 'border-amber-700 bg-amber-50/60 text-amber-950 shadow-sm'
+                : 'border-gray-200 hover:border-gray-300 bg-white text-gray-700'
+            }`}
+          >
+            <input
+              type="radio"
+              name="sponsoredDisplayMode"
+              checked={sponsoredDisplayMode === 'logos'}
+              onChange={() => setSponsoredDisplayMode('logos')}
+              className="mt-1 accent-amber-800"
+            />
+            <div>
+              <div className="font-bold text-sm flex items-center gap-2">
+                <span>♾️ Logomarcas em Loop Infinito</span>
+                {sponsoredDisplayMode === 'logos' && (
+                  <span className="text-[10px] bg-amber-800 text-white px-2 py-0.5 rounded-full font-semibold">Ativo</span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Exibe uma barra elegante e contínua apenas com as logomarcas e nomes deslizando em loop infinito com efeito hover.
+              </p>
+            </div>
           </div>
         </div>
       </div>

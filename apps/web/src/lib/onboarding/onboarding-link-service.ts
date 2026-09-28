@@ -195,7 +195,7 @@ export async function validateAndGetOnboardingLinkAction(token: string): Promise
     throw new Error('LINK_EXPIRADO: Este link de adesão expirou ou foi revogado. Solicite um novo reenvio no suporte.');
   }
 
-  const rawPlanCode = biz.plan_code || biz.plan_tier || 'esquadro';
+  const rawPlanCode = (biz as any).plan_code || biz.plan_tier || 'esquadro';
   const planCode = normalizeCanonicalPlanCode(rawPlanCode);
   const planInfo = getCanonicalPlanByCode(planCode);
 

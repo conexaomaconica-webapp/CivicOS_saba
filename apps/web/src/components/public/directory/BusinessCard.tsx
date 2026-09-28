@@ -256,9 +256,9 @@ export function BusinessCard({
         <div>
           {/* Logo sobreposta */}
           <div className={`relative mb-2.5 flex items-end justify-between ${isFeatured ? '-mt-10' : '-mt-8'}`}>
-            <div className={`rounded-2xl border-2 border-white bg-white shadow-md overflow-hidden shrink-0 ${isFeatured ? 'w-16 h-16' : 'w-14 h-14'}`}>
+            <div className={`rounded-xl border-2 border-white bg-white shadow-md overflow-hidden shrink-0 flex items-center justify-center p-1 ${isFeatured ? 'w-16 h-16' : 'w-14 h-14'}`}>
               {data.logo_url ? (
-                <img src={data.logo_url} alt={data.name} className="w-full h-full object-contain p-1" />
+                <img src={data.logo_url} alt={data.name} className="max-w-full max-h-full object-contain object-center p-0.5" />
               ) : (
                 <div className="w-full h-full bg-[#3b0b14] text-amber-400 font-bold flex items-center justify-center text-sm">
                   {data.name.slice(0, 2).toUpperCase()}

@@ -9,6 +9,7 @@ export type DirectoryHomeSettingsInput = {
   hero_search_placeholder: string;
   default_page_size: number;
   sections_config: Array<{ id: string; enabled: boolean; order: number }>;
+  sponsored_display_mode?: 'cards' | 'logos';
 };
 
 export async function saveDirectoryHomeSettingsAction(input: DirectoryHomeSettingsInput) {
@@ -36,6 +37,7 @@ export async function saveDirectoryHomeSettingsAction(input: DirectoryHomeSettin
       hero_search_placeholder: input.hero_search_placeholder,
       default_page_size: input.default_page_size,
       sections_config: input.sections_config,
+      sponsored_display_mode: input.sponsored_display_mode || 'cards',
       updated_at: new Date().toISOString(),
     };
 

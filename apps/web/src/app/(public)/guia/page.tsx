@@ -206,6 +206,7 @@ export default async function GuiaPage({ searchParams }: Props) {
   };
 
   const settings = homeData.settings || {};
+  const sponsoredDisplayMode: 'cards' | 'logos' = settings.sponsored_display_mode === 'logos' ? 'logos' : 'cards';
   let banners = (homeData.banners as DirectoryBannerItem[]) || [];
   let categories = (homeData.categories as DirectoryCategoryItem[]) || [];
   let sponsored = (homeData.sponsored as DirectorySponsoredItem[]) || [];
@@ -362,7 +363,7 @@ export default async function GuiaPage({ searchParams }: Props) {
         <SectionDivider />
 
         {/* Empresas Patrocinadas */}
-        <DirectorySponsored items={sponsored} />
+        <DirectorySponsored items={sponsored} displayMode={sponsoredDisplayMode} />
 
         <SectionDivider />
 

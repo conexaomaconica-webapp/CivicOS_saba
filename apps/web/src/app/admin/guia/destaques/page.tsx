@@ -41,6 +41,8 @@ export default function AdminGuiaDestaquesPage() {
   const [priority, setPriority] = useState(100);
   const [city, setCity] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [sponsoredDisplayMode, setSponsoredDisplayMode] = useState<'cards' | 'logos'>('cards');
+  const [updatingMode, setUpdatingMode] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -67,10 +69,41 @@ export default function AdminGuiaDestaquesPage() {
         .order('priority', { ascending: false });
 
       setSponsoredList((spData as SponsoredBusiness[]) || []);
+
+      const { data: settingsData } = await (supabase as any)
+        .from('directory_home_settings')
+        .select('sponsored_display_mode')
+        .eq('tenant_id', tid)
+        .maybeSingle();
+
+      if (settingsData?.sponsored_display_mode === 'logos' || settingsData?.sponsored_display_mode === 'cards') {
+        setSponsoredDisplayMode(settingsData.sponsored_display_mode);
+      }
     } catch (err) {
       console.error('Erro ao buscar empresas patrocinadas:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleDisplayMode = async (mode: 'cards' | 'logos') => {
+    if (!tenantId) return;
+    setUpdatingMode(true);
+    try {
+      const supabase = createClient();
+      await (supabase as any)
+        .from('directory_home_settings')
+        .upsert(
+          { tenant_id: tenantId, sponsored_display_mode: mode, updated_at: new Date().toISOString() },
+          { onConflict: 'tenant_id' }
+        );
+      setSponsoredDisplayMode(mode);
+      setSuccessMsg(`Formato de exibição atualizado para: ${mode === 'cards' ? 'Cards Completos' : 'Logomarcas em Loop Infinito'}.`);
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err) {
+      console.error('Erro ao salvar formato:', err);
+    } finally {
+      setUpdatingMode(false);
     }
   };
 
@@ -172,6 +205,47 @@ export default function AdminGuiaDestaquesPage() {
         >
           <Plus className="w-4 h-4" /> Destacar Empresa
         </button>
+      </div>
+
+      {/* Formato de Exibição na Página Inicial */}
+      <div className="bg-amber-50/70 border border-amber-200/80 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-bold text-amber-950 flex items-center gap-2">
+            <span>⚙️ Formato Exibido na Home Pública</span>
+            {updatingMode && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-900" />}
+          </h3>
+          <p className="text-xs text-amber-900/80 mt-0.5">
+            Defina se as empresas patrocinadas aparecem em formato de Cards Completos ou apenas Logomarcas em Loop.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            disabled={updatingMode}
+            onClick={() => handleToggleDisplayMode('cards')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+              sponsoredDisplayMode === 'cards'
+                ? 'bg-amber-900 text-white border-amber-900 shadow-sm'
+                : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+            }`}
+          >
+            🎴 Cards Completos
+          </button>
+
+          <button
+            type="button"
+            disabled={updatingMode}
+            onClick={() => handleToggleDisplayMode('logos')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+              sponsoredDisplayMode === 'logos'
+                ? 'bg-amber-900 text-white border-amber-900 shadow-sm'
+                : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+            }`}
+          >
+            ♾️ Logomarcas em Loop
+          </button>
+        </div>
       </div>
 
       {/* Lista */}

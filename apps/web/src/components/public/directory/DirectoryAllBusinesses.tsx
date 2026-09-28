@@ -249,9 +249,9 @@ export function DirectoryAllBusinesses({
           {items.map((biz) => (
             <div key={biz.id} className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:shadow-sm transition-shadow">
               <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 overflow-hidden ${biz.logo_url ? 'bg-white border-stone-200' : 'bg-amber-950 text-amber-400 font-bold border-amber-900'}`}>
+                <div className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 overflow-hidden p-1 ${biz.logo_url ? 'bg-white border-stone-200' : 'bg-amber-950 text-amber-400 font-bold border-amber-900'}`}>
                   {biz.logo_url ? (
-                    <img src={biz.logo_url} alt={biz.name} className="w-full h-full object-contain p-0.5" />
+                    <img src={biz.logo_url} alt={biz.name} className="max-w-full max-h-full object-contain object-center bg-white" />
                   ) : (
                     biz.name.slice(0, 2).toUpperCase()
                   )}

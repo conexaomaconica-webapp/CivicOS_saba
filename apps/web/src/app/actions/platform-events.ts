@@ -639,5 +639,128 @@ export async function updatePlatformEventAction(
   }
 }
 
+export interface CreatePlatformEventInput {
+  title: string;
+  subtitle?: string;
+  description?: string;
+  eventDate: string;
+  startTime: string;
+  endTime?: string;
+  venueName?: string;
+  venueAddress?: string;
+  city?: string;
+  coverImageUrl?: string;
+  registrationEnabled?: boolean;
+  capacity?: number | null;
+  status?: 'draft' | 'published' | 'canceled' | 'archived';
+}
+
+function slugifyTitle(text: string): string {
+  const base = text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '');
+  const suffix = Math.random().toString(36).substring(2, 6);
+  return `${base || 'evento'}-${suffix}`;
+}
+
+export async function createPlatformEventAction(
+  input: CreatePlatformEventInput
+): Promise<ActionResponse<{ eventId: string; slug: string }>> {
+  try {
+    if (!input.title?.trim()) {
+      return { success: false, error: 'Título do evento é obrigatório.' };
+    }
+    if (!input.eventDate) {
+      return { success: false, error: 'Data do evento é obrigatória.' };
+    }
+    if (!input.startTime) {
+      return { success: false, error: 'Horário de início é obrigatório.' };
+    }
+
+    const supabase = await getSupabaseServerOrAdminClient();
+    const tenantId = await resolveTenantIdServer();
+    const slug = slugifyTitle(input.title);
+
+    const { data: newEvent, error } = await (supabase as any)
+      .from('platform_events')
+      .insert({
+        tenant_id: tenantId,
+        slug,
+        title: input.title.trim(),
+        subtitle: input.subtitle?.trim() || null,
+        description: input.description?.trim() || null,
+        event_date: input.eventDate,
+        start_time: input.startTime,
+        end_time: input.endTime || null,
+        venue_name: input.venueName?.trim() || null,
+        venue_address: input.venueAddress?.trim() || null,
+        city: input.city?.trim() || null,
+        cover_image_url: input.coverImageUrl?.trim() || null,
+        registration_enabled: input.registrationEnabled ?? true,
+        capacity: input.capacity !== undefined && input.capacity !== null ? input.capacity : null,
+        status: input.status || 'published',
+      })
+      .select('id, slug')
+      .single();
+
+    if (error || !newEvent) {
+      console.error('[Admin/Events] Erro ao criar evento:', error);
+      return { success: false, error: error?.message || 'Não foi possível criar o evento.' };
+    }
+
+    try {
+      revalidatePath('/admin/eventos');
+      revalidatePath('/eventos');
+    } catch (_e) {}
+
+    return { success: true, data: { eventId: newEvent.id, slug: newEvent.slug } };
+  } catch (err) {
+    console.error('[Admin/Events] Exceção ao criar evento:', err);
+    return { success: false, error: 'Erro inesperado ao criar evento.' };
+  }
+}
+
+export async function deletePlatformEventAction(
+  eventId: string
+): Promise<ActionResponse<{ eventId: string }>> {
+  try {
+    if (!eventId) {
+      return { success: false, error: 'ID do evento é obrigatório.' };
+    }
+
+    const supabase = await getSupabaseServerOrAdminClient();
+
+    // 1. Apaga inscrições relacionadas
+    try {
+      await (supabase as any).from('event_registrations').delete().eq('event_id', eventId);
+    } catch (_e) {}
+
+    // 2. Apaga o evento
+    const { error } = await (supabase as any)
+      .from('platform_events')
+      .delete()
+      .eq('id', eventId);
+
+    if (error) {
+      console.error('[Admin/Events] Erro ao excluir evento:', error);
+      return { success: false, error: error.message || 'Não foi possível excluir o evento.' };
+    }
+
+    try {
+      revalidatePath('/admin/eventos');
+      revalidatePath('/eventos');
+    } catch (_e) {}
+
+    return { success: true, data: { eventId } };
+  } catch (err) {
+    console.error('[Admin/Events] Exceção ao excluir evento:', err);
+    return { success: false, error: 'Erro inesperado ao excluir evento.' };
+  }
+}
+
 // Re-export for convenience
 export { sanitizeUTMParams };
+

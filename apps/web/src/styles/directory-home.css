@@ -548,3 +548,28 @@
   .dh-header__mobile-actions { gap: 4px; }
   .dh-header__icon-btn { padding: 7px; }
 }
+
+/* ============================================================================
+   INFINITE SPONSORED LOGO MARQUEE
+   ============================================================================ */
+@keyframes logoMarqueeLoop {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.dh-logo-marquee-track {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: max-content;
+  animation: logoMarqueeLoop 30s linear infinite;
+  will-change: transform;
+}
+
+.dh-logo-marquee-track:hover {
+  animation-play-state: paused;
+}

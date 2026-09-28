@@ -117,9 +117,9 @@ export function BusinessListCard({ data, onViewOnMap }: BusinessListCardProps) {
     <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-2xs hover:shadow-md transition-all flex flex-col md:flex-row gap-5 items-start md:items-center justify-between group">
       {/* Esquerda: Logo e Imagem */}
       <div className="flex items-center gap-4 shrink-0 w-full md:w-auto">
-        <div className={`relative w-16 h-16 rounded-2xl border border-stone-200 flex items-center justify-center overflow-hidden shrink-0 shadow-xs ${data.logo_url ? 'bg-white' : 'bg-amber-950 text-amber-400 font-bold'}`}>
+        <div className={`relative w-16 h-16 rounded-xl border border-stone-200 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-xs p-1.5 ${data.logo_url ? 'bg-white' : 'bg-amber-950 text-amber-400 font-bold'}`}>
           {data.logo_url ? (
-            <img src={data.logo_url} alt={data.name} className="w-full h-full object-contain p-1" />
+            <img src={data.logo_url} alt={data.name} className="max-w-full max-h-full object-contain object-center bg-white" />
           ) : (
             <span className="text-base">{data.name.slice(0, 2).toUpperCase()}</span>
           )}

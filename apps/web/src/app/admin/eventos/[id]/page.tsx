@@ -9,7 +9,7 @@ import { AdminEventRegistrationsTable } from './page-client';
 import { EventRSVPDivulgacao } from '@/components/events/admin/EventRSVPDivulgacao';
 import { AdminEventHeaderActions } from '@/components/events/admin/AdminEventHeaderActions';
 import {
-  Users, CheckCircle2, XCircle, CalendarCheck, Clock, Percent, ChevronLeft, ScanLine,
+  Users, CheckCircle2, XCircle, CalendarCheck, Clock, Percent, ChevronLeft,
 } from 'lucide-react';
 
 import { notFound } from 'next/navigation';

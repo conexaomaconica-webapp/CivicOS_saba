@@ -24,10 +24,10 @@ export function PublicShell({
   viewer,
 }: PublicShellProps) {
   const pathname = usePathname();
-  const isGuia = pathname?.startsWith('/guia');
+  const isGuiaOrLegal = pathname?.startsWith('/guia') || pathname === '/privacidade' || pathname === '/termos';
 
-  const renderHeader = showHeader && !isGuia;
-  const renderFooter = showFooter && !isGuia;
+  const renderHeader = showHeader && !isGuiaOrLegal;
+  const renderFooter = showFooter && !isGuiaOrLegal;
 
   return (
     <div className="cm-public-shell">

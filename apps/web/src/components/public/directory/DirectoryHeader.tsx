@@ -102,15 +102,15 @@ export function DirectoryHeader({
         <div className="dh-header__actions hidden md:flex items-center gap-3">
           {/* Seletor de Cidade */}
           <div className="dh-city-dropdown">
-            <MapPin className="w-4 h-4 text-amber-400 shrink-0" />
+            <MapPin className="w-4 h-4 text-[#C9A227] shrink-0" />
             <select
               value={activeCity || ''}
               onChange={(e) => handleCityChange(e.target.value)}
               className="bg-transparent text-white border-none outline-none font-semibold cursor-pointer text-xs pr-1"
             >
-              <option value="" className="bg-amber-950 text-white">Todas as Cidades</option>
+              <option value="" className="bg-[#2b060d] text-white">Todas as Cidades</option>
               {citiesToDisplay.map((c) => (
-                <option key={c} value={c} className="bg-amber-950 text-white">
+                <option key={c} value={c} className="bg-[#2b060d] text-white">
                   {c}
                 </option>
               ))}
@@ -126,7 +126,7 @@ export function DirectoryHeader({
           >
             <Heart className={`w-5 h-5 ${favoritesCount > 0 ? 'fill-red-500 text-red-500' : ''}`} />
             {favoritesCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-amber-950 animate-pulse">
+              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-[#2b060d] animate-pulse">
                 {favoritesCount}
               </span>
             )}
@@ -135,7 +135,7 @@ export function DirectoryHeader({
           {/* Botão Anunciar Empresa */}
           <Link
             href="/anunciar/passo-1"
-            className="hidden lg:flex items-center gap-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold px-3 py-1.5 rounded-full border border-amber-500/40 transition-colors"
+            className="hidden lg:flex items-center gap-1.5 bg-[#C9A227]/15 hover:bg-[#C9A227]/25 text-[#f3cf68] hover:text-white text-xs font-semibold px-3.5 py-1.5 rounded-full border border-[#C9A227]/50 shadow-sm transition-all"
           >
             <PlusCircle className="w-3.5 h-3.5" />
             <span>Anunciar</span>
@@ -144,9 +144,9 @@ export function DirectoryHeader({
           {/* Botão Login / Entrar */}
           <Link
             href="/login"
-            className="flex items-center gap-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full shadow-md transition-all border border-amber-400/30"
+            className="flex items-center gap-2 bg-[#C9A227] hover:bg-[#b89320] text-[#2b060d] text-xs font-bold px-4 py-1.5 rounded-full shadow-md hover:shadow-lg transition-all border border-[#ffd866]/30"
           >
-            <User className="w-4 h-4" />
+            <User className="w-4 h-4 text-[#2b060d]" />
             <span>Entrar</span>
           </Link>
         </div>
@@ -171,7 +171,7 @@ export function DirectoryHeader({
             className="dh-header__icon-btn p-2 text-white"
             aria-label="Abrir menu de navegação"
           >
-            {mobileMenuOpen ? <X className="w-6 h-6 text-amber-400" /> : <Menu className="w-6 h-6 text-white" />}
+            {mobileMenuOpen ? <X className="w-6 h-6 text-[#C9A227]" /> : <Menu className="w-6 h-6 text-white" />}
           </button>
         </div>
       </div>
@@ -179,16 +179,16 @@ export function DirectoryHeader({
       {/* No mobile o filtro ocupa uma linha própria para não comprimir a marca e as ações. */}
       <div className="dh-header__mobile-city md:hidden">
         <div className="dh-city-dropdown">
-          <MapPin className="h-4 w-4 shrink-0 text-amber-400" />
+          <MapPin className="h-4 w-4 shrink-0 text-[#C9A227]" />
           <select
             value={activeCity || ''}
             onChange={(e) => handleCityChange(e.target.value)}
             aria-label="Filtrar empresas por cidade"
             className="min-w-0 flex-1 cursor-pointer truncate border-none bg-transparent text-xs font-semibold text-white outline-none"
           >
-            <option value="" className="bg-amber-950 text-white">Todas as cidades</option>
+            <option value="" className="bg-[#2b060d] text-white">Todas as cidades</option>
             {citiesToDisplay.map((c) => (
-              <option key={c} value={c} className="bg-amber-950 text-white">{c}</option>
+              <option key={c} value={c} className="bg-[#2b060d] text-white">{c}</option>
             ))}
           </select>
         </div>
@@ -207,7 +207,7 @@ export function DirectoryHeader({
                   onClick={() => setMobileMenuOpen(false)}
                   className={`text-sm font-semibold py-2 px-3 rounded-lg transition-colors flex items-center justify-between ${
                     active
-                      ? 'bg-amber-500/20 text-amber-300 border-l-4 border-amber-400'
+                      ? 'bg-[#C9A227]/20 text-[#f3cf68] border-l-4 border-[#C9A227]'
                       : 'text-white/80 hover:bg-white/5 hover:text-white'
                   }`}
                 >
@@ -221,7 +221,7 @@ export function DirectoryHeader({
             <Link
               href="/anunciar/passo-1"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center justify-center gap-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold py-2.5 rounded-xl border border-amber-500/40 w-full"
+              className="flex items-center justify-center gap-2 bg-[#C9A227]/15 hover:bg-[#C9A227]/25 text-[#f3cf68] text-xs font-semibold py-2.5 rounded-xl border border-[#C9A227]/50 w-full shadow-sm transition-all"
             >
               <PlusCircle className="w-4 h-4" />
               <span>Anunciar Empresa</span>
@@ -230,9 +230,9 @@ export function DirectoryHeader({
             <Link
               href="/login"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-600 to-amber-700 text-white text-xs font-semibold py-2.5 rounded-xl shadow-md w-full"
+              className="flex items-center justify-center gap-2 bg-[#C9A227] hover:bg-[#b89320] text-[#2b060d] text-xs font-bold py-2.5 rounded-xl shadow-md w-full transition-all border border-[#ffd866]/30"
             >
-              <User className="w-4 h-4" />
+              <User className="w-4 h-4 text-[#2b060d]" />
               <span>Entrar no Portal</span>
             </Link>
           </div>

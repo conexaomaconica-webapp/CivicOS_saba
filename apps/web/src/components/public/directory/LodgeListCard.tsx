@@ -33,9 +33,9 @@ export function LodgeListCard({ data }: LodgeListCardProps) {
     <article className="group bg-white border border-stone-200 rounded-2xl p-4 sm:p-5 shadow-2xs hover:shadow-md hover:border-amber-300 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       {/* Esquerda: Avatar / Brasão + Informações Principais */}
       <div className="flex items-start gap-4 flex-1">
-        <div className={`w-16 h-16 rounded-2xl border border-stone-200 shadow-2xs flex items-center justify-center shrink-0 overflow-hidden ${data.logo_url ? 'bg-white' : 'bg-gradient-to-br from-amber-50 to-stone-100'}`}>
+        <div className={`w-16 h-16 rounded-xl border border-stone-200 shadow-2xs flex items-center justify-center shrink-0 overflow-hidden p-1 ${data.logo_url ? 'bg-white' : 'bg-gradient-to-br from-amber-50 to-stone-100'}`}>
           {data.logo_url ? (
-            <img src={data.logo_url} alt={data.name} className="w-full h-full object-contain p-1" />
+            <img src={data.logo_url} alt={data.name} className="max-w-full max-h-full object-contain object-center" />
           ) : (
             <Landmark className="w-8 h-8 text-[#3b0b14]" />
           )}
