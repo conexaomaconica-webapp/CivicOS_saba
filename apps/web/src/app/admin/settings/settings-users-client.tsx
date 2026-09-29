@@ -12,10 +12,10 @@ import {
   Key,
   Eye,
   EyeOff,
-  ArrowRight,
+  ArrowLeft,
   Loader2,
   X,
-  CreditCard,
+  Building2,
 } from 'lucide-react';
 import {
   ALL_ADMIN_MODULES,
@@ -191,20 +191,32 @@ export default function SettingsUsersClient({ initialUsers, currentUserId }: Set
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto text-left">
+      {/* NAVEGAÇÃO DE RETORNO À DASHBOARD */}
+      <div>
+        <Link
+          href="/admin"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-stone-600 hover:text-[#3B0B14] transition-colors bg-white px-3 py-1.5 rounded-lg border border-stone-200 shadow-2xs hover:border-[#3B0B14]"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 text-[#3B0B14]" />
+          <span>Voltar para a Dashboard Principal (/admin)</span>
+        </Link>
+      </div>
+
       {/* 1. TOPO: TÍTULO & AÇÃO PRINCIPAL */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-300 pb-5">
         <div>
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full bg-[#3B0B14] text-[#C9A227] font-bold text-[10px] uppercase tracking-wider">
-              Segurança & Acessos
+            <span className="px-2.5 py-0.5 rounded-full bg-[#3B0B14] text-[#C9A227] font-bold text-[10px] uppercase tracking-wider flex items-center gap-1">
+              <Building2 className="w-3 h-3 text-[#C9A227]" />
+              Conexão Maçônica • Tenant Ativo
             </span>
-            <span className="text-xs text-stone-500 font-mono">Controle de Módulos da Plataforma</span>
+            <span className="text-xs text-stone-500 font-mono">Gestão de Equipe & Permissões</span>
           </div>
           <h1 className="text-2xl md:text-3xl font-serif font-bold text-stone-900 mt-1">
-            Usuários & Permissões
+            Usuários & Permissões da Plataforma
           </h1>
           <p className="text-xs text-stone-600 mt-1">
-            Cadastre os membros da equipe administrativa e defina exatamente quais módulos cada usuário pode visualizar e operar.
+            Cadastre os membros da equipe vinculados a este tenant e defina exatamente quais módulos cada usuário pode visualizar e operar.
           </p>
         </div>
 
@@ -214,7 +226,7 @@ export default function SettingsUsersClient({ initialUsers, currentUserId }: Set
           className="px-4 py-2.5 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl border border-[#C9A227]/40 shadow-xs transition-all flex items-center gap-2 cursor-pointer w-fit"
         >
           <UserPlus className="w-4 h-4 text-[#C9A227]" />
-          <span>+ Criar Novo Usuário</span>
+          <span>+ Criar Novo Usuário no Tenant</span>
         </button>
       </div>
 
@@ -235,29 +247,7 @@ export default function SettingsUsersClient({ initialUsers, currentUserId }: Set
         </div>
       )}
 
-      {/* 2. CARD DE DIRECIONAMENTO PARA PLANOS */}
-      <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-[#3B0B14] text-[#C9A227] rounded-xl shrink-0">
-            <CreditCard className="w-4 h-4" />
-          </div>
-          <div>
-            <h4 className="font-serif font-bold text-amber-950">Gestão de Planos Comerciais & Preços</h4>
-            <p className="text-stone-600 text-[11px] mt-0.5">
-              Valores das assinaturas, cotas de benefícios e regras financeiras são configuradas na área oficial de Planos.
-            </p>
-          </div>
-        </div>
-        <Link
-          href="/admin/planos"
-          className="px-3.5 py-1.5 bg-white hover:bg-stone-100 text-[#3B0B14] font-bold rounded-xl border border-stone-300 shadow-2xs inline-flex items-center gap-1.5 w-fit shrink-0 transition-colors"
-        >
-          <span>Ir para Planos</span>
-          <ArrowRight className="w-3.5 h-3.5 text-[#3B0B14]" />
-        </Link>
-      </div>
-
-      {/* 3. LISTA DE USUÁRIOS */}
+      {/* 2. LISTA DE USUÁRIOS */}
       <section className="bg-white border border-stone-300 rounded-2xl shadow-xs overflow-hidden">
         <div className="p-4 border-b border-stone-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -416,6 +406,18 @@ export default function SettingsUsersClient({ initialUsers, currentUserId }: Set
             </div>
 
             <form onSubmit={handleSaveUser} className="space-y-4">
+              {/* Tenant Vinculado */}
+              <div className="p-3 bg-stone-50 rounded-2xl border border-stone-200 text-xs flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-[#C9A227]" />
+                  <span className="font-bold text-stone-900">Tenant de Origem:</span>
+                  <span className="text-stone-600">Conexão Maçônica</span>
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-[#3B0B14] text-[#C9A227] px-2 py-0.5 rounded-full">
+                  Automático da Sessão
+                </span>
+              </div>
+
               {/* Dados Básicos */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-1">
