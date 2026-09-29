@@ -2,7 +2,7 @@ import React, { Suspense } from 'react';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import {
-  getAdminEventListAction,
+  getPlatformEventByIdAction,
   getAdminEventDashboardAction,
 } from '@/app/actions/platform-events';
 import { AdminEventRegistrationsTable } from './page-client';
@@ -20,8 +20,8 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
-  const listResult = await getAdminEventListAction();
-  const event = listResult.data?.find((e) => e.id === id);
+  const eventResult = await getPlatformEventByIdAction(id);
+  const event = eventResult.data;
   return {
     title: event ? `${event.title} · Admin` : 'Evento · Admin',
     robots: { index: false, follow: false },
@@ -107,12 +107,12 @@ function SourceTable({ data }: { data: Record<string, number> }) {
 export default async function AdminEventDashboardPage({ params }: PageProps) {
   const { id } = await params;
 
-  const [listResult, dashResult] = await Promise.all([
-    getAdminEventListAction(),
+  const [eventResult, dashResult] = await Promise.all([
+    getPlatformEventByIdAction(id),
     getAdminEventDashboardAction(id),
   ]);
 
-  const event = listResult.data?.find((e) => e.id === id);
+  const event = eventResult.data;
   if (!event) notFound();
 
   const dash = dashResult.data ?? {
@@ -125,8 +125,9 @@ export default async function AdminEventDashboardPage({ params }: PageProps) {
     ? ((dash.total_checkins / dash.total_confirmed) * 100).toFixed(1) + '%'
     : '0%';
 
-  const dateFormatted = new Date(event.event_date + 'T12:00:00').toLocaleDateString('pt-BR', {
-    day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC',
+  const [year, month, day] = event.event_date.split('-').map(Number);
+  const dateFormatted = new Date(Date.UTC(year!, month! - 1, day!, 12, 0, 0)).toLocaleDateString('pt-BR', {
+    day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Bahia',
   });
   const timeFormatted = event.start_time.slice(0, 5).replace(':', 'h');
 
@@ -148,23 +149,7 @@ export default async function AdminEventDashboardPage({ params }: PageProps) {
           </div>
           <AdminEventHeaderActions
             eventId={id}
-            event={{
-              id,
-              slug: event.slug,
-              title: event.title,
-              subtitle: (event as any).subtitle || null,
-              description: (event as any).description || null,
-              event_date: event.event_date,
-              start_time: event.start_time,
-              end_time: (event as any).end_time || null,
-              timezone: (event as any).timezone || 'America/Bahia',
-              venue_name: event.venue_name,
-              venue_address: (event as any).venue_address || null,
-              city: event.city,
-              cover_image_url: (event as any).cover_image_url || null,
-              registration_enabled: event.registration_enabled,
-              capacity: event.capacity,
-            }}
+            event={event}
           />
         </div>
       </div>

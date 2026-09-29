@@ -18,6 +18,7 @@ import { AdminCreateEventModal } from './AdminCreateEventModal';
 import { AdminEditEventModal } from './AdminEditEventModal';
 import {
   deletePlatformEventAction,
+  getPlatformEventByIdAction,
   type AdminEventListItem,
   type PlatformEvent,
 } from '@/app/actions/platform-events';
@@ -29,7 +30,7 @@ interface Props {
 function formatEventDate(dateStr: string): string {
   if (!dateStr) return '';
   const [year, month, day] = dateStr.split('-').map(Number);
-  const date = new Date(year!, month! - 1, day!);
+  const date = new Date(Date.UTC(year!, month! - 1, day!, 12, 0, 0));
   return date.toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: 'short',
@@ -53,9 +54,21 @@ export function AdminEventsListClient({ initialEvents }: Props) {
   const router = useRouter();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PlatformEvent | null>(null);
+  const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
   const [deletingEvent, setDeletingEvent] = useState<AdminEventListItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+
+  const handleOpenEdit = async (item: AdminEventListItem) => {
+    setLoadingEditId(item.id);
+    const res = await getPlatformEventByIdAction(item.id);
+    setLoadingEditId(null);
+    if (res.success && res.data) {
+      setEditingEvent(res.data);
+    } else {
+      setEditingEvent(mapItemToPlatformEvent(item));
+    }
+  };
 
   const handleDeleteConfirm = async () => {
     if (!deletingEvent) return;
@@ -184,12 +197,13 @@ export function AdminEventsListClient({ initialEvents }: Props) {
                 </Link>
                 <button
                   type="button"
-                  onClick={() => setEditingEvent(mapItemToPlatformEvent(event))}
+                  onClick={() => handleOpenEdit(event)}
+                  disabled={loadingEditId === event.id}
                   className="ev-action-btn ev-action-edit"
                   title="Editar Evento"
                 >
                   <Edit3 size={15} />
-                  <span>Editar</span>
+                  <span>{loadingEditId === event.id ? 'Carregando...' : 'Editar'}</span>
                 </button>
                 <button
                   type="button"

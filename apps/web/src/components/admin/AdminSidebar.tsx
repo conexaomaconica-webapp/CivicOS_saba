@@ -26,6 +26,7 @@ import {
   Scale,
   X,
   CalendarDays,
+  ClipboardList,
 } from 'lucide-react';
 import { getApprovalDirectoryListAction } from '@/lib/admin/admin-approval-service';
 
@@ -147,6 +148,12 @@ export const adminNavSections: NavSection[] = [
         label: 'Eventos & RSVP',
         path: '/admin/eventos',
         icon: CalendarDays,
+      },
+      {
+        id: 'pesquisas',
+        label: 'Pesquisas & Diagnósticos',
+        path: '/admin/pesquisas',
+        icon: ClipboardList,
       },
     ],
   },

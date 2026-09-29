@@ -60,3 +60,54 @@ export async function saveDirectoryHomeSettingsAction(input: DirectoryHomeSettin
     return { success: false, error: err.message || 'Erro inesperado ao salvar hero.' };
   }
 }
+
+export async function updateSponsoredDisplayModeAction(mode: 'cards' | 'logos') {
+  try {
+    const supabase = await createServerSideClient();
+
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData?.user) {
+      return { success: false, error: 'Usuário não autenticado.' };
+    }
+
+    const { data: profile } = await (supabase as any)
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', authData.user.id)
+      .maybeSingle();
+
+    const tenantId = profile?.tenant_id || '00000000-0000-0000-0000-000000000010';
+
+    // Busca configurações existentes para preservar os dados de hero e seções
+    const { data: existing } = await (supabase as any)
+      .from('directory_home_settings')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    const payload = {
+      ...(existing || {}),
+      tenant_id: tenantId,
+      sponsored_display_mode: mode,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await (supabase as any)
+      .from('directory_home_settings')
+      .upsert(payload, { onConflict: 'tenant_id' });
+
+    if (error) {
+      console.error('Erro ao atualizar sponsored_display_mode:', error);
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/guia');
+    revalidatePath('/(public)/guia');
+    revalidateTag('directory_home');
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Erro inesperado ao atualizar formato.' };
+  }
+}
+

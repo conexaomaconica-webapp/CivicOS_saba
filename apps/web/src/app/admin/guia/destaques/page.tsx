@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { updateSponsoredDisplayModeAction } from '@/app/actions/directory-home-settings';
 import { Plus, Trash2, Edit2, Loader2, CheckCircle2, X, Award } from 'lucide-react';
 
 type SponsoredBusiness = {
@@ -90,18 +91,17 @@ export default function AdminGuiaDestaquesPage() {
     if (!tenantId) return;
     setUpdatingMode(true);
     try {
-      const supabase = createClient();
-      await (supabase as any)
-        .from('directory_home_settings')
-        .upsert(
-          { tenant_id: tenantId, sponsored_display_mode: mode, updated_at: new Date().toISOString() },
-          { onConflict: 'tenant_id' }
-        );
-      setSponsoredDisplayMode(mode);
-      setSuccessMsg(`Formato de exibição atualizado para: ${mode === 'cards' ? 'Cards Completos' : 'Logomarcas em Loop Infinito'}.`);
-      setTimeout(() => setSuccessMsg(null), 4000);
+      const res = await updateSponsoredDisplayModeAction(mode);
+      if (res.success) {
+        setSponsoredDisplayMode(mode);
+        setSuccessMsg(`Formato de exibição atualizado para: ${mode === 'cards' ? 'Cards Completos' : 'Logomarcas em Loop Infinito'}.`);
+        setTimeout(() => setSuccessMsg(null), 4000);
+      } else {
+        alert(res.error || 'Erro ao atualizar formato de exibição.');
+      }
     } catch (err) {
       console.error('Erro ao salvar formato:', err);
+      alert('Erro inesperado ao salvar formato.');
     } finally {
       setUpdatingMode(false);
     }

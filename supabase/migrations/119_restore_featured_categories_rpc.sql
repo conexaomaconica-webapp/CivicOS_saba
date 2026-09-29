@@ -1,22 +1,7 @@
 -- ============================================================================
--- Migration 118: Add sponsored_display_mode to directory_home_settings & update RPC
+-- Migration 119: Restore directory_featured_categories in public_directory_home_data
 -- ============================================================================
 
--- 1. Add column to directory_home_settings if not exists
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'directory_home_settings'
-      AND column_name = 'sponsored_display_mode'
-  ) THEN
-    ALTER TABLE public.directory_home_settings
-    ADD COLUMN sponsored_display_mode TEXT NOT NULL DEFAULT 'cards';
-  END IF;
-END $$;
-
--- 2. Update public_directory_home_data RPC to return sponsored_display_mode in settings
 CREATE OR REPLACE FUNCTION public.public_directory_home_data(
   p_host TEXT,
   p_city TEXT DEFAULT NULL
@@ -142,41 +127,38 @@ BEGIN
       LIMIT 1
     ) sub_status ON true
     LEFT JOIN LATERAL (
-      SELECT c.name
-      FROM public.business_categories bc
-      JOIN public.categories c ON c.id = bc.category_id
-      WHERE bc.tenant_id = b.tenant_id AND bc.business_id = b.id AND c.is_active = true
-      ORDER BY bc.is_primary DESC
+      SELECT bm.url
+      FROM public.business_media bm
+      WHERE bm.tenant_id = b.tenant_id AND bm.business_id = b.id
+      ORDER BY bm.display_order ASC
+      LIMIT 1
+    ) media_cover ON true
+    LEFT JOIN LATERAL (
+      SELECT cat.name
+      FROM public.categories cat
+      WHERE cat.id = b.category_id
       LIMIT 1
     ) category ON true
     LEFT JOIN LATERAL (
       SELECT bl.city, bl.state
       FROM public.business_locations bl
-      WHERE bl.business_id = b.id
-      ORDER BY bl.is_headquarters DESC
+      WHERE bl.tenant_id = b.tenant_id AND bl.business_id = b.id
+      ORDER BY bl.created_at ASC
       LIMIT 1
     ) location ON true
-    LEFT JOIN LATERAL (
-      SELECT bm.url
-      FROM public.business_media bm
-      WHERE bm.tenant_id = b.tenant_id AND bm.business_id = b.id AND bm.media_type = 'image'
-      ORDER BY bm.display_order
-      LIMIT 1
-    ) media_cover ON true
     WHERE sb.tenant_id = v_tenant_id
       AND sb.is_active = true
       AND (sb.start_at IS NULL OR sb.start_at <= now())
       AND (sb.end_at IS NULL OR sb.end_at >= now())
-      -- REGRA TRIPLA DE PUBLICAÇÃO:
       AND b.is_active = true
       AND b.publication_status = 'published'
       AND COALESCE(sub_status.status, 'active') NOT IN ('past_due', 'canceled', 'unpaid', 'pending', 'suspended')
-      AND (v_city_filter IS NULL OR lower(location.city) = lower(v_city_filter))
+      AND (v_city_filter IS NULL OR location.city ILIKE v_city_filter)
   ) sub_sponsored;
 
-  -- Fallback de Empresas Patrocinadas: Se não houver destaques manuais no tenant, exibir empresas publicadas ativas recentes
+  -- Fallback de Patrocinadas se a lista estiver vazia: empresas publicadas recentes
   IF v_sponsored = '[]'::jsonb THEN
-    SELECT COALESCE(jsonb_agg(sp_json), '[]'::jsonb)
+    SELECT COALESCE(jsonb_agg(sp_fallback_json), '[]'::jsonb)
     INTO v_sponsored
     FROM (
       SELECT 
@@ -190,7 +172,7 @@ BEGIN
           'category_name', category.name,
           'city', location.city,
           'state', location.state
-        ) AS sp_json
+        ) AS sp_fallback_json
       FROM public.businesses b
       LEFT JOIN LATERAL (
         SELECT s.status
@@ -200,32 +182,30 @@ BEGIN
         LIMIT 1
       ) sub_status ON true
       LEFT JOIN LATERAL (
-        SELECT c.name
-        FROM public.business_categories bc
-        JOIN public.categories c ON c.id = bc.category_id
-        WHERE bc.tenant_id = b.tenant_id AND bc.business_id = b.id AND c.is_active = true
-        ORDER BY bc.is_primary DESC
+        SELECT bm.url
+        FROM public.business_media bm
+        WHERE bm.tenant_id = b.tenant_id AND bm.business_id = b.id
+        ORDER BY bm.display_order ASC
+        LIMIT 1
+      ) media_cover ON true
+      LEFT JOIN LATERAL (
+        SELECT cat.name
+        FROM public.categories cat
+        WHERE cat.id = b.category_id
         LIMIT 1
       ) category ON true
       LEFT JOIN LATERAL (
         SELECT bl.city, bl.state
         FROM public.business_locations bl
-        WHERE bl.business_id = b.id
-        ORDER BY bl.is_headquarters DESC
+        WHERE bl.tenant_id = b.tenant_id AND bl.business_id = b.id
+        ORDER BY bl.created_at ASC
         LIMIT 1
       ) location ON true
-      LEFT JOIN LATERAL (
-        SELECT bm.url
-        FROM public.business_media bm
-        WHERE bm.tenant_id = b.tenant_id AND bm.business_id = b.id AND bm.media_type = 'image'
-        ORDER BY bm.display_order
-        LIMIT 1
-      ) media_cover ON true
       WHERE b.tenant_id = v_tenant_id
         AND b.is_active = true
         AND b.publication_status = 'published'
         AND COALESCE(sub_status.status, 'active') NOT IN ('past_due', 'canceled', 'unpaid', 'pending', 'suspended')
-        AND (v_city_filter IS NULL OR lower(location.city) = lower(v_city_filter))
+        AND (v_city_filter IS NULL OR location.city ILIKE v_city_filter)
       ORDER BY b.created_at DESC
       LIMIT 6
     ) fallback_sponsored;
@@ -262,3 +242,5 @@ BEGIN
   );
 END;
 $$;
+
+GRANT EXECUTE ON FUNCTION public.public_directory_home_data(TEXT, TEXT) TO anon, authenticated, service_role;

@@ -206,10 +206,48 @@ export default async function GuiaPage({ searchParams }: Props) {
   };
 
   const settings = homeData.settings || {};
-  const sponsoredDisplayMode: 'cards' | 'logos' = settings.sponsored_display_mode === 'logos' ? 'logos' : 'cards';
+  let sponsoredDisplayMode: 'cards' | 'logos' = settings.sponsored_display_mode === 'logos' ? 'logos' : 'cards';
+
+  // Consulta direta em directory_home_settings para garantir resolução instantânea do modo de exibição
+  try {
+    const { data: dbSettings } = await (supabase as any)
+      .from('directory_home_settings')
+      .select('sponsored_display_mode')
+      .limit(1)
+      .maybeSingle();
+
+    if (dbSettings?.sponsored_display_mode === 'logos' || dbSettings?.sponsored_display_mode === 'cards') {
+      sponsoredDisplayMode = dbSettings.sponsored_display_mode;
+    }
+  } catch (_sErr) {}
+
   let banners = (homeData.banners as DirectoryBannerItem[]) || [];
   let categories = (homeData.categories as DirectoryCategoryItem[]) || [];
   let sponsored = (homeData.sponsored as DirectorySponsoredItem[]) || [];
+
+  // Respeitar rigorosamente as Categorias em Destaque cadastradas e ativas no painel administrativo
+  try {
+    const { data: featCats } = await (supabase as any)
+      .from('directory_featured_categories')
+      .select('id, custom_title, icon_name, display_order, categories(id, name, slug, icon)')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true });
+
+    if (featCats && featCats.length > 0) {
+      const parsedFeat = featCats
+        .filter((fc: any) => fc.categories)
+        .map((fc: any) => ({
+          id: fc.categories.id,
+          name: fc.custom_title || fc.categories.name,
+          slug: fc.categories.slug,
+          icon_name: fc.icon_name || fc.categories.icon,
+        }));
+
+      if (parsedFeat.length > 0) {
+        categories = parsedFeat;
+      }
+    }
+  } catch (_fcErr) {}
   
   // Normalização explícita de available_cities
   const rawCities = homeData.available_cities || homeData.availableCities;
@@ -241,14 +279,15 @@ export default async function GuiaPage({ searchParams }: Props) {
     } catch (_banErr) {}
   }
 
-  // Fallback para Categorias se a RPC falhar ou retornar vazio
+  // Fallback para Categorias se não houver destaques nem retorno da RPC
   if (!categories || categories.length === 0) {
     try {
       const { data: dbCats } = await (supabase as any)
         .from('categories')
         .select('id, name, slug, icon')
         .eq('is_active', true)
-        .order('name');
+        .order('name')
+        .limit(12);
 
       if (dbCats && dbCats.length > 0) {
         categories = dbCats.map((c: any) => ({

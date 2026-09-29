@@ -45,6 +45,7 @@ export interface PlatformEvent {
   cover_image_url: string | null;
   registration_enabled: boolean;
   capacity: number | null;
+  status?: string;
 }
 
 export interface RSVPInput {
@@ -165,6 +166,62 @@ export async function getPlatformEventBySlugAction(
     return { success: false, error: 'Erro inesperado ao carregar o evento.' };
   }
 }
+
+// ---------------------------------------------------------------------------
+// PUBLIC/ADMIN: Buscar evento completo por ID
+// ---------------------------------------------------------------------------
+export async function getPlatformEventByIdAction(
+  eventId: string
+): Promise<ActionResponse<PlatformEvent>> {
+  try {
+    if (!eventId || eventId.trim().length === 0) {
+      return { success: false, error: 'ID do evento é obrigatório.' };
+    }
+
+    const supabase = await getSupabaseServerOrAdminClient();
+
+    const { data, error } = await supabase
+      .from('platform_events')
+      .select('*')
+      .eq('id', eventId.trim())
+      .maybeSingle();
+
+    if (error) {
+      console.error('[Events] Erro ao buscar evento por ID:', error);
+      return { success: false, error: 'Erro ao carregar o evento.' };
+    }
+
+    if (!data) {
+      return { success: false, error: 'Evento não encontrado.' };
+    }
+
+    return {
+      success: true,
+      data: {
+        id: data.id,
+        slug: data.slug,
+        title: data.title,
+        subtitle: data.subtitle ?? null,
+        description: data.description ?? null,
+        event_date: data.event_date,
+        start_time: data.start_time,
+        end_time: data.end_time ?? null,
+        timezone: data.timezone || 'America/Bahia',
+        venue_name: data.venue_name ?? null,
+        venue_address: data.venue_address ?? null,
+        city: data.city ?? null,
+        cover_image_url: data.cover_image_url ?? null,
+        registration_enabled: data.registration_enabled ?? true,
+        capacity: data.capacity ?? null,
+        status: data.status,
+      },
+    };
+  } catch (err) {
+    console.error('[Events] Exceção ao buscar evento por ID:', err);
+    return { success: false, error: 'Erro inesperado ao carregar o evento.' };
+  }
+}
+
 
 // ---------------------------------------------------------------------------
 // PUBLIC: Confirmar/atualizar presença (RSVP)
@@ -574,15 +631,15 @@ export async function exportEventRegistrationsCSVAction(
 export interface UpdatePlatformEventInput {
   eventId: string;
   title?: string;
-  subtitle?: string;
-  description?: string;
+  subtitle?: string | null;
+  description?: string | null;
   eventDate?: string;
   startTime?: string;
-  endTime?: string;
-  venueName?: string;
-  venueAddress?: string;
-  city?: string;
-  coverImageUrl?: string;
+  endTime?: string | null;
+  venueName?: string | null;
+  venueAddress?: string | null;
+  city?: string | null;
+  coverImageUrl?: string | null;
   registrationEnabled?: boolean;
   capacity?: number | null;
   status?: 'draft' | 'published' | 'canceled' | 'archived';

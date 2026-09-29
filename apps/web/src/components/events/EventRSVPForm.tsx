@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { ChevronDown } from 'lucide-react';
 import { upsertEventRegistrationAction } from '@/app/actions/platform-events';
 import { EventSuccessScreen } from './EventSuccessScreen';
 import { normalizeWhatsApp, validateWhatsApp, sanitizeUTMParams } from '@/lib/events/events-service';
@@ -291,16 +292,20 @@ export function EventRSVPForm({ event }: EventRSVPFormProps) {
             {/* Cidade com Seleção Rápida e Auto-sugestão */}
             <div className="rsvp-field">
               <label htmlFor="rsvp-city" className="rsvp-label">Cidade / Município</label>
-              <input
-                id="rsvp-city"
-                type="text"
-                list="rsvp-city-list"
-                placeholder="Selecione ou digite sua cidade (ex.: Feira de Santana - BA)"
-                value={formData.city}
-                onChange={(e) => updateField('city', e.target.value)}
-                className="rsvp-input"
-                disabled={isSubmitting}
-              />
+              <div className="rsvp-select-wrap">
+                <input
+                  id="rsvp-city"
+                  type="text"
+                  list="rsvp-city-list"
+                  placeholder="Selecione ou digite sua cidade (ex.: Feira de Santana - BA)"
+                  value={formData.city}
+                  onChange={(e) => updateField('city', e.target.value)}
+                  className="rsvp-input"
+                  style={{ paddingRight: '2.5rem' }}
+                  disabled={isSubmitting}
+                />
+                <ChevronDown size={18} className="rsvp-select-icon" aria-hidden="true" />
+              </div>
               <datalist id="rsvp-city-list">
                 <option value="Feira de Santana - BA" />
                 <option value="Salvador - BA" />

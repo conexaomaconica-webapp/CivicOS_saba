@@ -321,6 +321,16 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
           width: 100%; padding: 0.625rem 0.75rem; border: 1px solid #D1D5DB; border-radius: 8px;
           font-size: 0.875rem; color: #111827; background: #FFFFFF; transition: border-color 0.15s;
         }
+        .acm-select {
+          cursor: pointer;
+          padding-right: 2.25rem;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%233B0B14' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 0.75rem center;
+          background-size: 16px 16px;
+          -webkit-appearance: none;
+          appearance: none;
+        }
         .acm-input:focus, .acm-textarea:focus, .acm-select:focus { outline: none; border-color: #3B0B14; box-shadow: 0 0 0 3px rgba(59,11,20,0.1); }
         .acm-checkbox-group { margin-top: 0.25rem; }
         .acm-checkbox-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; font-weight: 500; color: #374151; cursor: pointer; }

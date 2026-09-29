@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const pageUrl = appUrl(`/eventos/${slug}`);
 
   const [year, month, day] = event.event_date.split('-').map(Number);
-  const dateDisplay = new Date(year!, month! - 1, day!).toLocaleDateString('pt-BR', {
+  const dateDisplay = new Date(Date.UTC(year!, month! - 1, day!, 12, 0, 0)).toLocaleDateString('pt-BR', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -69,7 +69,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 // ---------------------------------------------------------------------------
 function formatEventDate(dateStr: string): string {
   const [year, month, day] = dateStr.split('-').map(Number);
-  const date = new Date(year!, month! - 1, day!);
+  const date = new Date(Date.UTC(year!, month! - 1, day!, 12, 0, 0));
   return date.toLocaleDateString('pt-BR', {
     weekday: 'long',
     day: 'numeric',
@@ -488,11 +488,34 @@ export default async function EventPage({ params }: PageProps) {
           border-radius: 10px;
           font-size: 1rem;
           font-family: var(--font-inter);
-          background: #FFFFFF;
+          background-color: #FFFFFF;
           color: var(--cm-text);
           transition: border-color 0.15s, box-shadow 0.15s;
           -webkit-appearance: none;
           appearance: none;
+        }
+
+        .rsvp-select {
+          cursor: pointer;
+          padding-right: 2.75rem;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%234B161B' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 1rem center;
+          background-size: 18px 18px;
+        }
+
+        .rsvp-select-wrap {
+          position: relative;
+          width: 100%;
+        }
+
+        .rsvp-select-wrap .rsvp-select-icon {
+          position: absolute;
+          right: 1rem;
+          top: 50%;
+          transform: translateY(-50%);
+          pointer-events: none;
+          color: var(--cm-bordeaux);
         }
 
         .rsvp-input::placeholder {

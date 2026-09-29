@@ -600,3 +600,151 @@ export async function getSurveyAnalyticsAction(surveyId: string, versionNumber?:
     return { success: false, error: err.message || 'Erro ao gerar indicadores do dashboard.' };
   }
 }
+
+/**
+ * Cria uma nova pesquisa administrativa com estrutura inicial.
+ */
+export async function createSurveyAction(payload: {
+  title: string;
+  description?: string;
+  slug?: string;
+}) {
+  try {
+    const supabase = await createServerSideClient();
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData?.user) {
+      return { success: false, error: 'Acesso não autenticado.' };
+    }
+
+    const { data: profile } = await (supabase as any)
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', authData.user.id)
+      .maybeSingle();
+
+    const tenantId = profile?.tenant_id || '00000000-0000-0000-0000-000000000010';
+
+    const rawSlug = payload.slug || payload.title;
+    const cleanSlug = rawSlug
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') + '-' + Date.now().toString().slice(-4);
+
+    // 1. Criar Pesquisa
+    const { data: survey, error: sErr } = await (supabase as any)
+      .from('surveys')
+      .insert({
+        tenant_id: tenantId,
+        title: payload.title.trim(),
+        description: payload.description?.trim() || null,
+        slug: cleanSlug,
+        status: 'draft',
+        current_version: 1,
+        created_by: authData.user.id,
+      })
+      .select('*')
+      .single();
+
+    if (sErr) throw sErr;
+
+    // 2. Criar Versão Inicial (v1)
+    await (supabase as any).from('survey_versions').insert({
+      survey_id: survey.id,
+      version_number: 1,
+      status: 'draft',
+      schema_snapshot: {},
+    });
+
+    // 3. Criar Bloco Padrão Inicial
+    await (supabase as any).from('survey_blocks').insert({
+      survey_id: survey.id,
+      title: 'Seção 1: Perguntas Principais',
+      description: 'Preencha as informações solicitadas abaixo.',
+      order_index: 0,
+      is_active: true,
+    });
+
+    return { success: true, data: survey };
+  } catch (err: any) {
+    console.error('Erro ao criar pesquisa:', err);
+    return { success: false, error: err.message || 'Erro ao criar pesquisa.' };
+  }
+}
+
+/**
+ * Atualiza status da pesquisa (draft, published, archived).
+ */
+export async function toggleSurveyStatusAction(
+  surveyId: string,
+  status: 'draft' | 'published' | 'archived'
+) {
+  try {
+    const supabase = await createServerSideClient();
+    const { error } = await (supabase as any)
+      .from('surveys')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', surveyId);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Erro ao atualizar status da pesquisa.' };
+  }
+}
+
+/**
+ * Atualiza título, descrição ou slug da pesquisa.
+ */
+export async function updateSurveyDetailsAction(
+  surveyId: string,
+  payload: { title: string; description?: string; slug?: string }
+) {
+  try {
+    const supabase = await createServerSideClient();
+    const updateData: Record<string, any> = {
+      title: payload.title.trim(),
+      description: payload.description?.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (payload.slug) {
+      updateData.slug = payload.slug
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+    }
+
+    const { error } = await (supabase as any)
+      .from('surveys')
+      .update(updateData)
+      .eq('id', surveyId);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Erro ao atualizar dados da pesquisa.' };
+  }
+}
+
+/**
+ * Exclui uma pesquisa permanentemente.
+ */
+export async function deleteSurveyAction(surveyId: string) {
+  try {
+    const supabase = await createServerSideClient();
+    const { error } = await (supabase as any)
+      .from('surveys')
+      .delete()
+      .eq('id', surveyId);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Erro ao excluir pesquisa.' };
+  }
+}
+

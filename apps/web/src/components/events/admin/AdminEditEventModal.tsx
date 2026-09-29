@@ -1,8 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { updatePlatformEventAction, type PlatformEvent } from '@/app/actions/platform-events';
+import {
+  updatePlatformEventAction,
+  getPlatformEventByIdAction,
+  type PlatformEvent,
+} from '@/app/actions/platform-events';
 import { X, Edit3, Save, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 
 interface Props {
@@ -26,11 +30,46 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
     coverImageUrl: event.cover_image_url || '',
     registrationEnabled: event.registration_enabled ?? true,
     capacity: event.capacity !== null && event.capacity !== undefined ? String(event.capacity) : '',
+    status: (event.status as 'published' | 'draft' | 'canceled' | 'archived') || 'published',
   });
 
+  const [loadingData, setLoadingData] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Busca os dados completos do banco caso o evento tenha vindo da listagem sem todos os campos
+  useEffect(() => {
+    let isMounted = true;
+    async function loadFullData() {
+      if (!event.id) return;
+      setLoadingData(true);
+      const res = await getPlatformEventByIdAction(event.id);
+      if (isMounted && res.success && res.data) {
+        const full = res.data;
+        setFormData({
+          title: full.title || '',
+          subtitle: full.subtitle || '',
+          description: full.description || '',
+          eventDate: full.event_date || '',
+          startTime: full.start_time?.slice(0, 5) || '',
+          endTime: full.end_time?.slice(0, 5) || '',
+          venueName: full.venue_name || '',
+          venueAddress: full.venue_address || '',
+          city: full.city || '',
+          coverImageUrl: full.cover_image_url || '',
+          registrationEnabled: full.registration_enabled ?? true,
+          capacity: full.capacity !== null && full.capacity !== undefined ? String(full.capacity) : '',
+          status: (full.status as any) || 'published',
+        });
+      }
+      if (isMounted) setLoadingData(false);
+    }
+    loadFullData();
+    return () => {
+      isMounted = false;
+    };
+  }, [event.id]);
 
   const handleChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -75,6 +114,7 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
       coverImageUrl: formData.coverImageUrl.trim() || null as any,
       registrationEnabled: formData.registrationEnabled,
       capacity: formData.capacity.trim() ? parseInt(formData.capacity, 10) : null,
+      status: formData.status,
     });
 
     setSaving(false);
@@ -98,7 +138,14 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
           <div className="aem-header-title">
             <Edit3 size={20} className="aem-icon" />
             <div>
-              <h3>Editar Evento e Página Pública</h3>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>Editar Evento e Página Pública</span>
+                {loadingData && (
+                  <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#C9A227', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <Loader2 size={13} className="aem-spin" /> Carregando...
+                  </span>
+                )}
+              </h3>
               <p>Altere o título, horários, local e detalhes de confirmação</p>
             </div>
           </div>
@@ -254,6 +301,21 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
               />
             </div>
 
+            {/* Status do Evento */}
+            <div className="aem-field">
+              <label htmlFor="aem-status">Status de Publicação</label>
+              <select
+                id="aem-status"
+                value={formData.status}
+                onChange={(e) => handleChange('status', e.target.value)}
+              >
+                <option value="published">Publicado</option>
+                <option value="draft">Rascunho</option>
+                <option value="canceled">Cancelado</option>
+                <option value="archived">Arquivado</option>
+              </select>
+            </div>
+
             {/* Controle de Inscrição */}
             <div className="aem-field aem-field--checkbox">
               <label className="aem-checkbox-label">
@@ -324,12 +386,23 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
         .aem-field input[type="time"],
         .aem-field input[type="number"],
         .aem-field input[type="url"],
-        .aem-field textarea {
+        .aem-field textarea,
+        .aem-field select {
           width: 100%; padding: 0.625rem 0.875rem; border: 1.5px solid #DDD7CD;
           border-radius: 8px; font-size: 0.875rem; color: #1C0D10; background: #FFF;
           transition: border-color 0.15s;
         }
-        .aem-field input:focus, .aem-field textarea:focus {
+        .aem-field select {
+          cursor: pointer;
+          padding-right: 2.25rem;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%233B0B14' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 0.75rem center;
+          background-size: 16px 16px;
+          -webkit-appearance: none;
+          appearance: none;
+        }
+        .aem-field input:focus, .aem-field textarea:focus, .aem-field select:focus {
           outline: none; border-color: #3B0B14; box-shadow: 0 0 0 3px rgba(59,11,20,0.1);
         }
         .aem-checkbox-label {
