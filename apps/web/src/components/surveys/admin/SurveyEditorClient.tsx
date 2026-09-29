@@ -27,6 +27,11 @@ import {
   Calendar,
   MousePointer,
   PenTool,
+  Settings,
+  Image as ImageIcon,
+  ArrowUp,
+  ArrowDown,
+  FolderInput,
 } from 'lucide-react';
 import type { Survey, SurveyQuestion } from '@/types/surveys';
 import {
@@ -36,7 +41,14 @@ import {
   saveSurveyBlockAction,
   deleteSurveyQuestionAction,
   deleteSurveyBlockAction,
+  updateSurveyDetailsAction,
+  moveQuestionToBlockAction,
+  reorderSurveyQuestionsAction,
 } from '@/app/actions/surveys';
+
+function cleanBlockTitle(title: string): string {
+  return title.replace(/^BLOCO\s+[A-Z]\s*[-–—:]\s*/i, '').trim();
+}
 
 interface Props {
   initialSurvey: Survey;
@@ -45,6 +57,20 @@ interface Props {
 export function SurveyEditorClient({ initialSurvey }: Props) {
   const router = useRouter();
   const [survey, setSurvey] = useState<Survey>(initialSurvey);
+
+  // Survey Info & Branding Modal State
+  const [showEditSurveyModal, setShowEditSurveyModal] = useState(false);
+  const [editTitle, setEditTitle] = useState(survey.title);
+  const [editDesc, setEditDesc] = useState(survey.description || '');
+  const [editSlug, setEditSlug] = useState(survey.slug);
+  const [editLogoMode, setEditLogoMode] = useState<'official' | 'custom' | 'none'>(
+    survey.show_logo === false
+      ? 'none'
+      : survey.logo_url && survey.logo_url !== '/logoconexao_red.png'
+      ? 'custom'
+      : 'official'
+  );
+  const [editLogoUrl, setEditLogoUrl] = useState(survey.logo_url || '/logoconexao_red.png');
 
   // Preview Drawer State
   const [showPreview, setShowPreview] = useState(false);
@@ -60,6 +86,7 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
   const [showAddBlock, setShowAddBlock] = useState(false);
   const [newBlockTitle, setNewBlockTitle] = useState('');
   const [newBlockDesc, setNewBlockDesc] = useState('');
+  const [editingBlock, setEditingBlock] = useState<{ id: string; title: string; description: string } | null>(null);
 
   // Status & Notifications
   const [saving, setSaving] = useState(false);
@@ -183,6 +210,15 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
     const qType = editingQuestion.question_type || 'short_text';
     const isChoice = ['single_choice', 'multiple_choice', 'dropdown'].includes(qType);
 
+    // Se a pergunta foi movida de bloco pelo seletor do drawer
+    const originalBlockId = editingQuestion.id
+      ? survey.blocks?.find((b) => b.questions?.some((q) => q.id === editingQuestion.id))?.id
+      : null;
+
+    if (editingQuestion.id && originalBlockId && originalBlockId !== selectedBlockId) {
+      await moveQuestionToBlockAction(survey.id, editingQuestion.id, selectedBlockId);
+    }
+
     const res = await saveSurveyQuestionAction(survey.id, {
       id: editingQuestion.id,
       block_id: selectedBlockId,
@@ -207,6 +243,91 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
     }
   };
 
+  // Reorder Question inside Block (Up or Down)
+  const handleReorderQuestion = async (blockId: string, currentIndex: number, direction: 'up' | 'down') => {
+    const currentBlock = survey.blocks?.find((b) => b.id === blockId);
+    if (!currentBlock || !currentBlock.questions) return;
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= currentBlock.questions.length) return;
+
+    const newQuestions = [...currentBlock.questions];
+    const [movedQ] = newQuestions.splice(currentIndex, 1);
+    if (!movedQ) return;
+    newQuestions.splice(targetIndex, 0, movedQ);
+
+    const reorderedIds = newQuestions.map((q) => q.id);
+
+    // Otimista
+    setSurvey((prev) => ({
+      ...prev,
+      blocks: prev.blocks?.map((b) => {
+        if (b.id !== blockId) return b;
+        return {
+          ...b,
+          questions: newQuestions.map((q, idx) => ({ ...q, order_index: idx + 1 })),
+        };
+      }),
+    }));
+
+    setSaving(true);
+    const res = await reorderSurveyQuestionsAction(survey.id, blockId, reorderedIds);
+    setSaving(false);
+
+    if (!res.success) {
+      setMessage({ type: 'error', text: res.error || 'Erro ao reordenar pergunta.' });
+      router.refresh();
+    } else {
+      setMessage({ type: 'success', text: 'Ordem das perguntas atualizada com sucesso!' });
+    }
+  };
+
+  // Move Question to another Block
+  const handleMoveQuestion = async (questionId: string, currentBlockId: string, targetBlockId: string) => {
+    if (currentBlockId === targetBlockId) return;
+
+    const currentBlock = survey.blocks?.find((b) => b.id === currentBlockId);
+    const targetBlock = survey.blocks?.find((b) => b.id === targetBlockId);
+    const movingQ = currentBlock?.questions?.find((q) => q.id === questionId);
+
+    if (!currentBlock || !targetBlock || !movingQ) return;
+
+    // Otimista
+    setSurvey((prev) => ({
+      ...prev,
+      blocks: prev.blocks?.map((b) => {
+        if (b.id === currentBlockId) {
+          return {
+            ...b,
+            questions: b.questions?.filter((q) => q.id !== questionId) || [],
+          };
+        }
+        if (b.id === targetBlockId) {
+          return {
+            ...b,
+            questions: [...(b.questions || []), { ...movingQ, block_id: targetBlockId }],
+          };
+        }
+        return b;
+      }),
+    }));
+
+    setSaving(true);
+    const res = await moveQuestionToBlockAction(survey.id, questionId, targetBlockId);
+    setSaving(false);
+
+    if (res.success) {
+      setMessage({
+        type: 'success',
+        text: `Pergunta movida para a seção "${cleanBlockTitle(targetBlock.title)}" com sucesso!`,
+      });
+      router.refresh();
+    } else {
+      setMessage({ type: 'error', text: res.error || 'Erro ao mover pergunta de seção.' });
+      router.refresh();
+    }
+  };
+
   // Add Block
   const handleCreateBlock = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -228,6 +349,88 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
       router.refresh();
     } else {
       setMessage({ type: 'error', text: res.error || 'Erro ao criar seção de perguntas.' });
+    }
+  };
+
+  // Edit / Rename Block
+  const handleSaveBlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBlock || !editingBlock.title.trim()) return;
+
+    setSaving(true);
+    setMessage(null);
+    const res = await saveSurveyBlockAction(survey.id, {
+      id: editingBlock.id,
+      title: editingBlock.title.trim(),
+      description: editingBlock.description.trim() || undefined,
+    });
+    setSaving(false);
+
+    if (res.success) {
+      setSurvey((prev) => ({
+        ...prev,
+        blocks: prev.blocks?.map((b) =>
+          b.id === editingBlock.id
+            ? { ...b, title: editingBlock.title.trim(), description: editingBlock.description.trim() || null }
+            : b
+        ),
+      }));
+      setEditingBlock(null);
+      setMessage({ type: 'success', text: 'Seção atualizada com sucesso!' });
+      router.refresh();
+    } else {
+      setMessage({ type: 'error', text: res.error || 'Erro ao atualizar seção.' });
+    }
+  };
+
+  // Open & Save Survey Metadata & Branding
+  const handleOpenEditSurvey = () => {
+    setEditTitle(survey.title);
+    setEditDesc(survey.description || '');
+    setEditSlug(survey.slug);
+    const isCustom = survey.logo_url && survey.logo_url !== '/logoconexao_red.png';
+    setEditLogoMode(survey.show_logo === false ? 'none' : isCustom ? 'custom' : 'official');
+    setEditLogoUrl(survey.logo_url || '/logoconexao_red.png');
+    setShowEditSurveyModal(true);
+  };
+
+  const handleSaveSurveyInfo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editTitle.trim()) return;
+
+    setSaving(true);
+    setMessage(null);
+
+    const showLogo = editLogoMode !== 'none';
+    const logoUrl =
+      editLogoMode === 'official'
+        ? '/logoconexao_red.png'
+        : editLogoMode === 'custom'
+        ? (editLogoUrl.trim() || '/logoconexao_red.png')
+        : null;
+
+    const res = await updateSurveyDetailsAction(survey.id, {
+      title: editTitle.trim(),
+      description: editDesc.trim() || undefined,
+      slug: editSlug.trim() || undefined,
+      logo_url: logoUrl,
+      show_logo: showLogo,
+    });
+    setSaving(false);
+
+    if (res.success) {
+      setSurvey((prev) => ({
+        ...prev,
+        title: editTitle.trim(),
+        description: editDesc.trim() || null,
+        slug: editSlug.trim() || prev.slug,
+        logo_url: logoUrl,
+        show_logo: showLogo,
+      }));
+      setShowEditSurveyModal(false);
+      setMessage({ type: 'success', text: 'Título, texto e logomarca da pesquisa atualizados com sucesso!' });
+    } else {
+      setMessage({ type: 'error', text: res.error || 'Erro ao atualizar dados da pesquisa.' });
     }
   };
 
@@ -261,8 +464,38 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
             <span>/</span>
             <span className="se-slug">/pesquisa/{survey.slug}</span>
           </div>
-          <h1 className="se-title">{survey.title}</h1>
-          <p className="se-subtitle">{survey.description || 'Editor visual de formulário dinâmico'}</p>
+
+          <div className="se-title-row">
+            {survey.show_logo !== false ? (
+              <div className="se-header-brand-wrap" title="Logomarca da Pesquisa Ativa">
+                <img
+                  src={survey.logo_url || '/logoconexao_red.png'}
+                  alt="Logomarca Conexão Maçônica"
+                  className="se-header-logo-thumb"
+                />
+              </div>
+            ) : (
+              <span className="se-p-badge" style={{ marginBottom: 0 }}>Texto Puro</span>
+            )}
+            <h1 className="se-title">{survey.title}</h1>
+            <button
+              type="button"
+              className="se-btn-edit-survey"
+              onClick={handleOpenEditSurvey}
+              title="Editar título, texto de apresentação e logomarca da pesquisa"
+            >
+              <Edit3 size={15} />
+              <span>Editar Título, Texto & Logomarca</span>
+            </button>
+          </div>
+
+          <p className="se-subtitle">
+            {survey.description || (
+              <span style={{ color: '#9CA3AF', fontStyle: 'italic' }}>
+                Nenhum texto de apresentação definido. Clique em &quot;Editar Título, Texto & Logomarca&quot; para adicionar.
+              </span>
+            )}
+          </p>
         </div>
 
         <div className="se-header-actions">
@@ -339,10 +572,18 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
                 <div className="se-block-header">
                   <div className="se-block-title-box">
                     <span className="se-block-badge">Seção {bIdx + 1}</span>
-                    <h3>{block.title}</h3>
+                    <h3>{cleanBlockTitle(block.title)}</h3>
                     {block.description && <p className="se-block-desc">{block.description}</p>}
                   </div>
                   <div className="se-block-actions">
+                    <button
+                      type="button"
+                      className="se-btn-icon"
+                      title="Editar título e descrição da seção"
+                      onClick={() => setEditingBlock({ id: block.id, title: cleanBlockTitle(block.title), description: block.description || '' })}
+                    >
+                      <Edit3 size={15} />
+                    </button>
                     <button
                       type="button"
                       className="se-btn-add-question"
@@ -382,7 +623,29 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
                         className={`se-question-item ${!q.is_active ? 'se-question-hidden' : ''}`}
                       >
                         <div className="se-q-left">
-                          <span className="se-q-num">Q{qIdx + 1}</span>
+                          <div className="se-q-order-box">
+                            <span className="se-q-num">Q{qIdx + 1}</span>
+                            <div className="se-q-order-btns">
+                              <button
+                                type="button"
+                                className="se-btn-order"
+                                disabled={qIdx === 0 || saving}
+                                onClick={() => handleReorderQuestion(block.id, qIdx, 'up')}
+                                title="Mover pergunta para cima"
+                              >
+                                <ArrowUp size={11} />
+                              </button>
+                              <button
+                                type="button"
+                                className="se-btn-order"
+                                disabled={qIdx === (block.questions?.length ?? 1) - 1 || saving}
+                                onClick={() => handleReorderQuestion(block.id, qIdx, 'down')}
+                                title="Mover pergunta para baixo"
+                              >
+                                <ArrowDown size={11} />
+                              </button>
+                            </div>
+                          </div>
                           <div>
                             <div className="se-q-header">
                               <span className="se-q-text">{q.question_text}</span>
@@ -409,6 +672,24 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
                         </div>
 
                         <div className="se-q-actions">
+                          {survey.blocks && survey.blocks.length > 1 && (
+                            <div className="se-move-block-wrap" title="Mover pergunta para outra seção">
+                              <FolderInput size={13} className="se-move-icon" />
+                              <select
+                                className="se-select-move-block"
+                                value={block.id}
+                                onChange={(e) => handleMoveQuestion(q.id, block.id, e.target.value)}
+                              >
+                                <option value={block.id} disabled>Mover p/ seção...</option>
+                                {survey.blocks.map((otherBlock, oIdx) => (
+                                  <option key={otherBlock.id} value={otherBlock.id} disabled={otherBlock.id === block.id}>
+                                    Seção {oIdx + 1}: {cleanBlockTitle(otherBlock.title)}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
                           <button
                             type="button"
                             className={`se-btn-toggle ${q.is_active ? 'se-btn-active' : 'se-btn-inactive'}`}
@@ -467,6 +748,25 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
             </div>
 
             <form onSubmit={handleSaveQuestion} className="se-drawer-form">
+              {/* Seletor de Seção / Bloco */}
+              {survey.blocks && survey.blocks.length > 0 && (
+                <div className="se-field">
+                  <label className="se-label">Seção / Etapa do Questionário *</label>
+                  <select
+                    className="se-select"
+                    value={selectedBlockId}
+                    onChange={(e) => setSelectedBlockId(e.target.value)}
+                    required
+                  >
+                    {survey.blocks.map((b, idx) => (
+                      <option key={b.id} value={b.id}>
+                        Seção {idx + 1}: {cleanBlockTitle(b.title)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Título da Pergunta */}
               <div className="se-field">
                 <label className="se-label">Enunciado / Pergunta *</label>
@@ -811,7 +1111,7 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
                   className="se-input"
                   value={newBlockTitle}
                   onChange={(e) => setNewBlockTitle(e.target.value)}
-                  placeholder="Ex: BLOCO B — Satisfação e Benefícios"
+                  placeholder="Ex: Satisfação e Benefícios"
                   required
                   autoFocus
                 />
@@ -832,6 +1132,194 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
                 </button>
                 <button type="submit" className="se-btn-save" disabled={saving}>
                   {saving ? 'Criando...' : 'Criar Seção'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edit Block */}
+      {editingBlock && (
+        <div className="se-modal-overlay" onClick={() => setEditingBlock(null)}>
+          <div className="se-modal-box" onClick={(e) => e.stopPropagation()}>
+            <h3>Editar Seção</h3>
+            <form onSubmit={handleSaveBlock} className="se-modal-form">
+              <div className="se-field">
+                <label className="se-label">Título da Seção *</label>
+                <input
+                  type="text"
+                  className="se-input"
+                  value={editingBlock.title}
+                  onChange={(e) => setEditingBlock({ ...editingBlock, title: e.target.value })}
+                  placeholder="Ex: Satisfação e Benefícios"
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="se-field">
+                <label className="se-label">Descrição (Opcional)</label>
+                <input
+                  type="text"
+                  className="se-input"
+                  value={editingBlock.description}
+                  onChange={(e) => setEditingBlock({ ...editingBlock, description: e.target.value })}
+                  placeholder="Instruções gerais sobre as perguntas desta seção"
+                />
+              </div>
+              <div className="se-modal-actions">
+                <button type="button" onClick={() => setEditingBlock(null)} className="se-btn-cancel">
+                  Cancelar
+                </button>
+                <button type="submit" className="se-btn-save" disabled={saving}>
+                  {saving ? 'Salvando...' : 'Salvar Alterações'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Editar Informações da Pesquisa, Texto e Logomarca */}
+      {showEditSurveyModal && (
+        <div className="se-modal-overlay" onClick={() => setShowEditSurveyModal(false)}>
+          <div className="se-modal-box se-modal-survey-info" onClick={(e) => e.stopPropagation()}>
+            <div className="se-modal-header-row">
+              <div className="flex items-center gap-2">
+                <Settings size={20} className="text-[#C9A227]" />
+                <h3>Editar Dados & Identidade da Pesquisa</h3>
+              </div>
+              <button type="button" onClick={() => setShowEditSurveyModal(false)} className="se-close-btn">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSurveyInfo} className="se-modal-form">
+              {/* Título */}
+              <div className="se-field">
+                <label className="se-label">Título da Pesquisa *</label>
+                <input
+                  type="text"
+                  className="se-input"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Ex: Censo & Diagnóstico Institucional 2026"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              {/* Texto de Apresentação / Descrição */}
+              <div className="se-field">
+                <label className="se-label">Texto de Apresentação / Introdução da Pesquisa</label>
+                <textarea
+                  className="se-input"
+                  rows={3}
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  placeholder="Explique o objetivo deste formulário, tempo estimado e orientações aos participantes..."
+                />
+              </div>
+
+              {/* Slug da URL */}
+              <div className="se-field">
+                <label className="se-label">Identificador na URL (Slug)</label>
+                <input
+                  type="text"
+                  className="se-input"
+                  value={editSlug}
+                  onChange={(e) => setEditSlug(e.target.value)}
+                  placeholder="ex: censo-institucional-2026"
+                  required
+                />
+                <small style={{ color: '#6B7280', fontSize: '0.75rem' }}>Link público: /pesquisas/{editSlug || '...'}</small>
+              </div>
+
+              {/* IDENTIDADE VISUAL: LOGOMARCA VS TEXTO */}
+              <div className="se-field">
+                <label className="se-label">Identidade Visual & Logomarca no Cabeçalho</label>
+                <div className="se-logo-mode-grid">
+                  <button
+                    type="button"
+                    className={`se-logo-mode-card ${editLogoMode === 'official' ? 'active' : ''}`}
+                    onClick={() => {
+                      setEditLogoMode('official');
+                      setEditLogoUrl('/logoconexao_red.png');
+                    }}
+                  >
+                    <div className="se-lmc-header">
+                      <ImageIcon size={16} className="text-[#C9A227]" />
+                      <strong>Logomarca Oficial</strong>
+                    </div>
+                    <span className="se-lmc-desc">Brasão oficial e marca Conexão Maçônica</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`se-logo-mode-card ${editLogoMode === 'custom' ? 'active' : ''}`}
+                    onClick={() => setEditLogoMode('custom')}
+                  >
+                    <div className="se-lmc-header">
+                      <ImageIcon size={16} className="text-blue-500" />
+                      <strong>Logo Personalizada</strong>
+                    </div>
+                    <span className="se-lmc-desc">URL de imagem de Loja ou Patrocinador</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`se-logo-mode-card ${editLogoMode === 'none' ? 'active' : ''}`}
+                    onClick={() => setEditLogoMode('none')}
+                  >
+                    <div className="se-lmc-header">
+                      <FileText size={16} className="text-gray-500" />
+                      <strong>Apenas Nome (Texto)</strong>
+                    </div>
+                    <span className="se-lmc-desc">Exibe apenas badge textual, sem imagem</span>
+                  </button>
+                </div>
+
+                {/* Input para URL Customizada se selecionado */}
+                {editLogoMode === 'custom' && (
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <label className="se-label" style={{ fontSize: '0.75rem' }}>URL da Imagem do Logotipo:</label>
+                    <input
+                      type="text"
+                      className="se-input"
+                      value={editLogoUrl}
+                      onChange={(e) => setEditLogoUrl(e.target.value)}
+                      placeholder="https://exemplo.com/logotipo.png ou /logoconexao_red.png"
+                      required
+                    />
+                  </div>
+                )}
+
+                {/* Live Preview da Marca */}
+                <div style={{ marginTop: '0.75rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: '0.25rem' }}>
+                    Pré-visualização da Marca:
+                  </span>
+                  <div className="se-logo-preview-box">
+                    {editLogoMode !== 'none' ? (
+                      <img
+                        src={editLogoMode === 'official' ? '/logoconexao_red.png' : (editLogoUrl || '/logoconexao_red.png')}
+                        alt="Prévia da Logomarca"
+                        className="se-logo-preview-img"
+                      />
+                    ) : (
+                      <span className="se-p-badge" style={{ marginBottom: 0 }}>Conexão Maçônica</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Botões de Ação */}
+              <div className="se-modal-actions">
+                <button type="button" onClick={() => setShowEditSurveyModal(false)} className="se-btn-cancel">
+                  Cancelar
+                </button>
+                <button type="submit" className="se-btn-save" disabled={saving}>
+                  {saving ? 'Salvando...' : 'Salvar Alterações'}
                 </button>
               </div>
             </form>
@@ -870,9 +1358,19 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
             <div className={`se-preview-content ${previewDevice}`}>
               <div className="se-preview-frame">
                 <div className="se-p-header">
-                  <span className="se-p-badge">Conexão Maçônica</span>
+                  {survey.show_logo !== false ? (
+                    <div className="se-p-logo-wrap">
+                      <img
+                        src={survey.logo_url || '/logoconexao_red.png'}
+                        alt="Logomarca Conexão Maçônica"
+                        className="se-p-logo-img"
+                      />
+                    </div>
+                  ) : (
+                    <span className="se-p-badge">Conexão Maçônica</span>
+                  )}
                   <h2>{survey.title}</h2>
-                  <p>{survey.description}</p>
+                  {survey.description && <p>{survey.description}</p>}
                 </div>
 
                 <div className="se-p-body">
@@ -880,7 +1378,7 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
                     ?.filter((b) => b.is_active)
                     .map((block) => (
                       <div key={block.id} className="se-p-block">
-                        <h4>{block.title}</h4>
+                        <h4>{cleanBlockTitle(block.title)}</h4>
                         {block.questions
                           ?.filter((q) => q.is_active)
                           .map((q) => (
@@ -1009,8 +1507,18 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
         .se-question-item:hover { border-color: #3B0B14; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
         .se-question-hidden { background: #F9FAFB; border-style: dashed; }
         .se-q-left { display: flex; align-items: center; gap: 0.75rem; }
+        .se-q-order-box { display: flex; align-items: center; gap: 0.35rem; }
+        .se-q-order-btns { display: flex; flex-direction: column; gap: 2px; }
+        .se-btn-order {
+          display: flex; align-items: center; justify-content: center;
+          background: #FAF8F5; border: 1px solid #D1D5DB; border-radius: 4px;
+          padding: 2px 3px; cursor: pointer; color: #4B5563; line-height: 1;
+          transition: all 0.15s;
+        }
+        .se-btn-order:hover:not(:disabled) { background: #3B0B14; color: #C9A227; border-color: #3B0B14; }
+        .se-btn-order:disabled { opacity: 0.25; cursor: not-allowed; }
         .se-q-header { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-        .se-q-num { font-size: 0.75rem; font-weight: 800; color: #3B0B14; background: #F3F4F6; padding: 0.125rem 0.375rem; border-radius: 4px; }
+        .se-q-num { font-size: 0.75rem; font-weight: 800; color: #3B0B14; background: #F3F4F6; padding: 0.2rem 0.45rem; border-radius: 4px; }
         .se-q-text { font-size: 0.9375rem; font-weight: 700; color: #111827; }
         .se-badge-req { font-size: 0.6875rem; background: #FEF2F2; color: #991B1B; font-weight: 700; padding: 0.125rem 0.375rem; border-radius: 4px; }
         .se-badge-hidden { font-size: 0.6875rem; background: #F3F4F6; color: #6B7280; font-weight: 700; padding: 0.125rem 0.375rem; border-radius: 4px; }
@@ -1020,6 +1528,17 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
         .se-q-opts-count { font-weight: 500; color: #9CA3AF; }
 
         .se-q-actions { display: flex; align-items: center; gap: 0.375rem; }
+        .se-move-block-wrap {
+          display: inline-flex; align-items: center; gap: 0.25rem;
+          background: #FAF8F5; border: 1px solid #D1D5DB; border-radius: 6px;
+          padding: 0.2rem 0.4rem; transition: border-color 0.15s;
+        }
+        .se-move-block-wrap:hover { border-color: #3B0B14; }
+        .se-move-icon { color: #8A6D3B; flex-shrink: 0; }
+        .se-select-move-block {
+          background: transparent; border: none; font-size: 0.6875rem; font-weight: 600;
+          color: #374151; cursor: pointer; outline: none; padding: 0; max-width: 130px;
+        }
         .se-btn-toggle { display: flex; align-items: center; gap: 0.25rem; padding: 0.375rem 0.625rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
         .se-btn-active { background: #ECFDF5; color: #065F46; border: 1px solid #6EE7B7; }
         .se-btn-inactive { background: #F3F4F6; color: #6B7280; border: 1px solid #D1D5DB; }
@@ -1087,12 +1606,33 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
         .se-btn-cancel { padding: 0.625rem 1.25rem; background: #F3F4F6; border: 1px solid #D1D5DB; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.875rem; }
         .se-btn-save { padding: 0.625rem 1.5rem; background: #3B0B14; color: #C9A227; border: 1px solid rgba(201,162,39,0.4); border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.875rem; }
 
+        /* Header Title & Branding */
+        .se-title-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.25rem; }
+        .se-header-brand-wrap { background: #FFFFFF; border: 1.5px solid #E5E0D8; border-radius: 8px; padding: 0.2rem 0.625rem; display: flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .se-header-logo-thumb { height: 26px; max-width: 120px; object-fit: contain; }
+        .se-btn-edit-survey { display: inline-flex; align-items: center; gap: 0.375rem; background: #FAF8F5; border: 1.5px solid #E5E0D8; color: #3B0B14; font-size: 0.75rem; font-weight: 700; padding: 0.35rem 0.75rem; border-radius: 8px; cursor: pointer; transition: all 0.15s; }
+        .se-btn-edit-survey:hover { background: #F3ECE1; border-color: #C9A227; }
+
         /* Modal Box */
         .se-modal-overlay { position: fixed; inset: 0; z-index: 999; background: rgba(15,23,42,0.6); display: flex; align-items: center; justify-content: center; padding: 1rem; }
         .se-modal-box { background: #FFFFFF; width: 100%; max-width: 480px; border-radius: 16px; padding: 1.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .se-modal-survey-info { max-width: 580px; }
+        .se-modal-header-row { display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.75rem; border-bottom: 1px solid #E5E0D8; margin-bottom: 1rem; }
+        .se-modal-header-row h3 { margin: 0; font-size: 1.125rem; font-weight: 800; color: #111827; font-family: serif; }
         .se-modal-box h3 { margin-top: 0; font-size: 1.125rem; font-weight: 700; color: #111827; font-family: serif; }
         .se-modal-form { display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem; }
         .se-modal-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.5rem; }
+
+        /* Logo Branding Mode Selector */
+        .se-logo-mode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.625rem; margin-top: 0.375rem; }
+        .se-logo-mode-card { border: 1.5px solid #E5E0D8; border-radius: 10px; padding: 0.625rem; background: #FFFFFF; cursor: pointer; text-align: left; display: flex; flex-direction: column; gap: 0.25rem; transition: all 0.15s; }
+        .se-logo-mode-card:hover { border-color: #3B0B14; background: #FFFDF9; }
+        .se-logo-mode-card.active { border-color: #3B0B14; background: #FAF8F5; box-shadow: 0 0 0 2px rgba(59,11,20,0.15); }
+        .se-lmc-header { display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem; font-weight: 700; color: #111827; }
+        .se-lmc-desc { font-size: 0.6875rem; color: #6B7280; line-height: 1.25; }
+
+        .se-logo-preview-box { background: #FAF8F5; border: 1px dashed #E5E0D8; border-radius: 10px; padding: 0.75rem; display: flex; align-items: center; justify-content: center; min-height: 56px; }
+        .se-logo-preview-img { max-height: 48px; max-width: 190px; object-fit: contain; }
 
         /* Preview Modal */
         .se-preview-overlay { position: fixed; inset: 0; z-index: 999; background: rgba(15,23,42,0.75); display: flex; align-items: center; justify-content: center; padding: 1rem; }
@@ -1106,6 +1646,8 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
         .se-preview-content.desktop .se-preview-frame { width: 100%; max-width: 760px; height: 100%; border-radius: 12px; border: 2px solid #334155; }
         .se-preview-frame { background: #FAF8F5; overflow-y: auto; display: flex; flex-direction: column; }
         .se-p-header { background: #3B0B14; color: #FFFFFF; padding: 1.5rem; text-align: center; }
+        .se-p-logo-wrap { display: flex; justify-content: center; align-items: center; margin-bottom: 0.75rem; }
+        .se-p-logo-img { max-height: 48px; max-width: 190px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25)); }
         .se-p-badge { font-size: 0.6875rem; font-weight: 800; color: #C9A227; text-transform: uppercase; letter-spacing: 0.1em; display: block; margin-bottom: 0.25rem; }
         .se-p-header h2 { margin: 0; font-size: 1.25rem; font-weight: 800; font-family: serif; }
         .se-p-header p { margin: 0.25rem 0 0; font-size: 0.8125rem; color: #D1D5DB; }

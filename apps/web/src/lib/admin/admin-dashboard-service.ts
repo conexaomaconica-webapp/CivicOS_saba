@@ -195,7 +195,7 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
       try {
         const { data: businessesData } = await (dbClient as any)
           .from('businesses')
-          .select('id, name, category, publication_status, plan_code, plan_tier, is_active, is_founder, is_pedra_fundamental, owner_id, created_at, logo_url, banner_url, description, whatsapp, phone, address, city, state, cnpj_cpf')
+          .select('id, name, category, publication_status, plan_tier, is_active, owner_id, created_at, logo_url, description, phone, email, website, address, cnpj, legal_name, slug')
           .order('created_at', { ascending: false });
 
         businesses = (businessesData || []) as any[];
@@ -203,6 +203,36 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
         businesses = [];
       }
     }
+
+    // 3.1 Assinaturas Reais do Banco
+    let subscriptions: any[] = [];
+    if (typeof dbClient.from === 'function') {
+      try {
+        const { data: subsData } = await (dbClient as any)
+          .from('subscriptions')
+          .select('id, business_id, tenant_id, status, plan_version_id, created_at, plan_versions(id, plan_id, plans(code, name))');
+        subscriptions = (subsData || []) as any[];
+      } catch {
+        subscriptions = [];
+      }
+    }
+    const activeSubscriptionsList = subscriptions.filter((s) => s.status === 'active');
+    const activeSubscriptionsCount = activeSubscriptionsList.length;
+
+    // 3.2 Reconhecimentos Canônicos (Pedra Fundamental / Fundadora / Coluna de Honra)
+    let recognitions: any[] = [];
+    if (typeof dbClient.from === 'function') {
+      try {
+        const { data: recData } = await (dbClient as any)
+          .from('business_recognitions')
+          .select('id, business_id, recognition_key, is_active');
+        recognitions = (recData || []) as any[];
+      } catch {
+        recognitions = [];
+      }
+    }
+    const pedraFundamentalBadgeCount = recognitions.filter((r) => r.recognition_key === 'pedra_fundamental' && r.is_active).length;
+    const founderBadgeCount = recognitions.filter((r) => r.recognition_key === 'fundadora' && r.is_active).length;
 
     // Métricas reais de empresas
     const totalCompanies = businesses.length;
@@ -222,31 +252,28 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
       growthPercent = 100;
     }
 
-    // 3.2 Planos Comerciais
+    // 3.3 Planos Comerciais
     const bronzeCount = businesses.filter((b) => {
-      const code = (b.plan_code || b.plan_tier || 'bronze').toLowerCase();
-      return code === 'bronze';
+      const code = (b.plan_tier || 'bronze').toLowerCase();
+      return code === 'bronze' || code === 'esquadro';
     }).length;
 
     const prataCount = businesses.filter((b) => {
-      const code = (b.plan_code || b.plan_tier || '').toLowerCase();
-      return code === 'prata';
+      const code = (b.plan_tier || '').toLowerCase();
+      return code === 'prata' || code === 'compasso';
     }).length;
 
     const ouroCount = businesses.filter((b) => {
-      const code = (b.plan_code || b.plan_tier || '').toLowerCase();
-      return code === 'ouro' || code === 'ouro_founder';
+      const code = (b.plan_tier || '').toLowerCase();
+      return code === 'ouro' || code === 'acacia' || code === 'ouro_founder';
     }).length;
-
-    const founderBadgeCount = businesses.filter((b) => Boolean(b.is_founder)).length;
-    const pedraFundamentalBadgeCount = businesses.filter((b) => Boolean(b.is_pedra_fundamental)).length;
 
     const totalCommercial = (bronzeCount + prataCount + ouroCount) || 1;
     const bronzePercent = Math.round((bronzeCount / totalCommercial) * 100);
     const prataPercent = Math.round((prataCount / totalCommercial) * 100);
     const ouroPercent = Math.round((ouroCount / totalCommercial) * 100);
 
-    // 3.3 Lojas Maçônicas (organizations)
+    // 3.4 Lojas Maçônicas (organizations)
     let publishedLodgesCount = 0;
     let lodgesWithoutCoordinates = 0;
     let newLodges30d = 0;
@@ -264,7 +291,7 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
       // Ignora erro se tabela não estiver disponível
     }
 
-    // 3.4 Usuários Novos 30d
+    // 3.5 Usuários Novos 30d
     let newUsers30d = 0;
     try {
       const { count } = await (dbClient as any)
@@ -276,7 +303,7 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
       // Ignora erro se profiles não estiver disponível
     }
 
-    // 3.5 Financeiro e Faturas
+    // 3.6 Financeiro e Faturas
     let confirmedPaymentsCount = 0;
     let pendingPaymentsCount = 0;
     let overduePaymentsCount = 0;
@@ -304,48 +331,48 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
         annualRevenueBrl = Math.round(totalPaidAmount);
         monthlyRevenueBrl = Math.round(annualRevenueBrl / 12);
       } else {
-        // Recorrência calculada pelos planos comerciais das empresas publicadas
-        monthlyRevenueBrl = (prataCount * 149) + (ouroCount * 199);
-        annualRevenueBrl = (prataCount * 1788) + (ouroCount * 2388);
-        confirmedPaymentsCount = publishedCompanies;
+        // Recorrência calculada pelas assinaturas ativas reais (Plano Ouro/Acácia = R$ 1.080,00 anual, R$ 90,00 mensal)
+        monthlyRevenueBrl = activeSubscriptionsCount * 90;
+        annualRevenueBrl = activeSubscriptionsCount * 1080;
+        confirmedPaymentsCount = activeSubscriptionsCount;
         pendingPaymentsCount = pendingCompanies;
       }
     } catch {
-      // Fallback por plano
-      monthlyRevenueBrl = (prataCount * 149) + (ouroCount * 199);
-      annualRevenueBrl = (prataCount * 1788) + (ouroCount * 2388);
-      confirmedPaymentsCount = publishedCompanies;
+      // Fallback pelas assinaturas ativas reais
+      monthlyRevenueBrl = activeSubscriptionsCount * 90;
+      annualRevenueBrl = activeSubscriptionsCount * 1080;
+      confirmedPaymentsCount = activeSubscriptionsCount;
       pendingPaymentsCount = pendingCompanies;
     }
 
-    // 3.6 Perfis Incompletos (< 70% de dados essenciais)
+    // 3.7 Perfis Incompletos (< 70% de dados essenciais)
     const incompleteProfilesCount = businesses.filter((b) => {
       let score = 0;
       if (b.owner_id) score += 15;
       if (b.name && b.name.trim().length > 0) score += 15;
       if (b.logo_url) score += 15;
       if (b.description && b.description.trim().length > 10) score += 15;
-      if (b.whatsapp || b.phone) score += 15;
-      if (b.city || b.address) score += 15;
-      if (b.cnpj_cpf) score += 10;
+      if (b.phone) score += 15;
+      if (b.address) score += 15;
+      if (b.cnpj) score += 10;
       return score < 70;
     }).length;
 
-    // 3.7 Últimas Solicitações de Anúncio Reais (Até 5 empresas mais recentes)
+    // 3.8 Últimas Solicitações de Anúncio Reais (Até 5 empresas mais recentes)
     // Coleta dados dos proprietários reais de profiles
     const ownerIds = businesses.map((b) => b.owner_id).filter(Boolean);
-    let profilesMap = new Map<string, { full_name: string; email: string }>();
+    let profilesMap = new Map<string, { name: string; email: string }>();
 
     if (ownerIds.length > 0) {
       try {
         const { data: ownersData } = await (dbClient as any)
           .from('profiles')
-          .select('id, full_name, email')
+          .select('id, name, email')
           .in('id', ownerIds);
 
         if (ownersData) {
           ownersData.forEach((p: any) => {
-            profilesMap.set(p.id, { full_name: p.full_name, email: p.email });
+            profilesMap.set(p.id, { name: p.name, email: p.email });
           });
         }
       } catch {
@@ -355,25 +382,25 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
 
     const recentApplications: RecentApplicationDTO[] = businesses.slice(0, 5).map((b) => {
       const owner = b.owner_id ? profilesMap.get(b.owner_id) : null;
+      const sub = activeSubscriptionsList.find((s) => s.business_id === b.id);
       let completeness = 0;
       if (b.owner_id) completeness += 15;
       if (b.name && b.name.trim().length > 0) completeness += 15;
-      if (b.logo_url) completeness += 10;
-      if (b.banner_url) completeness += 10;
-      if (b.description && b.description.trim().length > 10) completeness += 10;
-      if (b.whatsapp || b.phone) completeness += 10;
-      if (b.address || b.city) completeness += 10;
-      if (b.cnpj_cpf) completeness += 10;
-      if (b.publication_status === 'published' || (b.plan_code && b.plan_code !== 'bronze')) completeness += 10;
+      if (b.logo_url) completeness += 15;
+      if (b.description && b.description.trim().length > 10) completeness += 15;
+      if (b.phone) completeness += 15;
+      if (b.address) completeness += 15;
+      if (b.cnpj) completeness += 10;
+      if (b.publication_status === 'published') completeness += 15;
 
-      const planCode = (b.plan_code || b.plan_tier || 'bronze').toLowerCase();
-      const isPaid = planCode === 'bronze' || b.publication_status === 'published';
+      const planCode = (sub?.plan_versions?.plans?.code || b.plan_tier || 'bronze').toLowerCase();
+      const isPaid = Boolean(sub) || b.publication_status === 'published';
 
       return {
         id: b.id,
         name: b.name || 'Empresa Sem Nome',
         category: b.category || 'Comércio & Serviços',
-        owner_name: owner?.full_name || 'Anunciante Titular',
+        owner_name: owner?.name || 'Anunciante Titular',
         owner_email: owner?.email || b.email || 'Não informado',
         plan_code: planCode,
         completeness_percent: Math.min(completeness, 100),
@@ -490,7 +517,7 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
         prata: prataCount,
         ouro: ouroCount,
         founder: founderBadgeCount,
-        total: publishedCompanies,
+        total: activeSubscriptionsCount,
       },
       finance: {
         monthly_revenue_brl: monthlyRevenueBrl,
@@ -512,7 +539,7 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
       kpis: {
         activeCompanies: publishedCompanies,
         pendingApprovals: pendingCompanies,
-        activeSubscriptions: publishedCompanies,
+        activeSubscriptions: activeSubscriptionsCount,
         confirmedMonthlyRevenueBrl: monthlyRevenueBrl,
         confirmedAnnualRevenueBrl: annualRevenueBrl,
         pendingPaymentsCount: pendingPaymentsCount,

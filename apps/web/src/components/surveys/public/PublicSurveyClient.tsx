@@ -12,6 +12,11 @@ import {
 import type { Survey, SurveyBlock } from '@/types/surveys';
 import { submitSurveyResponseAction } from '@/app/actions/surveys';
 
+export function cleanBlockTitle(title: string): string {
+  if (!title) return '';
+  return title.replace(/^bloco\s+[a-z0-9]+\s*[-—–:]\s*/i, '').trim() || title;
+}
+
 interface Props {
   survey: Survey;
 }
@@ -35,7 +40,7 @@ export function PublicSurveyClient({ survey }: Props) {
   const [isCompleted, setIsCompleted] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Determine if Bloco B should be shown based on Trigger Question A5
+  // Determine if bloco de negócios should be shown based on Trigger Question A5
   const hasBusiness = () => {
     // Find trigger question A5 answer
     const triggerAnswer = Object.values(answers).find((ans) =>
@@ -47,8 +52,9 @@ export function PublicSurveyClient({ survey }: Props) {
   // Compute visible blocks array dynamically based on conditional rules
   const getVisibleBlocks = (): SurveyBlock[] => {
     return activeBlocks.filter((block) => {
-      // If block title contains "BLOCO B", check if hasBusiness is true or if trigger isn't answered yet
-      if (block.title.includes('BLOCO B')) {
+      const lower = block.title.toLowerCase();
+      // If block title contains "negócio" or "bloco b", check if hasBusiness is true
+      if (lower.includes('negócio') || lower.includes('bloco b')) {
         return hasBusiness();
       }
       return true;
@@ -195,7 +201,14 @@ export function PublicSurveyClient({ survey }: Props) {
       {/* Sticky Progress Bar Header */}
       <div className="ps-progress-bar-wrap">
         <div className="ps-progress-info">
-          <span className="ps-brand">Conexão Maçônica • Pesquisa Institucional</span>
+          <div className="ps-brand-wrap">
+            <img
+              src="/icone.png"
+              alt="Conexão Maçônica"
+              className="ps-brand-icon"
+            />
+            <span className="ps-brand">Conexão Maçônica • Pesquisa Institucional</span>
+          </div>
           <span className="ps-progress-step">Etapa {currentBlockIndex + 1} de {totalSteps}</span>
         </div>
         <div className="ps-progress-track">
@@ -207,9 +220,19 @@ export function PublicSurveyClient({ survey }: Props) {
       <div className="ps-card">
         {/* Survey Title Header */}
         <div className="ps-header">
-          <span className="ps-badge">Conexão Maçônica</span>
+          {survey.show_logo !== false ? (
+            <div className="ps-logo-container">
+              <img
+                src={survey.logo_url || '/logoconexao_red.png'}
+                alt="Conexão Maçônica"
+                className="ps-logo-img"
+              />
+            </div>
+          ) : (
+            <span className="ps-badge">Conexão Maçônica</span>
+          )}
           <h1 className="ps-title">{survey.title}</h1>
-          <p className="ps-subtitle">{survey.description}</p>
+          {survey.description && <p className="ps-subtitle">{survey.description}</p>}
         </div>
 
         {errorMessage && (
@@ -223,7 +246,7 @@ export function PublicSurveyClient({ survey }: Props) {
         {!isFinalStep && currentBlock && (
           <div className="ps-block-step">
             <div className="ps-block-title-box">
-              <h2>{currentBlock.title}</h2>
+              <h2>{cleanBlockTitle(currentBlock.title)}</h2>
               {currentBlock.description && <p>{currentBlock.description}</p>}
             </div>
 
@@ -418,12 +441,16 @@ export function PublicSurveyClient({ survey }: Props) {
           padding: 0.75rem 1rem; margin-bottom: 1.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
         }
         .ps-progress-info { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; font-weight: 700; color: #FFFFFF; margin-bottom: 0.5rem; }
+        .ps-brand-wrap { display: flex; align-items: center; gap: 0.5rem; }
+        .ps-brand-icon { width: 18px; height: 18px; object-fit: contain; }
         .ps-brand { color: #C9A227; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.6875rem; }
         .ps-progress-track { height: 6px; background: rgba(255,255,255,0.15); border-radius: 4px; overflow: hidden; }
         .ps-progress-fill { height: 100%; background: linear-gradient(90deg, #C9A227 0%, #E6C659 100%); transition: width 0.3s ease; }
 
         .ps-card { background: #FFFFFF; border: 1px solid #E5E0D8; border-radius: 20px; padding: 2rem 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.04); }
         .ps-header { text-align: center; border-bottom: 1px solid #F0ECE6; padding-bottom: 1.5rem; margin-bottom: 1.5rem; }
+        .ps-logo-container { display: flex; justify-content: center; align-items: center; margin-bottom: 1rem; }
+        .ps-logo-img { max-height: 64px; max-width: 260px; width: auto; height: auto; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05)); }
         .ps-badge { display: inline-block; background: #3B0B14; color: #C9A227; font-size: 0.6875rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; padding: 0.25rem 0.625rem; border-radius: 6px; margin-bottom: 0.5rem; }
         .ps-title { font-size: 1.5rem; font-weight: 800; color: #1C0D10; margin: 0 0 0.5rem; }
         .ps-subtitle { font-size: 0.875rem; color: #6B5E62; margin: 0; line-height: 1.5; }

@@ -285,6 +285,8 @@ export async function publishSurveyVersionAction(surveyId: string) {
       version: nextVersion,
       published_at: new Date().toISOString(),
       survey_title: survey.title,
+      logo_url: survey.logo_url,
+      show_logo: survey.show_logo,
       blocks: survey.blocks,
     };
 
@@ -668,6 +670,8 @@ export async function createSurveyAction(payload: {
   title: string;
   description?: string;
   slug?: string;
+  logo_url?: string;
+  show_logo?: boolean;
 }) {
   try {
     const { client: supabase, user } = await getSurveysAdminClient();
@@ -699,6 +703,8 @@ export async function createSurveyAction(payload: {
         title: payload.title.trim(),
         description: payload.description?.trim() || null,
         slug: cleanSlug,
+        logo_url: payload.logo_url || '/logoconexao_red.png',
+        show_logo: payload.show_logo ?? true,
         status: 'draft',
         current_version: 1,
         created_by: user.id,
@@ -755,11 +761,17 @@ export async function toggleSurveyStatusAction(
 }
 
 /**
- * Atualiza título, descrição ou slug da pesquisa.
+ * Atualiza título, descrição, slug ou configurações de marca da pesquisa.
  */
 export async function updateSurveyDetailsAction(
   surveyId: string,
-  payload: { title: string; description?: string; slug?: string }
+  payload: {
+    title: string;
+    description?: string;
+    slug?: string;
+    logo_url?: string | null;
+    show_logo?: boolean;
+  }
 ) {
   try {
     const { client: supabase } = await getSurveysAdminClient();
@@ -768,6 +780,14 @@ export async function updateSurveyDetailsAction(
       description: payload.description?.trim() || null,
       updated_at: new Date().toISOString(),
     };
+
+    if (payload.logo_url !== undefined) {
+      updateData.logo_url = payload.logo_url ? payload.logo_url.trim() : '/logoconexao_red.png';
+    }
+
+    if (payload.show_logo !== undefined) {
+      updateData.show_logo = Boolean(payload.show_logo);
+    }
 
     if (payload.slug) {
       updateData.slug = payload.slug
@@ -785,6 +805,7 @@ export async function updateSurveyDetailsAction(
 
     if (error) throw error;
     revalidatePath('/admin/pesquisas');
+    revalidatePath(`/admin/pesquisas/${surveyId}/editor`);
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao atualizar dados da pesquisa.' };
@@ -809,4 +830,75 @@ export async function deleteSurveyAction(surveyId: string) {
     return { success: false, error: err.message || 'Erro ao excluir pesquisa.' };
   }
 }
+
+/**
+ * Move uma pergunta para outro bloco da pesquisa.
+ */
+export async function moveQuestionToBlockAction(
+  surveyId: string,
+  questionId: string,
+  targetBlockId: string
+) {
+  try {
+    const { client: supabase } = await getSurveysAdminClient();
+
+    // Obtém o maior order_index do bloco de destino
+    const { data: existingQuestions } = await (supabase as any)
+      .from('survey_questions')
+      .select('order_index')
+      .eq('block_id', targetBlockId)
+      .order('order_index', { ascending: false })
+      .limit(1);
+
+    const nextOrder = (existingQuestions?.[0]?.order_index || 0) + 1;
+
+    const { error } = await (supabase as any)
+      .from('survey_questions')
+      .update({
+        block_id: targetBlockId,
+        order_index: nextOrder,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', questionId);
+
+    if (error) throw error;
+
+    revalidatePath(`/admin/pesquisas/${surveyId}/editor`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Erro ao mover pergunta para o bloco.' };
+  }
+}
+
+/**
+ * Reordena as perguntas dentro de um bloco.
+ */
+export async function reorderSurveyQuestionsAction(
+  surveyId: string,
+  blockId: string,
+  orderedQuestionIds: string[]
+) {
+  try {
+    const { client: supabase } = await getSurveysAdminClient();
+
+    const updates = orderedQuestionIds.map((qId, index) =>
+      (supabase as any)
+        .from('survey_questions')
+        .update({
+          order_index: index + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', qId)
+        .eq('block_id', blockId)
+    );
+
+    await Promise.all(updates);
+
+    revalidatePath(`/admin/pesquisas/${surveyId}/editor`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Erro ao reordenar perguntas.' };
+  }
+}
+
 

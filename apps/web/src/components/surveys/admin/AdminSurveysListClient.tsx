@@ -18,6 +18,8 @@ import {
   Calendar,
   Layers,
   Settings,
+  Image as ImageIcon,
+  FileText,
 } from 'lucide-react';
 import type { Survey } from '@/types/surveys';
 import {
@@ -42,12 +44,16 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newSlug, setNewSlug] = useState('');
+  const [newLogoMode, setNewLogoMode] = useState<'official' | 'custom' | 'none'>('official');
+  const [newLogoUrl, setNewLogoUrl] = useState('/logoconexao_red.png');
   const [saving, setSaving] = useState(false);
 
   // Edit states
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
   const [editSlug, setEditSlug] = useState('');
+  const [editLogoMode, setEditLogoMode] = useState<'official' | 'custom' | 'none'>('official');
+  const [editLogoUrl, setEditLogoUrl] = useState('/logoconexao_red.png');
 
   // Status feedback
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -63,10 +69,20 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
     if (!newTitle.trim()) return;
 
     setSaving(true);
+    const showLogo = newLogoMode !== 'none';
+    const logoUrl =
+      newLogoMode === 'official'
+        ? '/logoconexao_red.png'
+        : newLogoMode === 'custom'
+        ? (newLogoUrl.trim() || '/logoconexao_red.png')
+        : null;
+
     const res = await createSurveyAction({
       title: newTitle.trim(),
       description: newDescription.trim() || undefined,
       slug: newSlug.trim() || undefined,
+      logo_url: logoUrl || undefined,
+      show_logo: showLogo,
     });
     setSaving(false);
 
@@ -75,6 +91,8 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
       setNewTitle('');
       setNewDescription('');
       setNewSlug('');
+      setNewLogoMode('official');
+      setNewLogoUrl('/logoconexao_red.png');
       showFeedback('success', 'Pesquisa criada com sucesso! Redirecionando para o editor...');
       // Leva direto para o construtor visual de perguntas
       router.push(`/admin/pesquisas/${res.data.id}/editor`);
@@ -107,6 +125,9 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
     setEditTitle(survey.title);
     setEditDesc(survey.description || '');
     setEditSlug(survey.slug);
+    const isCustom = survey.logo_url && survey.logo_url !== '/logoconexao_red.png';
+    setEditLogoMode(survey.show_logo === false ? 'none' : isCustom ? 'custom' : 'official');
+    setEditLogoUrl(survey.logo_url || '/logoconexao_red.png');
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -114,10 +135,20 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
     if (!editingSurvey || !editTitle.trim()) return;
 
     setSaving(true);
+    const showLogo = editLogoMode !== 'none';
+    const logoUrl =
+      editLogoMode === 'official'
+        ? '/logoconexao_red.png'
+        : editLogoMode === 'custom'
+        ? (editLogoUrl.trim() || '/logoconexao_red.png')
+        : null;
+
     const res = await updateSurveyDetailsAction(editingSurvey.id, {
       title: editTitle.trim(),
       description: editDesc.trim() || undefined,
       slug: editSlug.trim() || undefined,
+      logo_url: logoUrl,
+      show_logo: showLogo,
     });
     setSaving(false);
 
@@ -125,7 +156,14 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
       setSurveys((prev) =>
         prev.map((s) =>
           s.id === editingSurvey.id
-            ? { ...s, title: editTitle.trim(), description: editDesc.trim() || null, slug: editSlug.trim() }
+            ? {
+                ...s,
+                title: editTitle.trim(),
+                description: editDesc.trim() || null,
+                slug: editSlug.trim(),
+                logo_url: logoUrl,
+                show_logo: showLogo,
+              }
             : s
         )
       );
@@ -240,6 +278,18 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
                       <Trash2 size={15} />
                     </button>
                   </div>
+                </div>
+
+                <div className="asl-card-brand-thumb-wrap">
+                  {survey.show_logo !== false ? (
+                    <img
+                      src={survey.logo_url || '/logoconexao_red.png'}
+                      alt="Logomarca Conexão Maçônica"
+                      className="asl-card-logo-thumb"
+                    />
+                  ) : (
+                    <span className="asl-badge-text-only">Sem Logomarca (Texto)</span>
+                  )}
                 </div>
 
                 <h3 className="asl-card-title">{survey.title}</h3>
@@ -360,6 +410,63 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
                 <span className="asl-help">Deixe em branco para gerar automaticamente do título.</span>
               </div>
 
+              {/* IDENTIDADE VISUAL & MARCA */}
+              <div className="asl-field">
+                <label>Identidade Visual & Logomarca</label>
+                <div className="asl-logo-mode-grid">
+                  <button
+                    type="button"
+                    className={`asl-logo-mode-card ${newLogoMode === 'official' ? 'active' : ''}`}
+                    onClick={() => {
+                      setNewLogoMode('official');
+                      setNewLogoUrl('/logoconexao_red.png');
+                    }}
+                  >
+                    <div className="asl-lmc-header">
+                      <ImageIcon size={15} className="text-[#C9A227]" />
+                      <strong>Logo Conexão Maçônica</strong>
+                    </div>
+                    <span className="asl-lmc-desc">Logomarca oficial com brasão maçônico</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`asl-logo-mode-card ${newLogoMode === 'custom' ? 'active' : ''}`}
+                    onClick={() => setNewLogoMode('custom')}
+                  >
+                    <div className="asl-lmc-header">
+                      <ImageIcon size={15} className="text-blue-500" />
+                      <strong>Logo Personalizada</strong>
+                    </div>
+                    <span className="asl-lmc-desc">URL de imagem de Loja ou Patrocinador</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`asl-logo-mode-card ${newLogoMode === 'none' ? 'active' : ''}`}
+                    onClick={() => setNewLogoMode('none')}
+                  >
+                    <div className="asl-lmc-header">
+                      <FileText size={15} className="text-gray-500" />
+                      <strong>Apenas Nome (Texto)</strong>
+                    </div>
+                    <span className="asl-lmc-desc">Exibe apenas texto, sem imagem</span>
+                  </button>
+                </div>
+
+                {newLogoMode === 'custom' && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <input
+                      type="text"
+                      placeholder="URL da imagem da logomarca (https://...)"
+                      value={newLogoUrl}
+                      onChange={(e) => setNewLogoUrl(e.target.value)}
+                      className="asl-input"
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="asl-modal-actions">
                 <button
                   type="button"
@@ -440,6 +547,76 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
                   onChange={(e) => setEditSlug(e.target.value)}
                   className="asl-input"
                 />
+              </div>
+
+              {/* IDENTIDADE VISUAL & MARCA */}
+              <div className="asl-field">
+                <label>Identidade Visual & Logomarca</label>
+                <div className="asl-logo-mode-grid">
+                  <button
+                    type="button"
+                    className={`asl-logo-mode-card ${editLogoMode === 'official' ? 'active' : ''}`}
+                    onClick={() => {
+                      setEditLogoMode('official');
+                      setEditLogoUrl('/logoconexao_red.png');
+                    }}
+                  >
+                    <div className="asl-lmc-header">
+                      <ImageIcon size={15} className="text-[#C9A227]" />
+                      <strong>Logo Conexão Maçônica</strong>
+                    </div>
+                    <span className="asl-lmc-desc">Logomarca oficial com brasão maçônico</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`asl-logo-mode-card ${editLogoMode === 'custom' ? 'active' : ''}`}
+                    onClick={() => setEditLogoMode('custom')}
+                  >
+                    <div className="asl-lmc-header">
+                      <ImageIcon size={15} className="text-blue-500" />
+                      <strong>Logo Personalizada</strong>
+                    </div>
+                    <span className="asl-lmc-desc">URL de imagem de Loja ou Patrocinador</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`asl-logo-mode-card ${editLogoMode === 'none' ? 'active' : ''}`}
+                    onClick={() => setEditLogoMode('none')}
+                  >
+                    <div className="asl-lmc-header">
+                      <FileText size={15} className="text-gray-500" />
+                      <strong>Apenas Nome (Texto)</strong>
+                    </div>
+                    <span className="asl-lmc-desc">Exibe apenas texto, sem imagem</span>
+                  </button>
+                </div>
+
+                {editLogoMode === 'custom' && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <input
+                      type="text"
+                      placeholder="URL da imagem da logomarca (https://...)"
+                      value={editLogoUrl}
+                      onChange={(e) => setEditLogoUrl(e.target.value)}
+                      className="asl-input"
+                    />
+                  </div>
+                )}
+
+                {/* Preview */}
+                <div style={{ marginTop: '0.5rem', background: '#FAF8F5', border: '1px dashed #E5E0D8', borderRadius: '8px', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '48px' }}>
+                  {editLogoMode !== 'none' ? (
+                    <img
+                      src={editLogoMode === 'official' ? '/logoconexao_red.png' : (editLogoUrl || '/logoconexao_red.png')}
+                      alt="Prévia"
+                      style={{ maxHeight: '36px', maxWidth: '160px', objectFit: 'contain' }}
+                    />
+                  ) : (
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280' }}>Conexão Maçônica (Apenas Texto)</span>
+                  )}
+                </div>
               </div>
 
               <div className="asl-modal-actions">
@@ -952,6 +1129,69 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
         .asl-spin {
           animation: spin 1s linear infinite;
         }
+
+        /* Branding & Logo Thumb in Card & Modal */
+        .asl-card-brand-thumb-wrap {
+          margin-bottom: 0.75rem;
+          min-height: 28px;
+          display: flex;
+          align-items: center;
+        }
+        .asl-card-logo-thumb {
+          height: 28px;
+          max-width: 130px;
+          object-fit: contain;
+          filter: drop-shadow(0 1px 2px rgba(0,0,0,0.06));
+        }
+        .asl-badge-text-only {
+          font-size: 0.6875rem;
+          font-weight: 700;
+          color: #9CA3AF;
+          background: #F3F4F6;
+          padding: 0.15rem 0.5rem;
+          border-radius: 4px;
+        }
+        .asl-logo-mode-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0.625rem;
+          margin-top: 0.25rem;
+        }
+        .asl-logo-mode-card {
+          border: 1.5px solid #E5E0D8;
+          border-radius: 8px;
+          padding: 0.625rem 0.5rem;
+          background: #FFFFFF;
+          cursor: pointer;
+          text-align: left;
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+          transition: all 0.15s;
+        }
+        .asl-logo-mode-card:hover {
+          border-color: #3B0B14;
+          background: #FFFDF9;
+        }
+        .asl-logo-mode-card.active {
+          border-color: #3B0B14;
+          background: #FAF8F5;
+          box-shadow: 0 0 0 2px rgba(59,11,20,0.12);
+        }
+        .asl-lmc-header {
+          display: flex;
+          align-items: center;
+          gap: 0.375rem;
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: #111827;
+        }
+        .asl-lmc-desc {
+          font-size: 0.6875rem;
+          color: #6B7280;
+          line-height: 1.2;
+        }
+
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }

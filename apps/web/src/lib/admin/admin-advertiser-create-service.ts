@@ -32,7 +32,8 @@ export async function createAdminAdvertiserAction(
 ): Promise<CreateAdminAdvertiserResult> {
   try {
     const { supabase, user: admin } = await assertPlatformAdminAccess();
-    const tenantId = input.tenantId.trim();
+    const fallbackTenantId = (admin as any)?.user_metadata?.tenant_id || '00000000-0000-0000-0000-000000000010';
+    const tenantId = (input.tenantId || fallbackTenantId).trim();
     const responsibleName = input.responsibleName.trim();
     const responsibleEmail = input.responsibleEmail.trim().toLowerCase();
     const temporaryPassword = input.temporaryPassword;
@@ -58,12 +59,12 @@ export async function createAdminAdvertiserAction(
     const [{ data: tenant }, { data: category }, { data: plan }, { data: duplicate }] = await Promise.all([
       (supabase as any).from('tenants').select('id').eq('id', tenantId).maybeSingle(),
       (supabase as any).from('categories').select('id, name').eq('id', categoryId).eq('is_active', true).maybeSingle(),
-      (supabase as any).from('plan_payment_rules').select('plan_code').eq('tenant_id', tenantId).eq('plan_code', planCode).maybeSingle(),
+      (supabase as any).from('plan_payment_rules').select('plan_code').eq('plan_code', planCode).maybeSingle(),
       (supabase as any).from('businesses').select('id').eq('tenant_id', tenantId).eq('cnpj', cnpj).maybeSingle(),
     ]);
     if (!tenant) return { success: false, error: 'Tenant inválido.' };
     if (!category) return { success: false, error: 'Categoria inválida ou inativa.' };
-    if (!plan) return { success: false, error: 'Plano não disponível para o tenant selecionado.' };
+    if (!plan) return { success: false, error: 'Plano não disponível.' };
     if (duplicate) return { success: false, error: 'Este CNPJ já está cadastrado neste tenant.' };
 
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -113,7 +114,6 @@ export async function createAdminAdvertiserAction(
         cnpj,
         category: category.name,
         phone: phone || null,
-        plan_code: planCode,
         plan_tier: planCode,
         publication_status: 'draft',
         is_active: true,

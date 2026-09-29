@@ -79,7 +79,11 @@ export default function PaymentManagementClient({
             <DollarSign className="w-4 h-4 text-[#C9A227]" />
           </div>
           <p className="text-2xl font-serif font-bold mt-1 text-white">
-            R$ {data?.kpis.monthlyReceivedBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '2.388,00'}
+            {loading && !data ? (
+              <span className="text-sm font-normal text-stone-300">Carregando...</span>
+            ) : (
+              `R$ ${(data?.kpis?.monthlyReceivedBrl ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+            )}
           </p>
         </div>
 
@@ -89,7 +93,11 @@ export default function PaymentManagementClient({
             <Clock className="w-4 h-4 text-amber-600" />
           </div>
           <p className="text-2xl font-serif font-bold text-stone-900 mt-1">
-            R$ {data?.kpis.toReceiveBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '1.788,00'}
+            {loading && !data ? (
+              <span className="text-sm font-normal text-stone-400">Carregando...</span>
+            ) : (
+              `R$ ${(data?.kpis?.toReceiveBrl ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+            )}
           </p>
         </div>
 
@@ -99,7 +107,11 @@ export default function PaymentManagementClient({
             <AlertTriangle className="w-4 h-4 text-rose-600" />
           </div>
           <p className="text-2xl font-serif font-bold text-stone-900 mt-1">
-            R$ {data?.kpis.overdueBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+            {loading && !data ? (
+              <span className="text-sm font-normal text-stone-400">Carregando...</span>
+            ) : (
+              `R$ ${(data?.kpis?.overdueBrl ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+            )}
           </p>
         </div>
 
@@ -108,7 +120,9 @@ export default function PaymentManagementClient({
             <span>Pagamentos c/ Falha</span>
             <AlertCircle className="w-4 h-4 text-rose-600" />
           </div>
-          <p className="text-2xl font-serif font-bold text-stone-900 mt-1">{data?.kpis.failedCount || 0}</p>
+          <p className="text-2xl font-serif font-bold text-stone-900 mt-1">
+            {loading && !data ? '-' : (data?.kpis?.failedCount ?? 0)}
+          </p>
         </div>
 
         <div className="p-4 bg-white border border-stone-300 rounded-2xl shadow-xs">
@@ -116,7 +130,9 @@ export default function PaymentManagementClient({
             <span>Assinaturas Ativas</span>
             <Sparkles className="w-4 h-4 text-emerald-600" />
           </div>
-          <p className="text-2xl font-serif font-bold text-emerald-900 mt-1">{data?.kpis.activeSubscriptionsCount || 15}</p>
+          <p className="text-2xl font-serif font-bold text-emerald-900 mt-1">
+            {loading && !data ? '-' : (data?.kpis?.activeSubscriptionsCount ?? 0)}
+          </p>
         </div>
       </section>
 

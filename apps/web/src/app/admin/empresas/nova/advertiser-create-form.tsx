@@ -9,8 +9,8 @@ import { createAdminAdvertiserAction } from '@/lib/admin/admin-advertiser-create
 interface Option { id: string; name: string }
 interface PlanOption { code: string; title: string }
 
-export default function AdvertiserCreateForm({ tenants, categories, plans }: {
-  tenants: Option[];
+export default function AdvertiserCreateForm({ tenantId, categories, plans }: {
+  tenantId: string;
   categories: Option[];
   plans: PlanOption[];
 }) {
@@ -32,7 +32,7 @@ export default function AdvertiserCreateForm({ tenants, categories, plans }: {
       return;
     }
     const result = await createAdminAdvertiserAction({
-      tenantId: String(data.get('tenantId') ?? ''),
+      tenantId: String(data.get('tenantId') || tenantId),
       responsibleName: String(data.get('responsibleName') ?? ''),
       responsibleEmail: String(data.get('responsibleEmail') ?? ''),
       temporaryPassword,
@@ -55,6 +55,8 @@ export default function AdvertiserCreateForm({ tenants, categories, plans }: {
   const inputClass = 'w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 outline-none focus:border-[#3B0B14] focus:ring-2 focus:ring-[#3B0B14]/10';
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <input type="hidden" name="tenantId" value={tenantId} />
+
       <section className="rounded-2xl border border-stone-300 bg-white p-5 shadow-xs">
         <h2 className="mb-4 flex items-center gap-2 font-serif text-lg font-bold text-stone-900"><UserRound className="h-5 w-5 text-[#3B0B14]" /> Responsável pelo anúncio</h2>
         <div className="grid gap-4 md:grid-cols-2">
@@ -74,9 +76,8 @@ export default function AdvertiserCreateForm({ tenants, categories, plans }: {
           <label className="space-y-1.5 text-xs font-bold text-stone-700">Razão social<input required name="legalName" className={inputClass} /></label>
           <label className="space-y-1.5 text-xs font-bold text-stone-700">CNPJ<input required name="cnpj" inputMode="numeric" placeholder="00.000.000/0000-00" className={inputClass} /></label>
           <label className="space-y-1.5 text-xs font-bold text-stone-700">Telefone<input name="phone" placeholder="(00) 00000-0000" className={inputClass} /></label>
-          <label className="space-y-1.5 text-xs font-bold text-stone-700">Tenant<select required name="tenantId" defaultValue={tenants.length === 1 ? tenants[0]?.id : ''} className={inputClass}><option value="">Selecione</option>{tenants.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
           <label className="space-y-1.5 text-xs font-bold text-stone-700">Categoria<select required name="categoryId" defaultValue="" className={inputClass}><option value="">Selecione</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-          <label className="space-y-1.5 text-xs font-bold text-stone-700 md:col-span-2">Plano comercial<select required name="planCode" defaultValue="" className={inputClass}><option value="">Selecione</option>{plans.map((item) => <option key={item.code} value={item.code}>{item.title}</option>)}</select></label>
+          <label className="space-y-1.5 text-xs font-bold text-stone-700">Plano comercial<select required name="planCode" defaultValue="" className={inputClass}><option value="">Selecione</option>{plans.map((item) => <option key={item.code} value={item.code}>{item.title}</option>)}</select></label>
         </div>
       </section>
 

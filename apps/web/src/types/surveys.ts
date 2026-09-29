@@ -69,6 +69,8 @@ export interface Survey {
   title: string;
   slug: string;
   description?: string | null;
+  logo_url?: string | null;
+  show_logo?: boolean;
   status: SurveyStatus;
   current_version: number;
   created_by?: string | null;

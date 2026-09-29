@@ -174,6 +174,7 @@ import {
   publishSurveyVersionAction,
   submitSurveyResponseAction,
   getSurveyAnalyticsAction,
+  updateSurveyDetailsAction,
 } from '@/app/actions/surveys';
 
 describe('Suíte de Testes Funcionais: Módulo de Pesquisas (Conexão Maçônica)', () => {
@@ -247,5 +248,15 @@ describe('Suíte de Testes Funcionais: Módulo de Pesquisas (Conexão Maçônica
     expect(res.data).toBeDefined();
     expect(res.data?.total_responses).toBe(1);
     expect(res.data?.block_summaries.length).toBe(3);
+  });
+
+  it('9. Deve atualizar título, descrição e incluir a logomarca da Conexão Maçônica', async () => {
+    const res = await updateSurveyDetailsAction('survey-123', {
+      title: 'Censo e Diagnóstico Oficial 2026',
+      description: 'Pesquisa detalhada com a rede de membros',
+      logo_url: '/logoconexao_red.png',
+      show_logo: true,
+    });
+    expect(res.success).toBe(true);
   });
 });
