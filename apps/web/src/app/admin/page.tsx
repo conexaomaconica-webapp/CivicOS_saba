@@ -123,7 +123,7 @@ export default async function AdminDashboardPage() {
                 {data.attentionCenter.incomplete_profiles}
               </span>
             </div>
-            <p className="text-[11px] text-stone-300 font-medium">Empresas com score de cadastro menor que 70%</p>
+            <p className="text-[11px] text-stone-300 font-medium">Empresas com dados cadastrais pendentes</p>
             <div className="text-[10px] text-[#C9A227] font-bold flex items-center justify-between pt-1">
               <span>Completar dados</span>
               <ArrowIcon className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
@@ -259,7 +259,11 @@ export default async function AdminDashboardPage() {
         </div>
         <div className="p-4 bg-white border border-stone-300 rounded-2xl shadow-xs">
           <span className="text-stone-500 font-medium block">Inadimplência Operacional:</span>
-          <strong className="text-emerald-700 text-lg font-bold font-mono">0.0% (Zero)</strong>
+          <strong className={`text-lg font-bold font-mono ${data.kpis.overduePaymentsCount > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+            {data.kpis.overduePaymentsCount > 0
+              ? `${((data.kpis.overduePaymentsCount / (data.kpis.overduePaymentsCount + (data.financeSummary.confirmedPaymentsCount || 1))) * 100).toFixed(1)}%`
+              : '0.0% (Zero)'}
+          </strong>
         </div>
       </section>
 
@@ -281,7 +285,7 @@ export default async function AdminDashboardPage() {
 
         {data.recentApplications.length === 0 ? (
           <div className="p-10 text-center space-y-1">
-            <p className="text-sm font-bold text-stone-800">Nenhuma solicitação aguardando aprovação</p>
+            <p className="text-sm font-bold text-stone-800">Nenhuma solicitação no momento</p>
             <p className="text-xs text-stone-500">Tudo em dia por aqui!</p>
           </div>
         ) : (
@@ -326,14 +330,38 @@ export default async function AdminDashboardPage() {
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-center">
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-bold text-[10px]">
-                        ✓ Confirmado
-                      </span>
+                      {app.payment_status === 'paid' ? (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-bold text-[10px]">
+                          ✓ Confirmado
+                        </span>
+                      ) : app.payment_status === 'overdue' ? (
+                        <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-900 font-bold text-[10px]">
+                          Atrasado
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px]">
+                          Pendente
+                        </span>
+                      )}
                     </td>
                     <td className="py-3.5 px-4 text-center">
-                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] uppercase">
-                        {app.publication_status}
-                      </span>
+                      {app.publication_status === 'published' ? (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-bold text-[10px] uppercase">
+                          Publicado
+                        </span>
+                      ) : app.publication_status === 'pending_review' ? (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] uppercase">
+                          Em Análise
+                        </span>
+                      ) : app.publication_status === 'draft' ? (
+                        <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-800 font-bold text-[10px] uppercase">
+                          Rascunho
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-900 font-bold text-[10px] uppercase">
+                          {app.publication_status}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <Link

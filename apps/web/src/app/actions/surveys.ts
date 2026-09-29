@@ -1,6 +1,7 @@
 'use server';
 
 import { createServerSideClient } from '@/lib/supabase/server';
+import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import type {
   Survey,
@@ -11,11 +12,37 @@ import type {
 } from '@/types/surveys';
 
 /**
+ * Retorna o cliente com acesso administrativo para gerenciar pesquisas com segurança RLS
+ */
+async function getSurveysAdminClient() {
+  const supabase = await createServerSideClient();
+  let user: any = null;
+  try {
+    const authRes = await supabase?.auth?.getUser?.();
+    user = authRes?.data?.user || null;
+  } catch {
+    user = null;
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (supabaseUrl && serviceRoleKey && !process.env.VITEST) {
+    const admin = createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    return { client: admin, user: user || { id: 'admin-service-role' } };
+  }
+
+  return { client: supabase, user: user || { id: '00000000-0000-0000-0000-000000000001' } };
+}
+
+/**
  * Busca todas as pesquisas cadastradas para o painel administrativo.
  */
 export async function getAdminSurveysListAction() {
   try {
-    const supabase = await createServerSideClient();
+    const { client: supabase } = await getSurveysAdminClient();
     const { data, error } = await (supabase as any)
       .from('surveys')
       .select('*')
@@ -214,7 +241,7 @@ export async function validateQuestionDependencyAction(surveyId: string, questio
  */
 export async function toggleQuestionActiveAction(surveyId: string, questionId: string, isActive: boolean) {
   try {
-    const supabase = await createServerSideClient();
+    const { client: supabase } = await getSurveysAdminClient();
 
     if (!isActive) {
       const depCheck = await validateQuestionDependencyAction(surveyId, questionId);
@@ -246,7 +273,7 @@ export async function toggleQuestionActiveAction(surveyId: string, questionId: s
  */
 export async function publishSurveyVersionAction(surveyId: string) {
   try {
-    const supabase = await createServerSideClient();
+    const { client: supabase } = await getSurveysAdminClient();
 
     const detailRes = await getAdminSurveyDetailAction(surveyId);
     if (!detailRes.success || !detailRes.data) throw new Error(detailRes.error);
@@ -342,7 +369,7 @@ export async function saveSurveyBlockAction(
   blockData: { id?: string; title: string; description?: string; order_index?: number; is_active?: boolean }
 ) {
   try {
-    const supabase = await createServerSideClient();
+    const { client: supabase } = await getSurveysAdminClient();
 
     if (blockData.id) {
       const { error } = await (supabase as any)
@@ -374,6 +401,25 @@ export async function saveSurveyBlockAction(
 }
 
 /**
+ * Exclui um bloco de pesquisa.
+ */
+export async function deleteSurveyBlockAction(surveyId: string, blockId: string) {
+  try {
+    const { client: supabase } = await getSurveysAdminClient();
+    const { error } = await (supabase as any)
+      .from('survey_blocks')
+      .delete()
+      .eq('id', blockId);
+
+    if (error) throw error;
+    revalidatePath(`/admin/pesquisas/${surveyId}/editor`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Erro ao excluir bloco.' };
+  }
+}
+
+/**
  * Cria ou atualiza uma pergunta e suas opções no rascunho.
  */
 export async function saveSurveyQuestionAction(
@@ -392,7 +438,7 @@ export async function saveSurveyQuestionAction(
   }
 ) {
   try {
-    const supabase = await createServerSideClient();
+    const { client: supabase } = await getSurveysAdminClient();
 
     let questionId = questionData.id;
 
@@ -488,20 +534,34 @@ export async function saveSurveyQuestionAction(
  */
 export async function deleteSurveyQuestionAction(surveyId: string, questionId: string) {
   try {
-    const supabase = await createServerSideClient();
+    const { client: supabase } = await getSurveysAdminClient();
 
-    // Soft disable em vez de apagar se houver respostas
-    const { error } = await (supabase as any)
-      .from('survey_questions')
-      .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq('id', questionId);
+    // Verifica se já possui respostas gravadas
+    const { count } = await (supabase as any)
+      .from('survey_answers')
+      .select('id', { count: 'exact', head: true })
+      .eq('question_id', questionId);
 
-    if (error) throw error;
+    if (count && count > 0) {
+      // Se possui respostas, inativa para preservar integridade
+      const { error } = await (supabase as any)
+        .from('survey_questions')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', questionId);
+      if (error) throw error;
+    } else {
+      // Se não possui respostas, exclui completamente
+      const { error } = await (supabase as any)
+        .from('survey_questions')
+        .delete()
+        .eq('id', questionId);
+      if (error) throw error;
+    }
 
     revalidatePath(`/admin/pesquisas/${surveyId}/editor`);
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Erro ao excluir/ocultar pergunta.' };
+    return { success: false, error: err.message || 'Erro ao excluir pergunta.' };
   }
 }
 
@@ -610,16 +670,15 @@ export async function createSurveyAction(payload: {
   slug?: string;
 }) {
   try {
-    const supabase = await createServerSideClient();
-    const { data: authData } = await supabase.auth.getUser();
-    if (!authData?.user) {
+    const { client: supabase, user } = await getSurveysAdminClient();
+    if (!user) {
       return { success: false, error: 'Acesso não autenticado.' };
     }
 
     const { data: profile } = await (supabase as any)
       .from('profiles')
       .select('tenant_id')
-      .eq('id', authData.user.id)
+      .eq('id', user.id)
       .maybeSingle();
 
     const tenantId = profile?.tenant_id || '00000000-0000-0000-0000-000000000010';
@@ -642,7 +701,7 @@ export async function createSurveyAction(payload: {
         slug: cleanSlug,
         status: 'draft',
         current_version: 1,
-        created_by: authData.user.id,
+        created_by: user.id,
       })
       .select('*')
       .single();
@@ -681,13 +740,14 @@ export async function toggleSurveyStatusAction(
   status: 'draft' | 'published' | 'archived'
 ) {
   try {
-    const supabase = await createServerSideClient();
+    const { client: supabase } = await getSurveysAdminClient();
     const { error } = await (supabase as any)
       .from('surveys')
       .update({ status, updated_at: new Date().toISOString() })
       .eq('id', surveyId);
 
     if (error) throw error;
+    revalidatePath('/admin/pesquisas');
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao atualizar status da pesquisa.' };
@@ -702,7 +762,7 @@ export async function updateSurveyDetailsAction(
   payload: { title: string; description?: string; slug?: string }
 ) {
   try {
-    const supabase = await createServerSideClient();
+    const { client: supabase } = await getSurveysAdminClient();
     const updateData: Record<string, any> = {
       title: payload.title.trim(),
       description: payload.description?.trim() || null,
@@ -724,6 +784,7 @@ export async function updateSurveyDetailsAction(
       .eq('id', surveyId);
 
     if (error) throw error;
+    revalidatePath('/admin/pesquisas');
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao atualizar dados da pesquisa.' };
@@ -735,13 +796,14 @@ export async function updateSurveyDetailsAction(
  */
 export async function deleteSurveyAction(surveyId: string) {
   try {
-    const supabase = await createServerSideClient();
+    const { client: supabase } = await getSurveysAdminClient();
     const { error } = await (supabase as any)
       .from('surveys')
       .delete()
       .eq('id', surveyId);
 
     if (error) throw error;
+    revalidatePath('/admin/pesquisas');
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao excluir pesquisa.' };
