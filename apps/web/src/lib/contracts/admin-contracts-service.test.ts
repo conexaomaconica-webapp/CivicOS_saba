@@ -27,6 +27,7 @@ describe('admin-contracts-service (Fase 4: Microetapa 4.2)', () => {
     responsavel_email: 'carlos@oficinacentral.com.br',
     plano_nome: 'Plano Acácia (Pedra Fundamental)',
     vigencia: '24 meses',
+    data_inicio_vigencia: 'a contar da data de assinatura',
     valor_total: 'R$ 1.200,00',
     forma_pagamento: 'À vista',
     parcelas: '1x',

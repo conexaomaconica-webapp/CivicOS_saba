@@ -28,9 +28,15 @@ import {
   MessageSquare,
   Mail,
   ExternalLink,
+  MapPin,
+  Search,
+  Save,
 } from 'lucide-react';
 import type { AdminBusiness360DTO } from '@/lib/admin/admin-businesses-service';
-import { confirmAdminCommercialTermsAction } from '@/lib/admin/admin-businesses-service';
+import {
+  confirmAdminCommercialTermsAction,
+  saveAdminBusinessContractAddressAction,
+} from '@/lib/admin/admin-businesses-service';
 import { formatCentsToReais } from '@/lib/billing/plans-service';
 import { MASONIC_ELIGIBILITY_TYPE_LABELS } from '@/lib/masonic/masonic-links-service';
 import { COMMERCIAL_STATUS_LABELS } from '@/lib/commercial-onboarding-status';
@@ -182,6 +188,134 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
   const [isRevokingToken, setIsRevokingToken] = useState<boolean>(false);
   const [revokeTokenError, setRevokeTokenError] = useState<string | null>(null);
 
+  // Estados para Endereço da Contratante (Sede / Minuta Contratual)
+  const [cep, setCep] = useState<string>(business.postal_code || '');
+  const [street, setStreet] = useState<string>(business.street || business.address || '');
+  const [number, setNumber] = useState<string>(business.number || '');
+  const [complement, setComplement] = useState<string>(business.complement || '');
+  const [neighborhood, setNeighborhood] = useState<string>(business.neighborhood || '');
+  const [city, setCity] = useState<string>(business.city || '');
+  const [state, setState] = useState<string>(business.state || '');
+  const [isSearchingCep, setIsSearchingCep] = useState<boolean>(false);
+  const [isSavingAddress, setIsSavingAddress] = useState<boolean>(false);
+  const [addressFeedback, setAddressFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [addressSavedSuccess, setAddressSavedSuccess] = useState<boolean>(
+    Boolean(business.street && business.city && business.state)
+  );
+
+  // Estado da data de início do contrato
+  const [contractStartDate, setContractStartDate] = useState<string>(
+    (savedTerms as any)?.contract_start_date || ''
+  );
+
+  const currentFormattedAddress = useMemo(() => {
+    const parts: string[] = [];
+    if (street.trim()) {
+      parts.push(street.trim());
+      if (number.trim()) {
+        parts.push(`, nº ${number.trim()}`);
+      } else {
+        parts.push(', s/nº');
+      }
+      if (complement.trim()) parts.push(` - ${complement.trim()}`);
+    }
+    if (neighborhood.trim()) parts.push(`, Bairro ${neighborhood.trim()}`);
+    if (city.trim()) parts.push(` - ${city.trim()}`);
+    if (state.trim()) parts.push(`/${state.trim().toUpperCase()}`);
+    if (cep.trim()) parts.push(`, CEP ${cep.trim()}`);
+    return parts.join('');
+  }, [street, number, complement, neighborhood, city, state, cep]);
+
+  const handleCepSearch = async (cepInput?: string) => {
+    const raw = (cepInput !== undefined ? cepInput : cep).replace(/\D/g, '');
+    if (raw.length !== 8) {
+      setAddressFeedback({ type: 'error', message: 'Informe um CEP válido com 8 dígitos numéricos.' });
+      return;
+    }
+
+    setIsSearchingCep(true);
+    setAddressFeedback(null);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${raw}/json/`);
+      if (!res.ok) throw new Error('Serviço de consulta de CEP indisponível no momento.');
+      const data = await res.json();
+      if (data.erro) {
+        setAddressFeedback({ type: 'error', message: 'CEP não localizado na base dos Correios.' });
+        return;
+      }
+
+      if (data.logradouro) setStreet(data.logradouro);
+      if (data.bairro) setNeighborhood(data.bairro);
+      if (data.localidade) setCity(data.localidade);
+      if (data.uf) setState(data.uf.toUpperCase());
+      setAddressFeedback({
+        type: 'success',
+        message: 'Endereço localizado via CEP! Complete com o número e complemento.',
+      });
+    } catch (err: any) {
+      setAddressFeedback({
+        type: 'error',
+        message: err?.message || 'Falha ao buscar CEP. Você pode preencher manualmente.',
+      });
+    } finally {
+      setIsSearchingCep(false);
+    }
+  };
+
+  const handleCepChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.replace(/\D/g, '');
+    if (val.length > 8) val = val.slice(0, 8);
+    let formatted = val;
+    if (val.length > 5) {
+      formatted = `${val.slice(0, 5)}-${val.slice(5)}`;
+    }
+    setCep(formatted);
+    setAddressFeedback(null);
+    if (val.length === 8) {
+      handleCepSearch(val);
+    }
+  };
+
+  const handleSaveAddressOnly = async () => {
+    if (!street.trim() || !city.trim() || !state.trim()) {
+      setAddressFeedback({
+        type: 'error',
+        message: 'Preencha pelo menos Logradouro, Cidade e Estado para salvar o endereço.',
+      });
+      return;
+    }
+
+    setIsSavingAddress(true);
+    setAddressFeedback(null);
+    try {
+      const res = await saveAdminBusinessContractAddressAction({
+        business_id: business.id,
+        postal_code: cep.trim() || undefined,
+        street: street.trim(),
+        number: number.trim() || undefined,
+        complement: complement.trim() || undefined,
+        neighborhood: neighborhood.trim() || undefined,
+        city: city.trim(),
+        state: state.trim().toUpperCase(),
+      });
+
+      if (!res.success) {
+        setAddressFeedback({ type: 'error', message: res.error || 'Falha ao salvar endereço.' });
+      } else {
+        setAddressFeedback({
+          type: 'success',
+          message: 'Endereço da contratante salvo com sucesso e pronto para o contrato ✓',
+        });
+        setAddressSavedSuccess(true);
+        router.refresh();
+      }
+    } catch (err: any) {
+      setAddressFeedback({ type: 'error', message: err?.message || 'Erro inesperado ao salvar endereço.' });
+    } finally {
+      setIsSavingAddress(false);
+    }
+  };
+
   // Vínculo maçônico verificado
   const isMasonicVerified =
     masonic_link_detail?.status === 'verified' ||
@@ -300,6 +434,19 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
         installment_amount_cents: calculatedInstallmentValueCents,
         is_pedra_fundamental: isPedraFundamental,
         notes: notes.trim() || undefined,
+        contract_start_date: contractStartDate.trim() || null,
+        address:
+          street.trim() || cep.trim()
+            ? {
+                postal_code: cep.trim() || undefined,
+                street: street.trim() || undefined,
+                number: number.trim() || undefined,
+                complement: complement.trim() || undefined,
+                neighborhood: neighborhood.trim() || undefined,
+                city: city.trim() || undefined,
+                state: state.trim().toUpperCase() || undefined,
+              }
+            : undefined,
       });
 
       if (!result.success) {
@@ -309,6 +456,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
         });
       } else {
         setCommercialStatus('dados_comerciais_conferidos');
+        setAddressSavedSuccess(true);
         setLastSaved({
           id: `terms-${business.id}`,
           plan_code: selectedPlan,
@@ -328,7 +476,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
         });
         setFeedback({
           type: 'success',
-          message: 'Dados comerciais conferidos e congelados com sucesso ✓',
+          message: 'Dados comerciais e endereço conferidos e congelados com sucesso ✓',
         });
         router.refresh();
       }
@@ -340,7 +488,10 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
     setIsLoadingDraft(true);
     setDraftError(null);
     try {
-      const res = await getAdminContractDraftPreviewAction(business.id);
+      const res = await getAdminContractDraftPreviewAction(
+        business.id,
+        currentFormattedAddress || undefined
+      );
       if (!res.success || !res.data) {
         setDraftError(res.error || 'Não foi possível carregar a minuta do contrato.');
       } else {
@@ -402,7 +553,10 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
     setIsGeneratingSnapshot(true);
     setDraftError(null);
     try {
-      const res = await generateAdminContractSnapshotAction(business.id);
+      const res = await generateAdminContractSnapshotAction(
+        business.id,
+        currentFormattedAddress || undefined
+      );
       if (!res.success || !res.data) {
         setDraftError(res.error || 'Falha ao gerar snapshot do contrato.');
       } else {
@@ -844,10 +998,19 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
               <div>
                 <span className="text-stone-400 block font-medium">Localização</span>
                 <span className="font-medium text-stone-700">
-                  {business.city}/{business.state}
+                  {city || business.city}/{state || business.state}
                 </span>
               </div>
             </div>
+
+            {currentFormattedAddress && (
+              <div className="pt-1">
+                <span className="text-stone-400 block font-medium">Endereço da Sede</span>
+                <span className="font-medium text-stone-700 truncate block">
+                  {currentFormattedAddress}
+                </span>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2 pt-1 border-t border-stone-100">
               <div>
@@ -928,6 +1091,228 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
           </div>
         </section>
       </div>
+
+      {/* Card: Endereço da Contratante (Sede e Minuta Contratual) */}
+      <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-stone-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3B0B14]/10 text-[#3B0B14]">
+              <MapPin className="h-5 w-5 text-[#3B0B14]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="font-serif text-base font-bold text-stone-900">
+                  Endereço da Contratante (Sede e Minuta Contratual)
+                </h2>
+                {street && city && state ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">
+                    <Check className="h-3 w-3 text-emerald-600 stroke-[3]" /> Completo
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200">
+                    <Clock className="h-3 w-3 text-amber-600" /> Pendente
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-stone-500">
+                Auto-preenchimento via CEP e sincronização automática com a qualificação da Contratante no contrato.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={isSavingAddress}
+            onClick={handleSaveAddressOnly}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white px-4 py-2 text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50 shrink-0"
+          >
+            {isSavingAddress ? (
+              <>
+                <Clock className="h-3.5 w-3.5 animate-spin" />
+                Salvando...
+              </>
+            ) : addressSavedSuccess ? (
+              <>
+                <Check className="h-3.5 w-3.5 text-emerald-400 stroke-[3]" />
+                Salvar Endereço
+              </>
+            ) : (
+              <>
+                <Save className="h-3.5 w-3.5" />
+                Salvar Endereço
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Feedback do endereço */}
+        {addressFeedback && (
+          <div
+            className={`flex items-start gap-2.5 rounded-xl p-3 text-xs border ${
+              addressFeedback.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-rose-50 border-rose-200 text-rose-900'
+            }`}
+          >
+            {addressFeedback.type === 'success' ? (
+              <Check className="h-4 w-4 shrink-0 text-emerald-600 stroke-[2.5]" />
+            ) : (
+              <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+            )}
+            <p className="flex-1 font-medium">{addressFeedback.message}</p>
+          </div>
+        )}
+
+        <div className="grid gap-3 sm:grid-cols-12 text-xs">
+          {/* CEP com busca */}
+          <div className="sm:col-span-4 space-y-1">
+            <label className="block text-[11px] font-semibold text-stone-600">
+              CEP (com busca automática)
+            </label>
+            <div className="flex gap-1.5">
+              <input
+                type="text"
+                value={cep}
+                onChange={handleCepChange}
+                placeholder="00000-000"
+                maxLength={9}
+                className="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs font-mono font-medium text-stone-900 focus:bg-white focus:border-[#3B0B14] focus:outline-none transition"
+              />
+              <button
+                type="button"
+                disabled={isSearchingCep}
+                onClick={() => handleCepSearch()}
+                title="Consultar CEP nos Correios"
+                className="inline-flex items-center justify-center rounded-xl border border-stone-300 bg-white px-3 py-2 text-stone-700 hover:bg-stone-100 transition cursor-pointer disabled:opacity-50"
+              >
+                {isSearchingCep ? (
+                  <Clock className="h-3.5 w-3.5 animate-spin text-[#3B0B14]" />
+                ) : (
+                  <Search className="h-3.5 w-3.5 text-stone-600" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Logradouro */}
+          <div className="sm:col-span-6 space-y-1">
+            <label className="block text-[11px] font-semibold text-stone-600">
+              Logradouro (Rua, Av, Rodovia...)
+            </label>
+            <input
+              type="text"
+              value={street}
+              onChange={(e) => {
+                setStreet(e.target.value);
+                setAddressSavedSuccess(false);
+              }}
+              placeholder="Ex: Av. Paulista, Rua da Glória..."
+              className="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs font-medium text-stone-900 focus:bg-white focus:border-[#3B0B14] focus:outline-none transition"
+            />
+          </div>
+
+          {/* Número */}
+          <div className="sm:col-span-2 space-y-1">
+            <label className="block text-[11px] font-semibold text-stone-600">
+              Número
+            </label>
+            <input
+              type="text"
+              value={number}
+              onChange={(e) => {
+                setNumber(e.target.value);
+                setAddressSavedSuccess(false);
+              }}
+              placeholder="Ex: 100 ou S/N"
+              className="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs font-medium text-stone-900 focus:bg-white focus:border-[#3B0B14] focus:outline-none transition"
+            />
+          </div>
+
+          {/* Complemento */}
+          <div className="sm:col-span-4 space-y-1">
+            <label className="block text-[11px] font-semibold text-stone-600">
+              Complemento (Opcional)
+            </label>
+            <input
+              type="text"
+              value={complement}
+              onChange={(e) => {
+                setComplement(e.target.value);
+                setAddressSavedSuccess(false);
+              }}
+              placeholder="Ex: Sala 402, Bloco B..."
+              className="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs font-medium text-stone-900 focus:bg-white focus:border-[#3B0B14] focus:outline-none transition"
+            />
+          </div>
+
+          {/* Bairro */}
+          <div className="sm:col-span-4 space-y-1">
+            <label className="block text-[11px] font-semibold text-stone-600">
+              Bairro
+            </label>
+            <input
+              type="text"
+              value={neighborhood}
+              onChange={(e) => {
+                setNeighborhood(e.target.value);
+                setAddressSavedSuccess(false);
+              }}
+              placeholder="Ex: Centro, Bela Vista..."
+              className="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs font-medium text-stone-900 focus:bg-white focus:border-[#3B0B14] focus:outline-none transition"
+            />
+          </div>
+
+          {/* Cidade */}
+          <div className="sm:col-span-3 space-y-1">
+            <label className="block text-[11px] font-semibold text-stone-600">
+              Cidade
+            </label>
+            <input
+              type="text"
+              value={city}
+              onChange={(e) => {
+                setCity(e.target.value);
+                setAddressSavedSuccess(false);
+              }}
+              placeholder="Ex: São Paulo"
+              className="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs font-medium text-stone-900 focus:bg-white focus:border-[#3B0B14] focus:outline-none transition"
+            />
+          </div>
+
+          {/* UF */}
+          <div className="sm:col-span-1 space-y-1">
+            <label className="block text-[11px] font-semibold text-stone-600">
+              UF
+            </label>
+            <input
+              type="text"
+              value={state}
+              onChange={(e) => {
+                setState(e.target.value.toUpperCase());
+                setAddressSavedSuccess(false);
+              }}
+              placeholder="SP"
+              maxLength={2}
+              className="w-full uppercase rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs font-semibold text-stone-900 focus:bg-white focus:border-[#3B0B14] focus:outline-none transition text-center"
+            />
+          </div>
+        </div>
+
+        {/* Linha de pré-visualização do endereço no contrato */}
+        <div className="rounded-xl bg-stone-50 p-3 border border-stone-200 text-[11px] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-stone-600 truncate">
+            <span className="font-semibold text-stone-800 shrink-0">Auto-preenchimento no Contrato:</span>
+            <span className="font-mono text-stone-700 truncate">
+              {currentFormattedAddress || 'Endereço ainda não informado'}
+            </span>
+          </div>
+          {currentFormattedAddress && !addressSavedSuccess && (
+            <span className="text-[10px] text-amber-700 font-medium shrink-0">
+              * Clique em "Salvar Endereço" ou "Conferir Dados Comerciais" para gravar.
+            </span>
+          )}
+        </div>
+      </section>
 
       {/* Card 3: Painel de Conferência Comercial Interativo (Microetapa 3.2) */}
       <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs space-y-6">
@@ -1171,6 +1556,32 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
             placeholder="Ex: Acordo aprovado em reunião com a diretoria; condição especial acordada para o lançamento."
             className="w-full rounded-xl border border-stone-300 bg-white p-3 text-xs text-stone-800 placeholder-stone-400 focus:border-[#3B0B14] focus:ring-[#3B0B14]"
           />
+        </div>
+
+        {/* 4b. Data de In\u00edcio da Vig\u00eancia Contratual */}
+        <div className="space-y-2 pt-2 border-t border-stone-100">
+          <label
+            htmlFor="contract-start-date"
+            className="text-xs font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1.5"
+          >
+            <Calendar className="h-3.5 w-3.5 text-[#3B0B14]" />
+            Data de In\u00edcio da Vig\u00eancia Contratual
+          </label>
+          <input
+            id="contract-start-date"
+            type="date"
+            value={contractStartDate}
+            onChange={(e) => {
+              setContractStartDate(e.target.value);
+              setFeedback(null);
+            }}
+            className="w-full sm:max-w-xs rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-xs font-mono font-bold text-stone-900 focus:border-[#3B0B14] focus:ring-[#3B0B14]"
+          />
+          <p className="text-[11px] text-stone-500 leading-relaxed">
+            Opcional. Define a data exata em que a vig&ecirc;ncia de{' '}
+            {billingCycle === 'biennial' ? '24' : '12'} meses come&ccedil;a a contar.{' '}
+            Deixe em branco para que a vig&ecirc;ncia conte <strong>a partir da data de assinatura</strong>.
+          </p>
         </div>
       </section>
 
@@ -1739,11 +2150,21 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
                       <div><strong className="font-sans text-stone-500">CNPJ:</strong> {contractDraft.variables.cnpj}</div>
                       <div><strong className="font-sans text-stone-500">Responsável:</strong> {contractDraft.variables.responsavel_nome}</div>
                       <div><strong className="font-sans text-stone-500">CPF:</strong> {contractDraft.variables.responsavel_cpf}</div>
+                      <div className="sm:col-span-2 lg:col-span-4 border-t border-stone-200/60 pt-1">
+                        <strong className="font-sans text-stone-500">Endereço da Contratante:</strong>{' '}
+                        {contractDraft.variables.endereco || 'Endereço não informado'}
+                      </div>
                       <div><strong className="font-sans text-stone-500">Plano:</strong> {contractDraft.variables.plano_nome}</div>
                       <div><strong className="font-sans text-stone-500">Vigência:</strong> {contractDraft.variables.vigencia}</div>
                       <div><strong className="font-sans text-stone-500">Valor Total:</strong> {contractDraft.variables.valor_total}</div>
                       <div><strong className="font-sans text-stone-500">Condição:</strong> {contractDraft.variables.parcelas} ({contractDraft.variables.forma_pagamento})</div>
                     </div>
+                    {(!contractDraft.variables.endereco || contractDraft.variables.endereco === 'Endereço não informado') && (
+                      <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-amber-50 p-2 border border-amber-200 text-amber-900 text-[11px]">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                        <span>Recomendamos salvar o endereço na etapa de contratação para qualificar a Contratante na minuta antes de gerar o snapshot imutável.</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Visualizador da Minuta Renderizada */}

@@ -15,6 +15,7 @@ export interface AdvertiserContractVariables {
 
   plano_nome: string;
   vigencia: string;
+  data_inicio_vigencia: string;
   valor_total: string;
   forma_pagamento: string;
   parcelas: string;
@@ -40,6 +41,7 @@ export function assertContractVariablesComplete(
     'responsavel_email',
     'plano_nome',
     'vigencia',
+    'data_inicio_vigencia',
     'valor_total',
     'forma_pagamento',
     'parcelas',
@@ -155,4 +157,25 @@ export function formatDataEmissao(date: Date = new Date()): string {
     month: '2-digit',
     year: 'numeric',
   }).format(date);
+}
+
+/**
+ * Formata a data de início da vigência contratual.
+ * Aceita string no formato ISO ("YYYY-MM-DD") ou um objeto Date.
+ * Quando não fornecida, retorna "a contar da data de assinatura".
+ */
+export function formatDataInicioVigencia(startDate?: string | Date | null): string {
+  if (!startDate) {
+    return 'a contar da data de assinatura';
+  }
+  const d = typeof startDate === 'string' ? new Date(`${startDate}T12:00:00`) : startDate;
+  if (isNaN(d.getTime())) {
+    return 'a contar da data de assinatura';
+  }
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(d);
 }

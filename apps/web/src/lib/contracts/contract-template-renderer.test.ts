@@ -20,6 +20,7 @@ describe('contract-template-renderer', () => {
     responsavel_email: 'joao@materiaisabc.com.br',
     plano_nome: 'Plano Obreiro',
     vigencia: '12 meses',
+    data_inicio_vigencia: '01/10/2026',
     valor_total: 'R$ 1.500,00',
     forma_pagamento: 'Boleto Bancário',
     parcelas: '12x',

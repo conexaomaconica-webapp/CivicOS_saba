@@ -102,6 +102,7 @@ describe('Fase de Homologação Funcional Completa — 15 Cenários E2E', () => 
     responsavel_email: 'carlos@oficinacentral.com.br',
     plano_nome: 'Plano Acácia (Pedra Fundamental)',
     vigencia: '12 meses',
+    data_inicio_vigencia: 'a contar da data de assinatura',
     valor_total: 'R$ 1.000,00',
     forma_pagamento: 'À vista',
     parcelas: '1x',

@@ -19,6 +19,7 @@ import {
   formatVigencia,
   formatSeloPedraFundamental,
   formatDataEmissao,
+  formatDataInicioVigencia,
 } from './contract-template-renderer';
 import {
   CANONICAL_ADVERTISER_CONTRACT_CODE,
@@ -45,7 +46,8 @@ export interface ContractDraftPreviewResult {
  * executando a renderização pura e devolvendo a minuta para conferência visual do admin (Fase 4: Microetapa 4.1).
  */
 export async function getAdminContractDraftPreviewAction(
-  businessId: string
+  businessId: string,
+  overrideAddress?: string
 ): Promise<ContractDraftPreviewResult> {
   try {
     const { supabase } = await assertPlatformAdminAccess();
@@ -112,28 +114,46 @@ export async function getAdminContractDraftPreviewAction(
       ownerProfile = prof;
     }
 
-    // 4. Busca endereço primário da empresa se disponível
-    const { data: locRow } = await (supabase as any)
-      .from('business_locations')
-      .select('street, number, neighborhood, city, state, postal_code')
-      .eq('business_id', businessId)
-      .eq('is_headquarters', true)
-      .maybeSingle();
+    // 4. Busca endereço da empresa
+    let formattedAddress = overrideAddress?.trim() || '';
 
-    let formattedAddress = 'Endereço não informado';
-    if (locRow && (locRow.street || locRow.city)) {
-      const parts = [
-        locRow.street ? `${locRow.street}${locRow.number ? `, ${locRow.number}` : ''}` : '',
-        locRow.neighborhood,
-        locRow.city ? `${locRow.city} - ${locRow.state || 'SP'}` : '',
-        locRow.postal_code ? `CEP ${locRow.postal_code}` : '',
-      ].filter(Boolean);
-      if (parts.length > 0) formattedAddress = parts.join(', ');
-    } else if (biz.address || biz.street) {
-      formattedAddress = [
-        biz.street ? `${biz.street}${biz.number ? `, ${biz.number}` : ''}` : biz.address,
-        biz.city ? `${biz.city} - ${biz.state || 'SP'}` : '',
-      ].filter(Boolean).join(', ');
+    if (!formattedAddress) {
+      let { data: locRow } = await (supabase as any)
+        .from('business_locations')
+        .select('street, number, complement, neighborhood, city, state, postal_code')
+        .eq('business_id', businessId)
+        .eq('is_headquarters', true)
+        .maybeSingle();
+
+      if (!locRow) {
+        const { data: anyLoc } = await (supabase as any)
+          .from('business_locations')
+          .select('street, number, complement, neighborhood, city, state, postal_code')
+          .eq('business_id', businessId)
+          .limit(1)
+          .maybeSingle();
+        locRow = anyLoc;
+      }
+
+      if (locRow && (locRow.street || locRow.city)) {
+        const parts = [
+          locRow.street ? `${locRow.street}${locRow.number ? `, ${locRow.number}` : ''}` : '',
+          locRow.complement,
+          locRow.neighborhood,
+          locRow.city ? `${locRow.city} - ${locRow.state || 'SP'}` : '',
+          locRow.postal_code ? `CEP ${locRow.postal_code}` : '',
+        ].filter(Boolean);
+        if (parts.length > 0) formattedAddress = parts.join(', ');
+      } else if (biz.address || biz.street) {
+        formattedAddress = [
+          biz.street ? `${biz.street}${biz.number ? `, ${biz.number}` : ''}` : biz.address,
+          biz.city ? `${biz.city} - ${biz.state || 'SP'}` : '',
+        ].filter(Boolean).join(', ');
+      }
+    }
+
+    if (!formattedAddress) {
+      formattedAddress = 'Endereço não informado';
     }
 
     // 5. Busca versão ativa do template de contrato no banco (com fallback para template oficial)
@@ -186,6 +206,7 @@ export async function getAdminContractDraftPreviewAction(
       responsavel_email: responsavelEmail,
       plano_nome: ctRow.plan_name,
       vigencia: formatVigencia(ctRow.billing_cycle),
+      data_inicio_vigencia: formatDataInicioVigencia(ctRow.contract_start_date ?? null),
       valor_total: formatCurrencyBRL(ctRow.amount_cents),
       forma_pagamento: ctRow.payment_method === 'avista' ? 'À vista' : 'Parcelado',
       parcelas: `${ctRow.installments_count}x`,
@@ -245,7 +266,8 @@ export interface GenerateContractSnapshotResult {
  * o status comercial para 'contrato_gerado' (Fase 4: Microetapa 4.2).
  */
 export async function generateAdminContractSnapshotAction(
-  businessId: string
+  businessId: string,
+  overrideAddress?: string
 ): Promise<GenerateContractSnapshotResult> {
   try {
     const { supabase, user } = await assertPlatformAdminAccess();
@@ -418,28 +440,46 @@ export async function generateAdminContractSnapshotAction(
       ownerProfile = prof;
     }
 
-    // 7. Consulta endereço
-    const { data: locRow } = await (supabase as any)
-      .from('business_locations')
-      .select('street, number, neighborhood, city, state, postal_code')
-      .eq('business_id', businessId)
-      .eq('is_headquarters', true)
-      .maybeSingle();
+    // 7. Consulta endereço da empresa
+    let formattedAddress = overrideAddress?.trim() || '';
 
-    let formattedAddress = 'Endereço não informado';
-    if (locRow && (locRow.street || locRow.city)) {
-      const parts = [
-        locRow.street ? `${locRow.street}${locRow.number ? `, ${locRow.number}` : ''}` : '',
-        locRow.neighborhood,
-        locRow.city ? `${locRow.city} - ${locRow.state || 'SP'}` : '',
-        locRow.postal_code ? `CEP ${locRow.postal_code}` : '',
-      ].filter(Boolean);
-      if (parts.length > 0) formattedAddress = parts.join(', ');
-    } else if (biz.address || biz.street) {
-      formattedAddress = [
-        biz.street ? `${biz.street}${biz.number ? `, ${biz.number}` : ''}` : biz.address,
-        biz.city ? `${biz.city} - ${biz.state || 'SP'}` : '',
-      ].filter(Boolean).join(', ');
+    if (!formattedAddress) {
+      let { data: locRow } = await (supabase as any)
+        .from('business_locations')
+        .select('street, number, complement, neighborhood, city, state, postal_code')
+        .eq('business_id', businessId)
+        .eq('is_headquarters', true)
+        .maybeSingle();
+
+      if (!locRow) {
+        const { data: anyLoc } = await (supabase as any)
+          .from('business_locations')
+          .select('street, number, complement, neighborhood, city, state, postal_code')
+          .eq('business_id', businessId)
+          .limit(1)
+          .maybeSingle();
+        locRow = anyLoc;
+      }
+
+      if (locRow && (locRow.street || locRow.city)) {
+        const parts = [
+          locRow.street ? `${locRow.street}${locRow.number ? `, ${locRow.number}` : ''}` : '',
+          locRow.complement,
+          locRow.neighborhood,
+          locRow.city ? `${locRow.city} - ${locRow.state || 'SP'}` : '',
+          locRow.postal_code ? `CEP ${locRow.postal_code}` : '',
+        ].filter(Boolean);
+        if (parts.length > 0) formattedAddress = parts.join(', ');
+      } else if (biz.address || biz.street) {
+        formattedAddress = [
+          biz.street ? `${biz.street}${biz.number ? `, ${biz.number}` : ''}` : biz.address,
+          biz.city ? `${biz.city} - ${biz.state || 'SP'}` : '',
+        ].filter(Boolean).join(', ');
+      }
+    }
+
+    if (!formattedAddress) {
+      formattedAddress = 'Endereço não informado';
     }
 
     // 8. Normalização e mapeamento obrigatório de variáveis
@@ -461,6 +501,7 @@ export async function generateAdminContractSnapshotAction(
       responsavel_email: responsavelEmail,
       plano_nome: ctRow.plan_name,
       vigencia: formatVigencia(ctRow.billing_cycle),
+      data_inicio_vigencia: formatDataInicioVigencia(ctRow.contract_start_date ?? null),
       valor_total: formatCurrencyBRL(ctRow.amount_cents),
       forma_pagamento: ctRow.payment_method === 'avista' ? 'À vista' : 'Parcelado',
       parcelas: `${ctRow.installments_count}x`,

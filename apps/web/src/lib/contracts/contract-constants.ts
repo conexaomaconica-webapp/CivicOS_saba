@@ -37,6 +37,7 @@ têm entre si justo e acordado o presente Contrato de Prestação de Serviços d
 2.1. A CONTRATANTE adere expressamente às seguintes condições comerciais conferidas e acordadas:
 - **Plano Contratado:** {{plano_nome}}
 - **Vigência:** {{vigencia}}
+- **Data de Início da Vigência:** {{data_inicio_vigencia}}
 - **Valor Total:** {{valor_total}}
 - **Forma de Pagamento:** {{forma_pagamento}}
 - **Quantidade de Parcelas:** {{parcelas}}

@@ -360,6 +360,11 @@ export interface AdminBusiness360DTO {
     city: string;
     state: string;
     address?: string;
+    street?: string;
+    number?: string;
+    complement?: string;
+    neighborhood?: string;
+    postal_code?: string;
     latitude?: number;
     longitude?: number;
     phone?: string;
@@ -846,18 +851,40 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
     const videoLimit = entMap360['business_video_limit'] ?? getCanonicalDefaultLimit(planCode, 'business_video_limit');
 
     // Localização (Fonte Canônica: business_locations)
-    let locationData: { city?: string; state?: string; address?: string } = {};
+    let locationData: {
+      city?: string;
+      state?: string;
+      address?: string;
+      street?: string;
+      number?: string;
+      complement?: string;
+      neighborhood?: string;
+      postal_code?: string;
+    } = {};
     try {
       const { data: locs } = await (supabase as any)
         .from('business_locations')
-        .select('city, state, street, number, is_headquarters')
+        .select('city, state, street, number, complement, neighborhood, postal_code, is_headquarters')
         .eq('business_id', businessId);
       if (locs && locs.length > 0) {
         const primary = locs.find((l: any) => l.is_headquarters === true) || locs[0];
+        const formattedParts = [
+          primary.street ? `${primary.street}${primary.number ? ', ' + primary.number : ''}` : '',
+          primary.complement,
+          primary.neighborhood,
+          primary.city ? `${primary.city} - ${primary.state || 'SP'}` : '',
+          primary.postal_code ? `CEP ${primary.postal_code}` : '',
+        ].filter(Boolean);
+
         locationData = {
           city: primary.city,
           state: primary.state,
-          address: primary.street ? `${primary.street}${primary.number ? ', ' + primary.number : ''}` : undefined,
+          address: formattedParts.length > 0 ? formattedParts.join(', ') : undefined,
+          street: primary.street || undefined,
+          number: primary.number || undefined,
+          complement: primary.complement || undefined,
+          neighborhood: primary.neighborhood || undefined,
+          postal_code: primary.postal_code || undefined,
         };
       }
     } catch (_e) { }
@@ -1311,6 +1338,11 @@ DOSSIÊ DE ACEITE E ASSINATURA DIGITAL (AUDITADO):
         city: locationData.city || b.city || 'São Paulo',
         state: locationData.state || b.state || 'SP',
         address: locationData.address || (b.street ? `${b.street}, ${b.number || ''}` : (b.address || undefined)),
+        street: locationData.street || b.street || undefined,
+        number: locationData.number || b.number || undefined,
+        complement: locationData.complement || b.complement || undefined,
+        neighborhood: locationData.neighborhood || b.neighborhood || undefined,
+        postal_code: locationData.postal_code || b.postal_code || undefined,
         phone: contactsMap['phone'] || b.phone || undefined,
         whatsapp: contactsMap['whatsapp'] || b.whatsapp || b.phone || undefined,
         email: contactsMap['email'] || b.email || undefined,
@@ -2455,6 +2487,143 @@ export interface ConfirmAdminCommercialTermsInput {
   installment_amount_cents?: number;
   is_pedra_fundamental?: boolean;
   notes?: string;
+  contract_start_date?: string | null; // ISO date string YYYY-MM-DD ou null
+  address?: {
+    street?: string;
+    number?: string;
+    complement?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+  };
+}
+
+export interface SaveAdminBusinessContractAddressInput {
+  business_id?: string;
+  street: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  city: string;
+  state: string;
+  postal_code?: string;
+}
+
+export async function saveAdminBusinessContractAddressAction(
+  businessIdOrInput: string | SaveAdminBusinessContractAddressInput,
+  maybeInput?: SaveAdminBusinessContractAddressInput
+): Promise<{ success: boolean; error?: string; formatted_address?: string }> {
+  try {
+    const { supabase } = await assertPlatformAdminAccess();
+
+    const businessId =
+      typeof businessIdOrInput === 'string'
+        ? businessIdOrInput
+        : businessIdOrInput.business_id || '';
+    const input = typeof businessIdOrInput === 'string' ? maybeInput || ({} as any) : businessIdOrInput;
+
+    if (!businessId?.trim()) {
+      return { success: false, error: 'Identificador da empresa é obrigatório.' };
+    }
+
+    const street = input.street?.trim() || '';
+    const city = input.city?.trim() || '';
+    const state = input.state?.trim() || '';
+
+    if (!street || !city || !state) {
+      return { success: false, error: 'Logradouro, Cidade e Estado (UF) são obrigatórios para o contrato.' };
+    }
+
+    const { data: biz, error: bizErr } = await (supabase as any)
+      .from('businesses')
+      .select('id, tenant_id')
+      .eq('id', businessId)
+      .single();
+
+    if (bizErr || !biz) {
+      return { success: false, error: 'Empresa não encontrada no banco de dados.' };
+    }
+
+    const number = input.number?.trim() || null;
+    const complement = input.complement?.trim() || null;
+    const neighborhood = input.neighborhood?.trim() || null;
+    const postal_code = input.postal_code?.trim() || null;
+
+    const parts = [
+      street ? `${street}${number ? ', ' + number : ''}` : '',
+      complement,
+      neighborhood,
+      city ? `${city} - ${state}` : '',
+      postal_code ? `CEP ${postal_code}` : '',
+    ].filter(Boolean);
+    const fullAddress = parts.join(', ');
+
+    // 1. Busca localização Matriz
+    const { data: existingLoc } = await (supabase as any)
+      .from('business_locations')
+      .select('id')
+      .eq('business_id', businessId)
+      .eq('is_headquarters', true)
+      .maybeSingle();
+
+    if (existingLoc) {
+      await (supabase as any)
+        .from('business_locations')
+        .update({
+          street,
+          number,
+          complement,
+          neighborhood,
+          city,
+          state,
+          postal_code: postal_code || '00000-000',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingLoc.id);
+    } else {
+      await (supabase as any)
+        .from('business_locations')
+        .insert({
+          tenant_id: biz.tenant_id,
+          business_id: businessId,
+          title: 'Matriz',
+          street,
+          number,
+          complement,
+          neighborhood,
+          city,
+          state,
+          postal_code: postal_code || '00000-000',
+          is_headquarters: true,
+          is_active: true,
+        });
+    }
+
+    // 2. Atualiza tabela businesses com endereço sincronizado
+    await (supabase as any)
+      .from('businesses')
+      .update({
+        address: fullAddress,
+        city,
+        state,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', businessId);
+
+    revalidatePath(`/admin/empresas/${businessId}`);
+    revalidatePath(`/admin/empresas/${businessId}/contratacao`);
+
+    return {
+      success: true,
+      formatted_address: fullAddress,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Falha ao salvar endereço do contratante.',
+    };
+  }
 }
 
 export async function confirmAdminCommercialTermsAction(
@@ -2486,7 +2655,7 @@ export async function confirmAdminCommercialTermsAction(
     // 2. Consulta da empresa
     const { data: biz, error: bizErr } = await (supabase as any)
       .from('businesses')
-      .select('id, tenant_id, commercial_status, plan_tier')
+      .select('id, tenant_id, commercial_status, plan_tier, city, state')
       .eq('id', input.business_id)
       .single();
 
@@ -2531,24 +2700,99 @@ export async function confirmAdminCommercialTermsAction(
       installment_amount_cents: installmentAmountCents,
       is_pedra_fundamental: Boolean(input.is_pedra_fundamental),
       notes: input.notes?.trim() || null,
+      contract_start_date: input.contract_start_date?.trim() || null,
       status: 'conferido',
       conferred_at: new Date().toISOString(),
       conferred_by: user.id,
       updated_at: new Date().toISOString(),
     };
 
+    // 4.1. Atualização do Endereço se fornecido no formulário
+    let fullAddressToSync: string | undefined = undefined;
+    let cityToSync = biz.city;
+    let stateToSync = biz.state;
+
+    if (input.address && (input.address.street?.trim() || input.address.city?.trim())) {
+      const street = input.address.street?.trim() || '';
+      const city = input.address.city?.trim() || biz.city || 'São Paulo';
+      const state = input.address.state?.trim() || biz.state || 'SP';
+      const number = input.address.number?.trim() || null;
+      const complement = input.address.complement?.trim() || null;
+      const neighborhood = input.address.neighborhood?.trim() || null;
+      const postal_code = input.address.postal_code?.trim() || null;
+
+      cityToSync = city;
+      stateToSync = state;
+
+      const parts = [
+        street ? `${street}${number ? ', ' + number : ''}` : '',
+        complement,
+        neighborhood,
+        city ? `${city} - ${state}` : '',
+        postal_code ? `CEP ${postal_code}` : '',
+      ].filter(Boolean);
+      fullAddressToSync = parts.join(', ');
+
+      const { data: existingLoc } = await (supabase as any)
+        .from('business_locations')
+        .select('id')
+        .eq('business_id', biz.id)
+        .eq('is_headquarters', true)
+        .maybeSingle();
+
+      if (existingLoc) {
+        await (supabase as any)
+          .from('business_locations')
+          .update({
+            street: street || 'Não informado',
+            number,
+            complement,
+            neighborhood,
+            city,
+            state,
+            postal_code: postal_code || '00000-000',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingLoc.id);
+      } else if (street) {
+        await (supabase as any)
+          .from('business_locations')
+          .insert({
+            tenant_id: biz.tenant_id,
+            business_id: biz.id,
+            title: 'Matriz',
+            street,
+            number,
+            complement,
+            neighborhood,
+            city,
+            state,
+            postal_code: postal_code || '00000-000',
+            is_headquarters: true,
+            is_active: true,
+          });
+      }
+    }
+
     // 5. Gravação concorrente para máxima velocidade
+    const bizUpdatePayload: Record<string, any> = {
+      commercial_status: 'dados_comerciais_conferidos',
+      plan_tier: input.plan_code,
+      updated_at: new Date().toISOString(),
+    };
+    if (fullAddressToSync) {
+      bizUpdatePayload.address = fullAddressToSync;
+      bizUpdatePayload.city = cityToSync;
+      bizUpdatePayload.state = stateToSync;
+    }
+
     const [termsRes, bizRes] = await Promise.all([
       (supabase as any)
         .from('business_commercial_terms')
         .upsert(termsPayload, { onConflict: 'business_id' }),
       (supabase as any)
         .from('businesses')
-        .update({
-          commercial_status: 'dados_comerciais_conferidos',
-          plan_tier: input.plan_code,
-          updated_at: new Date().toISOString(),
-        })
+        .update(bizUpdatePayload)
         .eq('id', biz.id),
       (supabase as any).from('admin_audit_logs').insert({
         tenant_id: biz.tenant_id,
