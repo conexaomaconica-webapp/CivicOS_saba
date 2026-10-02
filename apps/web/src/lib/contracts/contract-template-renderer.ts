@@ -12,6 +12,8 @@ export interface AdvertiserContractVariables {
   responsavel_nome: string;
   responsavel_cpf: string;
   responsavel_email: string;
+  responsavel_telefone: string;
+  empresa_telefone: string;
 
   plano_nome: string;
   vigencia: string;

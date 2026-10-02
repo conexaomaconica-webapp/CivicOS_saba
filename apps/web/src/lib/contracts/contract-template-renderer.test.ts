@@ -18,6 +18,8 @@ describe('contract-template-renderer', () => {
     responsavel_nome: 'João da Silva',
     responsavel_cpf: '123.456.789-00',
     responsavel_email: 'joao@materiaisabc.com.br',
+    responsavel_telefone: '(11) 99999-0000',
+    empresa_telefone: '(11) 99999-0000',
     plano_nome: 'Plano Obreiro',
     vigencia: '12 meses',
     data_inicio_vigencia: '01/10/2026',

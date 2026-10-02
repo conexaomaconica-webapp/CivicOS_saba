@@ -65,7 +65,9 @@ export async function getAdminContractDraftPreviewAction(
         name,
         legal_name,
         cnpj,
+        cnpj_cpf,
         phone,
+        whatsapp,
         email,
         street,
         number,
@@ -188,13 +190,14 @@ export async function getAdminContractDraftPreviewAction(
     }
 
     // 6. Normalização e mapeamento das variáveis do template
-    const rawCnpj = biz.cnpj || '00000000000000';
+    const rawCnpj = biz.cnpj_cpf || biz.cnpj || '00000000000000';
     const formattedCnpj = formatCpfCnpj(rawCnpj);
 
     const responsavelNome = resp?.name || ownerProfile?.name || 'Responsável Legal';
     const rawCpf = ownerProfile?.document_number || '00000000000';
     const formattedCpf = formatCpfCnpj(rawCpf);
     const responsavelEmail = ownerProfile?.email || biz.email || 'contato@anunciante.com.br';
+    const empresaTelefone = biz.phone || biz.whatsapp || 'Não informado';
 
     const variables: AdvertiserContractVariables = {
       razao_social: biz.legal_name || biz.name,
@@ -204,6 +207,8 @@ export async function getAdminContractDraftPreviewAction(
       responsavel_nome: responsavelNome,
       responsavel_cpf: formattedCpf,
       responsavel_email: responsavelEmail,
+      responsavel_telefone: empresaTelefone,
+      empresa_telefone: empresaTelefone,
       plano_nome: ctRow.plan_name,
       vigencia: formatVigencia(ctRow.billing_cycle),
       data_inicio_vigencia: formatDataInicioVigencia(ctRow.contract_start_date ?? null),
@@ -285,7 +290,9 @@ export async function generateAdminContractSnapshotAction(
         name,
         legal_name,
         cnpj,
+        cnpj_cpf,
         phone,
+        whatsapp,
         email,
         street,
         number,
@@ -483,13 +490,14 @@ export async function generateAdminContractSnapshotAction(
     }
 
     // 8. Normalização e mapeamento obrigatório de variáveis
-    const rawCnpj = biz.cnpj || '00000000000000';
+    const rawCnpj = biz.cnpj_cpf || biz.cnpj || '00000000000000';
     const formattedCnpj = formatCpfCnpj(rawCnpj);
 
     const responsavelNome = resp?.name || ownerProfile?.name || 'Responsável Legal';
     const rawCpf = ownerProfile?.document_number || '00000000000';
     const formattedCpf = formatCpfCnpj(rawCpf);
     const responsavelEmail = ownerProfile?.email || biz.email || 'contato@anunciante.com.br';
+    const empresaTelefone = biz.phone || biz.whatsapp || 'Não informado';
 
     const variables: AdvertiserContractVariables = {
       razao_social: biz.legal_name || biz.name,
@@ -499,6 +507,8 @@ export async function generateAdminContractSnapshotAction(
       responsavel_nome: responsavelNome,
       responsavel_cpf: formattedCpf,
       responsavel_email: responsavelEmail,
+      responsavel_telefone: empresaTelefone,
+      empresa_telefone: empresaTelefone,
       plano_nome: ctRow.plan_name,
       vigencia: formatVigencia(ctRow.billing_cycle),
       data_inicio_vigencia: formatDataInicioVigencia(ctRow.contract_start_date ?? null),

@@ -25,6 +25,8 @@ describe('admin-contracts-service (Fase 4: Microetapa 4.2)', () => {
     responsavel_nome: 'Carlos Drummond',
     responsavel_cpf: '111.222.333-44',
     responsavel_email: 'carlos@oficinacentral.com.br',
+    responsavel_telefone: '(11) 98888-0000',
+    empresa_telefone: '(11) 98888-0000',
     plano_nome: 'Plano Acácia (Pedra Fundamental)',
     vigencia: '24 meses',
     data_inicio_vigencia: 'a contar da data de assinatura',
