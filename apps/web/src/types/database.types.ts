@@ -356,6 +356,79 @@ export type Database = {
           },
         ]
       }
+      business_commercial_terms: {
+        Row: {
+          amount_cents: number
+          billing_cycle: string
+          business_id: string
+          conferred_at: string
+          conferred_by: string | null
+          created_at: string
+          id: string
+          installment_amount_cents: number
+          installments_count: number
+          is_pedra_fundamental: boolean
+          notes: string | null
+          payment_method: string
+          plan_code: string
+          plan_name: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents: number
+          billing_cycle?: string
+          business_id: string
+          conferred_at?: string
+          conferred_by?: string | null
+          created_at?: string
+          id?: string
+          installment_amount_cents?: number
+          installments_count?: number
+          is_pedra_fundamental?: boolean
+          notes?: string | null
+          payment_method?: string
+          plan_code: string
+          plan_name: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          billing_cycle?: string
+          business_id?: string
+          conferred_at?: string
+          conferred_by?: string | null
+          created_at?: string
+          id?: string
+          installment_amount_cents?: number
+          installments_count?: number
+          is_pedra_fundamental?: boolean
+          notes?: string | null
+          payment_method?: string
+          plan_code?: string
+          plan_name?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_commercial_terms_business_id_fkey"
+            columns: ["business_id"]
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_commercial_terms_tenant_id_fkey"
+            columns: ["tenant_id"]
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_contacts: {
         Row: {
           business_id: string
@@ -868,10 +941,15 @@ export type Database = {
           business_id: string
           created_at: string
           declaring_user_id: string | null
+          eligibility_type: string | null
+          family_relationship: string | null
           id: string
           is_primary: boolean
           link_type: string
+          notes: string | null
           organization_id: string | null
+          reference_mason_cim: string | null
+          reference_mason_name: string | null
           status: string
           tenant_id: string
           updated_at: string
@@ -883,10 +961,15 @@ export type Database = {
           business_id: string
           created_at?: string
           declaring_user_id?: string | null
+          eligibility_type?: string | null
+          family_relationship?: string | null
           id?: string
           is_primary?: boolean
           link_type: string
+          notes?: string | null
           organization_id?: string | null
+          reference_mason_cim?: string | null
+          reference_mason_name?: string | null
           status?: string
           tenant_id: string
           updated_at?: string
@@ -898,10 +981,15 @@ export type Database = {
           business_id?: string
           created_at?: string
           declaring_user_id?: string | null
+          eligibility_type?: string | null
+          family_relationship?: string | null
           id?: string
           is_primary?: boolean
           link_type?: string
+          notes?: string | null
           organization_id?: string | null
+          reference_mason_cim?: string | null
+          reference_mason_name?: string | null
           status?: string
           tenant_id?: string
           updated_at?: string

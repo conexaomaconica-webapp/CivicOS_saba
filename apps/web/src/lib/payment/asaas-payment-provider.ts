@@ -13,16 +13,22 @@ export class AsaasPaymentProvider implements IPaymentProvider {
   private apiKey: string;
   private configured: boolean;
 
-  constructor() {
-    try {
-      const config = getAsaasConfig();
-      this.baseUrl = config.baseUrl;
-      this.apiKey = config.apiKey;
-      this.configured = config.isApiConfigured;
-    } catch (err) {
-      this.baseUrl = 'https://sandbox.asaas.com/api/v3';
-      this.apiKey = '';
-      this.configured = false;
+  constructor(customConfig?: { baseUrl?: string; apiKey?: string; isApiConfigured?: boolean; configured?: boolean }) {
+    if (customConfig && (customConfig.apiKey || customConfig.baseUrl)) {
+      this.baseUrl = customConfig.baseUrl || 'https://api-sandbox.asaas.com/v3';
+      this.apiKey = customConfig.apiKey || '';
+      this.configured = customConfig.configured ?? customConfig.isApiConfigured ?? Boolean(customConfig.apiKey);
+    } else {
+      try {
+        const config = getAsaasConfig();
+        this.baseUrl = config.baseUrl;
+        this.apiKey = config.apiKey;
+        this.configured = config.isApiConfigured;
+      } catch (err) {
+        this.baseUrl = 'https://api-sandbox.asaas.com/v3';
+        this.apiKey = '';
+        this.configured = false;
+      }
     }
   }
 

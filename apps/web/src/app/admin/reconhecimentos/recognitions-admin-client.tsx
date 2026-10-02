@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   Award,
@@ -9,11 +9,15 @@ import {
   Save,
   Loader2,
   Eye,
+  Sparkles,
+  Crown,
 } from 'lucide-react';
 import {
   InstitutionalRecognitionDTO,
   updateInstitutionalRecognitionAction,
   uploadRecognitionSealAction,
+  getPedraFundamentalQuotaAction,
+  updatePedraFundamentalQuotaAction,
 } from '@/app/actions/institutional-recognitions';
 import { optimizeImageForUpload } from '@/lib/media/optimize-image';
 import { InstitutionalBadges } from '@/components/public/business/shared/InstitutionalBadges';
@@ -30,6 +34,7 @@ const DEFAULT_CATALOG: InstitutionalRecognitionDTO[] = [
     sealUrl: '/selos/pedra-fundamental.svg',
     compactSealUrl: '/selos/pedra-fundamental-compact.svg',
     header_display: 'badge',
+    card_display: 'circular_seal',
     priority_order: 1,
     is_active: true,
     updated_at: new Date().toISOString(),
@@ -85,6 +90,41 @@ export function RecognitionsAdminClient({
   const [saving, setSaving] = useState(false);
   const [uploadingField, setUploadingField] = useState<'seal_url' | 'compact_seal_url' | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Cota Dinâmica da Pedra Fundamental (Ajustável pelo Admin: ex. 30, 50, etc.)
+  const [pedraQuota, setPedraQuota] = useState<number>(50);
+  const [pedraAllocated, setPedraAllocated] = useState<number>(0);
+  const [savingQuota, setSavingQuota] = useState(false);
+
+  useEffect(() => {
+    getPedraFundamentalQuotaAction().then((res) => {
+      if (res && res.quota) {
+        setPedraQuota(res.quota);
+        setPedraAllocated(res.allocated);
+      }
+    });
+  }, []);
+
+  const handleSavePedraQuota = async () => {
+    setSavingQuota(true);
+    setMessage(null);
+    try {
+      const res = await updatePedraFundamentalQuotaAction(pedraQuota);
+      if (res.success && res.quota) {
+        setPedraQuota(res.quota);
+        setMessage({
+          type: 'success',
+          text: `Cota máxima de Pedra Fundamental ajustada com sucesso para ${res.quota} empresas!`,
+        });
+      } else {
+        throw new Error(res.error || 'Erro ao salvar cota.');
+      }
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Erro ao salvar cota.' });
+    } finally {
+      setSavingQuota(false);
+    }
+  };
 
   const mainFileInputRef = useRef<HTMLInputElement>(null);
   const horizontalFileInputRef = useRef<HTMLInputElement>(null);
@@ -270,6 +310,80 @@ export function RecognitionsAdminClient({
           </label>
         </div>
 
+        {/* Bloco de Ajuste de Cota Máxima da Pedra Fundamental */}
+        {selectedKey === 'pedra_fundamental' && (
+          <div className="rounded-xl border border-amber-900/30 bg-gradient-to-br from-[#faf6ed] to-[#f4ebe1] p-4.5 shadow-xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-900/15 pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#3B0B14] text-[#C9A227]">
+                  <Sparkles className="h-4 w-4" />
+                </span>
+                <div>
+                  <h3 className="text-xs font-bold text-[#3B0B14] uppercase tracking-wider">
+                    Cota Máxima de Empresas (Limite de Vagas)
+                  </h3>
+                  <p className="text-[11px] text-amber-950/80">
+                    Ajuste o teto de anunciantes pioneiros que podem receber o selo histórico.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-start sm:self-auto bg-white/80 border border-amber-900/20 px-3 py-1 rounded-lg text-xs">
+                <span className="font-semibold text-stone-700">
+                  <strong className="text-[#3B0B14]">{pedraAllocated}</strong> de {pedraQuota} vagas preenchidas
+                </span>
+                <span className="text-amber-800 font-bold">({Math.max(0, pedraQuota - pedraAllocated)} restantes)</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <div className="flex items-center gap-2">
+                <label htmlFor="pedra-quota-input" className="text-xs font-bold text-stone-800">
+                  Limite Total:
+                </label>
+                <input
+                  id="pedra-quota-input"
+                  type="number"
+                  min={1}
+                  max={1000}
+                  value={pedraQuota}
+                  onChange={(e) => setPedraQuota(Math.max(1, Number(e.target.value) || 1))}
+                  className="w-20 px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-bold text-stone-900 text-center focus:border-[#3B0B14] focus:outline-none"
+                />
+                <span className="text-xs text-stone-600 font-medium">empresas</span>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-semibold text-stone-500 mr-1">Atalhos:</span>
+                {[10, 30, 50, 100].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setPedraQuota(preset)}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                      pedraQuota === preset
+                        ? 'bg-[#3B0B14] text-[#C9A227] border-[#3B0B14] shadow-xs'
+                        : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+                    }`}
+                  >
+                    {preset} vagas
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                disabled={savingQuota}
+                onClick={handleSavePedraQuota}
+                className="px-4 py-1.5 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] text-xs font-extrabold rounded-lg shadow-xs transition-colors ml-auto flex items-center gap-1.5 disabled:opacity-60 cursor-pointer"
+              >
+                {savingQuota ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                <span>Salvar Cota</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1">
             <label className="block text-xs font-bold text-stone-700">Nome Público do Selo:</label>
@@ -384,6 +498,109 @@ export function RecognitionsAdminClient({
                 </div>
                 <span>180% (Destaque)</span>
               </div>
+            </div>
+          </fieldset>
+
+          {/* FORMATO DE EXIBIÇÃO NO CARD DA EMPRESA (GRID E LISTA DO GUIA) */}
+          <fieldset className="md:col-span-2 space-y-3 pt-3 border-t border-stone-200">
+            <div className="flex items-center justify-between">
+              <legend className="block text-xs font-bold text-stone-800">
+                Formato de Exibição no Card da Empresa (Guia Comercial — Grid e Lista):
+              </legend>
+              <span className="text-[11px] font-mono text-stone-500">
+                Define a apresentação no card quando a empresa for Pedra Fundamental
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Opção 1: Selo Normal (Circular) */}
+              <label
+                className={`p-3.5 border rounded-2xl cursor-pointer transition-all ${
+                  (activeRecognition.card_display || 'circular_seal') === 'circular_seal'
+                    ? 'border-[#3B0B14] bg-[#3B0B14]/5 ring-2 ring-[#3B0B14]/20 shadow-xs'
+                    : 'border-stone-300 hover:border-stone-400 bg-white'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="card_display"
+                    value="circular_seal"
+                    checked={(activeRecognition.card_display || 'circular_seal') === 'circular_seal'}
+                    onChange={() => handleFieldChange('card_display', 'circular_seal')}
+                    className="accent-[#3B0B14]"
+                  />
+                  <span className="text-xs font-bold text-stone-900">Selo Normal (Circular)</span>
+                </div>
+                <p className="ml-5 mt-1.5 text-[11px] text-stone-600 leading-snug">
+                  Medalha redonda oficial de Pedra Fundamental em tamanho nobre com animação de zoom e relevo dinâmico no hover.
+                </p>
+                <div className="mt-3 ml-5 flex items-center justify-center h-14 bg-stone-100/80 rounded-xl p-1">
+                  <div className="w-10 h-10 rounded-full border-2 border-amber-400 bg-[#1C1917] flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
+                    <Crown className="w-5 h-5 text-amber-400" />
+                  </div>
+                </div>
+              </label>
+
+              {/* Opção 2: Selo Horizontal */}
+              <label
+                className={`p-3.5 border rounded-2xl cursor-pointer transition-all ${
+                  activeRecognition.card_display === 'horizontal_seal'
+                    ? 'border-[#3B0B14] bg-[#3B0B14]/5 ring-2 ring-[#3B0B14]/20 shadow-xs'
+                    : 'border-stone-300 hover:border-stone-400 bg-white'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="card_display"
+                    value="horizontal_seal"
+                    checked={activeRecognition.card_display === 'horizontal_seal'}
+                    onChange={() => handleFieldChange('card_display', 'horizontal_seal')}
+                    className="accent-[#3B0B14]"
+                  />
+                  <span className="text-xs font-bold text-stone-900">Selo Horizontal</span>
+                </div>
+                <p className="ml-5 mt-1.5 text-[11px] text-stone-600 leading-snug">
+                  Faixa/selo horizontal oficial com borda dourada, brasão e inscrição estilizada da condecoração.
+                </p>
+                <div className="mt-3 ml-5 flex items-center justify-center h-14 bg-stone-100/80 rounded-xl p-1">
+                  <div className="h-6 px-3 rounded-full border border-amber-400 bg-[#1C1917] flex items-center gap-1.5 shadow-xs">
+                    <Crown className="w-3 h-3 text-amber-400" />
+                    <span className="text-[9px] font-bold tracking-wider text-amber-400 uppercase">PEDRA FUNDAMENTAL</span>
+                  </div>
+                </div>
+              </label>
+
+              {/* Opção 3: Badge em Formato de Texto */}
+              <label
+                className={`p-3.5 border rounded-2xl cursor-pointer transition-all ${
+                  activeRecognition.card_display === 'badge_text'
+                    ? 'border-[#3B0B14] bg-[#3B0B14]/5 ring-2 ring-[#3B0B14]/20 shadow-xs'
+                    : 'border-stone-300 hover:border-stone-400 bg-white'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="card_display"
+                    value="badge_text"
+                    checked={activeRecognition.card_display === 'badge_text'}
+                    onChange={() => handleFieldChange('card_display', 'badge_text')}
+                    className="accent-[#3B0B14]"
+                  />
+                  <span className="text-xs font-bold text-stone-900">Badge em Formato de Texto</span>
+                </div>
+                <p className="ml-5 mt-1.5 text-[11px] text-stone-600 leading-snug">
+                  Pílula clássica com fundo dourado suave, ícone de coroa dourada e texto "Pedra Fundamental".
+                </p>
+                <div className="mt-3 ml-5 flex items-center justify-center h-14 bg-stone-100/80 rounded-xl p-1">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-amber-400 bg-amber-100 text-amber-950 font-bold text-[10px] shadow-2xs">
+                    <Crown className="w-3 h-3 text-amber-800" />
+                    Pedra Fundamental
+                  </span>
+                </div>
+              </label>
             </div>
           </fieldset>
         </div>

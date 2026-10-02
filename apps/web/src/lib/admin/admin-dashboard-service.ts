@@ -61,6 +61,7 @@ export interface AdminDashboardDTO {
     overduePaymentsCount: number;
     publishedLodgesCount: number;
     pedraFundamentalCount: number;
+    pedraFundamentalQuota: number;
   };
   attentionCenter: {
     pending_approvals: number;
@@ -234,6 +235,32 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
     const pedraFundamentalBadgeCount = recognitions.filter((r) => r.recognition_key === 'pedra_fundamental' && r.is_active).length;
     const founderBadgeCount = recognitions.filter((r) => r.recognition_key === 'fundadora' && r.is_active).length;
 
+    // 3.2.1 Cota Máxima de Pedra Fundamental (dinâmica do banco, padrão 50)
+    let pedraFundamentalQuota = 50;
+    try {
+      const { data: setRow } = await (dbClient as any)
+        .from('directory_home_settings')
+        .select('sections_config')
+        .limit(1)
+        .maybeSingle();
+
+      if (setRow?.sections_config) {
+        if (Array.isArray(setRow.sections_config)) {
+          const cfg = setRow.sections_config.find((s: any) => s.id === 'pedra_fundamental');
+          if (cfg?.max_quota && Number(cfg.max_quota) > 0) {
+            pedraFundamentalQuota = Number(cfg.max_quota);
+          }
+        } else if (typeof setRow.sections_config === 'object') {
+          const q = Number(setRow.sections_config.pedra_fundamental_quota);
+          if (Number.isFinite(q) && q > 0) {
+            pedraFundamentalQuota = q;
+          }
+        }
+      }
+    } catch {
+      pedraFundamentalQuota = 50;
+    }
+
     // Métricas reais de empresas
     const totalCompanies = businesses.length;
     const publishedCompanies = businesses.filter((b) => b.publication_status === 'published' && b.is_active !== false).length;
@@ -331,17 +358,28 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
         annualRevenueBrl = Math.round(totalPaidAmount);
         monthlyRevenueBrl = Math.round(annualRevenueBrl / 12);
       } else {
-        // Recorrência calculada pelas assinaturas ativas reais (Plano Ouro/Acácia = R$ 1.080,00 anual, R$ 90,00 mensal)
-        monthlyRevenueBrl = activeSubscriptionsCount * 90;
-        annualRevenueBrl = activeSubscriptionsCount * 1080;
-        confirmedPaymentsCount = activeSubscriptionsCount;
+        // Recorrência calculada pela carteira de planos comerciais das empresas publicadas
+        // Acácia/Ouro = R$ 1.080/ano | Compasso/Prata = R$ 855/ano | Esquadro/Bronze = R$ 635/ano
+        const pubOuro = businesses.filter((b) => b.publication_status === 'published' && ['ouro', 'acacia', 'ouro_founder'].includes((b.plan_tier || '').toLowerCase())).length;
+        const pubPrata = businesses.filter((b) => b.publication_status === 'published' && ['prata', 'compasso'].includes((b.plan_tier || '').toLowerCase())).length;
+        const pubBronze = businesses.filter((b) => b.publication_status === 'published' && ['bronze', 'esquadro'].includes((b.plan_tier || 'bronze').toLowerCase())).length;
+
+        const calculatedAnnual = (pubOuro * 1080) + (pubPrata * 855) + (pubBronze * 635);
+        annualRevenueBrl = calculatedAnnual > 0 ? calculatedAnnual : (activeSubscriptionsCount * 1080);
+        monthlyRevenueBrl = Math.round(annualRevenueBrl / 12);
+        confirmedPaymentsCount = publishedCompanies || activeSubscriptionsCount;
         pendingPaymentsCount = pendingCompanies;
       }
     } catch {
-      // Fallback pelas assinaturas ativas reais
-      monthlyRevenueBrl = activeSubscriptionsCount * 90;
-      annualRevenueBrl = activeSubscriptionsCount * 1080;
-      confirmedPaymentsCount = activeSubscriptionsCount;
+      // Fallback pela carteira de planos comerciais das empresas publicadas
+      const pubOuro = businesses.filter((b) => b.publication_status === 'published' && ['ouro', 'acacia', 'ouro_founder'].includes((b.plan_tier || '').toLowerCase())).length;
+      const pubPrata = businesses.filter((b) => b.publication_status === 'published' && ['prata', 'compasso'].includes((b.plan_tier || '').toLowerCase())).length;
+      const pubBronze = businesses.filter((b) => b.publication_status === 'published' && ['bronze', 'esquadro'].includes((b.plan_tier || 'bronze').toLowerCase())).length;
+
+      const calculatedAnnual = (pubOuro * 1080) + (pubPrata * 855) + (pubBronze * 635);
+      annualRevenueBrl = calculatedAnnual > 0 ? calculatedAnnual : (activeSubscriptionsCount * 1080);
+      monthlyRevenueBrl = Math.round(annualRevenueBrl / 12);
+      confirmedPaymentsCount = publishedCompanies || activeSubscriptionsCount;
       pendingPaymentsCount = pendingCompanies;
     }
 
@@ -441,6 +479,7 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
           overduePaymentsCount: 0,
           publishedLodgesCount: rpcData.lodges?.publishedLodgesCount || publishedLodgesCount,
           pedraFundamentalCount: subs.founder || 0,
+          pedraFundamentalQuota: 50,
         },
         attentionCenter: {
           pending_approvals: comp.pending || 0,
@@ -546,6 +585,7 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
         overduePaymentsCount: overduePaymentsCount,
         publishedLodgesCount,
         pedraFundamentalCount: pedraFundamentalBadgeCount,
+        pedraFundamentalQuota,
       },
       attentionCenter: {
         pending_approvals: pendingCompanies,
@@ -616,6 +656,7 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
       overduePaymentsCount: 0,
       publishedLodgesCount: 0,
       pedraFundamentalCount: 0,
+      pedraFundamentalQuota: 50,
     },
     attentionCenter: {
       pending_approvals: 0,

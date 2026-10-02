@@ -16,6 +16,7 @@ type GovernanceControlsProps = {
   isPedraFundamental: boolean;
   isColunaHonra: boolean;
   pedraCount: number;
+  pedraQuota?: number;
 };
 
 export default function AdminBusinessGovernanceControls({
@@ -26,6 +27,7 @@ export default function AdminBusinessGovernanceControls({
   isPedraFundamental: initialPedra,
   isColunaHonra: initialColuna,
   pedraCount,
+  pedraQuota = 50,
 }: GovernanceControlsProps) {
   const [status, setStatus] = useState(initialStatus);
   const [founder, setFounder] = useState(initialFounder);
@@ -66,8 +68,8 @@ export default function AdminBusinessGovernanceControls({
         setMessage({ type: 'success', text: 'Selo Empresa Fundadora atualizado com sucesso!' });
       } else if (selectedAction === 'toggle_pedra') {
         const nextState = !pedra;
-        if (nextState && pedraCount >= 10) {
-          throw new Error('LIMITE_EXCEDIDO: O limite de 10 Pedra Fundamental já foi atingido na plataforma.');
+        if (nextState && pedraCount >= pedraQuota) {
+          throw new Error(`LIMITE_EXCEDIDO: O limite de ${pedraQuota} Pedra Fundamental já foi atingido na plataforma.`);
         }
 
         const res = await allocateFounderStatusAction({
@@ -179,7 +181,7 @@ export default function AdminBusinessGovernanceControls({
             onClick={() => handleOpenDialog('toggle_pedra')}
             className="text-[#4B161B] border-[#4B161B]/30 hover:bg-[#4B161B]/5 font-semibold text-xs rounded-xl"
           >
-            {pedra ? 'Revogar Pedra Fundamental' : 'Conceder Pedra Fundamental (1/10)'}
+            {pedra ? 'Revogar Pedra Fundamental' : 'Conceder Pedra Fundamental'}
           </Button>
 
           <Button

@@ -8,6 +8,16 @@ import { validatePhone, sanitizeCnpj } from '@/lib/onboarding/onboarding-validat
 import { getCanonicalDefaultLimit, getCommercialPlanName } from '@/lib/billing/plans-service';
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database.types';
+import {
+  COMMUNITY_LINK_TYPES,
+  type CommunityLinkType,
+  type MasonicEligibilityType,
+  MASONIC_ELIGIBILITY_TYPES,
+} from '@/lib/masonic/masonic-links-service';
+import {
+  assertCommercialStatusTransition,
+  type CommercialStatus,
+} from '@/lib/commercial-onboarding-status';
 
 function normalizeMasonicStatus(status: string | null | undefined): 'pending' | 'verified' | 'rejected' {
   if (status === 'verified' || status === 'approved' || status === 'active') return 'verified';
@@ -371,6 +381,8 @@ export interface AdminBusiness360DTO {
     is_verified: boolean;
     plan_code: string;
     completeness_percent: number;
+    cnpj?: string;
+    commercial_status?: string;
     created_at: string;
     updated_at: string;
   };
@@ -393,6 +405,11 @@ export interface AdminBusiness360DTO {
     lodge_name: string;
     potency: string;
     link_type: string;
+    eligibility_type?: 'mason' | 'mason_spouse' | 'mason_family' | string | null;
+    reference_mason_name?: string | null;
+    reference_mason_cim?: string | null;
+    family_relationship?: string | null;
+    notes?: string | null;
     verified_at: string | null;
     verified_by: string | null;
   };
@@ -403,6 +420,21 @@ export interface AdminBusiness360DTO {
     signed_at: string;
     rendered_text: string;
     signer_name: string;
+  };
+  commercial_terms?: {
+    id: string;
+    plan_code: string;
+    plan_name: string;
+    billing_cycle: 'annual' | 'biennial';
+    payment_method: 'avista' | 'parcelado';
+    amount_cents: number;
+    installments_count: number;
+    installment_amount_cents: number;
+    is_pedra_fundamental: boolean;
+    notes?: string | null;
+    status: 'conferido' | 'desatualizado' | 'contratado';
+    conferred_at: string;
+    conferred_by?: string | null;
   };
   subscription: {
     plan_code: string;
@@ -851,7 +883,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
     try {
       const { data: linkData } = await (supabase as any)
         .from('business_masonic_links')
-        .select('id, status, organization_id, link_type, verified_at, verified_by, organizations(name, potency)')
+        .select('id, status, organization_id, link_type, eligibility_type, reference_mason_name, reference_mason_cim, family_relationship, notes, verified_at, verified_by, organizations(name, potency)')
         .eq('business_id', businessId)
         .maybeSingle();
 
@@ -863,6 +895,11 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
           lodge_name: linkData.organizations?.name || b.masonic_lodge || 'Loja Não Identificada',
           potency: linkData.organizations?.potency || b.masonic_potency || 'GLEB / GOB / GLMMG',
           link_type: linkData.link_type || b.masonic_link_type || 'Membro',
+          eligibility_type: linkData.eligibility_type || null,
+          reference_mason_name: linkData.reference_mason_name || null,
+          reference_mason_cim: linkData.reference_mason_cim || null,
+          family_relationship: linkData.family_relationship || null,
+          notes: linkData.notes || null,
           verified_at: linkData.verified_at || null,
           verified_by: linkData.verified_by || null,
         };
@@ -1231,6 +1268,33 @@ DOSSIÊ DE ACEITE E ASSINATURA DIGITAL (AUDITADO):
       }
     } catch (_e) { }
 
+    let commercialTermsDetail: AdminBusiness360DTO['commercial_terms'] = undefined;
+    try {
+      const { data: ctRow } = await (supabase as any)
+        .from('business_commercial_terms')
+        .select('*')
+        .eq('business_id', businessId)
+        .maybeSingle();
+
+      if (ctRow) {
+        commercialTermsDetail = {
+          id: ctRow.id,
+          plan_code: ctRow.plan_code,
+          plan_name: ctRow.plan_name,
+          billing_cycle: ctRow.billing_cycle,
+          payment_method: ctRow.payment_method,
+          amount_cents: Number(ctRow.amount_cents),
+          installments_count: Number(ctRow.installments_count),
+          installment_amount_cents: Number(ctRow.installment_amount_cents || 0),
+          is_pedra_fundamental: Boolean(ctRow.is_pedra_fundamental),
+          notes: ctRow.notes || null,
+          status: ctRow.status,
+          conferred_at: ctRow.conferred_at,
+          conferred_by: ctRow.conferred_by || null,
+        };
+      }
+    } catch (_e) { }
+
     return {
       business: {
         id: b.id,
@@ -1238,7 +1302,9 @@ DOSSIÊ DE ACEITE E ASSINATURA DIGITAL (AUDITADO):
         name: b.name,
         slug: b.slug || undefined,
         legal_name: b.legal_name || b.name,
+        cnpj: b.cnpj || b.cnpj_cpf || undefined,
         cnpj_cpf: b.cnpj || b.cnpj_cpf || undefined,
+        commercial_status: b.commercial_status || 'pre_cadastro',
         category_id: primaryCategory?.id,
         category: primaryCategory?.name || b.category || 'Geral',
         description: b.description || undefined,
@@ -1322,6 +1388,7 @@ DOSSIÊ DE ACEITE E ASSINATURA DIGITAL (AUDITADO):
       recent_notifications: [],
       audit_timeline,
       pedra_fundamental_count: b.is_pedra_fundamental ? 1 : 0,
+      commercial_terms: commercialTermsDetail,
     };
   } catch (_err) {
     return null;
@@ -1970,7 +2037,7 @@ export async function updateAdminBusinessDetailsAction(
   }
 }
 
-function mapMasonicLinkStatus(status: string): string {
+function mapMasonicLinkStatus(status: string): 'approved' | 'pending_verification' | 'rejected' | 'draft' {
   switch (status) {
     case 'verified':
     case 'approved':
@@ -1984,29 +2051,23 @@ function mapMasonicLinkStatus(status: string): string {
     case 'draft':
       return 'draft';
     default:
-      return 'approved';
+      throw new Error(`Status de vínculo inválido: ${status}`);
   }
 }
 
-function mapMasonicLinkType(linkType?: string): string {
-  if (!linkType) return 'owner';
-  const allowed = [
-    'owner',
-    'equity_partner',
-    'family_owner',
-    'employee',
-    'executive',
-    'sales_representative',
-    'authorized_agent',
-    'institutional_partner',
-  ];
-  if (allowed.includes(linkType)) return linkType;
+function mapMasonicLinkType(linkType?: string): CommunityLinkType {
+  if (!linkType) {
+    throw new Error('Tipo de vínculo empresarial é obrigatório.');
+  }
+  if (COMMUNITY_LINK_TYPES.includes(linkType as CommunityLinkType)) {
+    return linkType as CommunityLinkType;
+  }
   const lower = linkType.toLowerCase();
-  if (lower.includes('proprietário') || lower.includes('owner') || lower.includes('ir')) return 'owner';
+  if (lower.includes('proprietário') || lower.includes('owner')) return 'owner';
   if (lower.includes('sócio') || lower.includes('partner')) return 'equity_partner';
   if (lower.includes('familiar') || lower.includes('family')) return 'family_owner';
   if (lower.includes('representante')) return 'sales_representative';
-  return 'owner';
+  throw new Error(`Tipo de vínculo empresarial inválido: ${linkType}`);
 }
 
 export async function verifyAdminMasonicLinkAction(
@@ -2019,7 +2080,7 @@ export async function verifyAdminMasonicLinkAction(
 
     const { data: biz } = await (supabase as any)
       .from('businesses')
-      .select('id, tenant_id')
+      .select('id, tenant_id, owner_id, commercial_status')
       .eq('id', businessId)
       .maybeSingle();
 
@@ -2029,23 +2090,30 @@ export async function verifyAdminMasonicLinkAction(
 
     const { data: linkData } = await (supabase as any)
       .from('business_masonic_links')
-      .select('id, tenant_id, status')
+      .select('id, tenant_id, status, declaring_user_id')
       .eq('business_id', businessId)
       .maybeSingle();
 
     let linkId = linkData?.id;
     const dbStatus = mapMasonicLinkStatus(newStatus);
     const isApproved = dbStatus === 'approved';
+    const targetDeclaringUserId = (biz.owner_id && biz.owner_id !== user.id) ? biz.owner_id : null;
 
     if (linkData) {
+      const updatePayload: Record<string, any> = {
+        status: dbStatus,
+        verified_at: isApproved ? new Date().toISOString() : null,
+        verified_by: isApproved ? user.id : null,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (isApproved && linkData.declaring_user_id === user.id) {
+        updatePayload.declaring_user_id = targetDeclaringUserId;
+      }
+
       const { error: updateErr } = await (supabase as any)
         .from('business_masonic_links')
-        .update({
-          status: dbStatus,
-          verified_at: isApproved ? new Date().toISOString() : null,
-          verified_by: isApproved ? user.id : null,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', linkData.id);
 
       if (updateErr) return { success: false, error: `Falha ao atualizar vínculo: ${updateErr.message}` };
@@ -2056,7 +2124,7 @@ export async function verifyAdminMasonicLinkAction(
         .insert({
           tenant_id: biz.tenant_id,
           business_id: businessId,
-          declaring_user_id: user.id,
+          declaring_user_id: targetDeclaringUserId,
           link_type: 'owner',
           status: 'draft',
         })
@@ -2093,8 +2161,33 @@ export async function verifyAdminMasonicLinkAction(
       })
       .eq('id', businessId);
 
-    await (supabase as any).from('admin_audit_logs').insert({
-      tenant_id: biz.tenant_id,
+        // Avança commercial_status caso aprovado
+    if (isApproved) {
+      const currentCommercialStatus = (biz.commercial_status || 'pre_cadastro') as CommercialStatus;
+      let nextCommercialStatus: CommercialStatus | null = null;
+      if (currentCommercialStatus === 'pre_cadastro') {
+        assertCommercialStatusTransition('pre_cadastro', 'vinculo_informado');
+        assertCommercialStatusTransition('vinculo_informado', 'vinculo_verificado');
+        nextCommercialStatus = 'vinculo_verificado';
+      } else if (currentCommercialStatus === 'vinculo_informado') {
+        assertCommercialStatusTransition('vinculo_informado', 'vinculo_verificado');
+        nextCommercialStatus = 'vinculo_verificado';
+      }
+
+      const bizUpdates: Record<string, any> = {
+        masonic_validation_status: 'approved',
+        updated_at: new Date().toISOString(),
+      };
+      if (nextCommercialStatus) {
+        bizUpdates.commercial_status = nextCommercialStatus;
+      }
+      await (supabase as any)
+        .from('businesses')
+        .update(bizUpdates)
+        .eq('id', businessId);
+    }
+
+    await (supabase as any).from('admin_audit_logs').insert({   tenant_id: biz.tenant_id,
       actor_id: user.id,
       action: `VERIFY_MASONIC_LINK_${newStatus.toUpperCase()}`,
       entity_type: 'business_masonic_link',
@@ -2120,6 +2213,11 @@ export async function upsertAdminMasonicLinkAction(
     lodge_name: string;
     potency?: string;
     link_type: string;
+    eligibility_type?: 'mason' | 'mason_spouse' | 'mason_family' | string;
+    reference_mason_name?: string;
+    reference_mason_cim?: string;
+    family_relationship?: string;
+    notes?: string;
     status: 'verified' | 'pending' | 'rejected' | string;
     justification?: string;
   }
@@ -2127,11 +2225,26 @@ export async function upsertAdminMasonicLinkAction(
   try {
     const { supabase, user } = await assertPlatformAdminAccess();
 
-    const { data: biz } = await (supabase as any)
-      .from('businesses')
-      .select('id, tenant_id')
-      .eq('id', businessId)
-      .maybeSingle();
+    // 1. Busca paralela dos registros essenciais
+    const [{ data: biz }, { data: existingLink }, { data: existingResp }] = await Promise.all([
+      (supabase as any)
+        .from('businesses')
+        .select('id, tenant_id, owner_id, commercial_status')
+        .eq('id', businessId)
+        .maybeSingle(),
+      (supabase as any)
+        .from('business_masonic_links')
+        .select('id, declaring_user_id')
+        .eq('business_id', businessId)
+        .maybeSingle(),
+      payload.lodge_name.trim()
+        ? (supabase as any)
+            .from('business_responsibles')
+            .select('id')
+            .eq('business_id', businessId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
 
     if (!biz) return { success: false, error: 'Empresa não localizada.' };
 
@@ -2174,29 +2287,41 @@ export async function upsertAdminMasonicLinkAction(
       }
     }
 
-    const { data: existingLink, error: linkLookupError } = await (supabase as any)
-      .from('business_masonic_links')
-      .select('id')
-      .eq('business_id', businessId)
-      .maybeSingle();
-
-    if (linkLookupError) return { success: false, error: `Falha ao consultar vínculo maçônico: ${linkLookupError.message}` };
-
     const dbStatus = mapMasonicLinkStatus(payload.status);
     const dbLinkType = mapMasonicLinkType(payload.link_type);
     const isApproved = dbStatus === 'approved';
+    const targetDeclaringUserId = (biz.owner_id && biz.owner_id !== user.id) ? biz.owner_id : null;
+
+    let eligibilityType: MasonicEligibilityType | null = null;
+    if (payload.eligibility_type) {
+      if (!MASONIC_ELIGIBILITY_TYPES.includes(payload.eligibility_type as MasonicEligibilityType)) {
+        return { success: false, error: `Tipo de elegibilidade maçônica inválido: ${payload.eligibility_type}` };
+      }
+      eligibilityType = payload.eligibility_type as MasonicEligibilityType;
+    }
 
     if (existingLink) {
+      const updatePayload: Record<string, any> = {
+        organization_id: organizationId,
+        link_type: dbLinkType,
+        eligibility_type: eligibilityType,
+        reference_mason_name: payload.reference_mason_name?.trim() || null,
+        reference_mason_cim: payload.reference_mason_cim?.trim() || null,
+        family_relationship: payload.family_relationship?.trim() || null,
+        notes: payload.notes?.trim() || null,
+        status: dbStatus,
+        verified_at: isApproved ? new Date().toISOString() : null,
+        verified_by: isApproved ? user.id : null,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (isApproved && existingLink.declaring_user_id === user.id) {
+        updatePayload.declaring_user_id = targetDeclaringUserId;
+      }
+
       const { error: updateErr } = await (supabase as any)
         .from('business_masonic_links')
-        .update({
-          organization_id: organizationId,
-          link_type: dbLinkType,
-          status: dbStatus,
-          verified_at: isApproved ? new Date().toISOString() : null,
-          verified_by: isApproved ? user.id : null,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', existingLink.id);
 
       if (updateErr) return { success: false, error: `Falha ao atualizar vínculo maçônico: ${updateErr.message}` };
@@ -2207,9 +2332,14 @@ export async function upsertAdminMasonicLinkAction(
         .insert({
           tenant_id: biz.tenant_id,
           business_id: businessId,
-          declaring_user_id: user.id,
+          declaring_user_id: targetDeclaringUserId,
           organization_id: organizationId,
           link_type: dbLinkType,
+          eligibility_type: eligibilityType,
+          reference_mason_name: payload.reference_mason_name?.trim() || null,
+          reference_mason_cim: payload.reference_mason_cim?.trim() || null,
+          family_relationship: payload.family_relationship?.trim() || null,
+          notes: payload.notes?.trim() || null,
           status: 'draft',
         })
         .select('id')
@@ -2233,64 +2363,232 @@ export async function upsertAdminMasonicLinkAction(
       }
     }
 
-    // Sincroniza campos denormalizados na tabela businesses
-    if (payload.lodge_name.trim()) {
-      await (supabase as any)
-        .from('businesses')
-        .update({
-          masonic_lodge: payload.lodge_name.trim(),
-          masonic_potency: payload.potency?.trim() || null,
-          masonic_link_type: dbLinkType,
-          masonic_validation_status: dbStatus,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', businessId);
+    // Transições formais de commercial_status
+    const currentCommercialStatus = (biz.commercial_status || 'pre_cadastro') as CommercialStatus;
+    let nextCommercialStatus: CommercialStatus | null = null;
+
+    if (dbStatus === 'pending_verification') {
+      if (currentCommercialStatus === 'pre_cadastro') {
+        assertCommercialStatusTransition('pre_cadastro', 'vinculo_informado');
+        nextCommercialStatus = 'vinculo_informado';
+      }
+    } else if (dbStatus === 'approved') {
+      if (currentCommercialStatus === 'pre_cadastro') {
+        assertCommercialStatusTransition('pre_cadastro', 'vinculo_informado');
+        assertCommercialStatusTransition('vinculo_informado', 'vinculo_verificado');
+        nextCommercialStatus = 'vinculo_verificado';
+      } else if (currentCommercialStatus === 'vinculo_informado') {
+        assertCommercialStatusTransition('vinculo_informado', 'vinculo_verificado');
+        nextCommercialStatus = 'vinculo_verificado';
+      }
     }
 
-    // Mantém o texto do card público sincronizado com a organização escolhida.
+    // Sincroniza campos na tabela businesses
+    const businessUpdates: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
     if (payload.lodge_name.trim()) {
-      const { data: existingResp, error: respLookupError } = await (supabase as any)
-        .from('business_responsibles')
-        .select('id')
-        .eq('business_id', businessId)
-        .maybeSingle();
-
-      if (respLookupError) return { success: false, error: `Falha ao consultar responsável: ${respLookupError.message}` };
-
-      const respWrite = existingResp
-        ? await (supabase as any)
-          .from('business_responsibles')
-          .update({ organization: payload.lodge_name.trim(), updated_at: new Date().toISOString() })
-          .eq('id', existingResp.id)
-        : await (supabase as any)
-          .from('business_responsibles')
-          .insert({
-            tenant_id: biz.tenant_id,
-            business_id: businessId,
-            name: 'Anunciante Titular',
-            organization: payload.lodge_name.trim(),
-          });
-
-      if (respWrite.error) return { success: false, error: `Falha ao sincronizar responsável: ${respWrite.error.message}` };
+      businessUpdates.masonic_lodge = payload.lodge_name.trim();
+      businessUpdates.masonic_potency = payload.potency?.trim() || null;
+      businessUpdates.masonic_link_type = dbLinkType;
+      businessUpdates.masonic_validation_status = dbStatus;
+    }
+    if (nextCommercialStatus) {
+      businessUpdates.commercial_status = nextCommercialStatus;
     }
 
-    await (supabase as any).from('admin_audit_logs').insert({
-      tenant_id: biz.tenant_id,
-      actor_id: user.id,
-      action: 'UPSERT_MASONIC_LINK',
-      entity_type: 'business_masonic_link',
-      entity_id: businessId,
-      after_value: { ...payload, db_status: dbStatus, db_link_type: dbLinkType },
-      reason: payload.justification || 'Cadastro/Atualização de vínculo maçônico via Admin 360º',
-    });
+    // Gravações finais em paralelo para máxima performance
+    const finishPromises: Promise<any>[] = [
+      (supabase as any).from('businesses').update(businessUpdates).eq('id', businessId),
+      (supabase as any).from('admin_audit_logs').insert({
+        tenant_id: biz.tenant_id,
+        actor_id: user.id,
+        action: 'UPSERT_MASONIC_LINK',
+        entity_type: 'business_masonic_link',
+        entity_id: businessId,
+        after_value: { ...payload, db_status: dbStatus, db_link_type: dbLinkType },
+        reason: payload.justification || 'Cadastro/Atualização de vínculo maçônico via Admin 360º',
+      }),
+    ];
+
+    if (payload.lodge_name.trim()) {
+      if (existingResp) {
+        finishPromises.push(
+          (supabase as any)
+            .from('business_responsibles')
+            .update({ organization: payload.lodge_name.trim(), updated_at: new Date().toISOString() })
+            .eq('id', existingResp.id)
+        );
+      } else {
+        finishPromises.push(
+          (supabase as any)
+            .from('business_responsibles')
+            .insert({
+              tenant_id: biz.tenant_id,
+              business_id: businessId,
+              name: 'Anunciante Titular',
+              organization: payload.lodge_name.trim(),
+            })
+        );
+      }
+    }
+
+    await Promise.all(finishPromises);
 
     revalidatePath('/admin/empresas');
     revalidatePath(`/admin/empresas/${businessId}`);
-    revalidatePath('/guia', 'layout');
+    revalidatePath(`/admin/empresas/${businessId}/vinculo-maconico`);
 
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao salvar vínculo maçônico.' };
+  }
+}
+
+export interface ConfirmAdminCommercialTermsInput {
+  business_id: string;
+  plan_code: string;
+  billing_cycle: 'annual' | 'biennial';
+  payment_method: 'avista' | 'parcelado';
+  amount_cents: number;
+  installments_count: number;
+  installment_amount_cents?: number;
+  is_pedra_fundamental?: boolean;
+  notes?: string;
+}
+
+export async function confirmAdminCommercialTermsAction(
+  input: ConfirmAdminCommercialTermsInput
+): Promise<{ success: boolean; error?: string; commercial_status?: string }> {
+  try {
+    const { supabase, user } = await assertPlatformAdminAccess();
+
+    // 1. Validação de campos obrigatórios
+    if (!input.business_id?.trim()) {
+      return { success: false, error: 'Identificador da empresa é obrigatório.' };
+    }
+    if (!input.plan_code?.trim()) {
+      return { success: false, error: 'O plano comercial deve ser selecionado.' };
+    }
+    if (!input.billing_cycle || !['annual', 'biennial'].includes(input.billing_cycle)) {
+      return { success: false, error: 'Vigência do contrato é obrigatória (anual ou bienal).' };
+    }
+    if (!input.payment_method || !['avista', 'parcelado'].includes(input.payment_method)) {
+      return { success: false, error: 'Condição de pagamento é obrigatória (à vista ou parcelado).' };
+    }
+    if (typeof input.amount_cents !== 'number' || input.amount_cents <= 0) {
+      return { success: false, error: 'Valor contratado deve ser maior que zero.' };
+    }
+    if (typeof input.installments_count !== 'number' || input.installments_count < 1) {
+      return { success: false, error: 'Quantidade de parcelas deve ser de no mínimo 1.' };
+    }
+
+    // 2. Consulta da empresa
+    const { data: biz, error: bizErr } = await (supabase as any)
+      .from('businesses')
+      .select('id, tenant_id, commercial_status, plan_tier')
+      .eq('id', input.business_id)
+      .single();
+
+    if (bizErr || !biz) {
+      return { success: false, error: 'Empresa não encontrada no banco de dados.' };
+    }
+
+    // 3. Validação da máquina de estados
+    const currentStatus = (biz.commercial_status || 'pre_cadastro') as CommercialStatus;
+
+    if (currentStatus !== 'dados_comerciais_conferidos') {
+      try {
+        assertCommercialStatusTransition(currentStatus, 'dados_comerciais_conferidos');
+      } catch (transitionErr: any) {
+        return {
+          success: false,
+          error: transitionErr?.message || `Transição inválida de ${currentStatus} para dados_comerciais_conferidos.`,
+        };
+      }
+    }
+
+    // 4. Preparação dos dados para persistência
+    const installmentsCount = input.payment_method === 'avista' ? 1 : input.installments_count;
+    const installmentAmountCents =
+      input.installment_amount_cents && input.installment_amount_cents > 0
+        ? input.installment_amount_cents
+        : Math.round(input.amount_cents / installmentsCount);
+
+    const planName = input.is_pedra_fundamental
+      ? 'Plano Acácia (Pedra Fundamental)'
+      : `Plano ${getCommercialPlanName(input.plan_code)}`;
+
+    const termsPayload = {
+      business_id: biz.id,
+      tenant_id: biz.tenant_id,
+      plan_code: input.plan_code,
+      plan_name: planName,
+      billing_cycle: input.billing_cycle,
+      payment_method: input.payment_method,
+      amount_cents: input.amount_cents,
+      installments_count: installmentsCount,
+      installment_amount_cents: installmentAmountCents,
+      is_pedra_fundamental: Boolean(input.is_pedra_fundamental),
+      notes: input.notes?.trim() || null,
+      status: 'conferido',
+      conferred_at: new Date().toISOString(),
+      conferred_by: user.id,
+      updated_at: new Date().toISOString(),
+    };
+
+    // 5. Gravação concorrente para máxima velocidade
+    const [termsRes, bizRes] = await Promise.all([
+      (supabase as any)
+        .from('business_commercial_terms')
+        .upsert(termsPayload, { onConflict: 'business_id' }),
+      (supabase as any)
+        .from('businesses')
+        .update({
+          commercial_status: 'dados_comerciais_conferidos',
+          plan_tier: input.plan_code,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', biz.id),
+      (supabase as any).from('admin_audit_logs').insert({
+        tenant_id: biz.tenant_id,
+        actor_id: user.id,
+        action: 'CONFERIR_DADOS_COMERCIAIS',
+        entity_type: 'businesses',
+        entity_id: biz.id,
+        reason: input.notes?.trim() || 'Conferência e congelamento de dados comerciais (Microetapa 3.2)',
+        after_value: termsPayload,
+      }),
+    ]);
+
+    if (termsRes.error) {
+      return {
+        success: false,
+        error: `Falha ao gravar termos comerciais: ${termsRes.error.message}`,
+      };
+    }
+
+    if (bizRes.error) {
+      return {
+        success: false,
+        error: `Falha ao atualizar status comercial da empresa: ${bizRes.error.message}`,
+      };
+    }
+
+    // 7. Revalidação das rotas
+    revalidatePath(`/admin/empresas/${biz.id}/contratacao`);
+    revalidatePath(`/admin/empresas/${biz.id}`);
+    revalidatePath('/admin/empresas');
+
+    return {
+      success: true,
+      commercial_status: 'dados_comerciais_conferidos',
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err.message || 'Erro inesperado ao conferir dados comerciais.',
+    };
   }
 }
 

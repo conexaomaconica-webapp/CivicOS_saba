@@ -4,8 +4,19 @@ import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { assertPlatformAdminAccess } from './admin-auth-helper';
 import { validateEmail, validateName, validatePassword } from '@/lib/auth/validation';
-import { sanitizeCnpj, validateCnpj, validatePhone } from '@/lib/onboarding/onboarding-validation';
+import { sanitizeCnpj, validatePhone } from '@/lib/onboarding/onboarding-validation';
 import type { Database } from '@/types/database.types';
+
+function validateAdminDocument(document: string): string | null {
+  const digits = sanitizeCnpj(document);
+  if (!digits) {
+    return 'Informe o CNPJ ou CPF da empresa/responsável.';
+  }
+  if (digits.length !== 11 && digits.length !== 14) {
+    return 'Documento deve conter 11 dígitos (CPF) ou 14 dígitos (CNPJ).';
+  }
+  return null;
+}
 
 export interface CreateAdminAdvertiserInput {
   tenantId: string;
@@ -18,12 +29,15 @@ export interface CreateAdminAdvertiserInput {
   phone: string;
   categoryId: string;
   planCode: string;
+  paymentCondition?: 'avista_1200' | 'parcelado_4x325' | string;
+  closingNotes?: string;
 }
 
 export interface CreateAdminAdvertiserResult {
   success: boolean;
   businessId?: string;
   temporaryPasswordCreated?: boolean;
+  isLaunchPromo?: boolean;
   error?: string;
 }
 
@@ -32,8 +46,21 @@ export async function createAdminAdvertiserAction(
 ): Promise<CreateAdminAdvertiserResult> {
   try {
     const { supabase, user: admin } = await assertPlatformAdminAccess();
-    const fallbackTenantId = (admin as any)?.user_metadata?.tenant_id || '00000000-0000-0000-0000-000000000010';
-    const tenantId = (input.tenantId || fallbackTenantId).trim();
+
+    // 1. Obtém perfil do admin para garantir vínculo estrito ao tenant logado (Conexão Maçônica)
+    const { data: adminProfile } = await (supabase as any)
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', admin.id)
+      .maybeSingle();
+
+    const tenantId = (
+      adminProfile?.tenant_id ||
+      (admin as any)?.user_metadata?.tenant_id ||
+      input.tenantId ||
+      '00000000-0000-0000-0000-000000000000'
+    ).trim();
+
     const responsibleName = input.responsibleName.trim();
     const responsibleEmail = input.responsibleEmail.trim().toLowerCase();
     const temporaryPassword = input.temporaryPassword;
@@ -42,14 +69,29 @@ export async function createAdminAdvertiserAction(
     const cnpj = sanitizeCnpj(input.cnpj);
     const phone = input.phone.trim();
     const categoryId = input.categoryId.trim();
-    const planCode = input.planCode.trim().toLowerCase();
+
+    // Reconhece a condição especial de lançamento dos 50 primeiros anunciantes
+    const rawPlanCode = input.planCode.trim().toLowerCase();
+    const isLaunchPromo = rawPlanCode === 'acacia_pedra_fundamental';
+
+    // Mapeamento canônico estrito dos planos vigentes do Conexão Maçônica
+    const CANONICAL_PLAN_MAP: Record<string, string> = {
+      bronze: 'esquadro',
+      prata: 'compasso',
+      ouro: 'acacia',
+      esquadro: 'esquadro',
+      compasso: 'compasso',
+      acacia: 'acacia',
+      acacia_pedra_fundamental: 'acacia',
+    };
+    const planCode = CANONICAL_PLAN_MAP[rawPlanCode] || rawPlanCode;
 
     const validationError = validateName(responsibleName)
       ?? validateEmail(responsibleEmail)
       ?? validatePassword(temporaryPassword)
       ?? validateName(tradingName)
       ?? validateName(legalName)
-      ?? validateCnpj(cnpj)
+      ?? validateAdminDocument(cnpj)
       ?? (phone ? validatePhone(phone) : null);
     if (validationError) return { success: false, error: validationError };
     if (!tenantId || !categoryId || !planCode) {
@@ -59,13 +101,20 @@ export async function createAdminAdvertiserAction(
     const [{ data: tenant }, { data: category }, { data: plan }, { data: duplicate }] = await Promise.all([
       (supabase as any).from('tenants').select('id').eq('id', tenantId).maybeSingle(),
       (supabase as any).from('categories').select('id, name').eq('id', categoryId).eq('is_active', true).maybeSingle(),
-      (supabase as any).from('plan_payment_rules').select('plan_code').eq('plan_code', planCode).maybeSingle(),
-      (supabase as any).from('businesses').select('id').eq('tenant_id', tenantId).eq('cnpj', cnpj).maybeSingle(),
+      (supabase as any).from('plan_payment_rules').select('plan_code').or(`plan_code.eq.${planCode},plan_code.eq.${rawPlanCode}`).maybeSingle(),
+      (supabase as any)
+        .from('businesses')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('cnpj', cnpj)
+        .maybeSingle(),
     ]);
     if (!tenant) return { success: false, error: 'Tenant inválido.' };
     if (!category) return { success: false, error: 'Categoria inválida ou inativa.' };
-    if (!plan) return { success: false, error: 'Plano não disponível.' };
-    if (duplicate) return { success: false, error: 'Este CNPJ já está cadastrado neste tenant.' };
+    if (!plan && !['esquadro', 'compasso', 'acacia'].includes(planCode)) {
+      return { success: false, error: 'Plano não disponível.' };
+    }
+    if (duplicate) return { success: false, error: 'Este documento (CNPJ/CPF) já está cadastrado neste tenant.' };
 
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -104,25 +153,62 @@ export async function createAdminAdvertiserAction(
       temporaryPasswordCreated = true;
     }
 
-    const { data: business, error: businessError } = await (adminClient as any)
+    const insertPayload: any = {
+      tenant_id: tenantId,
+      owner_id: ownerId,
+      name: tradingName,
+      legal_name: legalName,
+      cnpj,
+      category: category.name,
+      phone: phone || null,
+      plan_tier: planCode,
+      publication_status: 'draft',
+      commercial_status: 'pre_cadastro',
+      is_active: true,
+    };
+
+    let { data: business, error: businessError } = await (adminClient as any)
       .from('businesses')
-      .insert({
-        tenant_id: tenantId,
-        owner_id: ownerId,
-        name: tradingName,
-        legal_name: legalName,
-        cnpj,
-        category: category.name,
-        phone: phone || null,
-        plan_tier: planCode,
-        publication_status: 'draft',
-        is_active: true,
-      })
+      .insert(insertPayload)
       .select('id')
       .single();
+
+    // Se o banco ainda estiver com a restrição legada que aceita apenas 14 dígitos (CNPJ) e o input for CPF (11 dígitos):
+    if (businessError && (businessError.message?.includes('chk_businesses_cnpj_digits') || businessError.code === '23514')) {
+      if (temporaryPasswordCreated && ownerId) await adminClient.auth.admin.deleteUser(ownerId);
+      return {
+        success: false,
+        error: 'O banco de dados ainda requer a aplicação da migração 136 (136_allow_cpf_or_cnpj_in_businesses.sql) para cadastrar CPF (11 dígitos).',
+      };
+    }
+
     if (businessError || !business) {
       if (temporaryPasswordCreated && ownerId) await adminClient.auth.admin.deleteUser(ownerId);
       return { success: false, error: businessError?.message ?? 'Não foi possível criar a empresa.' };
+    }
+
+    // Se for a condição promocional de lançamento:
+    // Outorga oficialmente o Reconhecimento Institucional Pedra Fundamental
+    if (isLaunchPromo) {
+      const conditionLabel = input.paymentCondition === 'parcelado_4x325'
+        ? '4x de R$ 325,00 (Total R$ 1.300,00)'
+        : 'À vista R$ 1.200,00';
+      const notes = input.closingNotes?.trim() ? ` — Notas: ${input.closingNotes.trim()}` : '';
+
+      await (adminClient as any).from('business_recognitions').upsert(
+        {
+          tenant_id: tenantId,
+          business_id: business.id,
+          recognition_key: 'pedra_fundamental',
+          is_active: true,
+          revoked_at: null,
+          granted_at: new Date().toISOString(),
+          granted_by: admin.id,
+          justification: `Promoção de Lançamento (50 Primeiros Anunciantes): Plano Acácia Bienal (2 anos) — Condição: ${conditionLabel}${notes}`,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'tenant_id,business_id,recognition_key' },
+      );
     }
 
     await (adminClient as any).from('admin_audit_logs').insert({
@@ -130,14 +216,28 @@ export async function createAdminAdvertiserAction(
       actor_id: admin.id,
       entity_type: 'business',
       entity_id: business.id,
-      action: 'ADMIN_CREATE_ADVERTISER',
-      after_value: { responsible_email: responsibleEmail, plan_code: planCode, publication_status: 'draft' },
-      reason: 'Cadastro de anunciante realizado pelo administrador.',
+      action: isLaunchPromo ? 'ADMIN_CREATE_ADVERTISER_LAUNCH_PROMO' : 'ADMIN_CREATE_ADVERTISER',
+      after_value: {
+        responsible_email: responsibleEmail,
+        plan_code: planCode,
+        publication_status: 'draft',
+        ...(isLaunchPromo ? {
+          promo_code: '50_primeiros_anunciantes',
+          contract_years: 2,
+          payment_condition: input.paymentCondition || 'avista_1200',
+          recognition_key: 'pedra_fundamental',
+          closing_notes: input.closingNotes?.trim() || null,
+        } : {}),
+      },
+      reason: isLaunchPromo
+        ? 'Cadastro realizado sob a Promoção de Lançamento dos 50 primeiros anunciantes (Acácia Bienal + Pedra Fundamental).'
+        : 'Cadastro de anunciante realizado pelo administrador.',
     });
 
     revalidatePath('/admin/empresas');
     revalidatePath('/admin/aprovacoes');
-    return { success: true, businessId: business.id, temporaryPasswordCreated };
+    revalidatePath(`/admin/empresas/${business.id}`);
+    return { success: true, businessId: business.id, temporaryPasswordCreated, isLaunchPromo };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Erro ao cadastrar anunciante.' };
   }

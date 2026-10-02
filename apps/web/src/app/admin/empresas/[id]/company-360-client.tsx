@@ -34,6 +34,8 @@ import {
   Video,
   ArrowUp,
   ArrowDown,
+  Globe,
+  ExternalLink,
 } from 'lucide-react';
 import {
   upsertBusinessEventAction,
@@ -60,6 +62,16 @@ import {
 } from '@/lib/admin/admin-businesses-service';
 import { compressImageOnClient } from '@/lib/media/client-image-compressor';
 import { formatCpfCnpj, formatPhone } from '@/lib/onboarding/onboarding-validation';
+import {
+  unlockAdminCommercialDossierAction,
+  advanceToReadyForPublicationAction,
+  publishAdminBusinessAction,
+  unpublishAdminBusinessAction,
+} from '@/lib/admin/admin-commercial-dossier-service';
+import {
+  evaluateBusinessProfileReadiness,
+  validateBusinessPublicationGate,
+} from '@/lib/admin/admin-commercial-dossier-readiness';
 
 
 interface Props {
@@ -137,6 +149,179 @@ export default function Company360Client({ initialData }: Props) {
   const [respAvatarUrl, setRespAvatarUrl] = useState(data.owner?.avatar_url || '');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
+
+  // 6.4: Governança do Prontuário 360
+  const commercialStatus = data.business.commercial_status || 'pre_cadastro';
+  const [isUnlockingDossier, setIsUnlockingDossier] = useState(false);
+  const [isAdvancingToReady, setIsAdvancingToReady] = useState(false);
+
+  // Avaliação dinâmica de completude do perfil operacional
+  const readiness = evaluateBusinessProfileReadiness({
+    name,
+    legal_name: legalName,
+    description,
+    category,
+    category_id: categoryId,
+    city,
+    state,
+    phone,
+    whatsapp,
+    logo_url: data.business.logo_url,
+    website,
+    instagram,
+    facebook,
+    gallery_count: data.content_summary?.gallery_count || data.gallery_items?.length || 0,
+    benefits_count: data.content_summary?.benefits_count || 0,
+  });
+
+  const handleUnlockDossierFrom360 = async () => {
+    setIsUnlockingDossier(true);
+    try {
+      const res = await unlockAdminCommercialDossierAction(data.business.id);
+      if (res.success && res.commercial_status) {
+        setData((prev) => ({
+          ...prev,
+          business: {
+            ...prev.business,
+            commercial_status: res.commercial_status as any,
+            is_active: true,
+            publication_status: 'draft',
+          },
+        }));
+        setMessage({ type: 'success', text: 'Prontuário 360 liberado com sucesso! A etapa de configuração do anúncio está aberta.' });
+      } else {
+        setMessage({ type: 'error', text: res.error || 'Falha ao liberar Prontuário 360.' });
+      }
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err?.message || 'Erro inesperado.' });
+    } finally {
+      setIsUnlockingDossier(false);
+    }
+  };
+
+  const handleAdvanceToReadyFrom360 = async () => {
+    setIsAdvancingToReady(true);
+    try {
+      const res = await advanceToReadyForPublicationAction(data.business.id);
+      if (res.success && res.commercial_status) {
+        setData((prev) => ({
+          ...prev,
+          business: {
+            ...prev.business,
+            commercial_status: res.commercial_status as any,
+          },
+        }));
+        setMessage({
+          type: 'success',
+          text: 'Prontuário concluído com sucesso! Anúncio marcado como Pronto para Publicação.',
+        });
+      } else {
+        setMessage({
+          type: 'error',
+          text: res.error || 'Falha ao avançar para pronto para publicar.',
+        });
+      }
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err?.message || 'Erro inesperado.' });
+    } finally {
+      setIsAdvancingToReady(false);
+    }
+  };
+
+  // Fase 7: Gate Final de Publicação e Despublicação Segura
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [isUnpublishing, setIsUnpublishing] = useState(false);
+
+  // Validação dinâmica do Gate Final no cliente para exibição imediata
+  const publicationGate = validateBusinessPublicationGate({
+    commercial_status: commercialStatus,
+    masonic_validation_status: data.masonic_link_detail?.status === 'verified' || data.business.is_verified ? 'verified' : null,
+    has_verified_masonic_link: data.masonic_link_detail?.status === 'verified',
+    has_signed_contract: Boolean(data.contract?.signed_at || data.contract?.id),
+    has_confirmed_payment: ['pronto_para_publicar', 'publicado'].includes(commercialStatus) || data.payments_history?.some(p => p.status === 'succeeded' || p.status === 'paid'),
+    profile: {
+      name,
+      legal_name: legalName,
+      description,
+      category,
+      category_id: categoryId,
+      city,
+      state,
+      phone,
+      whatsapp,
+      logo_url: data.business.logo_url,
+      website,
+      instagram,
+      facebook,
+      gallery_count: data.content_summary?.gallery_count || data.gallery_items?.length || 0,
+      benefits_count: data.content_summary?.benefits_count || 0,
+    },
+  });
+
+  const handlePublishBusiness = async () => {
+    setIsPublishing(true);
+    setMessage(null);
+    try {
+      const res = await publishAdminBusinessAction(data.business.id);
+      if (res.success && res.commercial_status) {
+        setData((prev) => ({
+          ...prev,
+          business: {
+            ...prev.business,
+            commercial_status: res.commercial_status as any,
+            publication_status: 'published',
+            is_active: true,
+          },
+        }));
+        setMessage({
+          type: 'success',
+          text: 'Empresa publicada com sucesso no Guia Oficial! O anúncio já está online.',
+        });
+      } else {
+        setMessage({
+          type: 'error',
+          text: res.error || (res.missing ? `Pendências no Gate Final: ${res.missing.join('; ')}` : 'Falha ao publicar empresa pelo Gate Final.'),
+        });
+      }
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err?.message || 'Erro inesperado ao publicar.' });
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const handleUnpublishBusiness = async () => {
+    setIsUnpublishing(true);
+    setMessage(null);
+    try {
+      const res = await unpublishAdminBusinessAction(
+        data.business.id,
+        'Despublicação solicitada pelo administrador no Prontuário 360.'
+      );
+      if (res.success) {
+        setData((prev) => ({
+          ...prev,
+          business: {
+            ...prev.business,
+            publication_status: 'draft',
+          },
+        }));
+        setMessage({
+          type: 'success',
+          text: 'Empresa despublicada (tornada Rascunho). O histórico comercial foi mantido.',
+        });
+      } else {
+        setMessage({
+          type: 'error',
+          text: res.error || 'Falha ao despublicar empresa.',
+        });
+      }
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err?.message || 'Erro inesperado ao despublicar.' });
+    } finally {
+      setIsUnpublishing(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -1265,6 +1450,329 @@ export default function Company360Client({ initialData }: Props) {
       )}
 
       {/* =================================================================== */}
+      {/* 6.4: BANNER DE GOVERNANÇA DO PRONTUÁRIO 360                         */}
+      {/* =================================================================== */}
+      {(commercialStatus === 'pagamento_confirmado' ||
+        commercialStatus === 'prontuario_em_configuracao' ||
+        commercialStatus === 'pronto_para_publicar' ||
+        commercialStatus === 'publicado') && (
+        <div className="rounded-2xl border-2 border-stone-200 bg-white p-6 shadow-sm space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-100 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-[#3B0B14] text-white text-[10px] font-bold uppercase tracking-wider">
+                  Prontuário 360
+                </span>
+                <span className="text-xs text-stone-500 font-semibold">
+                  Status Comercial:{' '}
+                  <strong className="text-stone-900">
+                    {commercialStatus === 'pagamento_confirmado'
+                      ? 'Pagamento Confirmado'
+                      : commercialStatus === 'prontuario_em_configuracao'
+                      ? 'Prontuário em Configuração'
+                      : commercialStatus === 'pronto_para_publicar'
+                      ? 'Pronto para Publicar'
+                      : 'Publicado'}
+                  </strong>
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-semibold">
+                <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  Vínculo validado
+                </span>
+                <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  Contrato assinado
+                </span>
+                <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  Pagamento confirmado
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {commercialStatus === 'pagamento_confirmado' && (
+                <button
+                  type="button"
+                  disabled={isUnlockingDossier}
+                  onClick={handleUnlockDossierFrom360}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2.5 text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {isUnlockingDossier ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Liberando Prontuário...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 text-emerald-300" />
+                      <span>Liberar Prontuário 360</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {commercialStatus === 'prontuario_em_configuracao' && (
+                <button
+                  type="button"
+                  disabled={!readiness.ready || isAdvancingToReady}
+                  onClick={handleAdvanceToReadyFrom360}
+                  title={!readiness.ready ? `Itens pendentes: ${readiness.missing_labels.join(', ')}` : 'Concluir prontuário'}
+                  className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition shadow-xs ${
+                    readiness.ready
+                      ? 'bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer'
+                      : 'bg-stone-200 text-stone-400 cursor-not-allowed'
+                  }`}
+                >
+                  {isAdvancingToReady ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Avançando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4 stroke-[3]" />
+                      <span>Concluir Prontuário & Marcar como Pronto para Publicar</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {commercialStatus === 'pronto_para_publicar' && (
+                <span className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 border border-blue-200 px-4 py-2 text-xs font-bold text-blue-900">
+                  <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                  Pronto para Publicação (Aguardando Gate Final)
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* 6.4B: Checklist de Completude do Perfil Operacional */}
+          {commercialStatus === 'prontuario_em_configuracao' && (
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-stone-700">
+                  Etapa atual: <span className="text-[#3B0B14]">Configuração do anúncio</span>
+                </span>
+                <span className="font-mono text-stone-500">
+                  Completude Obrigatória: <strong>{readiness.completion_percentage}%</strong>
+                </span>
+              </div>
+
+              {/* Grid do Checklist */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-xs">
+                <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.logo ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-[11px]">Logo</span>
+                    {readiness.details.logo ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
+                  </div>
+                  <span className="text-[10px] text-stone-500 mt-1">{readiness.details.logo ? 'Preenchido' : 'Pendente'}</span>
+                </div>
+
+                <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.nome ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-[11px]">Nome Fantasia</span>
+                    {readiness.details.nome ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
+                  </div>
+                  <span className="text-[10px] text-stone-500 mt-1">{readiness.details.nome ? 'Preenchido' : 'Pendente'}</span>
+                </div>
+
+                <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.descricao ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-[11px]">Descrição</span>
+                    {readiness.details.descricao ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
+                  </div>
+                  <span className="text-[10px] text-stone-500 mt-1">{readiness.details.descricao ? 'Preenchido' : 'Pendente'}</span>
+                </div>
+
+                <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.categoria ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-[11px]">Categoria</span>
+                    {readiness.details.categoria ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
+                  </div>
+                  <span className="text-[10px] text-stone-500 mt-1">{readiness.details.categoria ? 'Preenchido' : 'Pendente'}</span>
+                </div>
+
+                <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.localizacao ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-[11px]">Cidade / UF</span>
+                    {readiness.details.localizacao ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
+                  </div>
+                  <span className="text-[10px] text-stone-500 mt-1">{readiness.details.localizacao ? 'Preenchido' : 'Pendente'}</span>
+                </div>
+
+                <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.contato ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-[11px]">Telefone/WhatsApp</span>
+                    {readiness.details.contato ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
+                  </div>
+                  <span className="text-[10px] text-stone-500 mt-1">{readiness.details.contato ? 'Preenchido' : 'Pendente'}</span>
+                </div>
+              </div>
+
+              {/* Status de Aviso */}
+              {!readiness.ready ? (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block font-bold">Perfil ainda incompleto</strong>
+                    <span>Faltam preencher: {readiness.missing_labels.join(', ')}. Utilize as abas abaixo (Cadastro, Conteúdo, etc.) para completar as informações.</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span><strong>Prontuário concluído ✓</strong> Todos os itens obrigatórios foram conferidos. Você já pode marcar o anúncio como <strong>Pronto para Publicar</strong>.</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Fase 7: Card de Revisão Final para Publicação */}
+          {commercialStatus === 'pronto_para_publicar' && (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-bold text-blue-950 flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-blue-700" />
+                    <span>Revisão Final para Publicação</span>
+                  </h4>
+                  <p className="text-xs text-blue-700 mt-0.5">
+                    Todos os requisitos contratuais, financeiros e operacionais devem ser rigorosamente validados antes da liberação do anúncio.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={!publicationGate.canPublish || isPublishing}
+                  onClick={handlePublishBusiness}
+                  className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition shadow-sm ${
+                    publicationGate.canPublish
+                      ? 'bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer'
+                      : 'bg-stone-200 text-stone-400 cursor-not-allowed'
+                  }`}
+                >
+                  {isPublishing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Validando e Publicando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="h-4 w-4" />
+                      <span>Publicar Empresa no Guia</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Lista dos 4 Pilares de Validação do Gate */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+                <div className={`p-2.5 rounded-xl border flex items-center justify-between ${publicationGate.reasons.masonicLinkVerified ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+                  <span className="font-medium">✓ Vínculo maçônico verificado</span>
+                  {publicationGate.reasons.masonicLinkVerified ? <Check className="h-4 w-4 text-emerald-600 stroke-[3]" /> : <XCircle className="h-4 w-4 text-rose-600" />}
+                </div>
+
+                <div className={`p-2.5 rounded-xl border flex items-center justify-between ${publicationGate.reasons.contractSigned ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+                  <span className="font-medium">✓ Contrato assinado</span>
+                  {publicationGate.reasons.contractSigned ? <Check className="h-4 w-4 text-emerald-600 stroke-[3]" /> : <XCircle className="h-4 w-4 text-rose-600" />}
+                </div>
+
+                <div className={`p-2.5 rounded-xl border flex items-center justify-between ${publicationGate.reasons.paymentConfirmed ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+                  <span className="font-medium">✓ Pagamento confirmado</span>
+                  {publicationGate.reasons.paymentConfirmed ? <Check className="h-4 w-4 text-emerald-600 stroke-[3]" /> : <XCircle className="h-4 w-4 text-rose-600" />}
+                </div>
+
+                <div className={`p-2.5 rounded-xl border flex items-center justify-between ${publicationGate.reasons.profileReady ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+                  <span className="font-medium">✓ Perfil obrigatório completo</span>
+                  {publicationGate.reasons.profileReady ? <Check className="h-4 w-4 text-emerald-600 stroke-[3]" /> : <XCircle className="h-4 w-4 text-rose-600" />}
+                </div>
+              </div>
+
+              {!publicationGate.canPublish && (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block font-bold">Publicação Bloqueada pelo Gate Final</strong>
+                    <span>Pendências: {publicationGate.missing.join('; ')}. Complete os itens para habilitar a publicação.</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Fase 7: Card de Empresa Publicada / Gestão de Visibilidade */}
+          {commercialStatus === 'publicado' && (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center text-emerald-700 shrink-0">
+                    <Globe className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-emerald-950">Empresa publicada com sucesso ✓</h4>
+                      <span className={`text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full ${
+                        data.business.publication_status === 'published'
+                          ? 'bg-emerald-200 text-emerald-900'
+                          : 'bg-amber-200 text-amber-900'
+                      }`}>
+                        {data.business.publication_status === 'published' ? 'Online no Guia' : 'Rascunho (Despublicada)'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-700 mt-0.5">
+                      {data.business.publication_status === 'published'
+                        ? 'O anúncio está público e indexável para membros e visitantes.'
+                        : 'A empresa concluiu todo o onboarding comercial, mas está temporariamente fora do ar como rascunho.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {data.business.publication_status === 'published' && data.business.slug && (
+                    <Link
+                      href={`/guia/${data.business.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-white border border-emerald-300 px-3.5 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-50 shadow-sm"
+                    >
+                      <span>Ver no Guia</span>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </Link>
+                  )}
+
+                  {data.business.publication_status === 'published' ? (
+                    <button
+                      type="button"
+                      disabled={isUnpublishing}
+                      onClick={handleUnpublishBusiness}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-amber-100 border border-amber-300 px-3.5 py-2 text-xs font-bold text-amber-900 hover:bg-amber-200 disabled:opacity-50 cursor-pointer"
+                    >
+                      {isUnpublishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                      <span>Despublicar (Tornar Rascunho)</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isPublishing}
+                      onClick={handlePublishBusiness}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-50 shadow-sm cursor-pointer"
+                    >
+                      {isPublishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
+                      <span>Republicar no Guia</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =================================================================== */}
       {/* TOPO EXECUTIVO DE RESPOSTA RÁPIDA                                   */}
       {/* =================================================================== */}
       <div className="bg-[#3B0B14] border border-[#C9A227]/50 rounded-2xl p-6 text-white shadow-xl space-y-4">
@@ -1308,7 +1816,7 @@ export default function Company360Client({ initialData }: Props) {
             </div>
             {data.business.is_pedra_fundamental && (
               <div className="px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold">
-                Pedra Fundamental (1/10)
+                Pedra Fundamental (Cota Pioneira)
               </div>
             )}
           </div>

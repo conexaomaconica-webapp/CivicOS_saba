@@ -9,6 +9,8 @@ import {
   List,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   RotateCcw,
 } from 'lucide-react';
 import { normalizeSearchTerm } from '@/lib/directory/normalize-search';
@@ -51,11 +53,38 @@ type DirectoryAllBusinessesProps = {
   sortBy: string;
 };
 
+function getPaginationRange(current: number, total: number): (number | string)[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  const delta = 1;
+  const left = Math.max(2, current - delta);
+  const right = Math.min(total - 1, current + delta);
+
+  const range: (number | string)[] = [1];
+
+  if (left > 2) {
+    range.push('...');
+  }
+
+  for (let i = left; i <= right; i++) {
+    range.push(i);
+  }
+
+  if (right < total - 1) {
+    range.push('...');
+  }
+
+  range.push(total);
+  return range;
+}
+
 export function DirectoryAllBusinesses({
   items,
   total,
   page,
-  pageSize: _pageSize,
+  pageSize,
   totalPages,
   hasNextPage,
   hasPreviousPage,
@@ -77,7 +106,7 @@ export function DirectoryAllBusinesses({
 
   const updateFilters = (newParams: Record<string, string | boolean | number | null | undefined>) => {
     const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
-    
+
     Object.entries(newParams).forEach(([key, val]) => {
       if (val === undefined || val === null || val === '' || val === false) {
         params.delete(key);
@@ -86,7 +115,16 @@ export function DirectoryAllBusinesses({
       }
     });
 
-    router.push(`${pathname}?${params.toString()}`);
+    const queryString = params.toString();
+    const targetUrl = queryString ? `${pathname}?${queryString}#todas` : `${pathname}#todas`;
+    router.push(targetUrl, { scroll: false });
+
+    if (typeof window !== 'undefined') {
+      const el = document.getElementById('todas');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -101,15 +139,36 @@ export function DirectoryAllBusinesses({
   };
 
   const hasActiveFilters =
-    searchQuery || selectedCity || selectedCategory || verifiedOnly || hasBenefitsOnly || (sortBy && sortBy !== 'relevance');
+    Boolean(searchQuery) ||
+    Boolean(selectedCity) ||
+    Boolean(selectedCategory) ||
+    verifiedOnly ||
+    hasBenefitsOnly ||
+    (Boolean(sortBy) && sortBy !== 'relevance');
+
+  const startItem = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endItem = Math.min(page * pageSize, total);
+  const paginationRange = getPaginationRange(page, totalPages);
 
   return (
     <section className="dh-container py-4" id="todas">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="dh-section-title">Todas as Empresas</h2>
-          <p className="text-xs text-gray-500 mt-1">
-            Exibindo <strong className="text-amber-900">{total}</strong> {total === 1 ? 'empresa cadastrada' : 'empresas cadastradas'} no Guia.
+          <p className="text-xs text-stone-600 mt-1">
+            {total === 0 ? (
+              'Nenhuma empresa encontrada com os filtros selecionados.'
+            ) : totalPages > 1 ? (
+              <>
+                Mostrando <strong className="text-amber-950 font-bold">{startItem}–{endItem}</strong> de{' '}
+                <strong className="text-amber-950 font-bold">{total}</strong> empresas cadastradas no Guia.
+              </>
+            ) : (
+              <>
+                Exibindo <strong className="text-amber-950 font-bold">{total}</strong>{' '}
+                {total === 1 ? 'empresa cadastrada' : 'empresas cadastradas'} no Guia.
+              </>
+            )}
           </p>
         </div>
 
@@ -182,7 +241,7 @@ export function DirectoryAllBusinesses({
             onChange={(e) => updateFilters({ sort: e.target.value, page: 1 })}
             className="dh-filter-select"
           >
-            <option value="relevance">Relevância</option>
+            <option value="relevance">Relevância (Prioridade)</option>
             <option value="recent">Mais Recentes</option>
             <option value="name">Nome (A-Z)</option>
             <option value="featured">Destaques Primeiro</option>
@@ -278,26 +337,96 @@ export function DirectoryAllBusinesses({
 
       {/* Real Server-side Pagination Controls */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-gray-200 pt-6 mt-8">
-          <button
-            disabled={!hasPreviousPage}
-            onClick={() => updateFilters({ page: page - 1 })}
-            className="flex items-center gap-1 text-xs font-bold text-gray-700 bg-white border border-gray-300 px-3 py-2 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <ChevronLeft className="w-4 h-4" /> Anterior
-          </button>
+        <div className="border-t border-stone-200 pt-6 mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          {/* Contador / Resumo para mobile & desktop */}
+          <div className="text-xs text-stone-600 order-2 sm:order-1 text-center sm:text-left">
+            Página <strong className="font-bold text-amber-950">{page}</strong> de <strong className="font-bold text-amber-950">{totalPages}</strong>
+            <span className="hidden md:inline text-stone-400 mx-2">·</span>
+            <span className="hidden md:inline">Mostrando itens {startItem} a {endItem} de {total}</span>
+          </div>
 
-          <span className="text-xs font-semibold text-gray-600">
-            Página <strong className="text-gray-900">{page}</strong> de {totalPages}
-          </span>
+          {/* Botões de Navegação */}
+          <nav aria-label="Navegação da paginação" className="flex items-center gap-1 sm:gap-1.5 order-1 sm:order-2 flex-wrap justify-center">
+            {/* Primeira Página */}
+            <button
+              disabled={page <= 1}
+              onClick={() => updateFilters({ page: 1 })}
+              title="Primeira página"
+              aria-label="Primeira página"
+              className="p-2 sm:px-2.5 sm:py-2 text-xs font-medium text-stone-700 bg-white border border-stone-300 rounded-lg hover:bg-stone-50 hover:text-amber-950 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronsLeft className="w-4 h-4" />
+            </button>
 
-          <button
-            disabled={!hasNextPage}
-            onClick={() => updateFilters({ page: page + 1 })}
-            className="flex items-center gap-1 text-xs font-bold text-gray-700 bg-white border border-gray-300 px-3 py-2 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Próxima <ChevronRight className="w-4 h-4" />
-          </button>
+            {/* Página Anterior */}
+            <button
+              disabled={!hasPreviousPage}
+              onClick={() => updateFilters({ page: page - 1 })}
+              title="Página anterior"
+              aria-label="Página anterior"
+              className="flex items-center gap-1 text-xs font-semibold text-stone-700 bg-white border border-stone-300 px-2.5 sm:px-3 py-2 rounded-lg hover:bg-stone-50 hover:text-amber-950 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">Anterior</span>
+            </button>
+
+            {/* Números de Página */}
+            <div className="flex items-center gap-1">
+              {paginationRange.map((item, idx) => {
+                if (item === '...') {
+                  return (
+                    <span
+                      key={`dots-${idx}`}
+                      className="w-7 sm:w-8 text-center text-stone-400 font-bold select-none text-xs"
+                    >
+                      ...
+                    </span>
+                  );
+                }
+
+                const pageNum = item as number;
+                const isActive = pageNum === page;
+
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => updateFilters({ page: pageNum })}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`min-w-[34px] sm:min-w-[38px] h-9 sm:h-9 px-2 text-xs sm:text-sm font-semibold rounded-lg transition-all flex items-center justify-center ${
+                      isActive
+                        ? 'bg-[#3B0B14] text-[#C9A227] border border-[#C9A227]/40 shadow-sm font-bold scale-105'
+                        : 'bg-white text-stone-700 border border-stone-300 hover:bg-stone-50 hover:text-amber-950 hover:border-amber-900/30'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Próxima Página */}
+            <button
+              disabled={!hasNextPage}
+              onClick={() => updateFilters({ page: page + 1 })}
+              title="Próxima página"
+              aria-label="Próxima página"
+              className="flex items-center gap-1 text-xs font-semibold text-stone-700 bg-white border border-stone-300 px-2.5 sm:px-3 py-2 rounded-lg hover:bg-stone-50 hover:text-amber-950 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <span className="hidden sm:inline">Próxima</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+
+            {/* Última Página */}
+            <button
+              disabled={page >= totalPages}
+              onClick={() => updateFilters({ page: totalPages })}
+              title="Última página"
+              aria-label="Última página"
+              className="p-2 sm:px-2.5 sm:py-2 text-xs font-medium text-stone-700 bg-white border border-stone-300 rounded-lg hover:bg-stone-50 hover:text-amber-950 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronsRight className="w-4 h-4" />
+            </button>
+          </nav>
         </div>
       )}
     </section>

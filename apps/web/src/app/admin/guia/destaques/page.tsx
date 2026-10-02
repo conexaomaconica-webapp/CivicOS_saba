@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { updateSponsoredDisplayModeAction } from '@/app/actions/directory-home-settings';
-import { Plus, Trash2, Edit2, Loader2, CheckCircle2, X, Award } from 'lucide-react';
+import { updateSponsoredSettingsAction } from '@/app/actions/directory-home-settings';
+import { Plus, Trash2, Edit2, Loader2, CheckCircle2, X, Award, Gauge, Sparkles, LayoutGrid, Check } from 'lucide-react';
 
 type SponsoredBusiness = {
   id: string;
@@ -43,6 +43,8 @@ export default function AdminGuiaDestaquesPage() {
   const [city, setCity] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [sponsoredDisplayMode, setSponsoredDisplayMode] = useState<'cards' | 'logos'>('cards');
+  const [sponsoredSpeed, setSponsoredSpeed] = useState<number>(45);
+  const [sponsoredLogoStyle, setSponsoredLogoStyle] = useState<'standard' | 'clean'>('standard');
   const [updatingMode, setUpdatingMode] = useState(false);
 
   const fetchData = async () => {
@@ -73,12 +75,36 @@ export default function AdminGuiaDestaquesPage() {
 
       const { data: settingsData } = await (supabase as any)
         .from('directory_home_settings')
-        .select('sponsored_display_mode')
+        .select('sponsored_display_mode, sponsored_marquee_speed, sponsored_logo_style, sections_config')
         .eq('tenant_id', tid)
         .maybeSingle();
 
-      if (settingsData?.sponsored_display_mode === 'logos' || settingsData?.sponsored_display_mode === 'cards') {
-        setSponsoredDisplayMode(settingsData.sponsored_display_mode);
+      if (settingsData) {
+        if (settingsData.sponsored_display_mode === 'logos' || settingsData.sponsored_display_mode === 'cards') {
+          setSponsoredDisplayMode(settingsData.sponsored_display_mode);
+        }
+        if (settingsData.sponsored_marquee_speed) {
+          setSponsoredSpeed(Number(settingsData.sponsored_marquee_speed));
+        }
+        if (settingsData.sponsored_logo_style === 'clean' || settingsData.sponsored_logo_style === 'standard') {
+          setSponsoredLogoStyle(settingsData.sponsored_logo_style);
+        }
+
+        // Fallback em sections_config
+        if (Array.isArray(settingsData.sections_config)) {
+          const spConfig = settingsData.sections_config.find((s: any) => s.id === 'sponsored');
+          if (spConfig) {
+            if (spConfig.display_mode === 'logos' || spConfig.display_mode === 'cards') {
+              setSponsoredDisplayMode(spConfig.display_mode);
+            }
+            if (spConfig.speed && !settingsData.sponsored_marquee_speed) {
+              setSponsoredSpeed(Number(spConfig.speed));
+            }
+            if (spConfig.logo_style && !settingsData.sponsored_logo_style) {
+              setSponsoredLogoStyle(spConfig.logo_style);
+            }
+          }
+        }
       }
     } catch (err) {
       console.error('Erro ao buscar empresas patrocinadas:', err);
@@ -87,17 +113,33 @@ export default function AdminGuiaDestaquesPage() {
     }
   };
 
-  const handleToggleDisplayMode = async (mode: 'cards' | 'logos') => {
+  const handleUpdateSponsoredSettings = async (overrides: {
+    mode?: 'cards' | 'logos';
+    speed?: number;
+    logoStyle?: 'standard' | 'clean';
+  }) => {
     if (!tenantId) return;
     setUpdatingMode(true);
+    const newMode = overrides.mode ?? sponsoredDisplayMode;
+    const newSpeed = overrides.speed ?? sponsoredSpeed;
+    const newStyle = overrides.logoStyle ?? sponsoredLogoStyle;
+
     try {
-      const res = await updateSponsoredDisplayModeAction(mode);
+      const res = await updateSponsoredSettingsAction({
+        mode: newMode,
+        speed: newSpeed,
+        logoStyle: newStyle,
+      });
+
       if (res.success) {
-        setSponsoredDisplayMode(mode);
-        setSuccessMsg(`Formato de exibição atualizado para: ${mode === 'cards' ? 'Cards Completos' : 'Logomarcas em Loop Infinito'}.`);
+        if (overrides.mode) setSponsoredDisplayMode(overrides.mode);
+        if (overrides.speed !== undefined) setSponsoredSpeed(overrides.speed);
+        if (overrides.logoStyle) setSponsoredLogoStyle(overrides.logoStyle);
+
+        setSuccessMsg('Configurações da seção de empresas patrocinadas atualizadas com sucesso!');
         setTimeout(() => setSuccessMsg(null), 4000);
       } else {
-        alert(res.error || 'Erro ao atualizar formato de exibição.');
+        alert(res.error || 'Erro ao atualizar configurações.');
       }
     } catch (err) {
       console.error('Erro ao salvar formato:', err);
@@ -207,45 +249,164 @@ export default function AdminGuiaDestaquesPage() {
         </button>
       </div>
 
-      {/* Formato de Exibição na Página Inicial */}
-      <div className="bg-amber-50/70 border border-amber-200/80 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h3 className="text-sm font-bold text-amber-950 flex items-center gap-2">
-            <span>⚙️ Formato Exibido na Home Pública</span>
-            {updatingMode && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-900" />}
-          </h3>
-          <p className="text-xs text-amber-900/80 mt-0.5">
-            Defina se as empresas patrocinadas aparecem em formato de Cards Completos ou apenas Logomarcas em Loop.
-          </p>
+      {/* Formato e Comportamento de Exibição na Página Inicial */}
+      <div className="bg-gradient-to-br from-amber-50/80 via-white to-amber-50/40 border border-amber-200/90 p-5 rounded-2xl shadow-sm space-y-5">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-amber-200/60 pb-4">
+          <div>
+            <h3 className="text-base font-bold text-amber-950 flex items-center gap-2">
+              <span>⚙️ Formato Exibido na Home Pública</span>
+              {updatingMode && <Loader2 className="w-4 h-4 animate-spin text-amber-900" />}
+            </h3>
+            <p className="text-xs text-stone-600 mt-0.5">
+              Escolha se as empresas patrocinadas são apresentadas em Cards Completos ou em Trilha Contínua de Logomarcas.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              disabled={updatingMode}
+              onClick={() => handleUpdateSponsoredSettings({ mode: 'cards' })}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                sponsoredDisplayMode === 'cards'
+                  ? 'bg-amber-900 text-white border-amber-900 shadow-md ring-2 ring-amber-900/20'
+                  : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Cards Completos</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={updatingMode}
+              onClick={() => handleUpdateSponsoredSettings({ mode: 'logos' })}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                sponsoredDisplayMode === 'logos'
+                  ? 'bg-amber-900 text-white border-amber-900 shadow-md ring-2 ring-amber-900/20'
+                  : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+              }`}
+            >
+              <span>♾️ Logomarcas em Loop</span>
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            disabled={updatingMode}
-            onClick={() => handleToggleDisplayMode('cards')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
-              sponsoredDisplayMode === 'cards'
-                ? 'bg-amber-900 text-white border-amber-900 shadow-sm'
-                : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
-            }`}
-          >
-            🎴 Cards Completos
-          </button>
+        {sponsoredDisplayMode === 'logos' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 pt-1">
+            {/* 1. Estilo das Logomarcas */}
+            <div className="bg-white/90 border border-stone-200/80 rounded-xl p-4 shadow-sm space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-800" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-stone-900">
+                  Estilo Visual das Marcas
+                </h4>
+              </div>
 
-          <button
-            type="button"
-            disabled={updatingMode}
-            onClick={() => handleToggleDisplayMode('logos')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
-              sponsoredDisplayMode === 'logos'
-                ? 'bg-amber-900 text-white border-amber-900 shadow-sm'
-                : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
-            }`}
-          >
-            ♾️ Logomarcas em Loop
-          </button>
-        </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  disabled={updatingMode}
+                  onClick={() => handleUpdateSponsoredSettings({ logoStyle: 'standard' })}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    sponsoredLogoStyle === 'standard'
+                      ? 'border-amber-800 bg-amber-50/70 text-amber-950 ring-1 ring-amber-800 shadow-sm'
+                      : 'border-stone-200 hover:border-stone-300 bg-stone-50/50 text-stone-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold">Card com Borda</span>
+                    {sponsoredLogoStyle === 'standard' && <Check className="w-3.5 h-3.5 text-amber-800" />}
+                  </div>
+                  <p className="text-[11px] text-stone-500 mt-1 leading-relaxed">
+                    Logo em caixinha com borda, exibindo nome e categoria sempre visíveis.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={updatingMode}
+                  onClick={() => handleUpdateSponsoredSettings({ logoStyle: 'clean' })}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    sponsoredLogoStyle === 'clean'
+                      ? 'border-amber-800 bg-amber-50/70 text-amber-950 ring-1 ring-amber-800 shadow-sm'
+                      : 'border-stone-200 hover:border-stone-300 bg-stone-50/50 text-stone-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold">✨ Só Logomarca Limpa</span>
+                    {sponsoredLogoStyle === 'clean' && <Check className="w-3.5 h-3.5 text-amber-800" />}
+                  </div>
+                  <p className="text-[11px] text-stone-500 mt-1 leading-relaxed">
+                    Sem borda e sem textos fixos. Ao passar o mouse, revela o nome e a categoria.
+                  </p>
+                </button>
+              </div>
+            </div>
+
+            {/* 2. Velocidade da Animação (Loop) */}
+            <div className="bg-white/90 border border-stone-200/80 rounded-xl p-4 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Gauge className="w-4 h-4 text-amber-800" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-stone-900">
+                    Velocidade do Deslizamento
+                  </h4>
+                </div>
+                <span className="text-xs font-extrabold text-amber-900 bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-200">
+                  {sponsoredSpeed}s por volta
+                </span>
+              </div>
+
+              {/* Presets táteis */}
+              <div className="grid grid-cols-4 gap-1.5">
+                {[
+                  { label: 'Muito Lenta', sec: 70 },
+                  { label: 'Lenta (Ideal)', sec: 50 },
+                  { label: 'Moderada', sec: 35 },
+                  { label: 'Rápida', sec: 20 },
+                ].map((preset) => (
+                  <button
+                    key={preset.sec}
+                    type="button"
+                    disabled={updatingMode}
+                    onClick={() => handleUpdateSponsoredSettings({ speed: preset.sec })}
+                    className={`py-1.5 px-1 rounded-lg text-[10px] font-semibold transition-all border text-center ${
+                      sponsoredSpeed === preset.sec
+                        ? 'bg-amber-900 text-white border-amber-900 shadow-xs'
+                        : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Slider de ajuste fino */}
+              <div className="pt-1 space-y-1">
+                <div className="flex items-center justify-between text-[11px] text-stone-500 font-medium">
+                  <span>Mais rápido (15s)</span>
+                  <span>Mais suave / calmo (90s)</span>
+                </div>
+                <input
+                  type="range"
+                  min="15"
+                  max="90"
+                  step="5"
+                  value={sponsoredSpeed}
+                  disabled={updatingMode}
+                  onChange={(e) => setSponsoredSpeed(Number(e.target.value))}
+                  onMouseUp={(e) => handleUpdateSponsoredSettings({ speed: Number((e.target as HTMLInputElement).value) })}
+                  onTouchEnd={(e) => handleUpdateSponsoredSettings({ speed: Number((e.target as HTMLInputElement).value) })}
+                  className="w-full accent-amber-900 h-2 bg-stone-200 rounded-lg cursor-pointer"
+                />
+                <p className="text-[10px] text-stone-400 text-center">
+                  💡 Quanto maior o tempo em segundos, mais suave, calmo e legível será o movimento.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Lista */}

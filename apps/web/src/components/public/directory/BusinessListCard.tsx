@@ -4,11 +4,17 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Heart, Share2, Star, Crown, Award, ShieldCheck, Users, Map } from 'lucide-react';
 import { useFavorites } from '@/lib/directory/favorites-context';
-import type { BusinessCardData } from './BusinessCard';
+import { usePedraCardDisplay, type PedraCardDisplay } from '@/lib/directory/pedra-card-display-context';
+import {
+  type BusinessCardData,
+  PEDRA_FUNDAMENTAL_SEAL,
+  PEDRA_FUNDAMENTAL_HORIZONTAL_SEAL,
+} from './BusinessCard';
 
 type BusinessListCardProps = {
   data: BusinessCardData;
   onViewOnMap?: (slug: string) => void;
+  pedraCardDisplay?: PedraCardDisplay;
 };
 
 // Format Masonic Connection string
@@ -48,10 +54,42 @@ function formatMasonicConnection(data: BusinessCardData): { title: string; lodge
   };
 }
 
-export function BusinessListCard({ data, onViewOnMap }: BusinessListCardProps) {
+export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay }: BusinessListCardProps) {
   const { isFavorite, toggleFavorite } = useFavorites();
+  const contextPedraDisplay = usePedraCardDisplay();
   const [copiedShare, setCopiedShare] = useState(false);
   const favorited = isFavorite(data.slug);
+
+  const effectivePedraDisplay =
+    data.pedra_fundamental_card_display ||
+    pedraCardDisplay ||
+    contextPedraDisplay ||
+    'circular_seal';
+
+  // Verificação da Condecoração Histórica Pedra Fundamental
+  const isPedraFundamental = Boolean(
+    data.is_pedra_fundamental ||
+    (data as any).isPedraFundamental ||
+    (data as any).recognitions?.some?.(
+      (r: any) =>
+        r === 'pedra_fundamental' ||
+        r?.key === 'pedra_fundamental' ||
+        r?.recognition_key === 'pedra_fundamental'
+    )
+  );
+
+  const [pedraSealSrc, setPedraSealSrc] = useState<string | null>(
+    isPedraFundamental ? PEDRA_FUNDAMENTAL_SEAL.primary : null
+  );
+  const [pedraSealFailed, setPedraSealFailed] = useState(false);
+
+  const handlePedraSealError = () => {
+    if (pedraSealSrc === PEDRA_FUNDAMENTAL_SEAL.primary) {
+      setPedraSealSrc(PEDRA_FUNDAMENTAL_SEAL.fallback);
+    } else {
+      setPedraSealFailed(true);
+    }
+  };
 
   const handleToggleFavorite = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -116,12 +154,20 @@ export function BusinessListCard({ data, onViewOnMap }: BusinessListCardProps) {
   return (
     <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-2xs hover:shadow-md transition-all flex flex-col md:flex-row gap-5 items-start md:items-center justify-between group">
       {/* Esquerda: Logo e Imagem */}
-      <div className="flex items-center gap-4 shrink-0 w-full md:w-auto">
-        <div className={`relative w-16 h-16 rounded-xl border border-stone-200 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-xs p-1.5 ${data.logo_url ? 'bg-white' : 'bg-amber-950 text-amber-400 font-bold'}`}>
+      <div className="flex items-center gap-4.5 shrink-0 w-full md:w-auto">
+        <div
+          className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-stone-200/90 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-xs p-2 transition-all duration-300 ease-out group-hover:scale-105 hover:!scale-115 hover:shadow-xl hover:border-amber-400 cursor-pointer ${
+            data.logo_url ? 'bg-white' : 'bg-amber-950 text-amber-400 font-bold'
+          }`}
+        >
           {data.logo_url ? (
-            <img src={data.logo_url} alt={data.name} className="max-w-full max-h-full object-contain object-center bg-white" />
+            <img
+              src={data.logo_url}
+              alt={data.name}
+              className="max-w-full max-h-full object-contain object-center bg-white transition-transform duration-300 ease-out group-hover:scale-105 hover:scale-110"
+            />
           ) : (
-            <span className="text-base">{data.name.slice(0, 2).toUpperCase()}</span>
+            <span className="text-xl sm:text-2xl font-bold">{data.name.slice(0, 2).toUpperCase()}</span>
           )}
         </div>
 
@@ -163,6 +209,50 @@ export function BusinessListCard({ data, onViewOnMap }: BusinessListCardProps) {
             </div>
           )}
         </div>
+      )}
+
+      {/* Reconhecimento Pedra Fundamental no Modo Lista Conforme Opção do Admin */}
+      {isPedraFundamental && (
+        <>
+          {effectivePedraDisplay === 'circular_seal' && !pedraSealFailed && pedraSealSrc && (
+            <div
+              className="shrink-0 flex items-center justify-center w-18 h-18 sm:w-20 sm:h-20 transition-all duration-300 ease-out group-hover:scale-110 hover:!scale-125 cursor-pointer"
+              title="Empresa com condecoração histórica de Pedra Fundamental"
+            >
+              <img
+                src={pedraSealSrc}
+                alt="Pedra Fundamental"
+                onError={handlePedraSealError}
+                className="max-w-full max-h-full object-contain drop-shadow-md hover:drop-shadow-2xl transition-all duration-300 ease-out"
+              />
+            </div>
+          )}
+
+          {effectivePedraDisplay === 'horizontal_seal' && (
+            <div
+              className="shrink-0 flex items-center justify-center transition-all duration-300 ease-out group-hover:scale-105 hover:!scale-110 cursor-pointer"
+              title="Empresa com condecoração histórica de Pedra Fundamental"
+            >
+              <img
+                src={PEDRA_FUNDAMENTAL_HORIZONTAL_SEAL.primary}
+                alt="Pedra Fundamental"
+                className="h-8 sm:h-9 max-w-[140px] sm:max-w-[160px] object-contain drop-shadow-xs"
+              />
+            </div>
+          )}
+
+          {effectivePedraDisplay === 'badge_text' && (
+            <div
+              className="shrink-0 flex items-center justify-center transition-all duration-300 ease-out"
+              title="Empresa com condecoração histórica de Pedra Fundamental"
+            >
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-amber-400 bg-amber-100 text-amber-950 font-bold text-xs shadow-2xs hover:bg-amber-200 transition-colors">
+                <Crown className="w-3.5 h-3.5 text-amber-800 shrink-0" />
+                Pedra Fundamental
+              </span>
+            </div>
+          )}
+        </>
       )}
 
       {/* Direita: Ações e Botões */}

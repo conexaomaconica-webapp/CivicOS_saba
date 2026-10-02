@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Save, ArrowUp, ArrowDown, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react';
+import { Save, ArrowUp, ArrowDown, Eye, EyeOff, Loader2, CheckCircle2, Gauge, Sparkles } from 'lucide-react';
 import { saveDirectoryHomeSettingsAction } from '@/app/actions/directory-home-settings';
 
 type SectionConfig = {
@@ -42,6 +42,8 @@ export default function AdminGuiaGeralPage() {
   const [defaultPageSize, setDefaultPageSize] = useState(12);
   const [sections, setSections] = useState<SectionConfig[]>(DEFAULT_SECTIONS);
   const [sponsoredDisplayMode, setSponsoredDisplayMode] = useState<'cards' | 'logos'>('cards');
+  const [sponsoredSpeed, setSponsoredSpeed] = useState<number>(45);
+  const [sponsoredLogoStyle, setSponsoredLogoStyle] = useState<'standard' | 'clean'>('standard');
 
   useEffect(() => {
     async function loadSettings() {
@@ -64,8 +66,23 @@ export default function AdminGuiaGeralPage() {
           if (data.sponsored_display_mode === 'logos' || data.sponsored_display_mode === 'cards') {
             setSponsoredDisplayMode(data.sponsored_display_mode);
           }
+          if (data.sponsored_marquee_speed) {
+            setSponsoredSpeed(Number(data.sponsored_marquee_speed));
+          }
+          if (data.sponsored_logo_style === 'clean' || data.sponsored_logo_style === 'standard') {
+            setSponsoredLogoStyle(data.sponsored_logo_style);
+          }
           if (Array.isArray(data.sections_config) && data.sections_config.length > 0) {
             setSections(data.sections_config as SectionConfig[]);
+            const spConfig = (data.sections_config as any[]).find((s) => s.id === 'sponsored');
+            if (spConfig) {
+              if (spConfig.speed && !data.sponsored_marquee_speed) {
+                setSponsoredSpeed(Number(spConfig.speed));
+              }
+              if (spConfig.logo_style && !data.sponsored_logo_style) {
+                setSponsoredLogoStyle(spConfig.logo_style);
+              }
+            }
           }
         }
       } catch (err) {
@@ -107,10 +124,12 @@ export default function AdminGuiaGeralPage() {
         default_page_size: defaultPageSize,
         sections_config: sections,
         sponsored_display_mode: sponsoredDisplayMode,
+        sponsored_marquee_speed: sponsoredSpeed,
+        sponsored_logo_style: sponsoredLogoStyle,
       });
 
       if (!res.success) throw new Error(res.error);
-      setSuccessMessage('Configurações salvas com sucesso! O Hero da página pública /guia foi atualizado em tempo real.');
+      setSuccessMessage('Configurações salvas com sucesso! A página pública do Guia foi atualizada em tempo real.');
       setTimeout(() => setSuccessMessage(null), 5000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro desconhecido ao salvar';
@@ -189,7 +208,7 @@ export default function AdminGuiaGeralPage() {
       </div>
 
       {/* Formato de Exibição de Empresas Patrocinadas */}
-      <div className="bg-white p-6 rounded-lg border shadow-sm space-y-4">
+      <div className="bg-white p-6 rounded-lg border shadow-sm space-y-5">
         <div className="border-b pb-2">
           <h2 className="text-lg font-bold text-gray-900">Formato de Exibição de Empresas Patrocinadas</h2>
           <p className="text-xs text-gray-500">Escolha como o bloco de empresas patrocinadas/destacadas será apresentado na página principal pública do Guia.</p>
@@ -200,7 +219,7 @@ export default function AdminGuiaGeralPage() {
             onClick={() => setSponsoredDisplayMode('cards')}
             className={`p-4 border-2 rounded-xl cursor-pointer transition-all flex items-start gap-3 ${
               sponsoredDisplayMode === 'cards'
-                ? 'border-amber-700 bg-amber-50/60 text-amber-950 shadow-sm'
+                ? 'border-amber-700 bg-amber-50/60 text-amber-950 shadow-sm ring-1 ring-amber-700/20'
                 : 'border-gray-200 hover:border-gray-300 bg-white text-gray-700'
             }`}
           >
@@ -228,7 +247,7 @@ export default function AdminGuiaGeralPage() {
             onClick={() => setSponsoredDisplayMode('logos')}
             className={`p-4 border-2 rounded-xl cursor-pointer transition-all flex items-start gap-3 ${
               sponsoredDisplayMode === 'logos'
-                ? 'border-amber-700 bg-amber-50/60 text-amber-950 shadow-sm'
+                ? 'border-amber-700 bg-amber-50/60 text-amber-950 shadow-sm ring-1 ring-amber-700/20'
                 : 'border-gray-200 hover:border-gray-300 bg-white text-gray-700'
             }`}
           >
@@ -247,11 +266,117 @@ export default function AdminGuiaGeralPage() {
                 )}
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Exibe uma barra elegante e contínua apenas com as logomarcas e nomes deslizando em loop infinito com efeito hover.
+                Exibe uma trilha contínua com logomarcas deslizando em loop suave com velocidade e estilo configuráveis.
               </p>
             </div>
           </div>
         </div>
+
+        {sponsoredDisplayMode === 'logos' && (
+          <div className="bg-amber-50/50 border border-amber-200/70 rounded-xl p-4 mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Estilo das Logomarcas */}
+            <div className="bg-white p-3.5 rounded-lg border border-amber-200/60 space-y-2.5">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-800" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-800">
+                  Estilo Visual das Marcas
+                </h4>
+              </div>
+
+              <div className="space-y-2">
+                <label className="flex items-start gap-2.5 p-2 rounded-lg border border-stone-200 cursor-pointer hover:bg-stone-50 transition-colors">
+                  <input
+                    type="radio"
+                    name="sponsoredLogoStyle"
+                    checked={sponsoredLogoStyle === 'standard'}
+                    onChange={() => setSponsoredLogoStyle('standard')}
+                    className="mt-0.5 accent-amber-800"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-gray-900 block">Card com Borda</span>
+                    <span className="text-[11px] text-gray-500 block leading-tight">
+                      Logo dentro de caixinha com borda, com nome e categoria visíveis.
+                    </span>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-2.5 p-2 rounded-lg border border-stone-200 cursor-pointer hover:bg-stone-50 transition-colors">
+                  <input
+                    type="radio"
+                    name="sponsoredLogoStyle"
+                    checked={sponsoredLogoStyle === 'clean'}
+                    onChange={() => setSponsoredLogoStyle('clean')}
+                    className="mt-0.5 accent-amber-800"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-gray-900 block">✨ Só Logomarca Limpa</span>
+                    <span className="text-[11px] text-gray-500 block leading-tight">
+                      Sem borda e sem textos fixos. Revela nome e categoria no hover (ao passar o mouse).
+                    </span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Velocidade do Loop */}
+            <div className="bg-white p-3.5 rounded-lg border border-amber-200/60 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Gauge className="w-4 h-4 text-amber-800" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-800">
+                    Velocidade do Deslizamento
+                  </h4>
+                </div>
+                <span className="text-xs font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+                  {sponsoredSpeed}s por volta
+                </span>
+              </div>
+
+              {/* Presets */}
+              <div className="grid grid-cols-4 gap-1">
+                {[
+                  { label: 'Muito Lenta', sec: 70 },
+                  { label: 'Lenta (Ideal)', sec: 50 },
+                  { label: 'Moderada', sec: 35 },
+                  { label: 'Rápida', sec: 20 },
+                ].map((p) => (
+                  <button
+                    key={p.sec}
+                    type="button"
+                    onClick={() => setSponsoredSpeed(p.sec)}
+                    className={`py-1 rounded text-[10px] font-semibold border transition-all ${
+                      sponsoredSpeed === p.sec
+                        ? 'bg-amber-900 text-white border-amber-900'
+                        : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Slider */}
+              <div className="pt-1 space-y-1">
+                <div className="flex items-center justify-between text-[11px] text-gray-500">
+                  <span>Mais rápido (15s)</span>
+                  <span>Mais suave / calmo (90s)</span>
+                </div>
+                <input
+                  type="range"
+                  min="15"
+                  max="90"
+                  step="5"
+                  value={sponsoredSpeed}
+                  onChange={(e) => setSponsoredSpeed(Number(e.target.value))}
+                  className="w-full accent-amber-900 h-2 bg-stone-200 rounded-lg cursor-pointer"
+                />
+                <p className="text-[10px] text-stone-400 text-center">
+                  💡 Valores maiores tornam o movimento mais suave e calmo para os visitantes.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Ordem e Visibilidade das Seções */}

@@ -27,6 +27,7 @@ import {
   X,
   CalendarDays,
   ClipboardList,
+  KeyRound,
 } from 'lucide-react';
 import { getApprovalDirectoryListAction } from '@/lib/admin/admin-approval-service';
 
@@ -193,6 +194,12 @@ export const adminNavSections: NavSection[] = [
         label: 'Marca & Identidade Visual',
         path: '/admin/marca',
         icon: Palette,
+      },
+      {
+        id: 'asaas-integracao',
+        label: 'Integração Asaas',
+        path: '/admin/configuracoes/integracoes/asaas',
+        icon: KeyRound,
       },
       {
         id: 'settings',

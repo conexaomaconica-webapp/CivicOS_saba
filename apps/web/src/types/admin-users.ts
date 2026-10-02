@@ -54,4 +54,5 @@ export interface UpdateAdminUserPermissionsInput {
   name: string;
   role: string;
   allowedModules: string[];
+  status?: string;
 }

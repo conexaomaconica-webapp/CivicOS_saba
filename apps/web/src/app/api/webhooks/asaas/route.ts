@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { AsaasBillingAdapter } from '@/lib/billing/billing-adapters';
+import { reconcileCommercialPaymentWebhook } from '@/lib/payment/commercial-onboarding-webhook-service';
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -16,6 +17,20 @@ export async function POST(req: Request) {
     }
 
     const payload = await req.json();
+
+    // 1. Tenta reconciliar como Onboarding Comercial (Microetapa 6.3)
+    // Localiza internamente pelo Asaas payment ID sem confiar em metadados externos
+    const onboardingRes = await reconcileCommercialPaymentWebhook(payload, req.headers.get('asaas-event-id'));
+    if (onboardingRes.success && onboardingRes.reconciled) {
+      return NextResponse.json({
+        received: true,
+        commercial_onboarding: true,
+        already_processed: onboardingRes.already_processed || false,
+        result: onboardingRes.data,
+      });
+    }
+
+    // 2. Se não for onboarding comercial, processa ciclo regular de assinaturas
     const canonicalEvent = AsaasBillingAdapter.parseEvent(req.headers, payload);
 
     // Isola cobranças técnicas de smoke test (ex: CM_TECHNICAL_SMOKE_*)

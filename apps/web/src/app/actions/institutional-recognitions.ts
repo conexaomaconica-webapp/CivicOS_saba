@@ -15,8 +15,10 @@ export interface InstitutionalRecognitionDTO {
   compactSealUrl?: string;
   header_display: 'badge' | 'horizontal_seal';
   header_scale?: number;
+  card_display?: 'circular_seal' | 'horizontal_seal' | 'badge_text';
   priority_order: number;
   is_active: boolean;
+  max_quota?: number;
   updated_at: string;
 }
 
@@ -33,6 +35,7 @@ const DEFAULT_RECOGNITIONS: InstitutionalRecognitionDTO[] = [
     compactSealUrl: '/selos/pedra-fundamental-compact.svg',
     header_display: 'badge',
     header_scale: 100,
+    card_display: 'circular_seal',
     priority_order: 1,
     is_active: true,
     updated_at: new Date().toISOString(),
@@ -98,9 +101,30 @@ export async function getInstitutionalRecognitionsAction() {
       return { success: true, data: DEFAULT_RECOGNITIONS };
     }
 
+    let homeSections: any[] = [];
+    try {
+      const { data: homeSettings } = await (supabase as any)
+        .from('directory_home_settings')
+        .select('sections_config')
+        .maybeSingle();
+      if (homeSettings?.sections_config && Array.isArray(homeSettings.sections_config)) {
+        homeSections = homeSettings.sections_config;
+      }
+    } catch {}
+
     const merged = DEFAULT_RECOGNITIONS.map((defItem) => {
       const dbItem = dbRows.find((r: any) => r.key === defItem.key);
-      if (!dbItem) return defItem;
+      const pedraFallback = defItem.key === 'pedra_fundamental'
+        ? homeSections.find((s: any) => s.id === 'pedra_fundamental')?.card_display
+        : undefined;
+
+      if (!dbItem) {
+        return {
+          ...defItem,
+          card_display: pedraFallback || defItem.card_display || 'circular_seal',
+        };
+      }
+
       const sealUrl = dbItem.seal_url || dbItem.sealUrl || defItem.seal_url;
       const compactSealUrl = dbItem.compact_seal_url || dbItem.compactSealUrl || defItem.compact_seal_url;
       return {
@@ -115,6 +139,7 @@ export async function getInstitutionalRecognitionsAction() {
         compactSealUrl: compactSealUrl,
         header_display: dbItem.header_display === 'horizontal_seal' ? 'horizontal_seal' : 'badge',
         header_scale: typeof dbItem.header_scale === 'number' ? dbItem.header_scale : (defItem.header_scale || 100),
+        card_display: dbItem.card_display || pedraFallback || defItem.card_display || 'circular_seal',
         priority_order: typeof dbItem.priority_order === 'number' ? dbItem.priority_order : defItem.priority_order,
         is_active: typeof dbItem.is_active === 'boolean' ? dbItem.is_active : defItem.is_active,
       };
@@ -194,9 +219,10 @@ export async function updateInstitutionalRecognitionAction(input: InstitutionalR
     }
 
     const sealUrl = input.seal_url || input.sealUrl || '';
-    const compactSealUrl = input.compact_seal_url || input.compactSealUrl || sealUrl;
+    const compactSealUrl = input.compact_seal_url || input.compactSealUrl || '';
+    const cardDisplay = input.card_display || 'circular_seal';
 
-    const dbPayload = {
+    const dbPayload: any = {
       id: input.id,
       key: input.key,
       title: input.title,
@@ -206,9 +232,21 @@ export async function updateInstitutionalRecognitionAction(input: InstitutionalR
       compact_seal_url: compactSealUrl,
       header_display: input.header_display === 'horizontal_seal' ? 'horizontal_seal' : 'badge',
       header_scale: typeof input.header_scale === 'number' ? input.header_scale : 100,
+      card_display: cardDisplay,
       priority_order: typeof input.priority_order === 'number' ? input.priority_order : 1,
       is_active: typeof input.is_active === 'boolean' ? input.is_active : true,
       updated_at: new Date().toISOString(),
+    };
+
+    const stripUnsupportedColumns = (payload: any, err?: any) => {
+      const p = { ...payload };
+      if (err?.code === 'PGRST204' || err?.message?.includes('header_scale')) {
+        delete p.header_scale;
+      }
+      if (err?.code === 'PGRST204' || err?.message?.includes('card_display')) {
+        delete p.card_display;
+      }
+      return p;
     };
 
     // 1. Tentar upsert nativo por 'key'
@@ -218,9 +256,9 @@ export async function updateInstitutionalRecognitionAction(input: InstitutionalR
 
     let saveErr = upsertErr;
 
-    // 2. Se upsert nativo falhar por ausência da coluna no PostgREST schema (PGRST204), tentar sem header_scale
-    if (saveErr && (saveErr.code === 'PGRST204' || saveErr.message?.includes('header_scale'))) {
-      const { header_scale: _scale, ...fallbackPayload } = dbPayload;
+    // 2. Se upsert nativo falhar por ausência de colunas no PostgREST schema (PGRST204), tentar sem elas
+    if (saveErr && (saveErr.code === 'PGRST204' || saveErr.message?.includes('header_scale') || saveErr.message?.includes('card_display'))) {
+      const fallbackPayload = stripUnsupportedColumns(dbPayload, saveErr);
       const { error: retryErr } = await (supabase as any)
         .from('institutional_recognitions')
         .upsert(fallbackPayload, { onConflict: 'key' });
@@ -242,8 +280,8 @@ export async function updateInstitutionalRecognitionAction(input: InstitutionalR
           .eq('id', existingRow.id);
         saveErr = updateErr;
 
-        if (saveErr && (saveErr.code === 'PGRST204' || saveErr.message?.includes('header_scale'))) {
-          const { header_scale: _scale, ...fallbackPayload } = dbPayload;
+        if (saveErr && (saveErr.code === 'PGRST204' || saveErr.message?.includes('header_scale') || saveErr.message?.includes('card_display'))) {
+          const fallbackPayload = stripUnsupportedColumns(dbPayload, saveErr);
           const { error: retryUpdateErr } = await (supabase as any)
             .from('institutional_recognitions')
             .update(fallbackPayload)
@@ -256,8 +294,8 @@ export async function updateInstitutionalRecognitionAction(input: InstitutionalR
           .insert(dbPayload);
         saveErr = insertErr;
 
-        if (saveErr && (saveErr.code === 'PGRST204' || saveErr.message?.includes('header_scale'))) {
-          const { header_scale: _scale, ...fallbackPayload } = dbPayload;
+        if (saveErr && (saveErr.code === 'PGRST204' || saveErr.message?.includes('header_scale') || saveErr.message?.includes('card_display'))) {
+          const fallbackPayload = stripUnsupportedColumns(dbPayload, saveErr);
           const { error: retryInsertErr } = await (supabase as any)
             .from('institutional_recognitions')
             .insert(fallbackPayload);
@@ -290,10 +328,37 @@ export async function updateInstitutionalRecognitionAction(input: InstitutionalR
         action: 'UPDATE_INSTITUTIONAL_RECOGNITION',
         entity_type: 'institutional_recognitions',
         entity_id: input.id,
-        after_value: { key: input.key, title: input.title, is_active: input.is_active, seal_url: sealUrl },
+        after_value: { key: input.key, title: input.title, is_active: input.is_active, seal_url: sealUrl, card_display: cardDisplay },
       });
     } catch {
       // Log opcional
+    }
+
+    // Persistência secundária resiliente em directory_home_settings caso a tabela ainda não tenha a coluna
+    if (input.key === 'pedra_fundamental') {
+      try {
+        const { data: homeSettings } = await (supabase as any)
+          .from('directory_home_settings')
+          .select('id, sections_config')
+          .maybeSingle();
+
+        if (homeSettings?.id) {
+          const currentSections: any[] = Array.isArray(homeSettings.sections_config)
+            ? [...homeSettings.sections_config]
+            : [];
+          const idx = currentSections.findIndex((s) => s.id === 'pedra_fundamental');
+          if (idx >= 0) {
+            currentSections[idx] = { ...currentSections[idx], card_display: cardDisplay };
+          } else {
+            currentSections.push({ id: 'pedra_fundamental', card_display: cardDisplay });
+          }
+
+          await (supabase as any)
+            .from('directory_home_settings')
+            .update({ sections_config: currentSections, updated_at: new Date().toISOString() })
+            .eq('id', homeSettings.id);
+        }
+      } catch {}
     }
 
     revalidatePath('/admin/reconhecimentos');
@@ -304,3 +369,109 @@ export async function updateInstitutionalRecognitionAction(input: InstitutionalR
     return { success: false, error: err.message || 'Falha ao salvar reconhecimento.' };
   }
 }
+
+export async function getPedraFundamentalQuotaAction(): Promise<{ quota: number; allocated: number }> {
+  try {
+    const supabase = await createServerSideClient();
+
+    const { count: allocatedCount } = await (supabase as any)
+      .from('business_recognitions')
+      .select('id', { count: 'exact', head: true })
+      .eq('recognition_key', 'pedra_fundamental')
+      .eq('is_active', true);
+
+    const { data: homeSettings } = await (supabase as any)
+      .from('directory_home_settings')
+      .select('sections_config')
+      .limit(1)
+      .maybeSingle();
+
+    let quota = 50;
+    if (homeSettings && Array.isArray(homeSettings.sections_config)) {
+      const cfg = homeSettings.sections_config.find((s: any) => s.id === 'pedra_fundamental');
+      if (cfg && typeof cfg.max_quota === 'number' && cfg.max_quota > 0) {
+        quota = cfg.max_quota;
+      }
+    }
+
+    return { quota, allocated: allocatedCount || 0 };
+  } catch {
+    return { quota: 50, allocated: 0 };
+  }
+}
+
+export async function updatePedraFundamentalQuotaAction(
+  newQuota: number
+): Promise<{ success: boolean; quota?: number; error?: string }> {
+  try {
+    const supabase = await createServerSideClient();
+    const { data: userRes } = await supabase.auth.getUser();
+    if (!userRes?.user) {
+      return { success: false, error: 'Usuário não autenticado.' };
+    }
+
+    if (!newQuota || newQuota < 1 || newQuota > 1000) {
+      return { success: false, error: 'A cota deve ser um número entre 1 e 1000.' };
+    }
+
+    const { data: homeSettings } = await (supabase as any)
+      .from('directory_home_settings')
+      .select('id, sections_config')
+      .limit(1)
+      .maybeSingle();
+
+    if (homeSettings) {
+      const currentSections: any[] = Array.isArray(homeSettings.sections_config) ? [...homeSettings.sections_config] : [];
+      const idx = currentSections.findIndex((s) => s.id === 'pedra_fundamental');
+      if (idx >= 0) {
+        currentSections[idx] = { ...currentSections[idx], max_quota: newQuota };
+      } else {
+        currentSections.push({ id: 'pedra_fundamental', max_quota: newQuota });
+      }
+
+      await (supabase as any)
+        .from('directory_home_settings')
+        .update({ sections_config: currentSections, updated_at: new Date().toISOString() })
+        .eq('id', homeSettings.id);
+    }
+
+    try {
+      await (supabase as any).from('admin_audit_logs').insert({
+        actor_id: userRes.user.id,
+        action: 'UPDATE_PEDRA_FUNDAMENTAL_QUOTA',
+        entity_type: 'institutional_recognitions',
+        entity_id: 'pedra_fundamental',
+        after_value: { max_quota: newQuota },
+        reason: `Cota máxima da Pedra Fundamental ajustada para ${newQuota} empresas.`,
+      });
+    } catch {}
+
+    revalidatePath('/admin');
+    revalidatePath('/admin/reconhecimentos');
+    revalidatePath('/admin/empresas/nova');
+    revalidatePath('/admin/empresas');
+
+    return { success: true, quota: newQuota };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Falha ao salvar cota da Pedra Fundamental.' };
+  }
+}
+
+/**
+ * Consulta de alta velocidade da preferência ativa de exibição da Pedra Fundamental nos cards do Guia.
+ */
+export async function getPedraFundamentalCardDisplayAction(): Promise<'circular_seal' | 'horizontal_seal' | 'badge_text'> {
+  try {
+    const res = await getInstitutionalRecognitionsAction();
+    if (res.success && res.data) {
+      const pedra = res.data.find((r) => r.key === 'pedra_fundamental');
+      if (pedra?.card_display) {
+        return pedra.card_display;
+      }
+    }
+    return 'circular_seal';
+  } catch {
+    return 'circular_seal';
+  }
+}
+

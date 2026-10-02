@@ -54,7 +54,14 @@ export default async function AdminDashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/admin/empresas/nova"
+            className="px-4 py-2.5 bg-[#C9A227] hover:bg-[#d8af2c] text-[#3B0B14] font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer border border-[#C9A227]"
+          >
+            <PlusIcon className="w-4 h-4 text-[#3B0B14]" />
+            <span>Anunciar Nova Empresa</span>
+          </Link>
           <Link
             href="/admin/aprovacoes"
             className="px-4 py-2.5 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-extrabold text-xs rounded-xl border border-[#C9A227]/40 shadow-xs transition-all flex items-center gap-2 cursor-pointer"
@@ -253,10 +260,18 @@ export default async function AdminDashboardPage() {
           <span className="text-stone-500 font-medium block">Lojas Maçônicas Publicadas:</span>
           <strong className="text-stone-900 text-lg font-bold font-mono">{data.kpis.publishedLodgesCount} Lojas</strong>
         </div>
-        <div className="p-4 bg-white border border-stone-300 rounded-2xl shadow-xs">
-          <span className="text-stone-500 font-medium block">Pedra Fundamental (Cota Pioneira):</span>
-          <strong className="text-amber-900 text-lg font-bold font-serif">{data.kpis.pedraFundamentalCount}/10 alocadas</strong>
-        </div>
+        <Link
+          href="/admin/reconhecimentos"
+          className="p-4 bg-white border border-stone-300 hover:border-[#C9A227] rounded-2xl shadow-xs transition-all block group text-left"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-stone-500 font-medium block">Pedra Fundamental:</span>
+            <span className="text-[10px] text-[#C9A227] font-bold group-hover:underline">Ajustar Cota →</span>
+          </div>
+          <strong className="text-amber-900 text-lg font-bold font-serif block mt-0.5">
+            {data.kpis.pedraFundamentalCount}/{data.kpis.pedraFundamentalQuota || 50} alocadas
+          </strong>
+        </Link>
         <div className="p-4 bg-white border border-stone-300 rounded-2xl shadow-xs">
           <span className="text-stone-500 font-medium block">Inadimplência Operacional:</span>
           <strong className={`text-lg font-bold font-mono ${data.kpis.overduePaymentsCount > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
@@ -430,7 +445,7 @@ export default async function AdminDashboardPage() {
           <div className="space-y-3 text-xs">
             <div className="space-y-1">
               <div className="flex justify-between font-bold">
-                <span>Esquadro (Gratuito)</span>
+                <span>Esquadro (Anual R$ 635)</span>
                 <span>{data.planDistribution.bronzeCount} empresas ({data.planDistribution.bronzePercent}%)</span>
               </div>
               <div className="w-full bg-stone-200 h-2 rounded-full overflow-hidden">
@@ -440,7 +455,7 @@ export default async function AdminDashboardPage() {
 
             <div className="space-y-1">
               <div className="flex justify-between font-bold">
-                <span>Compasso (Anual R$ 1.788)</span>
+                <span>Compasso (Anual R$ 855)</span>
                 <span>{data.planDistribution.prataCount} empresas ({data.planDistribution.prataPercent}%)</span>
               </div>
               <div className="w-full bg-stone-200 h-2 rounded-full overflow-hidden">
@@ -450,7 +465,7 @@ export default async function AdminDashboardPage() {
 
             <div className="space-y-1">
               <div className="flex justify-between font-bold">
-                <span>Acácia (Anual R$ 2.388)</span>
+                <span>Acácia (Anual R$ 1.080)</span>
                 <span>{data.planDistribution.ouroCount} empresas ({data.planDistribution.ouroPercent}%)</span>
               </div>
               <div className="w-full bg-stone-200 h-2 rounded-full overflow-hidden">
@@ -459,7 +474,7 @@ export default async function AdminDashboardPage() {
             </div>
 
             <p className="text-[11px] text-stone-500 pt-1">
-              * Nota: <strong>Pedra Fundamental</strong> ({data.planDistribution.pedraFundamentalBadgeCount}/10) e <strong>Empresa Fundadora</strong> são distintivos fraternos de honra, e não cotas comerciais.
+              * Nota: <strong>Pedra Fundamental</strong> ({data.planDistribution.pedraFundamentalBadgeCount}/{data.kpis.pedraFundamentalQuota || 50}) e <strong>Empresa Fundadora</strong> são distintivos fraternos de honra, e não cotas comerciais.
             </p>
           </div>
         </div>
@@ -542,6 +557,22 @@ export default async function AdminDashboardPage() {
         </strong>
 
         <div className="flex flex-wrap items-center gap-3 text-xs font-bold">
+          <Link
+            href="/admin/empresas/nova"
+            className="px-4 py-2 bg-[#C9A227] hover:bg-[#d8af2c] text-[#3B0B14] rounded-xl flex items-center gap-1.5 transition-all shadow-2xs font-extrabold"
+          >
+            <PlusIcon className="w-4 h-4 text-[#3B0B14]" />
+            <span>+ Anunciar Empresa</span>
+          </Link>
+
+          <Link
+            href="/admin/reconhecimentos"
+            className="px-4 py-2 bg-white hover:bg-stone-50 border border-stone-300 rounded-xl text-stone-800 flex items-center gap-1.5 transition-all shadow-2xs"
+          >
+            <AwardIcon className="w-4 h-4 text-[#C9A227]" />
+            <span>Cota Pedra Fundamental</span>
+          </Link>
+
           <Link
             href="/admin/lojas/nova"
             className="px-4 py-2 bg-white hover:bg-stone-50 border border-stone-300 rounded-xl text-stone-800 flex items-center gap-1.5 transition-all shadow-2xs"

@@ -10,9 +10,16 @@ export type DirectorySponsoredItem = BusinessCardData;
 type DirectorySponsoredProps = {
   items?: DirectorySponsoredItem[];
   displayMode?: 'cards' | 'logos';
+  speed?: number;
+  logoStyle?: 'standard' | 'clean';
 };
 
-export function DirectorySponsored({ items = [], displayMode = 'cards' }: DirectorySponsoredProps) {
+export function DirectorySponsored({
+  items = [],
+  displayMode = 'cards',
+  speed = 45,
+  logoStyle = 'standard',
+}: DirectorySponsoredProps) {
   if (!items.length) return null;
 
   if (displayMode === 'logos') {
@@ -22,6 +29,7 @@ export function DirectorySponsored({ items = [], displayMode = 'cards' }: Direct
       marqueeItems = [...marqueeItems, ...items];
     }
     const loopedItems = [...marqueeItems, ...marqueeItems];
+    const isCleanMode = logoStyle === 'clean';
 
     return (
       <section className="dh-container py-6" id="patrocinadas">
@@ -36,18 +44,67 @@ export function DirectorySponsored({ items = [], displayMode = 'cards' }: Direct
         </div>
 
         {/* Outer Marquee Container with Fading Edges */}
-        <div className="relative w-full overflow-hidden rounded-2xl bg-white/60 border border-stone-200/80 p-3 shadow-sm group">
-          <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-white via-white/80 to-transparent z-10 pointer-events-none" />
-          <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-white via-white/80 to-transparent z-10 pointer-events-none" />
+        <div
+          className={`relative w-full overflow-hidden rounded-2xl bg-white/70 border border-stone-200/80 shadow-sm group ${
+            isCleanMode ? 'py-5 px-3' : 'p-3'
+          }`}
+        >
+          <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-white via-white/80 to-transparent z-10 pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-white via-white/80 to-transparent z-10 pointer-events-none" />
 
-          {/* Marquee Track */}
-          <div className="dh-logo-marquee-track">
+          {/* Marquee Track with Configurable Duration */}
+          <div
+            className="dh-logo-marquee-track"
+            style={{ animationDuration: `${Math.max(10, speed)}s` }}
+          >
             {loopedItems.map((biz, idx) => {
               const logoSrc = biz.logo_url || '/logoconexao_red_vert.png';
+              const businessTitle = `${biz.name}${biz.category_name ? ` • ${biz.category_name}` : ''}`;
+
+              if (isCleanMode) {
+                // Modo Limpo: apenas a logomarca sem borda, sem nome e sem categoria fixos; hover exibe nome e categoria em tooltip
+                return (
+                  <Link
+                    key={`${biz.id}-${idx}`}
+                    href={`/guia/${biz.slug}`}
+                    title={businessTitle}
+                    className="relative group/logo flex items-center justify-center px-4 py-2 shrink-0 transition-transform duration-300 hover:scale-110"
+                  >
+                    {/* Tooltip flutuante exibida suavemente ao passar o mouse */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-none z-30 opacity-0 group-hover/logo:opacity-100 translate-y-1 group-hover/logo:translate-y-0 transition-all duration-200 whitespace-nowrap drop-shadow-lg">
+                      <div className="bg-stone-900/95 backdrop-blur-sm text-white px-3 py-1.5 rounded-lg border border-stone-700/60 shadow-xl flex flex-col items-center text-center">
+                        <span className="text-xs font-bold text-white tracking-wide">
+                          {biz.name}
+                        </span>
+                        {biz.category_name && (
+                          <span className="text-[10px] text-amber-300 font-medium mt-0.5">
+                            {biz.category_name}
+                          </span>
+                        )}
+                      </div>
+                      <div className="w-2 h-2 bg-stone-900/95 border-r border-b border-stone-700/60 rotate-45 mx-auto -mt-1" />
+                    </div>
+
+                    {/* Logomarca pura, sem borda e sem fundo */}
+                    <div className="w-28 sm:w-32 h-12 sm:h-14 relative flex items-center justify-center">
+                      <Image
+                        src={logoSrc}
+                        alt={biz.name || 'Logo da empresa parceira'}
+                        fill
+                        className="object-contain filter drop-shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:drop-shadow-[0_4px_8px_rgba(0,0,0,0.14)] transition-all"
+                        unoptimized
+                      />
+                    </div>
+                  </Link>
+                );
+              }
+
+              // Modo Standard: Card compacto com logo, borda, nome e categoria
               return (
                 <Link
                   key={`${biz.id}-${idx}`}
                   href={`/guia/${biz.slug}`}
+                  title={businessTitle}
                   className="flex items-center gap-3 bg-white border border-stone-200 hover:border-[#C9A227] shadow-sm hover:shadow-md rounded-xl px-3 py-2 transition-all shrink-0 group/card"
                 >
                   <div className="w-11 h-11 relative bg-white rounded-lg border border-stone-100 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
@@ -94,3 +151,4 @@ export function DirectorySponsored({ items = [], displayMode = 'cards' }: Direct
     </section>
   );
 }
+

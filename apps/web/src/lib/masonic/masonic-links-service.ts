@@ -29,6 +29,20 @@ export const COMMUNITY_LINK_TYPE_LABELS: Record<CommunityLinkType, string> = {
   institutional_partner: 'Parceiro Institucional',
 };
 
+export const MASONIC_ELIGIBILITY_TYPES = [
+  'mason',
+  'mason_spouse',
+  'mason_family',
+] as const;
+
+export type MasonicEligibilityType = (typeof MASONIC_ELIGIBILITY_TYPES)[number];
+
+export const MASONIC_ELIGIBILITY_TYPE_LABELS: Record<MasonicEligibilityType, string> = {
+  mason: 'Maçom',
+  mason_spouse: 'Esposa / Cônjuge de Maçom',
+  mason_family: 'Filho / Sobrinho / Familiar de Maçom',
+};
+
 export const COMMUNITY_LINK_STATUS_LABELS: Record<string, string> = {
   draft: 'Rascunho',
   pending_verification: 'Aguardando Verificação',

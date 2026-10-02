@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { assertPlatformAdminAccess } from '@/lib/admin/admin-auth-helper';
+import { getPedraFundamentalQuotaAction } from '@/app/actions/institutional-recognitions';
 import AdvertiserCreateForm from './advertiser-create-form';
 
 export const metadata: Metadata = { title: 'Cadastrar anunciante', robots: { index: false, follow: false } };
@@ -9,40 +10,37 @@ export const metadata: Metadata = { title: 'Cadastrar anunciante', robots: { ind
 export default async function NewAdminAdvertiserPage() {
   const { supabase, user } = await assertPlatformAdminAccess();
 
-  const [{ data: profile }, { data: categories }, { data: planRows }] = await Promise.all([
+  const [{ data: profile }, { data: categories }, { data: planRows }, { count: pedraCount }, quotaRes] = await Promise.all([
     (supabase as any).from('profiles').select('tenant_id').eq('id', user.id).maybeSingle(),
     (supabase as any).from('categories').select('id, name').eq('is_active', true).order('display_order'),
     (supabase as any).from('plan_payment_rules').select('plan_code, title, amount_cents').order('amount_cents'),
+    (supabase as any)
+      .from('business_recognitions')
+      .select('id', { count: 'exact', head: true })
+      .eq('recognition_key', 'pedra_fundamental')
+      .eq('is_active', true),
+    getPedraFundamentalQuotaAction(),
   ]);
 
-  const currentTenantId = profile?.tenant_id || '00000000-0000-0000-0000-000000000010';
+  const currentTenantId = profile?.tenant_id || '00000000-0000-0000-0000-000000000000';
 
-  // Desduplica planos por título e padroniza para os códigos canônicos vigentes
-  const CANONICAL_MAP: Record<string, { code: string; title: string; order: number }> = {
-    esquadro: { code: 'esquadro', title: 'Plano Esquadro', order: 1 },
-    bronze: { code: 'esquadro', title: 'Plano Esquadro', order: 1 },
-    compasso: { code: 'compasso', title: 'Plano Compasso', order: 2 },
-    prata: { code: 'compasso', title: 'Plano Compasso', order: 2 },
-    acacia: { code: 'acacia', title: 'Plano Acácia', order: 3 },
-    ouro: { code: 'acacia', title: 'Plano Acácia', order: 3 },
-  };
+  // Lista canônica oficial dos 3 planos vigentes no Conexão Maçônica
+  const CANONICAL_PLANS = [
+    { code: 'esquadro', title: 'Plano Esquadro', order: 1 },
+    { code: 'compasso', title: 'Plano Compasso', order: 2 },
+    { code: 'acacia', title: 'Plano Acácia', order: 3 },
+  ];
 
-  const planMap = new Map<string, { code: string; title: string; order: number }>();
-  for (const row of planRows ?? []) {
-    const rawCode = (row.plan_code || '').toLowerCase().trim();
-    const canonical = CANONICAL_MAP[rawCode] || {
-      code: row.plan_code,
-      title: row.title || row.plan_code,
-      order: 99,
+  // Enriquecer com títulos do banco se existirem, garantindo unicidade estrita
+  const plans = CANONICAL_PLANS.map((cp) => {
+    const dbMatch = (planRows ?? []).find(
+      (r: any) => (r.plan_code || '').toLowerCase().trim() === cp.code
+    );
+    return {
+      code: cp.code,
+      title: dbMatch?.title || cp.title,
     };
-    if (!planMap.has(canonical.title)) {
-      planMap.set(canonical.title, canonical);
-    }
-  }
-
-  const plans = Array.from(planMap.values())
-    .sort((a, b) => a.order - b.order)
-    .map(({ code, title }) => ({ code, title }));
+  });
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 p-6">
@@ -51,7 +49,13 @@ export default async function NewAdminAdvertiserPage() {
         <h1 className="font-serif text-3xl font-bold text-stone-900">Cadastrar anunciante</h1>
         <p className="mt-1 text-sm text-stone-600">Crie um rascunho vinculado ao responsável. Aprovação e publicação continuam sujeitas ao dossiê obrigatório.</p>
       </div>
-      <AdvertiserCreateForm tenantId={currentTenantId} categories={categories ?? []} plans={plans} />
+      <AdvertiserCreateForm
+        tenantId={currentTenantId}
+        categories={categories ?? []}
+        plans={plans}
+        pedraFundamentalCount={pedraCount ?? 0}
+        pedraFundamentalQuota={quotaRes?.quota || 50}
+      />
     </main>
   );
 }

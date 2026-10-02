@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Bell, ExternalLink, ShieldCheck, Menu, LogOut } from 'lucide-react';
+import { Bell, ExternalLink, ShieldCheck, Menu, LogOut, KeyRound } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
@@ -69,7 +69,16 @@ export function AdminHeader({
         </div>
 
         {/* Lado Direito: Atalhos, Notificações & Perfil do Admin */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <Link
+            href="/admin/configuracoes/integracoes/asaas"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#3B0B14] hover:bg-[#2b060d] text-amber-200 hover:text-white border border-[#C9A227]/40 text-xs font-medium transition-colors"
+            title="Central de Integrações Asaas (Sandbox / Produção)"
+          >
+            <KeyRound className="w-3.5 h-3.5 text-[#C9A227]" />
+            <span>Asaas</span>
+          </Link>
+
           <Link
             href="/guia"
             target="_blank"
@@ -78,7 +87,7 @@ export function AdminHeader({
             title="Visualizar Guia Público"
           >
             <ExternalLink className="w-3.5 h-3.5 text-[#C9A227]" />
-            <span>Ver Guia Público</span>
+            <span>Ver Guia</span>
           </Link>
 
           <button

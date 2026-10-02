@@ -5,6 +5,7 @@ export interface AsaasConfig {
   baseUrl: string;
   apiKey: string;
   webhookSecret: string;
+  webhookAuthToken: string;
   isApiConfigured: boolean;
   isWebhookConfigured: boolean;
 }
@@ -17,7 +18,7 @@ export interface AsaasSanitizedStatus {
 }
 
 const CANONICAL_BASE_URLS: Record<AsaasEnvironment, string> = {
-  sandbox: 'https://sandbox.asaas.com/api/v3',
+  sandbox: 'https://api-sandbox.asaas.com/v3',
   production: 'https://api.asaas.com/v3',
 };
 
@@ -39,8 +40,8 @@ export function getAsaasConfig(): AsaasConfig {
   const environment: AsaasEnvironment = rawEnv as AsaasEnvironment;
   const canonicalUrl = CANONICAL_BASE_URLS[environment];
 
-  // Se ASAAS_API_BASE_URL for fornecido, valida se bate com o ambiente
-  const overrideUrl = process.env.ASAAS_API_BASE_URL?.trim();
+  // Suporte a ASAAS_API_URL ou ASAAS_API_BASE_URL
+  const overrideUrl = (process.env.ASAAS_API_URL || process.env.ASAAS_API_BASE_URL)?.trim();
   let baseUrl = canonicalUrl;
 
   if (overrideUrl) {
@@ -50,24 +51,25 @@ export function getAsaasConfig(): AsaasConfig {
       throw new Error(`[AsaasConfigError] Mismatch de Configuração: ASAAS_ENVIRONMENT="sandbox" não pode ser usado com URL de produção ("${overrideUrl}").`);
     }
     
-    if (environment === 'production' && cleanOverride.includes('sandbox.asaas.com')) {
+    if (environment === 'production' && cleanOverride.includes('sandbox')) {
       throw new Error(`[AsaasConfigError] Mismatch de Configuração: ASAAS_ENVIRONMENT="production" não pode ser usado com URL de sandbox ("${overrideUrl}").`);
     }
 
     baseUrl = overrideUrl.replace(/\/$/, '');
   }
 
-  const apiKey = process.env.ASAAS_API_KEY?.trim() || '';
-  const webhookSecret = process.env.ASAAS_WEBHOOK_SECRET?.trim() || '';
+  const apiKey = (process.env.ASAAS_API_KEY || process.env.ASAAS_ACCESS_TOKEN)?.trim() || '';
+  const webhookAuthToken = (process.env.ASAAS_WEBHOOK_AUTH_TOKEN || process.env.ASAAS_WEBHOOK_SECRET)?.trim() || '';
 
   const isApiConfigured = Boolean(apiKey && apiKey.length > 10);
-  const isWebhookConfigured = Boolean(webhookSecret && webhookSecret.length >= 8);
+  const isWebhookConfigured = Boolean(webhookAuthToken && webhookAuthToken.length >= 8);
 
   return {
     environment,
     baseUrl,
     apiKey,
-    webhookSecret,
+    webhookSecret: webhookAuthToken,
+    webhookAuthToken,
     isApiConfigured,
     isWebhookConfigured,
   };

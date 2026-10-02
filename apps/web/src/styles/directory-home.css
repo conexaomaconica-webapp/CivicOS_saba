@@ -564,9 +564,9 @@
 .dh-logo-marquee-track {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 24px;
   width: max-content;
-  animation: logoMarqueeLoop 30s linear infinite;
+  animation: logoMarqueeLoop var(--marquee-speed, 45s) linear infinite;
   will-change: transform;
 }
 

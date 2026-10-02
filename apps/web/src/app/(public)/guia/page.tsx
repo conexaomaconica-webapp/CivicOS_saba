@@ -156,8 +156,35 @@ export default async function GuiaPage({ searchParams }: Props) {
       }
 
       if (filteredBiz.length > 0) {
+        // Ordenação por prioridade de plano comercial e desempate por nome alfabético A-Z
+        const getPlanWeight = (plan?: string | null) => {
+          const p = (plan || '').toLowerCase();
+          if (p === 'acacia' || p === 'ouro') return 30;
+          if (p === 'compasso' || p === 'prata') return 20;
+          if (p === 'esquadro' || p === 'bronze') return 10;
+          return 0;
+        };
+
+        filteredBiz.sort((a: any, b: any) => {
+          if (sort === 'name') {
+            return (a.name || '').localeCompare(b.name || '');
+          }
+          if (sort === 'recent') {
+            return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+          }
+          const weightDiff = getPlanWeight(b.plan_tier) - getPlanWeight(a.plan_tier);
+          if (weightDiff !== 0) return weightDiff;
+          return (a.name || '').localeCompare(b.name || '');
+        });
+
+        const totalItems = filteredBiz.length;
+        const totalPages = Math.max(1, Math.ceil(totalItems / 12));
+        const safePage = Math.max(1, Math.min(page, totalPages));
+        const startIndex = (safePage - 1) * 12;
+        const paginatedBiz = filteredBiz.slice(startIndex, startIndex + 12);
+
         searchData = {
-          items: filteredBiz.map((b: any) => ({
+          items: paginatedBiz.map((b: any) => ({
             id: b.id,
             slug: b.slug,
             name: b.name,
@@ -170,14 +197,15 @@ export default async function GuiaPage({ searchParams }: Props) {
             state: Array.isArray(b.business_locations) && b.business_locations[0] ? b.business_locations[0].state : null,
             is_verified: true,
             is_founder: false,
-            effective_plan_code: b.plan_tier || 'prata',
+            is_pedra_fundamental: Boolean(b.is_pedra_fundamental),
+            effective_plan_code: b.plan_tier || 'esquadro',
           })),
-          total: filteredBiz.length,
-          page: 1,
+          total: totalItems,
+          page: safePage,
           page_size: 12,
-          total_pages: 1,
-          has_next_page: false,
-          has_previous_page: false,
+          total_pages: totalPages,
+          has_next_page: safePage < totalPages,
+          has_previous_page: safePage > 1,
         };
       }
     } catch (_fallbackErr) {}
@@ -207,17 +235,43 @@ export default async function GuiaPage({ searchParams }: Props) {
 
   const settings = homeData.settings || {};
   let sponsoredDisplayMode: 'cards' | 'logos' = settings.sponsored_display_mode === 'logos' ? 'logos' : 'cards';
+  let sponsoredSpeed = Number(settings.sponsored_marquee_speed) || 45;
+  let sponsoredLogoStyle: 'standard' | 'clean' = settings.sponsored_logo_style === 'clean' ? 'clean' : 'standard';
 
-  // Consulta direta em directory_home_settings para garantir resolução instantânea do modo de exibição
+  // Consulta direta em directory_home_settings para garantir resolução instantânea das preferências
   try {
     const { data: dbSettings } = await (supabase as any)
       .from('directory_home_settings')
-      .select('sponsored_display_mode')
+      .select('sponsored_display_mode, sponsored_marquee_speed, sponsored_logo_style, sections_config')
       .limit(1)
       .maybeSingle();
 
-    if (dbSettings?.sponsored_display_mode === 'logos' || dbSettings?.sponsored_display_mode === 'cards') {
-      sponsoredDisplayMode = dbSettings.sponsored_display_mode;
+    if (dbSettings) {
+      if (dbSettings.sponsored_display_mode === 'logos' || dbSettings.sponsored_display_mode === 'cards') {
+        sponsoredDisplayMode = dbSettings.sponsored_display_mode;
+      }
+      if (dbSettings.sponsored_marquee_speed) {
+        sponsoredSpeed = Number(dbSettings.sponsored_marquee_speed);
+      }
+      if (dbSettings.sponsored_logo_style === 'clean' || dbSettings.sponsored_logo_style === 'standard') {
+        sponsoredLogoStyle = dbSettings.sponsored_logo_style;
+      }
+
+      // Fallback gracioso se salvo via sections_config
+      if (Array.isArray(dbSettings.sections_config)) {
+        const spConfig = dbSettings.sections_config.find((s: any) => s.id === 'sponsored');
+        if (spConfig) {
+          if (spConfig.display_mode === 'logos' || spConfig.display_mode === 'cards') {
+            sponsoredDisplayMode = spConfig.display_mode;
+          }
+          if (spConfig.speed && !dbSettings.sponsored_marquee_speed) {
+            sponsoredSpeed = Number(spConfig.speed);
+          }
+          if (spConfig.logo_style && !dbSettings.sponsored_logo_style) {
+            sponsoredLogoStyle = spConfig.logo_style;
+          }
+        }
+      }
     }
   } catch (_sErr) {}
 
@@ -402,7 +456,12 @@ export default async function GuiaPage({ searchParams }: Props) {
         <SectionDivider />
 
         {/* Empresas Patrocinadas */}
-        <DirectorySponsored items={sponsored} displayMode={sponsoredDisplayMode} />
+        <DirectorySponsored
+          items={sponsored}
+          displayMode={sponsoredDisplayMode}
+          speed={sponsoredSpeed}
+          logoStyle={sponsoredLogoStyle}
+        />
 
         <SectionDivider />
 
