@@ -62,6 +62,8 @@ import {
 } from '@/lib/admin/admin-businesses-service';
 import { compressImageOnClient } from '@/lib/media/client-image-compressor';
 import { formatCpfCnpj, formatPhone } from '@/lib/onboarding/onboarding-validation';
+import { AdminLodgeNameCombobox } from '@/components/admin/AdminLodgeNameCombobox';
+import { getCommercialPlanName } from '@/lib/admin/approval-display';
 import {
   unlockAdminCommercialDossierAction,
   advanceToReadyForPublicationAction,
@@ -455,7 +457,7 @@ export default function Company360Client({ initialData }: Props) {
         },
       }));
 
-      const selectedPlanName = updatedPlan.plan_name.replace('Plano ', '');
+      const selectedPlanName = getCommercialPlanName(updatedPlan.plan_name);
       setPlanMessage({
         type: 'success',
         text: `Plano comercial alterado para ${selectedPlanName} com sucesso. As cotas já foram atualizadas.`,
@@ -1807,7 +1809,7 @@ export default function Company360Client({ initialData }: Props) {
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <div className="px-3 py-1.5 rounded-xl bg-stone-900/60 border border-stone-700 text-stone-200">
-              Plano: <strong className="text-[#C9A227] uppercase">{data.business.plan_code}</strong>
+              Plano: <strong className="text-[#C9A227]">{getCommercialPlanName(data.business.plan_code)}</strong>
             </div>
             <div className="px-3 py-1.5 rounded-xl bg-stone-900/60 border border-stone-700 text-stone-200">
               Vigência: <strong className="text-emerald-400">
@@ -3095,14 +3097,14 @@ export default function Company360Client({ initialData }: Props) {
           <div className="flex justify-between items-center border-b border-stone-200 pb-3">
             <div>
               <h3 className="font-serif font-bold text-base text-stone-900 flex items-center gap-2">
-                <Layers className="w-5 h-5 text-[#3B0B14]" /> Cotas e Direitos do Plano {data.subscription.plan_name}
+              <Layers className="w-5 h-5 text-[#3B0B14]" /> Cotas e Direitos do Plano {getCommercialPlanName(data.subscription.plan_name)}
               </h3>
               <p className="text-xs text-stone-500">
                 Acompanhe as cotas cadastradas e gerencie upgrades ou downgrades comerciais do anunciante.
               </p>
             </div>
             <span className="px-3 py-1 bg-[#3B0B14] text-[#C9A227] font-bold text-xs rounded-full uppercase tracking-wider">
-              Plano Atual: {data.business.plan_code}
+              Plano Atual: {getCommercialPlanName(data.business.plan_code)}
             </span>
           </div>
 
@@ -3177,7 +3179,7 @@ export default function Company360Client({ initialData }: Props) {
                     <span className={`text-[10px] font-bold uppercase tracking-wider block ${isSelected ? 'text-[#C9A227]' : 'text-stone-500'}`}>
                       {p.amount_brl === 0 ? 'Gratuito' : `R$ ${p.amount_brl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / ano`}
                     </span>
-                    <h5 className="font-serif font-bold text-sm mt-1">{p.title}</h5>
+                    <h5 className="font-serif font-bold text-sm mt-1">{getCommercialPlanName(p.code || p.title)}</h5>
                     <p className={`text-xs mt-1 ${isSelected ? 'text-stone-300' : 'text-stone-500'}`}>{p.description || `Parcelamento em até ${p.installments_max}x.`}</p>
                   </button>
                 );
@@ -3372,7 +3374,7 @@ export default function Company360Client({ initialData }: Props) {
 
             <span className={`px-3 py-1 font-bold text-xs rounded-full flex items-center gap-1.5 border shadow-xs ${data.subscription.status === 'active' ? 'bg-emerald-100 text-emerald-900 border-emerald-300' : 'bg-amber-100 text-amber-900 border-amber-300'}`}>
               {data.subscription.status === 'active' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <History className="w-4 h-4 text-amber-700" />}
-              <span>{{ active: 'Assinatura ativa', pending: 'Assinatura pendente', past_due: 'Assinatura em atraso', canceled: 'Assinatura cancelada', expired: 'Assinatura expirada', not_found: 'Sem assinatura registrada' }[data.subscription.status]} ({data.subscription.plan_name})</span>
+              <span>{{ active: 'Assinatura ativa', pending: 'Assinatura pendente', past_due: 'Assinatura em atraso', canceled: 'Assinatura cancelada', expired: 'Assinatura expirada', not_found: 'Sem assinatura registrada' }[data.subscription.status]} ({getCommercialPlanName(data.subscription.plan_name)})</span>
             </span>
           </div>
 
@@ -3381,7 +3383,7 @@ export default function Company360Client({ initialData }: Props) {
             <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl space-y-1">
               <span className="text-stone-500 font-bold block">Plano Contratado:</span>
               <strong className="text-base font-serif font-bold text-[#3B0B14] block">
-                {data.subscription.plan_name}
+                {getCommercialPlanName(data.subscription.plan_name)}
               </strong>
               <span className="text-stone-500 block">
                 {data.subscription.amount_brl !== null
@@ -3508,7 +3510,7 @@ export default function Company360Client({ initialData }: Props) {
                 <Sparkles className="w-5 h-5 text-[#C9A227]" /> Gestão de Reconhecimentos Institucionais
               </h3>
               <p className="text-xs text-stone-500 mt-0.5">
-                Plano Atual da Empresa: <strong className="uppercase text-stone-900">{data.business.plan_code}</strong>
+                Plano Atual da Empresa: <strong className="text-stone-900">{getCommercialPlanName(data.business.plan_code)}</strong>
               </p>
             </div>
 
@@ -4349,11 +4351,10 @@ export default function Company360Client({ initialData }: Props) {
             <div className="space-y-3.5 text-xs">
               <div>
                 <label className="block font-bold text-stone-800 mb-1">Nome da Loja Maçônica *</label>
-                <input
-                  type="text"
+                <AdminLodgeNameCombobox
                   value={masonicLodgeInput}
-                  onChange={(e) => setMasonicLodgeInput(e.target.value)}
-                  placeholder="Ex: ARLS Luz e Verdade nº 123"
+                  onChange={setMasonicLodgeInput}
+                  placeholder="Busque uma Loja cadastrada ou informe uma nova"
                   className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
                   required
                 />

@@ -238,42 +238,22 @@ export default async function GuiaPage({ searchParams }: Props) {
   let sponsoredSpeed = Number(settings.sponsored_marquee_speed) || 45;
   let sponsoredLogoStyle: 'standard' | 'clean' = settings.sponsored_logo_style === 'clean' ? 'clean' : 'standard';
 
-  // Consulta direta em directory_home_settings para garantir resolução instantânea das preferências
-  try {
-    const { data: dbSettings } = await (supabase as any)
-      .from('directory_home_settings')
-      .select('sponsored_display_mode, sponsored_marquee_speed, sponsored_logo_style, sections_config')
-      .limit(1)
-      .maybeSingle();
-
-    if (dbSettings) {
-      if (dbSettings.sponsored_display_mode === 'logos' || dbSettings.sponsored_display_mode === 'cards') {
-        sponsoredDisplayMode = dbSettings.sponsored_display_mode;
+  // Compatibilidade com schemas que persistem as preferências no bloco patrocinado.
+  if (Array.isArray(settings.sections_config)) {
+    const sponsoredConfig = settings.sections_config.find((section: any) => section.id === 'sponsored');
+    if (sponsoredConfig) {
+      if (!settings.sponsored_display_mode && ['cards', 'logos'].includes(sponsoredConfig.display_mode)) {
+        sponsoredDisplayMode = sponsoredConfig.display_mode;
       }
-      if (dbSettings.sponsored_marquee_speed) {
-        sponsoredSpeed = Number(dbSettings.sponsored_marquee_speed);
+      if (!settings.sponsored_marquee_speed && Number(sponsoredConfig.speed) > 0) {
+        sponsoredSpeed = Number(sponsoredConfig.speed);
       }
-      if (dbSettings.sponsored_logo_style === 'clean' || dbSettings.sponsored_logo_style === 'standard') {
-        sponsoredLogoStyle = dbSettings.sponsored_logo_style;
-      }
-
-      // Fallback gracioso se salvo via sections_config
-      if (Array.isArray(dbSettings.sections_config)) {
-        const spConfig = dbSettings.sections_config.find((s: any) => s.id === 'sponsored');
-        if (spConfig) {
-          if (spConfig.display_mode === 'logos' || spConfig.display_mode === 'cards') {
-            sponsoredDisplayMode = spConfig.display_mode;
-          }
-          if (spConfig.speed && !dbSettings.sponsored_marquee_speed) {
-            sponsoredSpeed = Number(spConfig.speed);
-          }
-          if (spConfig.logo_style && !dbSettings.sponsored_logo_style) {
-            sponsoredLogoStyle = spConfig.logo_style;
-          }
-        }
+      if (!settings.sponsored_logo_style && ['standard', 'clean'].includes(sponsoredConfig.logo_style)) {
+        sponsoredLogoStyle = sponsoredConfig.logo_style;
       }
     }
-  } catch (_sErr) {}
+  }
+
 
   let banners = (homeData.banners as DirectoryBannerItem[]) || [];
   let categories = (homeData.categories as DirectoryCategoryItem[]) || [];

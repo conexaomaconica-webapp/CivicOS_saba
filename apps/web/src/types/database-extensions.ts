@@ -536,6 +536,11 @@ export type CustomFunctions = {
       venue_address: string | null;
       city: string | null;
       cover_image_url: string | null;
+      header_media_type: 'logo' | 'banner';
+      header_media_size: 'small' | 'medium' | 'large' | 'full';
+      header_media_position: 'left' | 'center' | 'right';
+      badge_text: string;
+      footer_information: string | null;
       registration_enabled: boolean;
       capacity: number | null;
     }>;
@@ -579,6 +584,7 @@ export type CustomFunctions = {
       capacity: number | null;
       total_registrations: number;
       total_confirmed: number;
+      total_declined: number;
       total_checkins: number;
       created_at: string;
     }>;
@@ -682,6 +688,11 @@ type PlatformEventTables = {
       venue_address: string | null;
       city: string | null;
       cover_image_url: string | null;
+      header_media_type: 'logo' | 'banner';
+      header_media_size: 'small' | 'medium' | 'large' | 'full';
+      header_media_position: 'left' | 'center' | 'right';
+      badge_text: string;
+      footer_information: string | null;
       status: EventStatus;
       registration_enabled: boolean;
       capacity: number | null;
@@ -703,6 +714,11 @@ type PlatformEventTables = {
       venue_address?: string | null;
       city?: string | null;
       cover_image_url?: string | null;
+      header_media_type?: 'logo' | 'banner';
+      header_media_size?: 'small' | 'medium' | 'large' | 'full';
+      header_media_position?: 'left' | 'center' | 'right';
+      badge_text?: string;
+      footer_information?: string | null;
       status?: EventStatus;
       registration_enabled?: boolean;
       capacity?: number | null;
@@ -722,6 +738,11 @@ type PlatformEventTables = {
       venue_address?: string | null;
       city?: string | null;
       cover_image_url?: string | null;
+      header_media_type?: 'logo' | 'banner';
+      header_media_size?: 'small' | 'medium' | 'large' | 'full';
+      header_media_position?: 'left' | 'center' | 'right';
+      badge_text?: string;
+      footer_information?: string | null;
       status?: EventStatus;
       registration_enabled?: boolean;
       capacity?: number | null;

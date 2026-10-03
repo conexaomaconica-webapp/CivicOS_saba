@@ -38,6 +38,24 @@ import {
 } from '@/lib/admin/admin-businesses-service';
 import { deleteBusinessAdminAction } from '@/app/actions/business-management';
 
+const PLAN_LABELS: Record<string, string> = {
+  bronze: 'Esquadro',
+  esquadro: 'Esquadro',
+  prata: 'Compasso',
+  silver: 'Compasso',
+  compasso: 'Compasso',
+  ouro: 'Acácia',
+  gold: 'Acácia',
+  acacia: 'Acácia',
+};
+
+const PUBLICATION_STATUS_LABELS: Record<string, string> = {
+  draft: 'Rascunho',
+  pending_review: 'Em análise',
+  archived: 'Arquivada',
+  rejected: 'Rejeitada',
+};
+
 // Definção de Colunas Disponíveis
 type ColumnKey =
   | 'company'
@@ -663,7 +681,7 @@ export default function AdminBusinessesDirectoryPage() {
                       {visibleColumns.plan && (
                         <td className="py-3.5 px-4 text-center" style={{ width: `${colWidths.plan}px` }}>
                           <span className="px-2.5 py-1 rounded-full bg-stone-100 text-stone-900 font-extrabold text-[10px] uppercase border border-stone-300 inline-block">
-                            {item.plan_code}
+                            {PLAN_LABELS[item.plan_code.toLowerCase()] ?? item.plan_code}
                           </span>
                         </td>
                       )}
@@ -681,7 +699,7 @@ export default function AdminBusinessesDirectoryPage() {
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-300 font-bold text-[10px]">
-                              {item.publication_status}
+                              {PUBLICATION_STATUS_LABELS[item.publication_status] ?? item.publication_status}
                             </span>
                           )}
                         </td>
@@ -705,7 +723,13 @@ export default function AdminBusinessesDirectoryPage() {
                       {/* COMPLETUDE */}
                       {visibleColumns.completeness && (
                         <td className="py-3.5 px-4 text-center" style={{ width: `${colWidths.completeness}px` }}>
-                          <div className="inline-flex items-center gap-1.5">
+                          <div
+                            className="inline-flex items-center gap-1.5"
+                            title={item.completeness_missing?.length
+                              ? `Pendências: ${item.completeness_missing.join(', ')}`
+                              : 'Cadastro completo nos 6 critérios obrigatórios'}
+                            aria-label={`${item.completeness_percent}% completo. ${item.completeness_missing?.length ? `Pendências: ${item.completeness_missing.join(', ')}` : 'Sem pendências obrigatórias'}`}
+                          >
                             <div className="w-12 bg-stone-200 h-2 rounded-full overflow-hidden shrink-0">
                               <div
                                 className={`h-full ${
@@ -720,6 +744,7 @@ export default function AdminBusinessesDirectoryPage() {
                             </div>
                             <span className="font-mono font-bold text-stone-800">{item.completeness_percent}%</span>
                           </div>
+                          <span className="mt-1 block text-[9px] font-medium text-stone-400">6 critérios obrigatórios</span>
                         </td>
                       )}
 

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { displayOptionalText } from '@/lib/utils/display';
+import { getAdminStatusLabel, getCommercialPlanName } from '@/lib/admin/approval-display';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -257,7 +258,7 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <div className="px-3 py-1.5 rounded-xl bg-stone-900/60 border border-stone-700 text-stone-200">
-              Plano: <strong className="text-[#C9A227] uppercase">{dossier.contract.plan_code}</strong>
+              Plano: <strong className="text-[#C9A227]">{getCommercialPlanName(dossier.contract.plan_code)}</strong>
             </div>
             <div className="px-3 py-1.5 rounded-xl bg-stone-900/60 border border-stone-700 text-stone-200">
               Completude: <strong className="text-emerald-400">{dossier.completeness.percent}%</strong>
@@ -810,14 +811,14 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
               <CreditCard className="w-5 h-5 text-[#3B0B14]" /> Situação Financeira (Asaas Gateway)
             </h3>
             <span className={`px-3 py-1 rounded-full font-bold text-xs ${['active', 'paid', 'trialing'].includes(dossier.payment.status) ? 'bg-emerald-100 text-emerald-900' : 'bg-red-100 text-red-900'}`}>
-              {['active', 'paid', 'trialing'].includes(dossier.payment.status) ? '✓ Pagamento Confirmado' : `○ ${dossier.payment.status}`}
+              {['active', 'paid', 'trialing'].includes(dossier.payment.status) ? '✓ Pagamento confirmado' : `○ ${getAdminStatusLabel(dossier.payment.status)}`}
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs text-stone-800">
             <div>
               <span className="text-stone-500 block">Plano:</span>
-              <strong className="uppercase font-bold text-[#3B0B14]">{dossier.payment.plan_code}</strong>
+              <strong className="font-bold text-[#3B0B14]">{getCommercialPlanName(dossier.payment.plan_code)}</strong>
             </div>
             <div>
               <span className="text-stone-500 block">Valor Anual:</span>
@@ -964,7 +965,7 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
               </div>
               <div className="flex justify-between">
                 <span className="text-stone-600">Plano Comercial:</span>
-                <strong className="uppercase text-[#3B0B14]">{dossier.contract.plan_code}</strong>
+                <strong className="text-[#3B0B14]">{getCommercialPlanName(dossier.contract.plan_code)}</strong>
               </div>
               {dossier.completeness.requirements.map(req => (
                 <div key={req.id} className="flex justify-between">

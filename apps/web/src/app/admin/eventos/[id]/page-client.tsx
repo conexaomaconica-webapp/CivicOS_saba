@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   getAdminEventRegistrationsAction,
   exportEventRegistrationsCSVAction,
@@ -9,6 +9,7 @@ import {
   type AdminRegistrationItem,
 } from '@/app/actions/platform-events';
 import { Search, Download, CheckCircle2, X, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { systemConfirm, systemNotify } from '@/components/system/SystemFeedback';
 
 interface Props {
   eventId: string;
@@ -100,7 +101,7 @@ export function AdminEventRegistrationsTable({ eventId, eventTitle }: Props) {
 
   // Filtros
   const [search, setSearch] = useState('');
-  const [filterPreset, setFilterPreset] = useState('');
+  const [filterPreset, setFilterPreset] = useState('confirmed');
   const [filterType, setFilterType] = useState('');
   const [filterCity, setFilterCity] = useState('');
   const [filterSource, setFilterSource] = useState('');
@@ -150,11 +151,12 @@ export function AdminEventRegistrationsTable({ eventId, eventTitle }: Props) {
     }
   }, [eventId]);
 
-  const handleInitialLoad = () => {
-    if (!loaded && !loading) {
-      loadData(0, search, filterPreset, filterType, filterCity, filterSource);
-    }
-  };
+  useEffect(() => {
+    void loadData(0, '', 'confirmed', '', '', '');
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [loadData]);
 
   const reloadCurrent = () => {
     loadData(page, search, filterPreset, filterType, filterCity, filterSource);
@@ -194,12 +196,17 @@ export function AdminEventRegistrationsTable({ eventId, eventTitle }: Props) {
     if (res.success) {
       reloadCurrent();
     } else {
-      alert(res.error ?? 'Erro ao realizar check-in.');
+      systemNotify({ type: 'danger', title: 'Erro no check-in', message: res.error ?? 'Erro ao realizar check-in.' });
     }
   };
 
   const handleInlineUndoCheckin = async (reg: AdminRegistrationItem) => {
-    if (!window.confirm(`Tem certeza que deseja DESFAZER o check-in de "${reg.full_name}"?`)) {
+    if (!(await systemConfirm({
+      title: 'Desfazer check-in',
+      message: `Tem certeza que deseja desfazer o check-in de "${reg.full_name}"?`,
+      confirmLabel: 'Desfazer check-in',
+      danger: true,
+    }))) {
       return;
     }
     setActionLoadingId(reg.id);
@@ -208,7 +215,7 @@ export function AdminEventRegistrationsTable({ eventId, eventTitle }: Props) {
     if (res.success) {
       reloadCurrent();
     } else {
-      alert(res.error ?? 'Erro ao desfazer check-in.');
+      systemNotify({ type: 'danger', title: 'Erro ao desfazer check-in', message: res.error ?? 'Erro ao desfazer check-in.' });
     }
   };
 
@@ -226,13 +233,15 @@ export function AdminEventRegistrationsTable({ eventId, eventTitle }: Props) {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+    } else {
+      systemNotify({ type: 'danger', title: 'Erro ao exportar', message: result.error ?? 'Não foi possível exportar os participantes.' });
     }
   };
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <div className="reg-table-wrap" onClick={handleInitialLoad}>
+    <div className="reg-table-wrap">
       {/* Filtros */}
       <div className="reg-filters">
         <div className="reg-search-wrap">
@@ -244,7 +253,6 @@ export function AdminEventRegistrationsTable({ eventId, eventTitle }: Props) {
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="reg-search"
-            onFocus={handleInitialLoad}
           />
         </div>
         <select
@@ -280,10 +288,6 @@ export function AdminEventRegistrationsTable({ eventId, eventTitle }: Props) {
       </div>
 
       {error && <p className="reg-error" role="alert">{error}</p>}
-
-      {!loaded && !loading && (
-        <p className="reg-hint">Clique ou pesquise para carregar os participantes.</p>
-      )}
 
       {loading && <p className="reg-loading">Carregando participantes...</p>}
 

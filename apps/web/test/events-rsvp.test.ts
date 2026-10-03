@@ -197,6 +197,7 @@ describe('upsertEventRegistrationAction', () => {
     fullName: 'Eduardo Silva',
     whatsapp: '75991272323',
     attendeeType: 'macom' as const,
+    masonicOrganization: 'Loja Maçônica União e Fraternidade',
     attendanceStatus: 'confirmed' as const,
   };
 

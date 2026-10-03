@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { assertPlatformAdminAccess } from '@/lib/admin/admin-auth-helper';
 import { listAdminUsersAction } from '@/lib/admin/admin-users-service';
 import SettingsUsersClient from './settings-users-client';
 
@@ -9,14 +8,14 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminSettingsPage() {
-  const { user } = await assertPlatformAdminAccess();
   const res = await listAdminUsersAction();
 
   return (
     <div className="p-4 md:p-6">
       <SettingsUsersClient
         initialUsers={res.users || []}
-        currentUserId={user.id}
+        currentUserId={res.currentUserId || ''}
+        actorRole={res.actorRole || 'member'}
       />
     </div>
   );

@@ -20,6 +20,8 @@ type Banner = {
   end_at?: string | null;
 };
 
+type BannerContentMode = 'image_text' | 'image_only';
+
 export default function AdminGuiaBannersPage() {
   const [loading, setLoading] = useState(true);
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -39,12 +41,20 @@ export default function AdminGuiaBannersPage() {
   const [city, setCity] = useState('');
   const [displayOrder, setDisplayOrder] = useState(1);
   const [isActive, setIsActive] = useState(true);
+  const [contentMode, setContentMode] = useState<BannerContentMode>('image_text');
 
   const fetchBanners = async () => {
     try {
       const supabase = createClient();
-      const { data: profileData } = await (supabase as any).from('profiles').select('tenant_id').maybeSingle();
-      const tid = profileData?.tenant_id || '00000000-0000-0000-0000-000000000010';
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData.user) throw new Error('Usuário não autenticado.');
+      const { data: profileData } = await (supabase as any)
+        .from('profiles')
+        .select('tenant_id')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+      const tid = profileData?.tenant_id;
+      if (!tid) throw new Error('Tenant do administrador não identificado.');
       setTenantId(tid);
 
       const { data } = await (supabase as any)
@@ -77,6 +87,7 @@ export default function AdminGuiaBannersPage() {
       setCity(banner.city || '');
       setDisplayOrder(banner.display_order);
       setIsActive(banner.is_active);
+      setContentMode(!banner.title?.trim() && !banner.subtitle?.trim() && !banner.cta_text?.trim() ? 'image_only' : 'image_text');
     } else {
       setEditingBanner(null);
       setTitle('');
@@ -88,23 +99,24 @@ export default function AdminGuiaBannersPage() {
       setCity('');
       setDisplayOrder(banners.length + 1);
       setIsActive(true);
+      setContentMode('image_text');
     }
     setModalOpen(true);
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tenantId || !title || !imageDesktopUrl) return;
+    if (!tenantId || !imageDesktopUrl || (contentMode === 'image_text' && !title.trim())) return;
 
     setSaving(true);
     try {
       const supabase = createClient();
       const payload = {
         tenant_id: tenantId,
-        title,
-        subtitle: subtitle || null,
-        cta_text: ctaText || null,
-        cta_url: ctaUrl || null,
+        title: contentMode === 'image_only' ? '' : title.trim(),
+        subtitle: contentMode === 'image_only' ? null : subtitle || null,
+        cta_text: contentMode === 'image_only' ? null : ctaText || null,
+        cta_url: contentMode === 'image_only' ? null : ctaUrl || null,
         image_desktop_url: imageDesktopUrl,
         image_mobile_url: imageMobileUrl || null,
         city: city || null,
@@ -194,7 +206,7 @@ export default function AdminGuiaBannersPage() {
                 <tr key={b.id} className="hover:bg-gray-50">
                   <td className="p-3 font-semibold text-amber-900">{b.display_order}</td>
                   <td className="p-3 font-medium">
-                    <div>{b.title}</div>
+                    <div>{b.title || 'Banner somente imagem'}</div>
                     <div className="text-xs text-gray-400">{b.subtitle}</div>
                   </td>
                   <td className="p-3">{b.city || 'Todas as Cidades'}</td>
@@ -221,7 +233,7 @@ export default function AdminGuiaBannersPage() {
       {/* Modal Modal Form */}
       {modalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-lg w-full p-6 space-y-4 shadow-xl">
+          <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-xl">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="text-lg font-bold text-gray-900">{editingBanner ? 'Editar Banner' : 'Novo Banner'}</h3>
               <button onClick={() => setModalOpen(false)} className="text-gray-400 hover:text-gray-600">
@@ -230,6 +242,19 @@ export default function AdminGuiaBannersPage() {
             </div>
 
             <form onSubmit={handleSave} className="space-y-3">
+              <fieldset>
+                <legend className="block text-xs font-semibold text-gray-700 mb-2">Formato do banner</legend>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setContentMode('image_text')} className={`rounded-md border px-3 py-2 text-sm font-medium ${contentMode === 'image_text' ? 'border-amber-800 bg-amber-50 text-amber-900' : 'border-gray-200 text-gray-600'}`}>
+                    Imagem com texto
+                  </button>
+                  <button type="button" onClick={() => setContentMode('image_only')} className={`rounded-md border px-3 py-2 text-sm font-medium ${contentMode === 'image_only' ? 'border-amber-800 bg-amber-50 text-amber-900' : 'border-gray-200 text-gray-600'}`}>
+                    Somente imagem
+                  </button>
+                </div>
+              </fieldset>
+
+              {contentMode === 'image_text' && <div className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Título Principal *</label>
                 <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full px-3 py-1.5 border rounded-md text-sm" />
@@ -251,9 +276,17 @@ export default function AdminGuiaBannersPage() {
                 </div>
               </div>
 
+              </div>}
+
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">URL Imagem Desktop *</label>
                 <input type="text" value={imageDesktopUrl} onChange={(e) => setImageDesktopUrl(e.target.value)} required className="w-full px-3 py-1.5 border rounded-md text-sm" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">URL Imagem Mobile (opcional)</label>
+                <input type="text" value={imageMobileUrl} onChange={(e) => setImageMobileUrl(e.target.value)} className="w-full px-3 py-1.5 border rounded-md text-sm" />
+                <p className="mt-1 text-xs text-gray-500">Sem uma imagem mobile, a imagem desktop também será usada no celular.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

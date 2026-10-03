@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { EventQRCodeModal } from './EventQRCodeModal';
 import { downloadQRCodePNG } from '@/lib/events/qr-code';
+import { systemNotify } from '@/components/system/SystemFeedback';
 
 interface EventRSVPDivulgacaoProps {
   eventSlug: string;
@@ -28,10 +29,13 @@ export function EventRSVPDivulgacao({
   eventTitle,
   bySource = {},
 }: EventRSVPDivulgacaoProps) {
-  // Configurar base URL no browser
-  const baseUrl = typeof window !== 'undefined'
-    ? `${window.location.protocol}//${window.location.host}`
-    : 'https://conexaomaconica.com.br';
+  // O primeiro render precisa ser idêntico no servidor e no navegador.
+  const canonicalBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://conexaomaconica.com.br').replace(/\/$/, '');
+  const [baseUrl, setBaseUrl] = useState(canonicalBaseUrl);
+
+  useEffect(() => {
+    setBaseUrl(window.location.origin);
+  }, []);
 
   const mainPublicUrl = `${baseUrl}/eventos/${eventSlug}`;
 
@@ -89,7 +93,7 @@ export function EventRSVPDivulgacao({
     if (!refKey) return;
 
     if (links.some((l) => l.refKey === refKey)) {
-      alert('Esta origem já existe na lista.');
+      systemNotify({ type: 'warning', title: 'Origem duplicada', message: 'Esta origem já existe na lista.' });
       return;
     }
 

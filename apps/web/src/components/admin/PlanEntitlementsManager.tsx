@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { getCommercialPlanName } from '@/lib/admin/approval-display';
 import Link from 'next/link';
 import {
   ShieldCheck,
@@ -107,7 +108,10 @@ function QuotaControl({
 }
 
 export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManagerProps) {
-  const [plans, setPlans] = useState<CommercialPlanFullData[]>(initialData);
+  const [plans, setPlans] = useState<CommercialPlanFullData[]>(() => initialData.map((plan) => ({
+    ...plan,
+    title: getCommercialPlanName(plan.plan_code),
+  })));
   const [selectedPlan, setSelectedPlan] = useState<'bronze' | 'prata' | 'ouro'>('prata');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -287,9 +291,9 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
               )}
 
               <span className={`text-[10px] font-bold uppercase tracking-wider block ${isSelected ? 'text-[#C9A227]' : 'text-stone-500'}`}>
-                {p.plan_code}
+                Plano comercial
               </span>
-              <h3 className="font-serif font-bold text-lg mt-0.5">{p.title}</h3>
+              <h3 className="font-serif font-bold text-lg mt-0.5">{getCommercialPlanName(p.plan_code)}</h3>
               <p className={`text-xs mt-1 line-clamp-2 ${isSelected ? 'text-stone-300' : 'text-stone-600'}`}>
                 {p.slogan}
               </p>

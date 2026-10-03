@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { upsertAdminMasonicLinkAction } from '@/lib/admin/admin-businesses-service';
 import type { MasonicEligibilityType } from '@/lib/masonic/masonic-links-service';
+import { AdminLodgeNameCombobox } from '@/components/admin/AdminLodgeNameCombobox';
 
 export interface MasonicLinkDetail {
   id?: string;
@@ -644,12 +645,11 @@ export default function MasonicLinkOnboardingForm({
             <label className="block text-xs font-bold text-stone-700 mb-1">
               Loja Maçônica <span className="text-rose-500">*</span>
             </label>
-            <input
-              type="text"
+            <AdminLodgeNameCombobox
               required
-              placeholder="Ex: ARLS Fraternidade e Progresso nº 123"
               value={lodgeName}
-              onChange={(e) => setLodgeName(e.target.value)}
+              onChange={setLodgeName}
+              placeholder="Busque uma Loja cadastrada ou informe uma nova"
               className={inputClass}
             />
           </div>

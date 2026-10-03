@@ -7,12 +7,15 @@ import {
   CalendarDays,
   Users,
   CheckCircle2,
+  XCircle,
+  TicketCheck,
   Plus,
   ArrowRight,
   Edit3,
   Trash2,
   AlertTriangle,
   Loader2,
+  ExternalLink,
 } from 'lucide-react';
 import { AdminCreateEventModal } from './AdminCreateEventModal';
 import { AdminEditEventModal } from './AdminEditEventModal';
@@ -104,6 +107,9 @@ export function AdminEventsListClient({ initialEvents }: Props) {
     capacity: item.capacity,
   });
 
+  const getAvailableCapacity = (event: AdminEventListItem) =>
+    event.capacity === null ? null : Math.max(0, event.capacity - event.total_confirmed);
+
   return (
     <>
       <div className="ev-header">
@@ -181,9 +187,19 @@ export function AdminEventsListClient({ initialEvents }: Props) {
                       <span className="ev-stat-label">Confirmados</span>
                     </div>
                     <div className="ev-stat">
+                      <XCircle size={14} className="ev-stat-icon ev-stat-icon--red" />
+                      <span className="ev-stat-value">{event.total_declined ?? 0}</span>
+                      <span className="ev-stat-label">Não confirmados</span>
+                    </div>
+                    <div className="ev-stat">
                       <CheckCircle2 size={14} className="ev-stat-icon ev-stat-icon--gold" />
                       <span className="ev-stat-value">{event.total_checkins}</span>
                       <span className="ev-stat-label">Check-ins</span>
+                    </div>
+                    <div className="ev-stat">
+                      <TicketCheck size={14} className="ev-stat-icon ev-stat-icon--blue" />
+                      <span className="ev-stat-value">{getAvailableCapacity(event) ?? '∞'}</span>
+                      <span className="ev-stat-label">Vagas disponíveis</span>
                     </div>
                   </div>
                 </div>
@@ -191,8 +207,18 @@ export function AdminEventsListClient({ initialEvents }: Props) {
 
               {/* Barra de Ações Rápidas por Evento */}
               <div className="ev-card-actions">
+                <Link
+                  href={`/eventos/${event.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ev-action-btn ev-action-rsvp"
+                  title="Abrir página pública de confirmação"
+                >
+                  <ExternalLink size={15} />
+                  <span>Abrir página RSVP</span>
+                </Link>
                 <Link href={`/admin/eventos/${event.id}`} className="ev-action-btn ev-action-view">
-                  <span>Ver Detalhes / RSVP</span>
+                  <span>Ver detalhes</span>
                   <ArrowRight size={16} />
                 </Link>
                 <button
@@ -324,12 +350,14 @@ export function AdminEventsListClient({ initialEvents }: Props) {
         .badge-gray { background: #F3F4F6; color: #374151; }
         .badge-red { background: #FEF2F2; color: #991B1B; }
         .badge-yellow { background: #FEF3C7; color: #92400E; }
-        .ev-card-right { display: flex; align-items: center; gap: 1.5rem; }
-        .ev-stats { display: flex; gap: 1rem; }
+        .ev-card-right { display: flex; align-items: center; gap: 1.5rem; max-width: 100%; }
+        .ev-stats { display: grid; grid-template-columns: repeat(3, minmax(82px, 1fr)); gap: 0.625rem; max-width: 100%; }
         .ev-stat { display: flex; flex-direction: column; align-items: center; background: #FAF8F5; padding: 0.5rem 0.75rem; border-radius: 8px; min-width: 70px; }
         .ev-stat-icon { color: #6B5E62; margin-bottom: 0.125rem; }
         .ev-stat-icon--green { color: #10B981; }
         .ev-stat-icon--gold { color: #C9A227; }
+        .ev-stat-icon--red { color: #DC2626; }
+        .ev-stat-icon--blue { color: #2563EB; }
         .ev-stat-value { font-size: 1rem; font-weight: 800; color: #1C0D10; }
         .ev-stat-label { font-size: 0.6875rem; color: #6B5E62; font-weight: 600; }
         
@@ -344,6 +372,8 @@ export function AdminEventsListClient({ initialEvents }: Props) {
         }
         .ev-action-view { background: #3B0B14; color: #C9A227; }
         .ev-action-view:hover { background: #2A080E; }
+        .ev-action-rsvp { background: #FFFBEB; color: #713F12; border: 1px solid #D6B653; }
+        .ev-action-rsvp:hover { background: #FEF3C7; border-color: #C9A227; }
         .ev-action-edit { background: #FFFFFF; color: #374151; border: 1px solid #D1D5DB; }
         .ev-action-edit:hover { background: #F3F4F6; border-color: #9CA3AF; }
         .ev-action-delete { background: #FEF2F2; color: #991B1B; border: 1px solid #FCA5A5; }

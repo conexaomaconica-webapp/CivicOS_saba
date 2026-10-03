@@ -104,6 +104,8 @@ export default async function EventPage({ params }: PageProps) {
   const dateDisplay  = formatEventDate(event.event_date);
   const timeDisplay  = formatEventTime(event.start_time);
   const locationLine = [event.venue_name, event.city].filter(Boolean).join(' — ');
+  const mediaSize = event.header_media_size ?? 'medium';
+  const mediaPosition = event.header_media_position ?? 'center';
 
   return (
     <>
@@ -113,13 +115,19 @@ export default async function EventPage({ params }: PageProps) {
       <div className="event-page">
         {/* ── HERO ────────────────────────────────────────────────────────── */}
         <header className="event-hero">
-          <div className="event-hero-inner">
-            {/* Logo oficial (via tenant brand) */}
-            {brand.logoUrl ? (
-              <div className="event-logo-wrap">
+          <div className={`event-hero-inner event-hero-inner--${event.header_media_type === 'banner' ? mediaSize : 'medium'}`}>
+            {event.header_media_type === 'banner' && event.cover_image_url && (
+              <div className={`event-custom-banner event-media--${mediaSize} event-media-position--${mediaPosition}`}>
+                <Image src={event.cover_image_url} alt={`Banner do evento ${event.title}`} width={1600} height={520} className="event-custom-banner-image" priority />
+              </div>
+            )}
+
+            {/* Logomarca específica do evento ou identidade oficial do tenant */}
+            {(event.header_media_type !== 'banner' && event.cover_image_url) || brand.logoUrl ? (
+              <div className={`event-logo-wrap event-media--${mediaSize} event-media-position--${mediaPosition}`}>
                 <Image
-                  src={brand.logoUrl}
-                  alt={brand.appName ?? 'Conexão Maçônica'}
+                  src={event.header_media_type !== 'banner' && event.cover_image_url ? event.cover_image_url : brand.logoUrl!}
+                  alt={event.header_media_type !== 'banner' && event.cover_image_url ? `Logomarca do evento ${event.title}` : (brand.appName ?? 'Conexão Maçônica')}
                   width={160}
                   height={80}
                   className="event-logo"
@@ -135,7 +143,7 @@ export default async function EventPage({ params }: PageProps) {
             {/* Badge convite */}
             <div className="event-badge" aria-label="Convite oficial">
               <span className="event-badge-deco" aria-hidden="true">✦</span>
-              CONVITE
+              {event.badge_text || 'Convite'}
               <span className="event-badge-deco" aria-hidden="true">✦</span>
             </div>
 
@@ -210,6 +218,15 @@ export default async function EventPage({ params }: PageProps) {
           </section>
         )}
 
+        {event.footer_information && (
+          <section className="event-information-section" aria-labelledby="event-information-title">
+            <div className="event-information-card">
+              <h2 id="event-information-title">Informações e contato</h2>
+              <p>{event.footer_information}</p>
+            </div>
+          </section>
+        )}
+
         {/* ── FOOTER MÍNIMO ─────────────────────────────────────────────── */}
         <footer className="event-footer">
           <p className="event-footer-brand">{brand.appName ?? 'Conexão Maçônica'}</p>
@@ -279,11 +296,18 @@ export default async function EventPage({ params }: PageProps) {
           z-index: 1;
         }
 
+        .event-hero-inner--large { max-width: 900px; }
+        .event-hero-inner--full { max-width: 1180px; }
+
         .event-logo-wrap {
           margin-bottom: 1.5rem;
           display: flex;
           justify-content: center;
         }
+
+        .event-media-position--left { justify-content: flex-start; margin-left: 0; margin-right: auto; }
+        .event-media-position--center { justify-content: center; margin-left: auto; margin-right: auto; }
+        .event-media-position--right { justify-content: flex-end; margin-left: auto; margin-right: 0; }
 
         .event-logo {
           max-height: 72px;
@@ -291,6 +315,35 @@ export default async function EventPage({ params }: PageProps) {
           object-fit: contain;
           filter: brightness(1.1);
         }
+
+        .event-logo-wrap.event-media--small .event-logo { width: 140px; max-height: 56px; max-width: 100%; }
+        .event-logo-wrap.event-media--medium .event-logo { width: 240px; max-height: 96px; max-width: 100%; }
+        .event-logo-wrap.event-media--large .event-logo { width: 380px; max-height: 150px; max-width: 100%; }
+        .event-logo-wrap.event-media--full .event-logo { width: 620px; max-height: 220px; max-width: 100%; }
+
+        .event-custom-banner {
+          width: min(100%, 1080px);
+          margin: 0 auto 2rem;
+          border-radius: 18px;
+          box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+        }
+
+        .event-custom-banner-image {
+          display: block;
+          width: 100%;
+          height: auto;
+          max-height: 680px;
+          object-fit: contain;
+          border-radius: 18px;
+        }
+
+        .event-custom-banner.event-media--small { max-width: 480px; }
+        .event-custom-banner.event-media--medium { max-width: 640px; }
+        .event-custom-banner.event-media--large { max-width: 900px; }
+        .event-custom-banner.event-media--full { max-width: 1180px; }
+        .event-media-position--left .event-custom-banner-image { object-position: left center; }
+        .event-media-position--center .event-custom-banner-image { object-position: center; }
+        .event-media-position--right .event-custom-banner-image { object-position: right center; }
 
         .event-logo-text {
           color: var(--cm-gold);
@@ -849,6 +902,35 @@ export default async function EventPage({ params }: PageProps) {
         }
 
         /* ── FOOTER ───────────────────────────────────────────────────── */
+        .event-information-section {
+          background: var(--cm-ivory);
+          padding: 0 1.25rem 2rem;
+        }
+
+        .event-information-card {
+          max-width: 640px;
+          margin: 0 auto;
+          padding: 1.25rem 1.5rem;
+          border: 1px solid rgba(201, 162, 39, 0.45);
+          border-radius: 14px;
+          background: #fffdf7;
+          color: var(--cm-text);
+          box-shadow: 0 8px 24px rgba(44, 13, 16, 0.06);
+        }
+
+        .event-information-card h2 {
+          margin-bottom: 0.5rem;
+          color: var(--cm-bordeaux);
+          font-size: 1rem;
+          font-weight: 800;
+        }
+
+        .event-information-card p {
+          white-space: pre-line;
+          font-size: 0.875rem;
+          line-height: 1.7;
+        }
+
         .event-footer {
           background: var(--cm-dark);
           padding: 1.5rem 1.25rem;

@@ -8,6 +8,7 @@ import {
   type PlatformEvent,
 } from '@/app/actions/platform-events';
 import { X, Edit3, Save, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { EventHeaderMediaField } from './EventHeaderMediaField';
 
 interface Props {
   event: PlatformEvent;
@@ -28,6 +29,11 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
     venueAddress: event.venue_address || '',
     city: event.city || '',
     coverImageUrl: event.cover_image_url || '',
+    headerMediaType: event.header_media_type || 'logo' as 'logo' | 'banner',
+    headerMediaSize: event.header_media_size || 'medium' as 'small' | 'medium' | 'large' | 'full',
+    headerMediaPosition: event.header_media_position || 'center' as 'left' | 'center' | 'right',
+    badgeText: event.badge_text || 'Convite',
+    footerInformation: event.footer_information || '',
     registrationEnabled: event.registration_enabled ?? true,
     capacity: event.capacity !== null && event.capacity !== undefined ? String(event.capacity) : '',
     status: (event.status as 'published' | 'draft' | 'canceled' | 'archived') || 'published',
@@ -58,6 +64,11 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
           venueAddress: full.venue_address || '',
           city: full.city || '',
           coverImageUrl: full.cover_image_url || '',
+          headerMediaType: full.header_media_type || 'logo',
+          headerMediaSize: full.header_media_size || 'medium',
+          headerMediaPosition: full.header_media_position || 'center',
+          badgeText: full.badge_text || 'Convite',
+          footerInformation: full.footer_information || '',
           registrationEnabled: full.registration_enabled ?? true,
           capacity: full.capacity !== null && full.capacity !== undefined ? String(full.capacity) : '',
           status: (full.status as any) || 'published',
@@ -112,6 +123,11 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
       venueAddress: formData.venueAddress.trim() || null as any,
       city: formData.city.trim() || null as any,
       coverImageUrl: formData.coverImageUrl.trim() || null as any,
+      headerMediaType: formData.headerMediaType,
+      headerMediaSize: formData.headerMediaSize,
+      headerMediaPosition: formData.headerMediaPosition,
+      badgeText: formData.badgeText,
+      footerInformation: formData.footerInformation.trim() || null,
       registrationEnabled: formData.registrationEnabled,
       capacity: formData.capacity.trim() ? parseInt(formData.capacity, 10) : null,
       status: formData.status,
@@ -276,16 +292,28 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
               />
             </div>
 
-            {/* URL Capa */}
             <div className="aem-field aem-field--full">
-              <label htmlFor="aem-cover">URL da Imagem de Capa (Banner)</label>
-              <input
-                id="aem-cover"
-                type="url"
-                value={formData.coverImageUrl}
-                onChange={(e) => handleChange('coverImageUrl', e.target.value)}
-                placeholder="https://exemplo.com/imagem.jpg"
+              <EventHeaderMediaField
+                mediaType={formData.headerMediaType}
+                mediaSize={formData.headerMediaSize}
+                mediaPosition={formData.headerMediaPosition}
+                imageUrl={formData.coverImageUrl}
+                onMediaTypeChange={(value) => handleChange('headerMediaType', value)}
+                onMediaSizeChange={(value) => handleChange('headerMediaSize', value)}
+                onMediaPositionChange={(value) => handleChange('headerMediaPosition', value)}
+                onImageUrlChange={(value) => handleChange('coverImageUrl', value)}
               />
+            </div>
+
+            <div className="aem-field aem-field--full">
+              <label htmlFor="aem-badge">Texto do badge no convite</label>
+              <input id="aem-badge" type="text" maxLength={60} value={formData.badgeText} onChange={(e) => handleChange('badgeText', e.target.value)} placeholder="Ex.: Convite / Lançamento" />
+            </div>
+
+            <div className="aem-field aem-field--full">
+              <label htmlFor="aem-footer-information">Informações / contato / observações no final do RSVP</label>
+              <textarea id="aem-footer-information" rows={4} maxLength={1200} value={formData.footerInformation} onChange={(e) => handleChange('footerInformation', e.target.value)} placeholder={'Ex.: Dúvidas pelo WhatsApp (75) 99999-9999\nTraje: esporte fino\nEstacionamento disponível no local'} />
+              <span className="text-xs text-stone-500">Campo opcional. Será exibido abaixo do formulário de confirmação.</span>
             </div>
 
             {/* Capacidade */}

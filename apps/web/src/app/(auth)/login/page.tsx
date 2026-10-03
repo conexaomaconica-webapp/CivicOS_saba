@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, Building2, LayoutDashboard, Crown, LogOut, ArrowRight, Loader2, Lock, Mail, User } from 'lucide-react';
+import { ShieldCheck, Building2, LayoutDashboard, Crown, LogOut, ArrowRight, Loader2, Lock, Mail, User, Eye, EyeOff } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
@@ -15,6 +15,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -320,13 +321,22 @@ export default function LoginPage() {
           <Lock className="w-4 h-4 text-stone-400 absolute left-3 top-3.5" />
           <input
             id="password"
-            type="password"
+            type={showPassword ? 'text' : 'password'}
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Sua senha secreta"
-            className="w-full pl-9 pr-3 py-2.5 bg-[#1f0509]/80 border border-[#C9A227]/40 rounded-xl text-xs text-white placeholder-stone-500 outline-none focus:border-[#C9A227] focus:ring-1 focus:ring-[#C9A227]"
+            className="w-full pl-9 pr-11 py-2.5 bg-[#1f0509]/80 border border-[#C9A227]/40 rounded-xl text-xs text-white placeholder-stone-500 outline-none focus:border-[#C9A227] focus:ring-1 focus:ring-[#C9A227]"
           />
+          <button
+            type="button"
+            onClick={() => setShowPassword((current) => !current)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-stone-400 transition hover:text-[#C9A227] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C9A227]"
+            aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+            aria-pressed={showPassword}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
         </div>
       </div>
 

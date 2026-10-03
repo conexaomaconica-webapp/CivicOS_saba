@@ -13,13 +13,13 @@ describe('Asaas Config Hardening & Fail-Closed Validation', () => {
     process.env = originalEnv;
   });
 
-  it('1. Deve resolver ambiente sandbox para URL canônica sandbox.asaas.com', () => {
+  it('1. Deve resolver ambiente sandbox para URL canônica api-sandbox.asaas.com', () => {
     process.env.ASAAS_ENVIRONMENT = 'sandbox';
     delete process.env.ASAAS_API_BASE_URL;
 
     const config = getAsaasConfig();
     expect(config.environment).toBe('sandbox');
-    expect(config.baseUrl).toBe('https://sandbox.asaas.com/api/v3');
+    expect(config.baseUrl).toBe('https://api-sandbox.asaas.com/v3');
   });
 
   it('2. Deve resolver ambiente production para URL canônica api.asaas.com', () => {

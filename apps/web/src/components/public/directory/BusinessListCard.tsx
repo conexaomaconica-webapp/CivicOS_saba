@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Heart, Share2, Star, Crown, Award, ShieldCheck, Users, Map } from 'lucide-react';
 import { useFavorites } from '@/lib/directory/favorites-context';
-import { usePedraCardDisplay, type PedraCardDisplay } from '@/lib/directory/pedra-card-display-context';
+import { usePedraCardDisplay, usePedraHorizontalSeal, type PedraCardDisplay } from '@/lib/directory/pedra-card-display-context';
 import {
   type BusinessCardData,
   PEDRA_FUNDAMENTAL_SEAL,
@@ -57,6 +57,7 @@ function formatMasonicConnection(data: BusinessCardData): { title: string; lodge
 export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay }: BusinessListCardProps) {
   const { isFavorite, toggleFavorite } = useFavorites();
   const contextPedraDisplay = usePedraCardDisplay();
+  const pedraHorizontalSealUrl = usePedraHorizontalSeal();
   const [copiedShare, setCopiedShare] = useState(false);
   const favorited = isFavorite(data.slug);
 
@@ -234,8 +235,11 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay }: Busine
               title="Empresa com condecoração histórica de Pedra Fundamental"
             >
               <img
-                src={PEDRA_FUNDAMENTAL_HORIZONTAL_SEAL.primary}
+                src={pedraHorizontalSealUrl || PEDRA_FUNDAMENTAL_HORIZONTAL_SEAL.fallback}
                 alt="Pedra Fundamental"
+                onError={(event) => {
+                  event.currentTarget.src = PEDRA_FUNDAMENTAL_HORIZONTAL_SEAL.fallback;
+                }}
                 className="h-8 sm:h-9 max-w-[140px] sm:max-w-[160px] object-contain drop-shadow-xs"
               />
             </div>

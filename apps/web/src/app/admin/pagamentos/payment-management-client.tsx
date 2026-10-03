@@ -23,6 +23,7 @@ import {
   AdminPaymentsDashboardDTO,
   AdminPaymentListItem,
 } from '@/lib/admin/admin-payments-service';
+import { getCommercialPlanName } from '@/lib/admin/approval-display';
 
 export interface PaymentManagementClientProps {
   isAsaasConfigured: boolean;
@@ -275,7 +276,7 @@ export default function PaymentManagementClient({
                     {/* PLANO */}
                     <td className="py-3.5 px-4 text-center">
                       <span className="px-2.5 py-1 rounded-full bg-stone-100 text-stone-900 font-extrabold text-[10px] uppercase border border-stone-300">
-                        {item.plan_code}
+                        {getCommercialPlanName(item.plan_code)}
                       </span>
                     </td>
 
@@ -364,7 +365,7 @@ export default function PaymentManagementClient({
               </div>
               <div className="flex justify-between">
                 <span className="text-stone-600">Plano Comercial:</span>
-                <strong className="uppercase font-bold text-[#3B0B14]">{selectedPaymentDetail.plan_code}</strong>
+                <strong className="font-bold text-[#3B0B14]">{getCommercialPlanName(selectedPaymentDetail.plan_code)}</strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-stone-600">Valor Anual:</span>

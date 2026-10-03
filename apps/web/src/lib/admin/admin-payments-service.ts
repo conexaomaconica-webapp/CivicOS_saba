@@ -117,7 +117,7 @@ export async function getAdminPaymentsDashboardAction(params?: {
         const owner = biz?.owner_id ? profilesMap.get(biz.owner_id) : null;
 
         const planCode = sub?.plan_versions?.plans?.code || biz?.plan_tier || 'ouro';
-        const amountCents = inv.amount_cents || (inv.amount_due ? Math.round(inv.amount_due * 100) : 108000);
+        const amountCents = inv.amount_cents ?? (inv.amount_due ? Math.round(inv.amount_due * 100) : 0);
         const canonical = deriveCanonicalBillingStatus({
           invoiceStatus: inv.status,
           subscriptionStatus: sub?.status,
@@ -125,7 +125,7 @@ export async function getAdminPaymentsDashboardAction(params?: {
         });
         const status = canonical.status === 'paid' ? 'paid' : canonical.status === 'overdue' ? 'overdue' : canonical.status === 'failed' ? 'failed' : 'pending';
         const gatewayStatus = status === 'paid' ? 'RECEIVED' : status === 'overdue' ? 'OVERDUE' : 'PENDING';
-        const platformStatus = sub?.status || 'active';
+        const platformStatus = sub?.status || 'pending';
 
         const hasDivergence = gatewayStatus === 'RECEIVED' && platformStatus === 'past_due';
 
@@ -141,7 +141,7 @@ export async function getAdminPaymentsDashboardAction(params?: {
           payment_method: inv.payment_method === 'pix' ? 'pix' : 'credit_card',
           installments: 1,
           due_date: inv.due_date || inv.created_at,
-          paid_at: inv.paid_at || (status === 'paid' ? inv.created_at : undefined),
+          paid_at: inv.paid_at || undefined,
           status,
           gateway_status: gatewayStatus,
           platform_status: platformStatus,
@@ -162,40 +162,6 @@ export async function getAdminPaymentsDashboardAction(params?: {
             amount_cents: amountCents,
           });
         }
-      }
-    } else if (subscriptions.length > 0) {
-      // Quando não há faturas avulsas, gera os itens a partir das assinaturas do banco
-      for (const sub of subscriptions) {
-        const biz = (businesses || []).find((b: any) => b.id === sub.business_id);
-        const owner = biz?.owner_id ? profilesMap.get(biz.owner_id) : null;
-
-        const planCode = sub?.plan_versions?.plans?.code || biz?.plan_tier || 'ouro';
-        const isActive = sub.status === 'active';
-        const amountCents = planCode === 'ouro' || planCode === 'acacia' ? 108000 : planCode === 'prata' || planCode === 'compasso' ? 85500 : 63500;
-        const status = isActive ? 'paid' : 'pending';
-        const gatewayStatus = isActive ? 'RECEIVED' : 'PENDING';
-        const platformStatus = sub.status || 'active';
-
-        items.push({
-          id: sub.id,
-          asaas_payment_id: `sub_${sub.id.slice(0, 8)}`,
-          business_id: sub.business_id,
-          business_name: biz?.name || 'Empresa Anunciante',
-          owner_name: (owner as any)?.name || 'Anunciante Titular',
-          owner_email: (owner as any)?.email || biz?.email || 'contato@anunciante.com',
-          plan_code: planCode,
-          amount_cents: amountCents,
-          payment_method: 'credit_card',
-          installments: 1,
-          due_date: sub.created_at,
-          paid_at: isActive ? sub.created_at : undefined,
-          status,
-          gateway_status: gatewayStatus,
-          platform_status: platformStatus,
-          has_divergence: false,
-          last_event_title: `${gatewayStatus} · Assinatura Ativa`,
-          created_at: sub.created_at,
-        });
       }
     }
 
@@ -227,10 +193,18 @@ export async function getAdminPaymentsDashboardAction(params?: {
     const activeSubs = (subscriptions || []).filter((s: any) => s.status === 'active');
     const activeSubscriptionsCount = activeSubs.length;
 
-    // Recebido no Mês: R$ 90,00 por mês por assinatura ativa (R$ 270,00 no total)
-    const monthlyReceivedBrl = invoiceList.length > 0
-      ? items.filter((i) => i.status === 'paid').reduce((acc, curr) => acc + curr.amount_cents / 100, 0)
-      : activeSubs.length * 90;
+    // Receita realizada: somente faturas realmente pagas no mês corrente.
+    // Assinatura ativa, publicação ou cadastro não comprovam recebimento.
+    const now = new Date();
+    const monthlyReceivedBrl = items
+      .filter((item) => {
+        if (item.status !== 'paid' || !item.paid_at) return false;
+        const paidAt = new Date(item.paid_at);
+        return !Number.isNaN(paidAt.getTime())
+          && paidAt.getFullYear() === now.getFullYear()
+          && paidAt.getMonth() === now.getMonth();
+      })
+      .reduce((total, item) => total + item.amount_cents / 100, 0);
 
     const toReceiveBrl = items
       .filter((i) => i.status === 'pending')

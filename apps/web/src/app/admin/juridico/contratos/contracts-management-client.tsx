@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Scale,
   FileText,
@@ -15,12 +15,86 @@ import {
   Plus,
   Lock,
 } from 'lucide-react';
+import { publishManagedDocumentAction } from '@/lib/contracts/legal-document-management-service';
 
-export default function ContractsManagementClient() {
-  const [selectedDocType, setSelectedDocType] = useState<'anunciante' | 'termos' | 'privacidade'>('anunciante');
+type DocumentType = 'anunciante' | 'termos' | 'privacidade';
+
+const DOCUMENT_META: Record<DocumentType, { title: string; description: string; defaultText: string }> = {
+  anunciante: {
+    title: 'Contrato de Prestação de Serviços de Publicidade e Presença Comercial Digital',
+    description: 'Modelo utilizado nos novos aceites do anunciante e no fluxo comercial.',
+    defaultText: '',
+  },
+  termos: {
+    title: 'Termos de Uso da Plataforma',
+    description: 'Regras gerais aplicáveis aos usuários e à utilização da plataforma.',
+    defaultText: `TERMOS DE USO DA PLATAFORMA CONEXÃO MAÇÔNICA
+
+Versão: v1.0
+
+1. ACEITAÇÃO DOS TERMOS
+Ao acessar ou utilizar a plataforma Conexão Maçônica, o usuário declara ter lido, compreendido e aceitado estes Termos de Uso.
+
+2. FINALIDADE DA PLATAFORMA
+A plataforma promove conexão institucional, divulgação de empresas, serviços, eventos e conteúdos destinados à comunidade atendida.
+
+3. RESPONSABILIDADES DO USUÁRIO
+O usuário deve fornecer informações verdadeiras, preservar suas credenciais e utilizar os recursos de forma lícita, ética e compatível com a finalidade da plataforma.
+
+4. CONTEÚDOS E CONDUTAS VEDADAS
+É proibida a publicação de conteúdo ilícito, enganoso, ofensivo, discriminatório ou que viole direitos de terceiros.
+
+5. DISPONIBILIDADE E ALTERAÇÕES
+Funcionalidades podem ser atualizadas, suspensas ou ajustadas para manutenção, segurança ou evolução do serviço.
+
+6. PROPRIEDADE INTELECTUAL
+Marcas, interfaces, textos, sistemas e demais ativos permanecem sob titularidade dos respectivos proprietários.
+
+7. DISPOSIÇÕES GERAIS
+Estes termos são regidos pela legislação brasileira e devem ser interpretados em conjunto com a Política de Privacidade vigente.`,
+  },
+  privacidade: {
+    title: 'Política de Privacidade e Proteção de Dados — LGPD',
+    description: 'Documento sobre coleta, finalidade, segurança e direitos dos titulares de dados.',
+    defaultText: `POLÍTICA DE PRIVACIDADE E PROTEÇÃO DE DADOS — LGPD
+
+Versão: v1.0
+
+1. COMPROMISSO COM A PRIVACIDADE
+A Conexão Maçônica trata dados pessoais de forma transparente, segura e compatível com a Lei nº 13.709/2018 (LGPD).
+
+2. DADOS TRATADOS
+Podem ser tratados dados cadastrais, profissionais, empresariais, de contato, autenticação, uso da plataforma e registros necessários à segurança e auditoria.
+
+3. FINALIDADES E BASES LEGAIS
+Os dados são utilizados para prestação dos serviços, cumprimento de obrigações legais, execução contratual, segurança, prevenção a fraudes e exercício regular de direitos.
+
+4. COMPARTILHAMENTO
+O compartilhamento ocorre apenas quando necessário à operação, por obrigação legal ou com fornecedores sujeitos a deveres de segurança e confidencialidade.
+
+5. SEGURANÇA E RETENÇÃO
+São adotadas medidas técnicas e administrativas razoáveis. Os dados são mantidos pelo período necessário às finalidades informadas e às obrigações aplicáveis.
+
+6. DIREITOS DO TITULAR
+O titular poderá solicitar confirmação, acesso, correção, informação sobre compartilhamento e demais direitos previstos na LGPD.
+
+7. CONTATO
+Solicitações relacionadas à privacidade devem ser encaminhadas pelos canais oficiais disponibilizados pela Conexão Maçônica.`,
+  },
+};
+
+export default function ContractsManagementClient({
+  initialDocType = 'anunciante',
+  initialDocuments,
+}: {
+  initialDocType?: DocumentType;
+  initialDocuments?: Partial<Record<DocumentType, { version: string; text: string }>>;
+}) {
+  const [selectedDocType, setSelectedDocType] = useState<DocumentType>(initialDocType);
   const [showEditorModal, setShowEditorModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // Modelo ativo v1.0
   const [activeVersion, setActiveVersion] = useState('v1.0');
@@ -136,8 +210,23 @@ CLÁUSULA 18 — DA LEGISLAÇÃO E DO FORO
 
 E, por manifestação eletrônica de vontade, o ANUNCIANTE declara que teve acesso ao conteúdo integral deste instrumento e concorda com seus termos.`);
 
-  const [editText, setEditText] = useState(activeContractText);
+  const [documents, setDocuments] = useState<Record<DocumentType, { version: string; text: string }>>(() => ({
+    anunciante: initialDocuments?.anunciante ?? { version: 'v1.0', text: activeContractText },
+    termos: initialDocuments?.termos ?? { version: 'v1.0', text: DOCUMENT_META.termos.defaultText },
+    privacidade: initialDocuments?.privacidade ?? { version: 'v1.0', text: DOCUMENT_META.privacidade.defaultText },
+  }));
+  const [editText, setEditText] = useState(
+    initialDocType === 'anunciante' ? activeContractText : DOCUMENT_META[initialDocType].defaultText
+  );
   const [newVersionTag, setNewVersionTag] = useState('v1.1');
+
+  useEffect(() => {
+    const initialDocument = documents[initialDocType];
+    setActiveVersion(initialDocument.version);
+    setActiveContractText(initialDocument.text);
+    setEditText(initialDocument.text);
+    setNewVersionTag(`v${(Number(initialDocument.version.replace(/^v/, '')) + 0.1).toFixed(1)}`);
+  }, [initialDocType]);
 
   const variablesList = [
     { name: '{{empresa_anunciante}}', desc: 'Nome Fantasia / Razão Social da Empresa Anunciante' },
@@ -155,11 +244,33 @@ E, por manifestação eletrônica de vontade, o ANUNCIANTE declara que teve aces
     { version: 'v0.9 (Legado)', date: '15/05/2026', status: 'Arquivado (Substituído)', count: 'Congelado para contratos antigos' },
   ];
 
-  const handlePublishNewVersion = () => {
-    setActiveVersion(newVersionTag);
-    setActiveContractText(editText);
+  const selectDocumentType = (nextType: DocumentType) => {
+    const nextDocument = documents[nextType];
+    setSelectedDocType(nextType);
+    setActiveVersion(nextDocument.version);
+    setActiveContractText(nextDocument.text);
+    setEditText(nextDocument.text);
+    setNewVersionTag(`v${(Number(nextDocument.version.replace(/^v/, '')) + 0.1).toFixed(1)}`);
+    setMessage(null);
+  };
+
+  const handlePublishNewVersion = async () => {
+    setIsPublishing(true);
+    setMessage(null);
+    const result = await publishManagedDocumentAction({ type: selectedDocType, version: newVersionTag, text: editText });
+    setIsPublishing(false);
+    if (!result.success || !result.document) {
+      setMessage({ type: 'error', text: result.error || 'Falha ao publicar a nova versão.' });
+      return;
+    }
+    setActiveVersion(result.document.version);
+    setActiveContractText(result.document.text);
+    setDocuments((current) => ({
+      ...current,
+      [selectedDocType]: result.document!,
+    }));
     setShowEditorModal(false);
-    setMessage({ type: 'success', text: `Nova versão contratual ${newVersionTag} publicada com sucesso! Os novos anunciantes passarão a assinar este modelo.` });
+    setMessage({ type: 'success', text: `Nova versão ${result.document.version} publicada e salva com sucesso.` });
   };
 
   const handlePrintTemplatePDF = () => {
@@ -282,7 +393,7 @@ E, por manifestação eletrônica de vontade, o ANUNCIANTE declara que teve aces
       <div className="flex gap-2 border-b border-stone-200 pb-2">
         <button
           type="button"
-          onClick={() => setSelectedDocType('anunciante')}
+          onClick={() => selectDocumentType('anunciante')}
           className={`px-4 py-2 text-xs font-bold font-serif rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
             selectedDocType === 'anunciante'
               ? 'bg-[#3B0B14] text-[#C9A227] shadow-sm'
@@ -294,7 +405,7 @@ E, por manifestação eletrônica de vontade, o ANUNCIANTE declara que teve aces
 
         <button
           type="button"
-          onClick={() => setSelectedDocType('termos')}
+          onClick={() => selectDocumentType('termos')}
           className={`px-4 py-2 text-xs font-bold font-serif rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
             selectedDocType === 'termos'
               ? 'bg-[#3B0B14] text-[#C9A227] shadow-sm'
@@ -306,7 +417,7 @@ E, por manifestação eletrônica de vontade, o ANUNCIANTE declara que teve aces
 
         <button
           type="button"
-          onClick={() => setSelectedDocType('privacidade')}
+          onClick={() => selectDocumentType('privacidade')}
           className={`px-4 py-2 text-xs font-bold font-serif rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
             selectedDocType === 'privacidade'
               ? 'bg-[#3B0B14] text-[#C9A227] shadow-sm'
@@ -326,10 +437,10 @@ E, por manifestação eletrônica de vontade, o ANUNCIANTE declara que teve aces
               <div>
                 <h3 className="font-serif font-bold text-base text-stone-900 flex items-center gap-2">
                   <FileText className="w-5 h-5 text-[#3B0B14]" />
-                  <span>Modelo de Contrato Vigente ({activeVersion})</span>
+                  <span>{DOCUMENT_META[selectedDocType].title} ({activeVersion})</span>
                 </h3>
                 <p className="text-xs text-stone-500 font-serif mt-0.5">
-                  Este modelo é utilizado para novos aceites no Onboarding (Passo 7) e no Admin 360º.
+                  {DOCUMENT_META[selectedDocType].description}
                 </p>
               </div>
 
@@ -365,7 +476,7 @@ E, por manifestação eletrônica de vontade, o ANUNCIANTE declara que teve aces
               {/* Faixa de Destaque do Título */}
               <div className="text-center py-2.5 px-4 bg-[#3B0B14]/5 border-y-2 border-[#3B0B14]/20 rounded-xl my-3">
                 <h5 className="font-serif font-extrabold text-sm text-[#3B0B14] uppercase tracking-wide">
-                  Contrato de Prestação de Serviços de Publicidade e Presença Comercial Digital
+                  {DOCUMENT_META[selectedDocType].title}
                 </h5>
               </div>
 
@@ -478,9 +589,10 @@ E, por manifestação eletrônica de vontade, o ANUNCIANTE declara que teve aces
               <button
                 type="button"
                 onClick={handlePublishNewVersion}
-                className="px-5 py-2 bg-[#3B0B14] hover:bg-[#5d1523] text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-md"
+                disabled={isPublishing}
+                className="px-5 py-2 bg-[#3B0B14] hover:bg-[#5d1523] disabled:opacity-60 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-md"
               >
-                <CheckCircle2 className="w-4 h-4 text-[#C9A227]" /> Publicar Versão {newVersionTag}
+                <CheckCircle2 className="w-4 h-4 text-[#C9A227]" /> {isPublishing ? 'Publicando...' : `Publicar Versão ${newVersionTag}`}
               </button>
             </div>
           </div>

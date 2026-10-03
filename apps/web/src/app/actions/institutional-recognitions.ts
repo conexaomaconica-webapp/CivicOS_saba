@@ -475,3 +475,31 @@ export async function getPedraFundamentalCardDisplayAction(): Promise<'circular_
   }
 }
 
+export async function getPedraFundamentalCardConfigAction(): Promise<{
+  display: 'circular_seal' | 'horizontal_seal' | 'badge_text';
+  horizontalSealUrl: string;
+}> {
+  const fallback = {
+    display: 'circular_seal' as const,
+    horizontalSealUrl: '/selos/pedra-fundamental.svg',
+  };
+
+  try {
+    const res = await getInstitutionalRecognitionsAction();
+    const pedra = res.data?.find((recognition) => recognition.key === 'pedra_fundamental');
+    if (!pedra) return fallback;
+
+    return {
+      display: pedra.card_display || fallback.display,
+      horizontalSealUrl:
+        pedra.compactSealUrl
+        || pedra.compact_seal_url
+        || pedra.sealUrl
+        || pedra.seal_url
+        || fallback.horizontalSealUrl,
+    };
+  } catch {
+    return fallback;
+  }
+}
+

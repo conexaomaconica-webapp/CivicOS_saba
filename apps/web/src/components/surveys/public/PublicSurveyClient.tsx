@@ -219,14 +219,22 @@ export function PublicSurveyClient({ survey }: Props) {
       {/* Main Form Content */}
       <div className="ps-card">
         {/* Survey Title Header */}
-        <div className="ps-header">
+        {survey.banner_url && (
+          <div className="ps-banner-wrap">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={survey.banner_url} alt={`Banner da pesquisa ${survey.title}`} className="ps-banner-img" />
+          </div>
+        )}
+        <div className="ps-header" style={{ backgroundColor: survey.header_color || '#4B161B' }}>
           {survey.show_logo !== false ? (
-            <div className="ps-logo-container">
+            <div className={`ps-logo-row ps-logo-row--${survey.logo_position || 'center'}`}>
+              <div className={`ps-logo-container ps-logo-container--${survey.logo_size || 'medium'}`}>
               <img
                 src={survey.logo_url || '/logoconexao_red.png'}
                 alt="Conexão Maçônica"
                 className="ps-logo-img"
               />
+              </div>
             </div>
           ) : (
             <span className="ps-badge">Conexão Maçônica</span>
@@ -447,13 +455,26 @@ export function PublicSurveyClient({ survey }: Props) {
         .ps-progress-track { height: 6px; background: rgba(255,255,255,0.15); border-radius: 4px; overflow: hidden; }
         .ps-progress-fill { height: 100%; background: linear-gradient(90deg, #C9A227 0%, #E6C659 100%); transition: width 0.3s ease; }
 
-        .ps-card { background: #FFFFFF; border: 1px solid #E5E0D8; border-radius: 20px; padding: 2rem 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.04); }
-        .ps-header { text-align: center; border-bottom: 1px solid #F0ECE6; padding-bottom: 1.5rem; margin-bottom: 1.5rem; }
-        .ps-logo-container { display: flex; justify-content: center; align-items: center; margin-bottom: 1rem; }
-        .ps-logo-img { max-height: 64px; max-width: 260px; width: auto; height: auto; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05)); }
+        .ps-card { background: #FFFFFF; border: 1px solid #E5E0D8; border-radius: 20px; padding: 0 1.5rem 2rem; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.04); }
+        .ps-banner-wrap { margin: 0 -1.5rem; overflow: hidden; }
+        .ps-banner-img { display: block; width: 100%; aspect-ratio: 3 / 1; object-fit: cover; }
+        .ps-header { text-align: center; margin: 0 -1.5rem 1.5rem; padding: 1.75rem 1.5rem; }
+        .ps-logo-row { display: flex; margin-bottom: 1rem; }
+        .ps-logo-row--left { justify-content: flex-start; }
+        .ps-logo-row--center { justify-content: center; }
+        .ps-logo-row--right { justify-content: flex-end; }
+        .ps-logo-container { display: flex; justify-content: center; align-items: center; max-width: 100%; }
+        .ps-logo-container--small { width: 180px; }
+        .ps-logo-container--medium { width: 320px; }
+        .ps-logo-container--large { width: 480px; }
+        .ps-logo-container--full { width: 100%; }
+        .ps-logo-img { max-height: 300px; max-width: 100%; width: 100%; height: auto; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.12)); }
+        .ps-logo-container--small .ps-logo-img { max-height: 80px; }
+        .ps-logo-container--medium .ps-logo-img { max-height: 130px; }
+        .ps-logo-container--large .ps-logo-img { max-height: 210px; }
         .ps-badge { display: inline-block; background: #3B0B14; color: #C9A227; font-size: 0.6875rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; padding: 0.25rem 0.625rem; border-radius: 6px; margin-bottom: 0.5rem; }
-        .ps-title { font-size: 1.5rem; font-weight: 800; color: #1C0D10; margin: 0 0 0.5rem; }
-        .ps-subtitle { font-size: 0.875rem; color: #6B5E62; margin: 0; line-height: 1.5; }
+        .ps-title { font-size: 1.5rem; font-weight: 800; color: #FFFFFF; margin: 0 0 0.5rem; }
+        .ps-subtitle { font-size: 0.875rem; color: rgba(255,255,255,0.82); margin: 0; line-height: 1.5; }
 
         .ps-alert-error { display: flex; align-items: center; gap: 0.5rem; background: #FEF2F2; color: #991B1B; border: 1px solid #FCA5A5; padding: 0.75rem 1rem; border-radius: 10px; font-size: 0.875rem; font-weight: 600; margin-bottom: 1.5rem; }
 

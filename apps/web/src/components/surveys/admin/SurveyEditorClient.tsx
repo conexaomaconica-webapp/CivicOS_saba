@@ -44,7 +44,10 @@ import {
   updateSurveyDetailsAction,
   moveQuestionToBlockAction,
   reorderSurveyQuestionsAction,
+  uploadSurveyBrandAssetAction,
 } from '@/app/actions/surveys';
+import { optimizeImageForUpload } from '@/lib/media/optimize-image';
+import { systemConfirm } from '@/components/system/SystemFeedback';
 
 function cleanBlockTitle(title: string): string {
   return title.replace(/^BLOCO\s+[A-Z]\s*[-–—:]\s*/i, '').trim();
@@ -71,6 +74,9 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
       : 'official'
   );
   const [editLogoUrl, setEditLogoUrl] = useState(survey.logo_url || '/logoconexao_red.png');
+  const [editHeaderColor, setEditHeaderColor] = useState(survey.header_color || '#4B161B');
+  const [editBannerUrl, setEditBannerUrl] = useState(survey.banner_url || '');
+  const [uploadingBrandAsset, setUploadingBrandAsset] = useState<'logo' | 'banner' | null>(null);
 
   // Preview Drawer State
   const [showPreview, setShowPreview] = useState(false);
@@ -171,7 +177,12 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
 
   // Delete Question
   const handleDeleteQuestion = async (questionId: string) => {
-    if (!confirm('Deseja realmente excluir esta pergunta do questionário?')) return;
+    if (!(await systemConfirm({
+      title: 'Excluir pergunta',
+      message: 'Deseja realmente excluir esta pergunta do questionário?',
+      confirmLabel: 'Excluir pergunta',
+      danger: true,
+    }))) return;
     setSaving(true);
     setMessage(null);
     const res = await deleteSurveyQuestionAction(survey.id, questionId);
@@ -186,7 +197,12 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
 
   // Delete Block
   const handleDeleteBlock = async (blockId: string) => {
-    if (!confirm('Deseja excluir esta seção e todas as perguntas dentro dela?')) return;
+    if (!(await systemConfirm({
+      title: 'Excluir seção',
+      message: 'Deseja excluir esta seção e todas as perguntas dentro dela?',
+      confirmLabel: 'Excluir seção',
+      danger: true,
+    }))) return;
     setSaving(true);
     setMessage(null);
     const res = await deleteSurveyBlockAction(survey.id, blockId);
@@ -216,7 +232,12 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
       : null;
 
     if (editingQuestion.id && originalBlockId && originalBlockId !== selectedBlockId) {
-      await moveQuestionToBlockAction(survey.id, editingQuestion.id, selectedBlockId);
+      const moveResult = await moveQuestionToBlockAction(survey.id, editingQuestion.id, selectedBlockId);
+      if (!moveResult.success) {
+        setSaving(false);
+        setMessage({ type: 'error', text: moveResult.error || 'Erro ao mover a pergunta para outra seção.' });
+        return;
+      }
     }
 
     const res = await saveSurveyQuestionAction(survey.id, {
@@ -234,7 +255,16 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
 
     setSaving(false);
 
-    if (res.success) {
+    if (res.success && res.question) {
+      setSurvey((current) => ({
+        ...current,
+        blocks: current.blocks?.map((block) => {
+          const withoutSavedQuestion = (block.questions || []).filter((question) => question.id !== res.question!.id);
+          return block.id === res.question!.block_id
+            ? { ...block, questions: [...withoutSavedQuestion, res.question!].sort((a, b) => a.order_index - b.order_index) }
+            : { ...block, questions: withoutSavedQuestion };
+        }),
+      }));
       setEditingQuestion(null);
       setMessage({ type: 'success', text: 'Pergunta salva no rascunho com sucesso!' });
       router.refresh();
@@ -391,6 +421,8 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
     const isCustom = survey.logo_url && survey.logo_url !== '/logoconexao_red.png';
     setEditLogoMode(survey.show_logo === false ? 'none' : isCustom ? 'custom' : 'official');
     setEditLogoUrl(survey.logo_url || '/logoconexao_red.png');
+    setEditHeaderColor(survey.header_color || '#4B161B');
+    setEditBannerUrl(survey.banner_url || '');
     setShowEditSurveyModal(true);
   };
 
@@ -415,6 +447,8 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
       slug: editSlug.trim() || undefined,
       logo_url: logoUrl,
       show_logo: showLogo,
+      header_color: editHeaderColor,
+      banner_url: editBannerUrl.trim() || null,
     });
     setSaving(false);
 
@@ -426,6 +460,8 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
         slug: editSlug.trim() || prev.slug,
         logo_url: logoUrl,
         show_logo: showLogo,
+        header_color: editHeaderColor,
+        banner_url: editBannerUrl.trim() || null,
       }));
       setShowEditSurveyModal(false);
       setMessage({ type: 'success', text: 'Título, texto e logomarca da pesquisa atualizados com sucesso!' });
@@ -434,9 +470,38 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
     }
   };
 
+  const handleBrandAssetUpload = async (file: File | undefined, target: 'logo' | 'banner') => {
+    if (!file) return;
+    setUploadingBrandAsset(target);
+    setMessage(null);
+    try {
+      const optimized = await optimizeImageForUpload(file, { maxBytes: 4.5 * 1024 * 1024, maxDimension: target === 'logo' ? 1400 : 2400 });
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Falha ao ler a imagem.'));
+        reader.readAsDataURL(optimized);
+      });
+      const result = await uploadSurveyBrandAssetAction(dataUrl);
+      if (!result.success || !result.data) throw new Error(result.error || 'Falha no upload.');
+      if (target === 'logo') {
+        setEditLogoMode('custom');
+        setEditLogoUrl(result.data.url);
+      } else setEditBannerUrl(result.data.url);
+    } catch (error) {
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Falha no upload.' });
+    } finally {
+      setUploadingBrandAsset(null);
+    }
+  };
+
   // Publish New Version Snapshot
   const handlePublishVersion = async () => {
-    if (!confirm('Deseja publicar uma nova versão com todas as alterações do rascunho? A nova versão ficará disponível imediatamente para o público.')) return;
+    if (!(await systemConfirm({
+      title: 'Publicar nova versão',
+      message: 'Deseja publicar uma nova versão com todas as alterações do rascunho? A nova versão ficará disponível imediatamente para o público.',
+      confirmLabel: 'Publicar versão',
+    }))) return;
 
     setPublishing(true);
     setMessage(null);
@@ -1291,6 +1356,11 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
                       placeholder="https://exemplo.com/logotipo.png ou /logoconexao_red.png"
                       required
                     />
+                    <label className="se-btn-cancel" style={{ marginTop: '0.5rem', display: 'inline-flex', cursor: 'pointer' }}>
+                      {uploadingBrandAsset === 'logo' ? <Loader2 size={15} className="animate-spin" /> : <ImageIcon size={15} />}
+                      {uploadingBrandAsset === 'logo' ? ' Enviando...' : ' Fazer upload da logomarca'}
+                      <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={uploadingBrandAsset !== null} onChange={(e) => void handleBrandAssetUpload(e.target.files?.[0], 'logo')} />
+                    </label>
                   </div>
                 )}
 
@@ -1311,6 +1381,27 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
                     )}
                   </div>
                 </div>
+              </div>
+
+              <div className="se-field">
+                <label className="se-label" htmlFor="survey-header-color">Cor do cabeçalho</label>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  <input id="survey-header-color" type="color" value={editHeaderColor} onChange={(e) => setEditHeaderColor(e.target.value)} style={{ width: 52, height: 42, border: '1px solid #E5E0D8', borderRadius: 8, padding: 3 }} />
+                  <input className="se-input" value={editHeaderColor} onChange={(e) => setEditHeaderColor(e.target.value)} pattern="#[0-9A-Fa-f]{6}" placeholder="#4B161B" />
+                </div>
+                <small style={{ color: '#6B7280', fontSize: '0.75rem' }}>O bordô institucional é usado como padrão.</small>
+              </div>
+
+              <div className="se-field">
+                <label className="se-label">Banner opcional no topo</label>
+                <input className="se-input" value={editBannerUrl} onChange={(e) => setEditBannerUrl(e.target.value)} placeholder="URL do banner ou faça o upload abaixo" />
+                <label className="se-btn-cancel" style={{ marginTop: '0.5rem', display: 'inline-flex', cursor: 'pointer' }}>
+                  {uploadingBrandAsset === 'banner' ? <Loader2 size={15} className="animate-spin" /> : <ImageIcon size={15} />}
+                  {uploadingBrandAsset === 'banner' ? ' Enviando...' : ' Fazer upload do banner'}
+                  <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={uploadingBrandAsset !== null} onChange={(e) => void handleBrandAssetUpload(e.target.files?.[0], 'banner')} />
+                </label>
+                {editBannerUrl && <div style={{ marginTop: '0.75rem', overflow: 'hidden', borderRadius: 10 }}><img src={editBannerUrl} alt="Prévia do banner" style={{ width: '100%', aspectRatio: '3 / 1', objectFit: 'cover', display: 'block' }} /></div>}
+                {editBannerUrl && <button type="button" className="se-btn-cancel" style={{ marginTop: '0.5rem' }} onClick={() => setEditBannerUrl('')}>Remover banner</button>}
               </div>
 
               {/* Botões de Ação */}

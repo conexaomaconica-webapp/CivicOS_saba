@@ -30,7 +30,10 @@ export async function saveDirectoryHomeSettingsAction(input: DirectoryHomeSettin
       .eq('id', authData.user.id)
       .maybeSingle();
 
-    const tenantId = profile?.tenant_id || '00000000-0000-0000-0000-000000000010';
+    const tenantId = profile?.tenant_id;
+    if (!tenantId) {
+      return { success: false, error: 'Tenant do administrador não identificado. Nenhuma configuração foi alterada.' };
+    }
 
     // Mesclar speed e logo_style em sections_config para o bloco sponsored como garantia
     const updatedSections = (input.sections_config || []).map((sec: any) => {
@@ -63,7 +66,12 @@ export async function saveDirectoryHomeSettingsAction(input: DirectoryHomeSettin
       .upsert(payload, { onConflict: 'tenant_id' });
 
     // Fallback gracioso se colunas ainda não existirem no schema do banco
-    if (error && (error.code === '42703' || error.message?.includes('does not exist'))) {
+    if (error && (
+      error.code === '42703'
+      || error.code === 'PGRST204'
+      || error.message?.includes('does not exist')
+      || error.message?.includes('schema cache')
+    )) {
       delete payload.sponsored_marquee_speed;
       delete payload.sponsored_logo_style;
       const retry = await (supabase as any)
@@ -75,6 +83,27 @@ export async function saveDirectoryHomeSettingsAction(input: DirectoryHomeSettin
     if (error) {
       console.error('Erro ao salvar directory_home_settings:', error);
       return { success: false, error: error.message };
+    }
+
+    const { data: savedSettings, error: verificationError } = await (supabase as any)
+      .from('directory_home_settings')
+      .select('hero_title, hero_subtitle, hero_search_placeholder, default_page_size')
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (verificationError || !savedSettings) {
+      return {
+        success: false,
+        error: `A configuração foi enviada, mas não pôde ser confirmada: ${verificationError?.message || 'registro não encontrado'}`,
+      };
+    }
+
+    if (
+      savedSettings.hero_title !== input.hero_title
+      || savedSettings.hero_subtitle !== input.hero_subtitle
+      || savedSettings.hero_search_placeholder !== input.hero_search_placeholder
+    ) {
+      return { success: false, error: 'O banco não confirmou os novos textos da Hero.' };
     }
 
     // INVALIDA O CACHE DO NEXT.JS DA PÁGINA PÚBLICA /guia PARA ATUALIZAR O HERO EM TEMPO REAL
@@ -109,7 +138,10 @@ export async function updateSponsoredSettingsAction(input: UpdateSponsoredSettin
       .eq('id', authData.user.id)
       .maybeSingle();
 
-    const tenantId = profile?.tenant_id || '00000000-0000-0000-0000-000000000010';
+    const tenantId = profile?.tenant_id;
+    if (!tenantId) {
+      return { success: false, error: 'Tenant do administrador não identificado. Nenhuma configuração foi alterada.' };
+    }
 
     // Busca configurações existentes para preservar os dados de hero e seções
     const { data: existing } = await (supabase as any)
@@ -131,6 +163,17 @@ export async function updateSponsoredSettingsAction(input: UpdateSponsoredSettin
         }
         return sec;
       });
+
+      if (!updatedSections.some((sec: any) => sec.id === 'sponsored')) {
+        updatedSections.push({
+          id: 'sponsored',
+          enabled: true,
+          order: 4,
+          display_mode: input.mode,
+          speed: input.speed ?? 45,
+          logo_style: input.logoStyle ?? 'standard',
+        });
+      }
     }
 
     const payload: any = {

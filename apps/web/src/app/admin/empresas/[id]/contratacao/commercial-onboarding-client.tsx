@@ -36,6 +36,7 @@ import type { AdminBusiness360DTO } from '@/lib/admin/admin-businesses-service';
 import {
   confirmAdminCommercialTermsAction,
   saveAdminBusinessContractAddressAction,
+  reconcileMasonicCommercialStatus,
 } from '@/lib/admin/admin-businesses-service';
 import { formatCentsToReais } from '@/lib/billing/plans-service';
 import { MASONIC_ELIGIBILITY_TYPE_LABELS } from '@/lib/masonic/masonic-links-service';
@@ -334,6 +335,27 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
   const hasMasonicStatusMismatch =
     isMasonicVerified &&
     ['pre_cadastro', 'vinculo_informado'].includes(business.commercial_status || 'pre_cadastro');
+
+  const [isSyncingStatus, setIsSyncingStatus] = useState<boolean>(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const handleSyncMasonicStatus = async () => {
+    setIsSyncingStatus(true);
+    setSyncError(null);
+    try {
+      const res = await reconcileMasonicCommercialStatus(business.id);
+      if (!res.success) {
+        setSyncError(res.error || 'Falha ao sincronizar status.');
+        return;
+      }
+      if (res.commercial_status) setCommercialStatus(res.commercial_status);
+      setFeedback({ type: 'success', message: 'Status comercial sincronizado para Vínculo verificado.' });
+      router.refresh();
+    } catch (err: any) {
+      setSyncError(err?.message || 'Erro inesperado ao sincronizar status.');
+    } finally {
+      setIsSyncingStatus(false);
+    }
+  };
 
   // Detecção de alterações em relação ao que foi formalmente gravado
   const isDirty = useMemo(() => {
@@ -896,13 +918,31 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
       )}
 
       {hasMasonicStatusMismatch && (
-        <div className="flex items-start gap-3 rounded-2xl bg-sky-50 p-4 border border-sky-200 text-sky-950 text-xs">
-          <ShieldCheck className="h-5 w-5 shrink-0 text-sky-700" />
+        <div className="flex items-start gap-3 rounded-2xl bg-amber-50 p-4 border border-amber-300 text-amber-950 text-xs">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
           <div className="space-y-1">
-            <p className="font-bold text-sm">Vínculo verificado — sincronização comercial pendente</p>
-            <p className="text-sky-800">
-              O vínculo está aprovado. Ao conferir os dados comerciais, o status legado será sincronizado automaticamente para Vínculo verificado e o fluxo avançará normalmente.
+            <p className="font-bold text-sm">Inconsistência de ativação detectada</p>
+            <p className="text-amber-800">
+              O vínculo maçônico está <strong className="font-semibold">verificado</strong>, mas o status comercial ainda está em{' '}
+              <strong className="font-semibold">
+                {COMMERCIAL_STATUS_LABELS[(business.commercial_status || 'pre_cadastro') as keyof typeof COMMERCIAL_STATUS_LABELS] ||
+                  business.commercial_status}
+              </strong>
+              .
             </p>
+            {syncError && <p className="text-rose-700 font-semibold">{syncError}</p>}
+            <div className="pt-2">
+              <button
+                id="sync-masonic-commercial-status"
+                type="button"
+                onClick={handleSyncMasonicStatus}
+                disabled={isSyncingStatus}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-amber-800 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-900 transition disabled:opacity-60"
+              >
+                <RotateCcw className={`h-3.5 w-3.5 ${isSyncingStatus ? 'animate-spin' : ''}`} />
+                {isSyncingStatus ? 'Sincronizando…' : 'Sincronizar status'}
+              </button>
+            </div>
           </div>
         </div>
       )}

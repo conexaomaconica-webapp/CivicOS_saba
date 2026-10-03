@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { createAdminAdvertiserAction } from '@/lib/admin/admin-advertiser-create-service';
 import { formatCpfCnpj, formatPhone } from '@/lib/onboarding/onboarding-validation';
+import { getCommercialPlanName } from '@/lib/admin/approval-display';
 
 interface Option { id: string; name: string }
 interface PlanOption { code: string; title: string }
@@ -204,7 +205,7 @@ export default function AdvertiserCreateForm({
               <option value="">Selecione o plano</option>
               {plans.map((item) => (
                 <option key={item.code} value={item.code}>
-                  {item.title}
+                  {getCommercialPlanName(item.code || item.title)}
                 </option>
               ))}
               <option value="acacia_pedra_fundamental" className="font-bold text-[#3B0B14]">

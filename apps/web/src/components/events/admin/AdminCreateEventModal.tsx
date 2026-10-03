@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createPlatformEventAction } from '@/app/actions/platform-events';
 import { X, CalendarPlus, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { EventHeaderMediaField } from './EventHeaderMediaField';
 
 interface Props {
   onClose: () => void;
@@ -23,6 +24,11 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
     venueAddress: '',
     city: '',
     coverImageUrl: '',
+    headerMediaType: 'logo' as 'logo' | 'banner',
+    headerMediaSize: 'medium' as 'small' | 'medium' | 'large' | 'full',
+    headerMediaPosition: 'center' as 'left' | 'center' | 'right',
+    badgeText: 'Convite',
+    footerInformation: '',
     registrationEnabled: true,
     capacity: '',
     status: 'published' as const,
@@ -72,6 +78,11 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
       venueAddress: formData.venueAddress.trim() || undefined,
       city: formData.city.trim() || undefined,
       coverImageUrl: formData.coverImageUrl.trim() || undefined,
+      headerMediaType: formData.headerMediaType,
+      headerMediaSize: formData.headerMediaSize,
+      headerMediaPosition: formData.headerMediaPosition,
+      badgeText: formData.badgeText,
+      footerInformation: formData.footerInformation.trim() || undefined,
       registrationEnabled: formData.registrationEnabled,
       capacity: formData.capacity.trim() ? parseInt(formData.capacity, 10) : null,
       status: formData.status,
@@ -232,6 +243,27 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
               onChange={(e) => handleChange('description', e.target.value)}
               placeholder="Informações adicionais, trajes exigidos, programação do evento..."
             />
+          </div>
+
+          <EventHeaderMediaField
+            mediaType={formData.headerMediaType}
+            mediaSize={formData.headerMediaSize}
+            mediaPosition={formData.headerMediaPosition}
+            imageUrl={formData.coverImageUrl}
+            onMediaTypeChange={(value) => handleChange('headerMediaType', value)}
+            onMediaSizeChange={(value) => handleChange('headerMediaSize', value)}
+            onMediaPositionChange={(value) => handleChange('headerMediaPosition', value)}
+            onImageUrlChange={(value) => handleChange('coverImageUrl', value)}
+          />
+
+          <div className="acm-field">
+            <label className="acm-label" htmlFor="create-badge">Texto do badge no convite</label>
+            <input id="create-badge" type="text" maxLength={60} className="acm-input" value={formData.badgeText} onChange={(e) => handleChange('badgeText', e.target.value)} placeholder="Ex.: Convite / Lançamento" />
+          </div>
+
+          <div className="acm-field">
+            <label className="acm-label" htmlFor="create-footer-information">Informações / contato / observações no final do RSVP</label>
+            <textarea id="create-footer-information" rows={4} maxLength={1200} className="acm-textarea" value={formData.footerInformation} onChange={(e) => handleChange('footerInformation', e.target.value)} placeholder={'Ex.: Dúvidas pelo WhatsApp (75) 99999-9999\nTraje: esporte fino\nEstacionamento disponível no local'} />
           </div>
 
           <div className="acm-grid">

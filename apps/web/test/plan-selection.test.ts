@@ -37,10 +37,10 @@ describe('CANONICAL_PLANS & Formatação Monetária · ADV-003 (CRIT-VSC-005)', 
   });
 
   it('contém os preços oficiais em centavos inteiros alinhados aos documentos do produto', () => {
-    expect(CANONICAL_PLANS.bronze.annualPriceCents).toBe(0);         // R$ 0 / Gratuito
-    expect(CANONICAL_PLANS.bronze.monthlyPriceCents).toBe(0);
-    expect(CANONICAL_PLANS.prata.annualPriceCents).toBe(178800);    // R$ 1.788
-    expect(CANONICAL_PLANS.ouro.annualPriceCents).toBe(238800);     // R$ 2.388
+    expect(CANONICAL_PLANS.bronze.annualPriceCents).toBe(60000); // R$ 600
+    expect(CANONICAL_PLANS.bronze.monthlyPriceCents).toBe(5000);
+    expect(CANONICAL_PLANS.prata.annualPriceCents).toBe(80000);  // R$ 800
+    expect(CANONICAL_PLANS.ouro.annualPriceCents).toBe(100000);  // R$ 1.000
   });
 
   it('formata valores em centavos para a moeda oficial BRL', () => {
@@ -82,9 +82,9 @@ describe('fetchTenantPlans & Tratamento de Erro do Supabase', () => {
 
     const plans = await fetchTenantPlans(mockSupabaseClean, 'tenant-123');
     expect(plans).toHaveLength(3);
-    expect(plans[0].annualPriceCents).toBe(0);
-    expect(plans[1].annualPriceCents).toBe(178800);
-    expect(plans[2].annualPriceCents).toBe(238800);
+    expect(plans[0].annualPriceCents).toBe(60000);
+    expect(plans[1].annualPriceCents).toBe(80000);
+    expect(plans[2].annualPriceCents).toBe(100000);
   });
 });
 

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Heart, Share2, MapPin, Briefcase, Star, Crown, Award, ShieldCheck, Users } from 'lucide-react';
 import { useFavorites } from '@/lib/directory/favorites-context';
-import { usePedraCardDisplay, type PedraCardDisplay } from '@/lib/directory/pedra-card-display-context';
+import { usePedraCardDisplay, usePedraHorizontalSeal, type PedraCardDisplay } from '@/lib/directory/pedra-card-display-context';
 
 export type BusinessCardData = {
   id: string;
@@ -122,6 +122,7 @@ export function BusinessCard({
 }: BusinessCardProps) {
   const { isFavorite, toggleFavorite } = useFavorites();
   const contextPedraDisplay = usePedraCardDisplay();
+  const pedraHorizontalSealUrl = usePedraHorizontalSeal();
   const [copiedShare, setCopiedShare] = useState(false);
   const favorited = isFavorite(data.slug);
 
@@ -365,8 +366,11 @@ export function BusinessCard({
                     title="Empresa com condecoração histórica de Pedra Fundamental"
                   >
                     <img
-                      src={PEDRA_FUNDAMENTAL_HORIZONTAL_SEAL.primary}
+                      src={pedraHorizontalSealUrl || PEDRA_FUNDAMENTAL_HORIZONTAL_SEAL.fallback}
                       alt="Pedra Fundamental"
+                      onError={(event) => {
+                        event.currentTarget.src = PEDRA_FUNDAMENTAL_HORIZONTAL_SEAL.fallback;
+                      }}
                       className={`object-contain drop-shadow-sm hover:drop-shadow-md transition-all duration-300 ${
                         isFeatured ? 'h-8 sm:h-9 max-w-[130px] sm:max-w-[150px]' : 'h-7 sm:h-8 max-w-[115px] sm:max-w-[130px]'
                       }`}

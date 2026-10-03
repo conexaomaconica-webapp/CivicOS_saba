@@ -71,6 +71,11 @@ export interface Survey {
   description?: string | null;
   logo_url?: string | null;
   show_logo?: boolean;
+  header_color?: string;
+  banner_url?: string | null;
+  logo_size?: 'small' | 'medium' | 'large' | 'full';
+  logo_position?: 'left' | 'center' | 'right';
+  response_count?: number;
   status: SurveyStatus;
   current_version: number;
   created_by?: string | null;

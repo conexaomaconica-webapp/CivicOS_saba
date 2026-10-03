@@ -21,6 +21,10 @@ vi.mock('../src/lib/supabase/server', () => ({
             select: vi.fn().mockReturnThis(),
             update: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({
+              data: { id: '00000000-0000-0000-0000-000000000001', commercial_status: 'pagamento_confirmado' },
+              error: null,
+            }),
             maybeSingle: vi.fn().mockResolvedValue({
               data: {
                 id: '00000000-0000-0000-0000-000000000001',
@@ -36,6 +40,27 @@ vi.mock('../src/lib/supabase/server', () => ({
               },
               error: null,
             }),
+          };
+        }
+        if (table === 'business_masonic_links') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: { status: 'approved' }, error: null }),
+          };
+        }
+        if (table === 'contracts') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'contract-1', status: 'signed' }, error: null }),
+          };
+        }
+        if (table === 'subscriptions') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: { status: 'active' }, error: null }),
           };
         }
         if (table === 'admin_audit_logs') {

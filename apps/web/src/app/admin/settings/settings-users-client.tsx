@@ -16,6 +16,7 @@ import {
   Loader2,
   X,
   Building2,
+  Trash2,
 } from 'lucide-react';
 import {
   ALL_ADMIN_MODULES,
@@ -26,11 +27,14 @@ import {
   createAdminUserAction,
   updateAdminUserPermissionsAction,
   toggleAdminUserStatusAction,
+  deleteAdminUserAction,
 } from '@/lib/admin/admin-users-service';
+import { systemConfirm, systemNotify } from '@/components/system/SystemFeedback';
 
 interface SettingsUsersClientProps {
   initialUsers: AdminUserListItem[];
   currentUserId: string;
+  actorRole: string;
 }
 
 const ROLE_LABELS: Record<string, { label: string; color: string; description: string }> = {
@@ -42,7 +46,7 @@ const ROLE_LABELS: Record<string, { label: string; color: string; description: s
   editor: { label: 'Operador de Conteúdo / Guia', color: 'bg-stone-100 text-stone-800 border border-stone-300', description: 'Lojas, categorias e eventos' },
 };
 
-export default function SettingsUsersClient({ initialUsers, currentUserId }: SettingsUsersClientProps) {
+export default function SettingsUsersClient({ initialUsers, currentUserId, actorRole }: SettingsUsersClientProps) {
   const [users, setUsers] = useState<AdminUserListItem[]>(initialUsers);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
@@ -57,6 +61,7 @@ export default function SettingsUsersClient({ initialUsers, currentUserId }: Set
   const [selectedModules, setSelectedModules] = useState<string[]>(ROLE_PRESET_MODULES.admin || []);
   const [submitting, setSubmitting] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const canManageUsers = ['master', 'superadmin', 'platform_admin', 'admin'].includes(actorRole);
 
   const openCreateModal = () => {
     setModalMode('create');
@@ -175,7 +180,7 @@ export default function SettingsUsersClient({ initialUsers, currentUserId }: Set
       ? `Deseja desativar o acesso de ${userToToggle.name}?`
       : `Deseja reativar o acesso de ${userToToggle.name}?`;
 
-    if (!window.confirm(confirmText)) return;
+    if (!(await systemConfirm({ title: 'Alterar acesso', message: confirmText }))) return;
 
     const res = await toggleAdminUserStatusAction(userToToggle.id, nextStatus);
     if (res.success) {
@@ -186,9 +191,30 @@ export default function SettingsUsersClient({ initialUsers, currentUserId }: Set
         type: 'success',
         text: `Status de ${userToToggle.name} alterado para ${nextStatus === 'active' ? 'Ativo' : 'Inativo'}.`,
       });
+      systemNotify({ type: 'success', title: 'Acesso atualizado', message: `Status de ${userToToggle.name} alterado com sucesso.` });
     } else {
       setActionMsg({ type: 'error', text: res.error || 'Erro ao alterar status.' });
+      systemNotify({ type: 'danger', title: 'Não foi possível alterar o acesso', message: res.error || 'Erro ao alterar status.' });
     }
+  };
+
+  const handleDeleteUser = async (userToDelete: AdminUserListItem) => {
+    if (!(await systemConfirm({
+      title: 'Excluir usuário',
+      message: `Excluir permanentmente o usuário ${userToDelete.name} (${userToDelete.email})? Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Excluir usuário',
+      danger: true,
+    }))) return;
+    setActionMsg(null);
+    const res = await deleteAdminUserAction(userToDelete.id);
+    if (!res.success) {
+      setActionMsg({ type: 'error', text: res.error || 'Erro ao excluir usuário.' });
+      systemNotify({ type: 'danger', title: 'Erro ao excluir usuário', message: res.error || 'Não foi possível excluir o usuário.' });
+      return;
+    }
+    setUsers((current) => current.filter((user) => user.id !== userToDelete.id));
+    setActionMsg({ type: 'success', text: `Usuário ${userToDelete.name} excluído com sucesso.` });
+    systemNotify({ type: 'success', title: 'Usuário excluído', message: `${userToDelete.name} foi excluído com sucesso.` });
   };
 
   return (
@@ -222,14 +248,14 @@ export default function SettingsUsersClient({ initialUsers, currentUserId }: Set
           </p>
         </div>
 
-        <button
+          {canManageUsers && <button
           type="button"
           onClick={openCreateModal}
           className="px-4 py-2.5 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl border border-[#C9A227]/40 shadow-xs transition-all flex items-center gap-2 cursor-pointer w-fit"
         >
           <UserPlus className="w-4 h-4 text-[#C9A227]" />
           <span>+ Criar Novo Usuário no Tenant</span>
-        </button>
+          </button>}
       </div>
 
       {actionMsg && (
@@ -352,16 +378,17 @@ export default function SettingsUsersClient({ initialUsers, currentUserId }: Set
 
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button
+                        {canManageUsers && <button
                           type="button"
                           onClick={() => openEditModal(u)}
                           className="px-2.5 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border border-stone-300"
                         >
                           <Edit2 className="w-3 h-3 text-[#3B0B14]" />
                           <span>Permissões</span>
-                        </button>
+                        </button>}
 
-                        {!isCurrent && (
+                        {canManageUsers && !isCurrent && (
+                          <>
                           <button
                             type="button"
                             onClick={() => handleToggleStatus(u)}
@@ -373,6 +400,16 @@ export default function SettingsUsersClient({ initialUsers, currentUserId }: Set
                           >
                             {u.status === 'active' ? 'Desativar' : 'Ativar'}
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteUser(u)}
+                            title="Excluir usuário"
+                            aria-label={`Excluir usuário ${u.name}`}
+                            className="rounded-lg border border-red-200 bg-red-50 p-1.5 text-red-700 transition hover:bg-red-100 cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                          </>
                         )}
                       </div>
                     </td>

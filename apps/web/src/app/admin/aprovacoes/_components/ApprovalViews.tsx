@@ -3,6 +3,7 @@ import { Sparkles, ArrowRight, Building2, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { ApprovalDirectoryItem } from '@/lib/admin/admin-approval-service';
 import { displayOptionalText } from '@/lib/utils/display';
+import { getAdminStatusLabel } from '@/lib/admin/approval-display';
 
 export const PLAN_LABELS: Record<string, string> = {
   bronze: 'Esquadro',
@@ -79,7 +80,7 @@ export function ApprovalStatusBadge({
   }
   return (
     <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-300 font-bold text-[10px] uppercase w-fit">
-      {publicationStatus}
+      {getAdminStatusLabel(publicationStatus)}
     </span>
   );
 }
@@ -213,7 +214,7 @@ export function ApprovalTable({ items, onDelete }: { items: ApprovalDirectoryIte
               <td className="py-3.5 px-4 text-right">
                 <div className="flex items-center justify-end gap-2">
                   <Link
-                    href={`/admin/aprovacoes/${item.id}`}
+                    href={`/admin/empresas/${item.id}/contratacao`}
                     className="px-3.5 py-1.5 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-extrabold text-xs rounded-xl transition-all inline-flex items-center gap-1.5 shadow-xs border border-[#C9A227]/40 cursor-pointer"
                   >
                     <span>Analisar</span>
@@ -325,7 +326,7 @@ export function ApprovalGrid({ items, onDelete }: { items: ApprovalDirectoryItem
           {/* Footer Action */}
           <div className="flex items-center gap-2">
             <Link
-              href={`/admin/aprovacoes/${item.id}`}
+              href={`/admin/empresas/${item.id}/contratacao`}
               className="flex-1 py-2.5 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-extrabold text-sm rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs border border-[#C9A227]/40 cursor-pointer"
             >
               <span>Analisar cadastro</span>

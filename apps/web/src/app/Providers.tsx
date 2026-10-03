@@ -2,6 +2,7 @@
 
 import { ReactNode, createContext, useContext, useEffect, useState } from 'react';
 import type { BootData } from '../runtime/types';
+import { SystemFeedbackProvider } from '@/components/system/SystemFeedback';
 
 interface ThemeContextType {
   theme: 'light' | 'dark';
@@ -55,7 +56,9 @@ export function Providers({
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      <BootContext.Provider value={bootData}>{children}</BootContext.Provider>
+      <BootContext.Provider value={bootData}>
+        <SystemFeedbackProvider>{children}</SystemFeedbackProvider>
+      </BootContext.Provider>
     </ThemeContext.Provider>
   );
 }

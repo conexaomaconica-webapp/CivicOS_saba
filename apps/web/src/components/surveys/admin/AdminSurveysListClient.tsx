@@ -20,6 +20,8 @@ import {
   Settings,
   Image as ImageIcon,
   FileText,
+  Upload,
+  MessageSquareText,
 } from 'lucide-react';
 import type { Survey } from '@/types/surveys';
 import {
@@ -27,7 +29,9 @@ import {
   toggleSurveyStatusAction,
   deleteSurveyAction,
   updateSurveyDetailsAction,
+  uploadSurveyBrandAssetAction,
 } from '@/app/actions/surveys';
+import { optimizeImageForUpload } from '@/lib/media/optimize-image';
 
 interface Props {
   initialSurveys: Survey[];
@@ -54,6 +58,9 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
   const [editSlug, setEditSlug] = useState('');
   const [editLogoMode, setEditLogoMode] = useState<'official' | 'custom' | 'none'>('official');
   const [editLogoUrl, setEditLogoUrl] = useState('/logoconexao_red.png');
+  const [editLogoSize, setEditLogoSize] = useState<'small' | 'medium' | 'large' | 'full'>('medium');
+  const [editLogoPosition, setEditLogoPosition] = useState<'left' | 'center' | 'right'>('center');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Status feedback
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -128,6 +135,31 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
     const isCustom = survey.logo_url && survey.logo_url !== '/logoconexao_red.png';
     setEditLogoMode(survey.show_logo === false ? 'none' : isCustom ? 'custom' : 'official');
     setEditLogoUrl(survey.logo_url || '/logoconexao_red.png');
+    setEditLogoSize(survey.logo_size || 'medium');
+    setEditLogoPosition(survey.logo_position || 'center');
+  };
+
+  const handleEditLogoUpload = async (file?: File) => {
+    if (!file) return;
+    setUploadingLogo(true);
+    try {
+      const optimized = await optimizeImageForUpload(file, { maxBytes: 4.5 * 1024 * 1024, maxDimension: 1600 });
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Falha ao ler a imagem.'));
+        reader.readAsDataURL(optimized);
+      });
+      const result = await uploadSurveyBrandAssetAction(dataUrl);
+      if (!result.success || !result.data) throw new Error(result.error || 'Falha no upload.');
+      setEditLogoMode('custom');
+      setEditLogoUrl(result.data.url);
+      showFeedback('success', 'Logomarca enviada com sucesso.');
+    } catch (error) {
+      showFeedback('error', error instanceof Error ? error.message : 'Não foi possível enviar a logomarca.');
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -149,6 +181,8 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
       slug: editSlug.trim() || undefined,
       logo_url: logoUrl,
       show_logo: showLogo,
+      logo_size: editLogoSize,
+      logo_position: editLogoPosition,
     });
     setSaving(false);
 
@@ -163,6 +197,8 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
                 slug: editSlug.trim(),
                 logo_url: logoUrl,
                 show_logo: showLogo,
+                logo_size: editLogoSize,
+                logo_position: editLogoPosition,
               }
             : s
         )
@@ -296,6 +332,14 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
                 {survey.description && (
                   <p className="asl-card-desc">{survey.description}</p>
                 )}
+
+                <div className="asl-response-kpi">
+                  <MessageSquareText size={18} />
+                  <div>
+                    <strong>{(survey.response_count ?? 0).toLocaleString('pt-BR')}</strong>
+                    <span>pesquisa(s) respondida(s)</span>
+                  </div>
+                </div>
 
                 <div className="asl-card-meta">
                   <div className="asl-meta-item">
@@ -602,16 +646,34 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
                       onChange={(e) => setEditLogoUrl(e.target.value)}
                       className="asl-input"
                     />
+                    <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-700 hover:border-[#4B161B]">
+                      {uploadingLogo ? <Loader2 size={16} className="asl-spin" /> : <Upload size={16} />}
+                      {uploadingLogo ? 'Enviando...' : 'Fazer upload da logomarca'}
+                      <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={uploadingLogo} onChange={(event) => void handleEditLogoUpload(event.target.files?.[0])} />
+                    </label>
                   </div>
                 )}
 
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <label className="text-xs font-bold text-gray-700">Tamanho
+                    <select className="asl-input mt-1" value={editLogoSize} onChange={(event) => setEditLogoSize(event.target.value as typeof editLogoSize)}>
+                      <option value="small">Pequeno</option><option value="medium">Médio</option><option value="large">Grande</option><option value="full">Largura máxima</option>
+                    </select>
+                  </label>
+                  <label className="text-xs font-bold text-gray-700">Posição
+                    <select className="asl-input mt-1" value={editLogoPosition} onChange={(event) => setEditLogoPosition(event.target.value as typeof editLogoPosition)}>
+                      <option value="left">Esquerda</option><option value="center">Centralizada</option><option value="right">Direita</option>
+                    </select>
+                  </label>
+                </div>
+
                 {/* Preview */}
-                <div style={{ marginTop: '0.5rem', background: '#FAF8F5', border: '1px dashed #E5E0D8', borderRadius: '8px', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '48px' }}>
+                <div style={{ marginTop: '0.5rem', background: '#4B161B', border: '1px dashed #C9A227', borderRadius: '8px', padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: editLogoPosition === 'left' ? 'flex-start' : editLogoPosition === 'right' ? 'flex-end' : 'center', minHeight: '80px' }}>
                   {editLogoMode !== 'none' ? (
                     <img
                       src={editLogoMode === 'official' ? '/logoconexao_red.png' : (editLogoUrl || '/logoconexao_red.png')}
                       alt="Prévia"
-                      style={{ maxHeight: '36px', maxWidth: '160px', objectFit: 'contain' }}
+                      style={{ maxHeight: editLogoSize === 'small' ? '80px' : editLogoSize === 'medium' ? '130px' : editLogoSize === 'large' ? '210px' : '300px', width: editLogoSize === 'small' ? '180px' : editLogoSize === 'medium' ? '320px' : editLogoSize === 'large' ? '480px' : '100%', maxWidth: '100%', objectFit: 'contain' }}
                     />
                   ) : (
                     <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280' }}>Conexão Maçônica (Apenas Texto)</span>
@@ -911,6 +973,19 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
           -webkit-box-orient: vertical;
           overflow: hidden;
         }
+        .asl-response-kpi {
+          display: flex;
+          align-items: center;
+          gap: 0.625rem;
+          margin-bottom: 0.875rem;
+          padding: 0.75rem;
+          border: 1px solid #E5D49B;
+          border-radius: 10px;
+          background: #FFFBEB;
+          color: #713F12;
+        }
+        .asl-response-kpi strong { display: block; font-size: 1.125rem; line-height: 1; }
+        .asl-response-kpi span { display: block; margin-top: 0.2rem; font-size: 0.6875rem; font-weight: 700; }
         .asl-card-meta {
           display: flex;
           align-items: center;

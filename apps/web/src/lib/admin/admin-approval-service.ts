@@ -159,6 +159,27 @@ export async function getApprovalDirectoryListAction(statusFilter: string = 'tod
   try {
     const supabase = await createServerSideClient();
     const { data, error } = await (supabase as any).rpc('get_admin_approval_directory_list');
+    let businesses: any[] = [];
+    let businessesError: any = null;
+    try {
+      const businessesResult = await (supabase as any)
+        .from('businesses')
+        .select('*')
+        .order('created_at', { ascending: false });
+      businesses = businessesResult.data || [];
+      businessesError = businessesResult.error;
+    } catch (businessesQueryError) {
+      businessesError = businessesQueryError;
+    }
+
+    if (businessesError && error) {
+      return {
+        success: false,
+        error: `Falha ao consultar empresas para aprovação: ${businessesError.message || String(businessesError)}`,
+        items: [],
+        counts: { total: 0, ready: 0, pendingReview: 0, missingContract: 0, missingPayment: 0, missingLink: 0, incomplete: 0, correctionRequested: 0, rejected: 0 },
+      };
+    }
 
     let allItems: ApprovalDirectoryItem[] = [];
 
@@ -186,6 +207,48 @@ export async function getApprovalDirectoryListAction(statusFilter: string = 'tod
         cnpj: b.cnpj_cpf || undefined,
         city: b.city || undefined,
       }));
+    }
+
+    // A RPC de aprovação é legada e pode não retornar anúncios recém-criados.
+    // Reconcilia com a fonte canônica para que todo cadastro apareça imediatamente.
+    const listedIds = new Set(allItems.map((item) => item.id));
+    for (const business of businesses || []) {
+      if (listedIds.has(business.id)) continue;
+
+      const hasResponsible = Boolean(business.owner_id);
+      const hasBusinessData = Boolean(business.name?.trim());
+      allItems.push({
+        id: business.id,
+        tenant_id: business.tenant_id,
+        name: business.name || null,
+        category: business.category || null,
+        publication_status: (business.publication_status || 'draft') as ApprovalDirectoryItem['publication_status'],
+        plan_code: business.plan_code || business.plan_tier || undefined,
+        created_at: business.created_at || new Date().toISOString(),
+        is_founder: Boolean(business.is_founder),
+        is_pedra_fundamental: Boolean(business.is_pedra_fundamental),
+        is_coluna_honra: Boolean(business.is_coluna_honra),
+        has_responsible: hasResponsible,
+        has_business_data: hasBusinessData,
+        has_masonic_link: false,
+        has_signed_contract: false,
+        has_valid_payment: false,
+        is_ready_for_approval: false,
+        completeness_percent: (hasResponsible ? 15 : 0) + (hasBusinessData ? 15 : 0),
+        cnpj: business.cnpj_cpf || business.cnpj || undefined,
+        city: business.city || undefined,
+      });
+    }
+
+    allItems.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+
+    if (error && allItems.length === 0) {
+      return {
+        success: false,
+        error: `Falha ao carregar a central de aprovações: ${error.message}`,
+        items: [],
+        counts: { total: 0, ready: 0, pendingReview: 0, missingContract: 0, missingPayment: 0, missingLink: 0, incomplete: 0, correctionRequested: 0, rejected: 0 },
+      };
     }
 
     const counts = {

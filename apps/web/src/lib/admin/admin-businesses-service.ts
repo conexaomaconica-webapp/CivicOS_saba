@@ -5,7 +5,11 @@ import { createServerSideClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { resolveLogoUrl } from '@/lib/business/business-media-helpers';
 import { validatePhone, sanitizeCnpj } from '@/lib/onboarding/onboarding-validation';
-import { getCanonicalDefaultLimit, getCommercialPlanName } from '@/lib/billing/plans-service';
+import {
+  getCanonicalDefaultLimit,
+  getCommercialPlanName,
+  normalizeCanonicalPlanCode,
+} from '@/lib/billing/plans-service';
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database.types';
 import {
@@ -18,6 +22,7 @@ import {
   assertCommercialStatusTransition,
   type CommercialStatus,
 } from '@/lib/commercial-onboarding-status';
+import { evaluateBusinessProfileReadiness } from './admin-commercial-dossier-readiness';
 
 function normalizeMasonicStatus(status: string | null | undefined): 'pending' | 'verified' | 'rejected' {
   if (status === 'verified' || status === 'approved' || status === 'active') return 'verified';
@@ -337,6 +342,7 @@ export interface AdminBusinessListItem {
   payment_status?: 'paid' | 'pending' | 'overdue';
   plan_code: string;
   completeness_percent: number;
+  completeness_missing?: string[];
   is_founder: boolean;
   is_pedra_fundamental: boolean;
   is_coluna_honra: boolean;
@@ -616,7 +622,9 @@ export async function getAdminBusinessesListAction(params?: {
       .range(offset, offset + pageSize - 1);
 
     // Carregar todos os negócios para KPIs de contagem
-    const { data: allBizData } = await (supabase as any).from('businesses').select('id, publication_status, plan_code, created_at');
+    const { data: allBizData } = await (supabase as any)
+      .from('businesses')
+      .select('id, publication_status, plan_code, plan_tier, created_at');
     const allBiz = (allBizData || []) as any[];
 
 
@@ -660,9 +668,9 @@ export async function getAdminBusinessesListAction(params?: {
     const pedraCount = Object.values(allRecMap).filter((keys) => keys.includes('pedra_fundamental')).length;
 
     // Contagens de plano efetivo
-    const bronzeCount = allBiz.filter((b) => (allPlanMap[b.id] || b.plan_code || 'bronze') === 'bronze').length;
-    const prataCount = allBiz.filter((b) => (allPlanMap[b.id] || b.plan_code || 'bronze') === 'prata').length;
-    const ouroCount = allBiz.filter((b) => (allPlanMap[b.id] || b.plan_code || 'bronze') === 'ouro').length;
+    const bronzeCount = allBiz.filter((b) => normalizeCanonicalPlanCode(allPlanMap[b.id] || b.plan_tier || b.plan_code) === 'esquadro').length;
+    const prataCount = allBiz.filter((b) => normalizeCanonicalPlanCode(allPlanMap[b.id] || b.plan_tier || b.plan_code) === 'compasso').length;
+    const ouroCount = allBiz.filter((b) => normalizeCanonicalPlanCode(allPlanMap[b.id] || b.plan_tier || b.plan_code) === 'acacia').length;
 
     const kpis = {
       total: totalPortfolio,
@@ -689,6 +697,8 @@ export async function getAdminBusinessesListAction(params?: {
     // Resolver localizações para os itens da página atual
     const bizIds = (data || []).map((b: any) => b.id);
     let locationMap: Record<string, { city: string; state: string }> = {};
+    let contactMap: Record<string, { phone?: string; whatsapp?: string }> = {};
+    let categoryMap: Record<string, { id?: string; name?: string }> = {};
     if (bizIds.length > 0) {
       try {
         const locBuilder = (supabase as any).from('business_locations').select('business_id, city, state, is_headquarters');
@@ -701,6 +711,27 @@ export async function getAdminBusinessesListAction(params?: {
               }
             }
           }
+        }
+      } catch (_e) { }
+      try {
+        const { data: contacts } = await (supabase as any)
+          .from('business_contacts')
+          .select('business_id, type, value')
+          .in('business_id', bizIds)
+          .in('type', ['phone', 'whatsapp']);
+        for (const contact of contacts || []) {
+          contactMap[contact.business_id] ||= {};
+          contactMap[contact.business_id]![contact.type as 'phone' | 'whatsapp'] = contact.value;
+        }
+      } catch (_e) { }
+      try {
+        const { data: categories } = await (supabase as any)
+          .from('business_categories')
+          .select('business_id, category_id, is_primary, categories(name)')
+          .in('business_id', bizIds)
+          .order('is_primary', { ascending: false });
+        for (const row of categories || []) {
+          if (!categoryMap[row.business_id]) categoryMap[row.business_id] = { id: row.category_id, name: row.categories?.name };
         }
       } catch (_e) { }
     }
@@ -723,15 +754,27 @@ export async function getAdminBusinessesListAction(params?: {
     }
 
     let items: AdminBusinessListItem[] = (data || []).map((b: any) => {
-      const effectivePlan = allPlanMap[b.id] || b.plan_code || 'bronze';
+      const effectivePlan = normalizeCanonicalPlanCode(allPlanMap[b.id] || b.plan_tier || b.plan_code);
       const recs = allRecMap[b.id] || [];
+      const readiness = evaluateBusinessProfileReadiness({
+        name: b.name,
+        legal_name: b.legal_name,
+        description: b.description,
+        category_id: categoryMap[b.id]?.id || b.category_id,
+        category: categoryMap[b.id]?.name || b.category,
+        city: locationMap[b.id]?.city || b.city,
+        state: locationMap[b.id]?.state || b.state,
+        phone: contactMap[b.id]?.phone || b.phone,
+        whatsapp: contactMap[b.id]?.whatsapp || b.whatsapp,
+        logo_url: b.logo_url,
+      });
       return {
         id: b.id,
         tenant_id: b.tenant_id || '00000000-0000-0000-0000-000000000001',
         name: b.name || 'Empresa Anunciante',
         legal_name: b.legal_name || b.name,
         cnpj_cpf: b.cnpj_cpf || b.cnpj || 'Não informado',
-        category: b.category || 'Geral',
+        category: categoryMap[b.id]?.name || b.category || 'Geral',
         city: locationMap[b.id]?.city || b.city || 'Não informado',
         state: locationMap[b.id]?.state || b.state || '',
         owner_name: 'Anunciante Titular',
@@ -739,7 +782,8 @@ export async function getAdminBusinessesListAction(params?: {
         publication_status: (b.publication_status || 'published') as any,
         payment_status: b.publication_status === 'published' ? 'paid' : 'pending',
         plan_code: effectivePlan,
-        completeness_percent: 92,
+        completeness_percent: readiness.completion_percentage,
+        completeness_missing: readiness.missing_labels,
         is_founder: recs.includes('coluna_de_honra'),
         is_pedra_fundamental: recs.includes('pedra_fundamental'),
         is_coluna_honra: recs.includes('coluna_de_honra'),
@@ -752,7 +796,9 @@ export async function getAdminBusinessesListAction(params?: {
 
     // Filtro por plano (pós-resolução efetiva)
     if (params?.plan && params.plan !== 'all') {
-      items = items.filter((item) => item.plan_code === params!.plan);
+      items = items.filter(
+        (item) => normalizeCanonicalPlanCode(item.plan_code) === normalizeCanonicalPlanCode(params!.plan),
+      );
     }
 
     // Filtro por reconhecimento (pós-resolução canônica)
@@ -1343,7 +1389,18 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
         is_verified: isVerified,
 
         plan_code: planCode,
-        completeness_percent: 90,
+        completeness_percent: evaluateBusinessProfileReadiness({
+          name: b.name,
+          legal_name: b.legal_name,
+          description: b.description,
+          category_id: primaryCategory?.id,
+          category: primaryCategory?.name || b.category,
+          city: locationData.city || b.city,
+          state: locationData.state || b.state,
+          phone: contactsMap['phone'] || b.phone,
+          whatsapp: contactsMap['whatsapp'] || b.whatsapp,
+          logo_url: b.logo_url,
+        }).completion_percentage,
         created_at: b.created_at,
         updated_at: b.updated_at,
       },
@@ -2190,7 +2247,6 @@ export async function verifyAdminMasonicLinkAction(
     }
 
     const businessUpdates: Record<string, any> = {
-      is_verified: isApproved,
       masonic_validation_status: newStatus,
       updated_at: new Date().toISOString(),
     };
@@ -2407,7 +2463,6 @@ export async function upsertAdminMasonicLinkAction(
 
     // Sincroniza campos na tabela businesses
     const businessUpdates: Record<string, any> = {
-      is_verified: isApproved,
       masonic_validation_status:
         dbStatus === 'approved' ? 'verified' : dbStatus === 'pending_verification' ? 'pending' : dbStatus,
       updated_at: new Date().toISOString(),
@@ -2474,6 +2529,126 @@ export async function upsertAdminMasonicLinkAction(
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao salvar vínculo maçônico.' };
+  }
+}
+
+const PRE_LINK_COMMERCIAL_STATUSES: CommercialStatus[] = ['pre_cadastro', 'vinculo_informado'];
+
+/**
+ * Reconcilia o domínio maçônico com a máquina de estados comercial.
+ * SE existe vínculo aprovado/verificado E commercial_status é anterior ao vínculo
+ * ENTÃO avança para vinculo_verificado. Nunca regride estados posteriores.
+ */
+async function reconcileMasonicCommercialStatusWithClient(
+  supabase: any,
+  businessId: string,
+  currentStatus: CommercialStatus
+): Promise<{ status: CommercialStatus; reconciled: boolean; error?: string }> {
+  if (!PRE_LINK_COMMERCIAL_STATUSES.includes(currentStatus)) {
+    return { status: currentStatus, reconciled: false };
+  }
+
+  const { data: verifiedLink, error: verifiedLinkError } = await supabase
+    .from('business_masonic_links')
+    .select('id, status, verified_at')
+    .eq('business_id', businessId)
+    .in('status', ['approved', 'verified'])
+    .not('verified_at', 'is', null)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (verifiedLinkError) {
+    return {
+      status: currentStatus,
+      reconciled: false,
+      error: `Falha ao validar o vínculo maçônico: ${verifiedLinkError.message}`,
+    };
+  }
+  if (!verifiedLink) return { status: currentStatus, reconciled: false };
+
+  const { error: reconcileError } = await supabase
+    .from('businesses')
+    .update({
+      commercial_status: 'vinculo_verificado',
+      masonic_validation_status: 'verified',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', businessId)
+    .in('commercial_status', PRE_LINK_COMMERCIAL_STATUSES);
+
+  if (reconcileError) {
+    return {
+      status: currentStatus,
+      reconciled: false,
+      error: `Falha ao sincronizar o status comercial: ${reconcileError.message}`,
+    };
+  }
+  return { status: 'vinculo_verificado', reconciled: true };
+}
+
+/**
+ * Central de Ativação: sincroniza manualmente commercial_status com o vínculo maçônico verificado.
+ * Idempotente e forward-only.
+ */
+export async function reconcileMasonicCommercialStatus(
+  businessId: string
+): Promise<{ success: boolean; error?: string; commercial_status?: string; reconciled?: boolean }> {
+  try {
+    const { supabase, user } = await assertPlatformAdminAccess();
+    if (!businessId?.trim()) {
+      return { success: false, error: 'Identificador da empresa é obrigatório.' };
+    }
+
+    const { data: biz, error: bizErr } = await (supabase as any)
+      .from('businesses')
+      .select('id, tenant_id, commercial_status')
+      .eq('id', businessId)
+      .single();
+
+    if (bizErr) {
+      console.error('[reconcileMasonicCommercialStatus] Erro ao consultar empresa:', {
+        businessId,
+        code: bizErr.code,
+        message: bizErr.message,
+        details: bizErr.details,
+        hint: bizErr.hint,
+      });
+      return { success: false, error: `Falha ao consultar empresa: ${bizErr.message}` };
+    }
+    if (!biz) return { success: false, error: 'Empresa não encontrada no banco de dados.' };
+
+    const before = (biz.commercial_status || 'pre_cadastro') as CommercialStatus;
+    const result = await reconcileMasonicCommercialStatusWithClient(supabase, biz.id, before);
+    if (result.error) return { success: false, error: result.error };
+
+    if (!result.reconciled && PRE_LINK_COMMERCIAL_STATUSES.includes(before)) {
+      return {
+        success: false,
+        error: 'Nenhum vínculo maçônico verificado foi encontrado. Verifique o vínculo antes de sincronizar.',
+      };
+    }
+
+    if (result.reconciled) {
+      await (supabase as any).from('admin_audit_logs').insert({
+        tenant_id: biz.tenant_id,
+        actor_id: user.id,
+        action: 'RECONCILE_MASONIC_COMMERCIAL_STATUS',
+        entity_type: 'business',
+        entity_id: biz.id,
+        before_value: { commercial_status: before },
+        after_value: { commercial_status: result.status },
+        reason: 'Sincronização do status comercial com vínculo maçônico verificado (Central de Ativação).',
+      });
+
+      revalidatePath('/admin/empresas');
+      revalidatePath(`/admin/empresas/${biz.id}`);
+      revalidatePath(`/admin/empresas/${biz.id}/contratacao`);
+    }
+
+    return { success: true, commercial_status: result.status, reconciled: result.reconciled };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Erro ao sincronizar status comercial.' };
   }
 }
 
@@ -2679,39 +2854,11 @@ export async function confirmAdminCommercialTermsAction(
 
     // Reconcilia registros legados em que o vínculo foi aprovado, mas a máquina
     // comercial permaneceu em uma etapa anterior. Nunca regride estados posteriores.
-    if (currentStatus === 'pre_cadastro' || currentStatus === 'vinculo_informado') {
-      const { data: verifiedLink, error: verifiedLinkError } = await (supabase as any)
-        .from('business_masonic_links')
-        .select('id, status, verified_at')
-        .eq('business_id', biz.id)
-        .in('status', ['approved', 'verified'])
-        .not('verified_at', 'is', null)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (verifiedLinkError) {
-        return { success: false, error: `Falha ao validar o vínculo maçônico: ${verifiedLinkError.message}` };
-      }
-
-      if (verifiedLink) {
-        const { error: reconcileError } = await (supabase as any)
-          .from('businesses')
-          .update({
-            commercial_status: 'vinculo_verificado',
-            is_verified: true,
-            masonic_validation_status: 'verified',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', biz.id)
-          .in('commercial_status', ['pre_cadastro', 'vinculo_informado']);
-
-        if (reconcileError) {
-          return { success: false, error: `Falha ao sincronizar o status comercial: ${reconcileError.message}` };
-        }
-        currentStatus = 'vinculo_verificado';
-      }
+    const reconcile = await reconcileMasonicCommercialStatusWithClient(supabase, biz.id, currentStatus);
+    if (reconcile.error) {
+      return { success: false, error: reconcile.error };
     }
+    currentStatus = reconcile.status;
 
     if (currentStatus !== 'dados_comerciais_conferidos') {
       try {
@@ -2818,7 +2965,6 @@ export async function confirmAdminCommercialTermsAction(
     // 5. Gravação concorrente para máxima velocidade
     const bizUpdatePayload: Record<string, any> = {
       commercial_status: 'dados_comerciais_conferidos',
-      plan_tier: input.plan_code,
       updated_at: new Date().toISOString(),
     };
     if (fullAddressToSync) {

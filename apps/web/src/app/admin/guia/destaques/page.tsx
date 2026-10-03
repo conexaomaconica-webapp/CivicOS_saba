@@ -50,8 +50,15 @@ export default function AdminGuiaDestaquesPage() {
   const fetchData = async () => {
     try {
       const supabase = createClient();
-      const { data: profileData } = await (supabase as any).from('profiles').select('tenant_id').maybeSingle();
-      const tid = profileData?.tenant_id || '00000000-0000-0000-0000-000000000010';
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData.user) throw new Error('Usuário não autenticado.');
+      const { data: profileData } = await (supabase as any)
+        .from('profiles')
+        .select('tenant_id')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+      const tid = profileData?.tenant_id;
+      if (!tid) throw new Error('Tenant do administrador não identificado.');
       setTenantId(tid);
 
       // 1. Fetch available businesses
@@ -404,6 +411,20 @@ export default function AdminGuiaDestaquesPage() {
                   💡 Quanto maior o tempo em segundos, mais suave, calmo e legível será o movimento.
                 </p>
               </div>
+
+              <button
+                type="button"
+                disabled={updatingMode}
+                onClick={() => handleUpdateSponsoredSettings({
+                  mode: sponsoredDisplayMode,
+                  speed: sponsoredSpeed,
+                  logoStyle: sponsoredLogoStyle,
+                })}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#3B0B14] px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-[#54101d] disabled:cursor-wait disabled:opacity-60"
+              >
+                {updatingMode ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                {updatingMode ? 'Salvando…' : 'Salvar configurações do loop'}
+              </button>
             </div>
           </div>
         )}

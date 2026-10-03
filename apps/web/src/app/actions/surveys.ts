@@ -45,11 +45,15 @@ export async function getAdminSurveysListAction() {
     const { client: supabase } = await getSurveysAdminClient();
     const { data, error } = await (supabase as any)
       .from('surveys')
-      .select('*')
+      .select('*, survey_responses(count)')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return { success: true, data: (data as Survey[]) || [] };
+    const surveys = ((data as any[]) || []).map(({ survey_responses, ...survey }) => ({
+      ...survey,
+      response_count: survey_responses?.[0]?.count ?? 0,
+    })) as Survey[];
+    return { success: true, data: surveys };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao carregar lista de pesquisas.' };
   }
@@ -287,6 +291,8 @@ export async function publishSurveyVersionAction(surveyId: string) {
       survey_title: survey.title,
       logo_url: survey.logo_url,
       show_logo: survey.show_logo,
+      header_color: survey.header_color,
+      banner_url: survey.banner_url,
       blocks: survey.blocks,
     };
 
@@ -442,10 +448,18 @@ export async function saveSurveyQuestionAction(
   try {
     const { client: supabase } = await getSurveysAdminClient();
 
+    const { data: targetBlock, error: blockError } = await (supabase as any)
+      .from('survey_blocks')
+      .select('id, survey_id')
+      .eq('id', questionData.block_id)
+      .eq('survey_id', surveyId)
+      .maybeSingle();
+    if (blockError || !targetBlock) throw blockError || new Error('A seção selecionada não pertence a esta pesquisa.');
+
     let questionId = questionData.id;
 
     if (questionId) {
-      const { error } = await (supabase as any)
+      const { data: updatedQuestion, error } = await (supabase as any)
         .from('survey_questions')
         .update({
           block_id: questionData.block_id,
@@ -458,8 +472,11 @@ export async function saveSurveyQuestionAction(
           conditional_rules: questionData.conditional_rules || null,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', questionId);
+        .eq('id', questionId)
+        .select('id')
+        .maybeSingle();
       if (error) throw error;
+      if (!updatedQuestion) throw new Error('A pergunta não foi atualizada. Verifique suas permissões e tente novamente.');
     } else {
       const { data: newQ, error } = await (supabase as any)
         .from('survey_questions')
@@ -489,13 +506,15 @@ export async function saveSurveyQuestionAction(
       const newOptionIds = questionData.options.map((o) => o.id).filter(Boolean);
       if (questionData.id) {
         if (newOptionIds.length > 0) {
-          await (supabase as any)
+          const { error: deleteError } = await (supabase as any)
             .from('survey_options')
             .delete()
             .eq('question_id', questionId)
             .not('id', 'in', `(${newOptionIds.join(',')})`);
+          if (deleteError) throw deleteError;
         } else {
-          await (supabase as any).from('survey_options').delete().eq('question_id', questionId);
+          const { error: deleteError } = await (supabase as any).from('survey_options').delete().eq('question_id', questionId);
+          if (deleteError) throw deleteError;
         }
       }
 
@@ -504,7 +523,7 @@ export async function saveSurveyQuestionAction(
         const opt = questionData.options[i];
         if (!opt) continue;
         if (opt.id) {
-          await (supabase as any)
+          const { error: optionError } = await (supabase as any)
             .from('survey_options')
             .update({
               label: opt.label,
@@ -512,20 +531,36 @@ export async function saveSurveyQuestionAction(
               order_index: i + 1,
             })
             .eq('id', opt.id);
+          if (optionError) throw optionError;
         } else {
-          await (supabase as any).from('survey_options').insert({
+          const { error: optionError } = await (supabase as any).from('survey_options').insert({
             question_id: questionId,
             label: opt.label,
             value: opt.value || opt.label.toLowerCase().replace(/\s+/g, '_'),
             order_index: i + 1,
             is_active: true,
           });
+          if (optionError) throw optionError;
         }
       }
     }
 
+    const { data: savedQuestion, error: savedQuestionError } = await (supabase as any)
+      .from('survey_questions')
+      .select('*')
+      .eq('id', questionId)
+      .single();
+    if (savedQuestionError || !savedQuestion) throw savedQuestionError || new Error('Não foi possível confirmar a pergunta salva.');
+
+    const { data: savedOptions, error: savedOptionsError } = await (supabase as any)
+      .from('survey_options')
+      .select('*')
+      .eq('question_id', questionId)
+      .order('order_index', { ascending: true });
+    if (savedOptionsError) throw savedOptionsError;
+
     revalidatePath(`/admin/pesquisas/${surveyId}/editor`);
-    return { success: true, questionId };
+    return { success: true, questionId, question: { ...savedQuestion, options: savedOptions || [] } as SurveyQuestion };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao salvar pergunta.' };
   }
@@ -672,6 +707,8 @@ export async function createSurveyAction(payload: {
   slug?: string;
   logo_url?: string;
   show_logo?: boolean;
+  header_color?: string;
+  banner_url?: string;
 }) {
   try {
     const { client: supabase, user } = await getSurveysAdminClient();
@@ -705,6 +742,8 @@ export async function createSurveyAction(payload: {
         slug: cleanSlug,
         logo_url: payload.logo_url || '/logoconexao_red.png',
         show_logo: payload.show_logo ?? true,
+        header_color: payload.header_color || '#4B161B',
+        banner_url: payload.banner_url?.trim() || null,
         status: 'draft',
         current_version: 1,
         created_by: user.id,
@@ -771,6 +810,10 @@ export async function updateSurveyDetailsAction(
     slug?: string;
     logo_url?: string | null;
     show_logo?: boolean;
+    header_color?: string;
+    banner_url?: string | null;
+    logo_size?: 'small' | 'medium' | 'large' | 'full';
+    logo_position?: 'left' | 'center' | 'right';
   }
 ) {
   try {
@@ -788,6 +831,13 @@ export async function updateSurveyDetailsAction(
     if (payload.show_logo !== undefined) {
       updateData.show_logo = Boolean(payload.show_logo);
     }
+    if (payload.header_color !== undefined) {
+      if (!/^#[0-9A-Fa-f]{6}$/.test(payload.header_color)) return { success: false, error: 'Cor do cabeçalho inválida.' };
+      updateData.header_color = payload.header_color;
+    }
+    if (payload.banner_url !== undefined) updateData.banner_url = payload.banner_url?.trim() || null;
+    if (payload.logo_size !== undefined) updateData.logo_size = payload.logo_size;
+    if (payload.logo_position !== undefined) updateData.logo_position = payload.logo_position;
 
     if (payload.slug) {
       updateData.slug = payload.slug
@@ -809,6 +859,32 @@ export async function updateSurveyDetailsAction(
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao atualizar dados da pesquisa.' };
+  }
+}
+
+export async function uploadSurveyBrandAssetAction(fileDataUrl: string) {
+  try {
+    const match = fileDataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+    if (!match) return { success: false, error: 'Formato inválido. Use PNG, JPEG ou WebP.' };
+    const buffer = Buffer.from(match[2]!, 'base64');
+    if (!buffer.length || buffer.length > 5 * 1024 * 1024) return { success: false, error: 'A imagem deve ter no máximo 5 MB.' };
+
+    const supabase = await createServerSideClient();
+    const auth = await supabase.auth.getUser();
+    if (!auth.data.user) return { success: false, error: 'Acesso não autenticado.' };
+    const { data: profile } = await (supabase as any).from('profiles').select('tenant_id').eq('id', auth.data.user.id).maybeSingle();
+    if (!profile?.tenant_id) return { success: false, error: 'Tenant não identificado.' };
+
+    const mimeType = match[1]!;
+    const extension = mimeType === 'image/jpeg' ? 'jpg' : mimeType.split('/')[1];
+    const path = `${profile.tenant_id}/${crypto.randomUUID()}.${extension}`;
+    const { error } = await supabase.storage.from('survey-assets').upload(path, buffer, { contentType: mimeType });
+    if (error) return { success: false, error: error.message };
+    const { data } = supabase.storage.from('survey-assets').getPublicUrl(path);
+    return { success: true, data: { url: data.publicUrl } };
+  } catch (error) {
+    console.error('[Admin/Surveys] Falha no upload:', error);
+    return { success: false, error: 'Não foi possível enviar a imagem.' };
   }
 }
 
@@ -900,5 +976,3 @@ export async function reorderSurveyQuestionsAction(
     return { success: false, error: err.message || 'Erro ao reordenar perguntas.' };
   }
 }
-
-

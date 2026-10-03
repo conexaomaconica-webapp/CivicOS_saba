@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Camera, Upload, X, RefreshCw } from 'lucide-react';
+import { systemNotify } from '@/components/system/SystemFeedback';
 
 interface EventQRScannerModalProps {
   isOpen: boolean;
@@ -66,11 +67,17 @@ export function EventQRScannerModal({
         }
       );
     } catch (err) {
-      console.error('[QRScanner] Erro ao acessar câmera:', err);
       setIsScanning(false);
-      setCameraError(
-        'Não foi possível acessar a câmera. Verifique as permissões do navegador ou utilize o envio de imagem.'
-      );
+      const errorName = err instanceof DOMException ? err.name : '';
+      const errorText = err instanceof Error ? err.message : String(err);
+      if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError' || /NotAllowedError|Permission denied/i.test(errorText)) {
+        setCameraError('A permissão da câmera foi bloqueada. Autorize a câmera nas configurações do navegador ou carregue uma imagem do QR Code.');
+      } else if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError' || /NotFoundError|DevicesNotFoundError/i.test(errorText)) {
+        setCameraError('Nenhuma câmera foi encontrada neste dispositivo. Utilize o envio de imagem do QR Code.');
+      } else {
+        console.warn('[QRScanner] Câmera indisponível:', err);
+        setCameraError('Não foi possível iniciar a câmera. Tente novamente ou utilize o envio de imagem.');
+      }
     }
   };
 
@@ -101,11 +108,11 @@ export function EventQRScannerModal({
       if (result?.decodedText) {
         onScanSuccess(result.decodedText);
       } else {
-        alert('Nenhum QR Code válido encontrado na imagem enviada.');
+        systemNotify({ type: 'warning', title: 'QR Code não encontrado', message: 'Nenhum QR Code válido foi encontrado na imagem enviada.' });
       }
     } catch (err) {
-      console.error('[QRScanner] Erro ao ler arquivo:', err);
-      alert('Não foi possível ler o QR Code do arquivo selecionado. Tente uma imagem mais nítida.');
+      console.warn('[QRScanner] Não foi possível ler o arquivo:', err);
+      systemNotify({ type: 'danger', title: 'Falha na leitura', message: 'Não foi possível ler o QR Code. Tente uma imagem mais nítida.' });
     }
   };
 
@@ -152,6 +159,9 @@ export function EventQRScannerModal({
                 <p className="error-text">{cameraError}</p>
                 <button onClick={startCamera} className="retry-btn">
                   <RefreshCw size={14} /> Tentar Novamente
+                </button>
+                <button onClick={() => setActiveTab('upload')} className="retry-btn">
+                  <Upload size={14} /> Carregar Imagem
                 </button>
               </div>
             )}

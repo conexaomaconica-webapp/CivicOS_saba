@@ -17,6 +17,7 @@ import {
   Server as ServerIcon,
 } from 'lucide-react';
 import { getAdminDashboardMetricsAction } from '@/lib/admin/admin-dashboard-service';
+import { getCommercialPlanName } from '@/lib/admin/approval-display';
 
 export const metadata = {
   title: 'Mesa de Comando Operacional · Admin Conexão Maçônica',
@@ -330,7 +331,7 @@ export default async function AdminDashboardPage() {
                     </td>
                     <td className="py-3.5 px-4 text-center">
                       <span className="px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-900 font-extrabold text-[10px] uppercase border border-stone-300">
-                        {app.plan_code}
+                        {getCommercialPlanName(app.plan_code)}
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-center">

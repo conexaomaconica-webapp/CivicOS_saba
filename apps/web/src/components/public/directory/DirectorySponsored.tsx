@@ -39,15 +39,14 @@ export function DirectorySponsored({
             <p className="text-xs text-stone-500 mt-1">Parceiros em destaque e empresas pilares da nossa rede.</p>
           </div>
           <span className="hidden sm:inline-flex text-[11px] font-semibold text-amber-900 bg-amber-100/80 px-2.5 py-1 rounded-full border border-amber-200">
-            ♾️ Destaques da Rede
+            ♾️ Destaques da Plataforma
           </span>
         </div>
 
         {/* Outer Marquee Container with Fading Edges */}
         <div
-          className={`relative w-full overflow-hidden rounded-2xl bg-white/70 border border-stone-200/80 shadow-sm group ${
-            isCleanMode ? 'py-5 px-3' : 'p-3'
-          }`}
+          className={`relative w-full overflow-hidden rounded-2xl bg-white/70 border border-stone-200/80 shadow-sm group ${isCleanMode ? 'pt-16 pb-5 px-3' : 'p-3'
+            }`}
         >
           <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-white via-white/80 to-transparent z-10 pointer-events-none" />
           <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-white via-white/80 to-transparent z-10 pointer-events-none" />
@@ -55,7 +54,7 @@ export function DirectorySponsored({
           {/* Marquee Track with Configurable Duration */}
           <div
             className="dh-logo-marquee-track"
-            style={{ animationDuration: `${Math.max(10, speed)}s` }}
+            style={{ '--marquee-speed': `${Math.max(10, speed)}s` } as React.CSSProperties}
           >
             {loopedItems.map((biz, idx) => {
               const logoSrc = biz.logo_url || '/logoconexao_red_vert.png';
@@ -151,4 +150,3 @@ export function DirectorySponsored({
     </section>
   );
 }
-

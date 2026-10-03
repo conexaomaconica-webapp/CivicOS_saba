@@ -773,21 +773,21 @@ export function RecognitionsAdminClient({
                 target="_blank"
                 className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
               >
-                <span>Selo Esquadro (Bronze)</span>
+                <span>Selo Esquadro</span>
               </Link>
               <Link
                 href="/visual-lab/prata"
                 target="_blank"
                 className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
               >
-                <span>Selo Compasso (Prata)</span>
+                <span>Selo Compasso</span>
               </Link>
               <Link
                 href="/visual-lab/ouro"
                 target="_blank"
                 className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
               >
-                <span>Selo Acácia (Ouro)</span>
+                <span>Selo Acácia</span>
               </Link>
               <Link
                 href="/visual-lab/pedra-fundamental"

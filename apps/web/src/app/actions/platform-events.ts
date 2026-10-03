@@ -43,6 +43,11 @@ export interface PlatformEvent {
   venue_address: string | null;
   city: string | null;
   cover_image_url: string | null;
+  header_media_type?: 'logo' | 'banner';
+  header_media_size?: 'small' | 'medium' | 'large' | 'full';
+  header_media_position?: 'left' | 'center' | 'right';
+  badge_text?: string;
+  footer_information?: string | null;
   registration_enabled: boolean;
   capacity: number | null;
   status?: string;
@@ -86,6 +91,7 @@ export interface AdminEventListItem {
   capacity: number | null;
   total_registrations: number;
   total_confirmed: number;
+  total_declined: number;
   total_checkins: number;
   created_at: string;
 }
@@ -211,6 +217,11 @@ export async function getPlatformEventByIdAction(
         venue_address: data.venue_address ?? null,
         city: data.city ?? null,
         cover_image_url: data.cover_image_url ?? null,
+        header_media_type: data.header_media_type ?? 'logo',
+        header_media_size: data.header_media_size ?? 'medium',
+        header_media_position: data.header_media_position ?? 'center',
+        badge_text: data.badge_text ?? 'Convite',
+        footer_information: data.footer_information ?? null,
         registration_enabled: data.registration_enabled ?? true,
         capacity: data.capacity ?? null,
         status: data.status,
@@ -421,7 +432,7 @@ export async function getAdminEventRegistrationsAction(params: {
 
     const { data, error } = await supabase.rpc('admin_list_event_registrations', {
       p_event_id:          params.eventId,
-      p_search:            params.search ?? null,
+      p_search:            params.search?.trim() || null,
       p_attendance_status: params.attendanceStatus ?? null,
       p_attendee_type:     params.attendeeType ?? null,
       p_city:              params.city ?? null,
@@ -640,6 +651,11 @@ export interface UpdatePlatformEventInput {
   venueAddress?: string | null;
   city?: string | null;
   coverImageUrl?: string | null;
+  headerMediaType?: 'logo' | 'banner';
+  headerMediaSize?: 'small' | 'medium' | 'large' | 'full';
+  headerMediaPosition?: 'left' | 'center' | 'right';
+  badgeText?: string;
+  footerInformation?: string | null;
   registrationEnabled?: boolean;
   capacity?: number | null;
   status?: 'draft' | 'published' | 'canceled' | 'archived';
@@ -666,18 +682,28 @@ export async function updatePlatformEventAction(
     if (input.venueAddress !== undefined) updateData.venue_address = input.venueAddress;
     if (input.city !== undefined) updateData.city = input.city;
     if (input.coverImageUrl !== undefined) updateData.cover_image_url = input.coverImageUrl;
+    if (input.headerMediaType !== undefined) updateData.header_media_type = input.headerMediaType;
+    if (input.headerMediaSize !== undefined) updateData.header_media_size = input.headerMediaSize;
+    if (input.headerMediaPosition !== undefined) updateData.header_media_position = input.headerMediaPosition;
+    if (input.badgeText !== undefined) updateData.badge_text = input.badgeText.trim() || 'Convite';
+    if (input.footerInformation !== undefined) updateData.footer_information = input.footerInformation?.trim() || null;
     if (input.registrationEnabled !== undefined) updateData.registration_enabled = input.registrationEnabled;
     if (input.capacity !== undefined) updateData.capacity = input.capacity;
     if (input.status !== undefined) updateData.status = input.status;
 
     updateData.updated_at = new Date().toISOString();
 
-    const { data: updatedEvent } = await supabase
+    const { data: updatedEvent, error: updateError } = await supabase
       .from('platform_events')
       .update(updateData)
       .eq('id', input.eventId)
       .select('slug')
       .maybeSingle();
+
+    if (updateError) {
+      console.error('[Admin/Events] Erro ao atualizar evento:', updateError);
+      return { success: false, error: updateError.message || 'Não foi possível atualizar o evento.' };
+    }
 
     try {
       revalidatePath('/eventos');
@@ -707,6 +733,11 @@ export interface CreatePlatformEventInput {
   venueAddress?: string;
   city?: string;
   coverImageUrl?: string;
+  headerMediaType?: 'logo' | 'banner';
+  headerMediaSize?: 'small' | 'medium' | 'large' | 'full';
+  headerMediaPosition?: 'left' | 'center' | 'right';
+  badgeText?: string;
+  footerInformation?: string;
   registrationEnabled?: boolean;
   capacity?: number | null;
   status?: 'draft' | 'published' | 'canceled' | 'archived';
@@ -756,6 +787,11 @@ export async function createPlatformEventAction(
         venue_address: input.venueAddress?.trim() || null,
         city: input.city?.trim() || null,
         cover_image_url: input.coverImageUrl?.trim() || null,
+        header_media_type: input.headerMediaType || 'logo',
+        header_media_size: input.headerMediaSize || 'medium',
+        header_media_position: input.headerMediaPosition || 'center',
+        badge_text: input.badgeText?.trim() || 'Convite',
+        footer_information: input.footerInformation?.trim() || null,
         registration_enabled: input.registrationEnabled ?? true,
         capacity: input.capacity !== undefined && input.capacity !== null ? input.capacity : null,
         status: input.status || 'published',
@@ -777,6 +813,37 @@ export async function createPlatformEventAction(
   } catch (err) {
     console.error('[Admin/Events] Exceção ao criar evento:', err);
     return { success: false, error: 'Erro inesperado ao criar evento.' };
+  }
+}
+
+export async function uploadPlatformEventMediaAction(
+  fileDataUrl: string
+): Promise<ActionResponse<{ url: string }>> {
+  try {
+    const match = fileDataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+    if (!match) return { success: false, error: 'Formato inválido. Use PNG, JPEG ou WebP.' };
+
+    const mimeType = match[1]!;
+    const buffer = Buffer.from(match[2]!, 'base64');
+    if (!buffer.length || buffer.length > 5 * 1024 * 1024) {
+      return { success: false, error: 'A imagem deve ter no máximo 5 MB.' };
+    }
+
+    const supabase = await createServerSideClient();
+    const tenantId = await resolveTenantIdServer();
+    const extension = mimeType === 'image/jpeg' ? 'jpg' : mimeType.split('/')[1];
+    const path = `${tenantId}/${crypto.randomUUID()}.${extension}`;
+    const { error } = await supabase.storage.from('event-assets').upload(path, buffer, {
+      contentType: mimeType,
+      upsert: false,
+    });
+    if (error) return { success: false, error: error.message };
+
+    const { data } = supabase.storage.from('event-assets').getPublicUrl(path);
+    return { success: true, data: { url: data.publicUrl } };
+  } catch (err) {
+    console.error('[Admin/Events] Falha no upload da imagem:', err);
+    return { success: false, error: 'Não foi possível enviar a imagem.' };
   }
 }
 
@@ -820,4 +887,3 @@ export async function deletePlatformEventAction(
 
 // Re-export for convenience
 export { sanitizeUTMParams };
-

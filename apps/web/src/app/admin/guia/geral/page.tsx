@@ -49,8 +49,16 @@ export default function AdminGuiaGeralPage() {
     async function loadSettings() {
       try {
         const supabase = createClient();
-        const { data: profileData } = await (supabase as any).from('profiles').select('tenant_id').maybeSingle();
-        const tid = profileData?.tenant_id || '00000000-0000-0000-0000-000000000010';
+        const { data: authData } = await supabase.auth.getUser();
+        if (!authData.user) throw new Error('Usuário não autenticado.');
+
+        const { data: profileData } = await (supabase as any)
+          .from('profiles')
+          .select('tenant_id')
+          .eq('id', authData.user.id)
+          .maybeSingle();
+        const tid = profileData?.tenant_id;
+        if (!tid) throw new Error('Tenant do administrador não identificado.');
 
         const { data } = await (supabase as any)
           .from('directory_home_settings')
