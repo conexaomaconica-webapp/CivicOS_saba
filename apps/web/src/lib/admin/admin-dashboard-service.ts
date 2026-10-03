@@ -13,6 +13,7 @@ export interface RecentApplicationDTO {
   completeness_percent: number;
   payment_status: 'paid' | 'pending' | 'overdue';
   publication_status: 'draft' | 'pending_review' | 'published' | 'rejected' | 'suspended';
+  commercial_status?: string;
   created_at: string;
 }
 
@@ -196,7 +197,7 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
       try {
         const { data: businessesData } = await (dbClient as any)
           .from('businesses')
-          .select('id, name, category, publication_status, plan_tier, is_active, owner_id, created_at, logo_url, description, phone, email, website, address, cnpj, legal_name, slug')
+          .select('id, name, category, publication_status, commercial_status, plan_tier, is_active, owner_id, created_at, logo_url, description, phone, email, website, address, cnpj, legal_name, slug')
           .order('created_at', { ascending: false });
 
         businesses = (businessesData || []) as any[];
@@ -264,7 +265,12 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
     // Métricas reais de empresas
     const totalCompanies = businesses.length;
     const publishedCompanies = businesses.filter((b) => b.publication_status === 'published' && b.is_active !== false).length;
-    const pendingCompanies = businesses.filter((b) => b.publication_status === 'pending_review').length;
+    const pendingCompanies = businesses.filter(
+      (b) =>
+        b.publication_status === 'pending_review' ||
+        (!['publicado'].includes(b.commercial_status || '') &&
+          !['published', 'rejected', 'suspended'].includes(b.publication_status || 'draft')),
+    ).length;
     const suspendedCompanies = businesses.filter((b) => b.publication_status === 'suspended').length;
     const draftCompanies = businesses.filter((b) => b.publication_status === 'draft').length;
 
@@ -444,6 +450,7 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
         completeness_percent: Math.min(completeness, 100),
         payment_status: isPaid ? 'paid' : 'pending',
         publication_status: b.publication_status || 'draft',
+        commercial_status: b.commercial_status || 'pre_cadastro',
         created_at: b.created_at || new Date().toISOString(),
       };
     });

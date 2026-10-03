@@ -420,11 +420,23 @@ export interface AdminBusiness360DTO {
   };
   contract?: {
     id: string;
+    snapshot_id: string;
+    status: 'draft' | 'awaiting_signature' | 'signed' | 'voided' | 'superseded';
     version: string;
     sha256_hash: string;
-    signed_at: string;
+    signed_at: string | null;
+    acceptance_id: string | null;
     rendered_text: string;
     signer_name: string;
+  };
+  commercial_activation: {
+    commercial_status: string;
+    contract_id: string | null;
+    contract_status: string | null;
+    snapshot_id: string | null;
+    acceptance_id: string | null;
+    contract_signed: boolean;
+    payment_confirmed: boolean;
   };
   commercial_terms?: {
     id: string;
@@ -1107,12 +1119,12 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
 
 
 
-    // 6. Contrato Digital Assinado
+    // 6. Contrato digital: nunca inferir assinatura a partir da existência do contrato/snapshot.
     let contractDetail: AdminBusiness360DTO['contract'] = undefined;
     try {
       const { data: contractRow } = await (supabase as any)
         .from('contracts')
-        .select('id, created_at')
+        .select('id, status, version_id, created_at')
         .eq('business_id', businessId)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -1122,7 +1134,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       if (contractRow) {
         const { data: snap } = await (supabase as any)
           .from('contract_snapshots')
-          .select('id, rendered_text, sha256_hash, version, created_at')
+          .select('id, rendered_text, sha256_hash, created_at')
           .eq('contract_id', contractRow.id)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -1131,62 +1143,32 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       }
 
       if (snapshotRow && snapshotRow.rendered_text) {
+        const [{ data: versionRow }, { data: acceptanceRow }] = await Promise.all([
+          (supabase as any)
+            .from('contract_versions')
+            .select('version')
+            .eq('id', contractRow.version_id)
+            .maybeSingle(),
+          (supabase as any)
+            .from('contract_acceptances')
+            .select('id, accepted_at')
+            .eq('contract_id', contractRow.id)
+            .eq('snapshot_id', snapshotRow.id)
+            .order('accepted_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ]);
+
         contractDetail = {
-          id: snapshotRow.id,
-          version: snapshotRow.version || 'v1.0',
-          sha256_hash: snapshotRow.sha256_hash || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-          signed_at: snapshotRow.created_at || b.created_at,
+          id: contractRow.id,
+          snapshot_id: snapshotRow.id,
+          status: contractRow.status,
+          version: versionRow?.version || 'sem versão',
+          sha256_hash: snapshotRow.sha256_hash,
+          signed_at: acceptanceRow?.accepted_at || null,
+          acceptance_id: acceptanceRow?.id || null,
           rendered_text: snapshotRow.rendered_text,
-          signer_name: b.name || 'Anunciante Titular',
-        };
-      } else {
-        const dateFormatted = new Date(b.created_at || Date.now()).toLocaleDateString('pt-BR');
-        const timeFormatted = new Date(b.created_at || Date.now()).toLocaleTimeString('pt-BR');
-        const planName = planCode === 'ouro' ? 'Plano Acácia Anual' : planCode === 'prata' ? 'Plano Compasso Anual' : 'Plano Esquadro';
-
-        const generatedContractText = `CONTRATO DE ADESÃO E LICENCIAMENTO DE ANÚNCIO COMERCIAL
-PLATAFORMA CONEXÃO MAÇÔNICA
-
-================================================================================
-PARTES CONTRATANTES:
-CONTRATADA: CONEXÃO MAÇÔNICA COMUNICAÇÃO E TECNOLOGIA LTDA.
-CONTRATANTE: ${b.name || 'EMPRESA ANUNCIANTE'} (${b.legal_name || b.name || 'RAZÃO SOCIAL NÃO INFORMADA'})
-DOCUMENTO CNPJ/CPF: ${b.cnpj || b.cnpj_cpf || 'Cadastrado no Sistema'}
-E-MAIL DE CONTATO: ${b.email || 'anunciante@conexaomaconica.com.br'}
-PLANO ANUNCIADO: ${planName.toUpperCase()}
-CIDADE / UF: ${locationData.city || b.city || 'São Paulo'} / ${locationData.state || b.state || 'SP'}
-================================================================================
-
-CLÁUSULA PRIMEIRA - DO OBJETO:
-O presente contrato tem por objeto o licenciamento de espaço publicitário digital no Guia de Empresas Conexão Maçônica, concedendo à CONTRATANTE o direito de veiculação de seu perfil comercial, logotipo, galeria de imagens, catálogo de serviços e publicação de ofertas no ecossistema fraterno.
-
-CLÁUSULA SEGUNDA - DAS OBRIGAÇÕES DA CONTRATANTE:
-1. A CONTRATANTE declara sob as penas da lei que todas as informações prestadas são verdadeiras e autênticas.
-2. A CONTRATANTE compromete-se a manter atualizados os seus canais de atendimento e dados cadastrais.
-3. É expressamente vedada a veiculação de conteúdos ilícitos, falsos ou incompatíveis com as diretrizes éticas e morais da plataforma.
-
-CLÁUSULA TERCEIRA - DA VIGÊNCIA E RENOVAÇÃO:
-O presente instrumento possui vigência de 12 (doze) meses a contar da data de sua assinatura eletrônica, sendo renovável por iguais períodos mediante o adimplemento das obrigações financeiras pactuadas.
-
-CLÁUSULA QUARTA - DA ASSINATURA ELETRÔNICA E INTEGRIDADE:
-As partes declaram a plena validade jurídica da aceitação por meio eletrônico, nos termos do Art. 10, § 2º da Medida Provisória nº 2.200-2/2001, certificada pela hash de integridade criptográfica SHA-256 infra.
-
---------------------------------------------------------------------------------
-DOSSIÊ DE ACEITE E ASSINATURA DIGITAL (AUDITADO):
-• STATUS DO CONTRATO: ASSINADO E CONGELADO (VALIDADO)
-• REGISTRO DO SIGNATÁRIO: ${b.name || 'Empresa Anunciante'} (${b.email || 'anunciante@conexaomaconica.com.br'})
-• DATA/HORA DA ASSINATURA: ${dateFormatted} às ${timeFormatted}
-• ASSINATURA DIGITAL HASH SHA-256: 4f8a91b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0
-• PROTOCOLO DE VALIDAÇÃO AMBIENTAL: Integridade Verificada — SHA-256 / SSL TLS 1.3
---------------------------------------------------------------------------------`.trim();
-
-        contractDetail = {
-          id: `contract-${b.id}`,
-          version: 'v1.0',
-          sha256_hash: '4f8a91b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0',
-          signed_at: b.created_at,
-          rendered_text: generatedContractText,
-          signer_name: b.name || 'Anunciante Titular',
+          signer_name: acceptanceRow ? (b.name || 'Anunciante Titular') : '',
         };
       }
     } catch (_e) {
@@ -1378,6 +1360,18 @@ DOSSIÊ DE ACEITE E ASSINATURA DIGITAL (AUDITADO):
 
       masonic_link_detail,
       contract: contractDetail,
+      commercial_activation: {
+        commercial_status: b.commercial_status || 'pre_cadastro',
+        contract_id: contractDetail?.id || null,
+        contract_status: contractDetail?.status || null,
+        snapshot_id: contractDetail?.snapshot_id || null,
+        acceptance_id: contractDetail?.acceptance_id || null,
+        contract_signed: contractDetail?.status === 'signed' && Boolean(contractDetail.acceptance_id),
+        payment_confirmed:
+          ['pagamento_confirmado', 'prontuario_em_configuracao', 'pronto_para_publicar', 'publicado'].includes(
+            b.commercial_status || '',
+          ) || payments_history.some((payment) => payment.status === 'paid' || payment.status === 'succeeded'),
+      },
       subscription: {
         plan_code: planCode,
         plan_name: `Plano ${getCommercialPlanName(planCode)}`,
@@ -2184,39 +2178,34 @@ export async function verifyAdminMasonicLinkAction(
       }
     }
 
-    await (supabase as any)
+    const currentCommercialStatus = (biz.commercial_status || 'pre_cadastro') as CommercialStatus;
+    let nextCommercialStatus: CommercialStatus | null = null;
+    if (isApproved && currentCommercialStatus === 'pre_cadastro') {
+      assertCommercialStatusTransition('pre_cadastro', 'vinculo_informado');
+      assertCommercialStatusTransition('vinculo_informado', 'vinculo_verificado');
+      nextCommercialStatus = 'vinculo_verificado';
+    } else if (isApproved && currentCommercialStatus === 'vinculo_informado') {
+      assertCommercialStatusTransition('vinculo_informado', 'vinculo_verificado');
+      nextCommercialStatus = 'vinculo_verificado';
+    }
+
+    const businessUpdates: Record<string, any> = {
+      is_verified: isApproved,
+      masonic_validation_status: newStatus,
+      updated_at: new Date().toISOString(),
+    };
+    if (nextCommercialStatus) businessUpdates.commercial_status = nextCommercialStatus;
+
+    const { error: businessUpdateError } = await (supabase as any)
       .from('businesses')
-      .update({
-        is_verified: isApproved,
-        masonic_validation_status: newStatus,
-        updated_at: new Date().toISOString(),
-      })
+      .update(businessUpdates)
       .eq('id', businessId);
 
-        // Avança commercial_status caso aprovado
-    if (isApproved) {
-      const currentCommercialStatus = (biz.commercial_status || 'pre_cadastro') as CommercialStatus;
-      let nextCommercialStatus: CommercialStatus | null = null;
-      if (currentCommercialStatus === 'pre_cadastro') {
-        assertCommercialStatusTransition('pre_cadastro', 'vinculo_informado');
-        assertCommercialStatusTransition('vinculo_informado', 'vinculo_verificado');
-        nextCommercialStatus = 'vinculo_verificado';
-      } else if (currentCommercialStatus === 'vinculo_informado') {
-        assertCommercialStatusTransition('vinculo_informado', 'vinculo_verificado');
-        nextCommercialStatus = 'vinculo_verificado';
-      }
-
-      const bizUpdates: Record<string, any> = {
-        masonic_validation_status: 'approved',
-        updated_at: new Date().toISOString(),
+    if (businessUpdateError) {
+      return {
+        success: false,
+        error: `Vínculo atualizado, mas o status comercial não foi sincronizado: ${businessUpdateError.message}`,
       };
-      if (nextCommercialStatus) {
-        bizUpdates.commercial_status = nextCommercialStatus;
-      }
-      await (supabase as any)
-        .from('businesses')
-        .update(bizUpdates)
-        .eq('id', businessId);
     }
 
     await (supabase as any).from('admin_audit_logs').insert({   tenant_id: biz.tenant_id,
@@ -2231,6 +2220,7 @@ export async function verifyAdminMasonicLinkAction(
 
     revalidatePath('/admin/empresas');
     revalidatePath(`/admin/empresas/${businessId}`);
+    revalidatePath(`/admin/empresas/${businessId}/contratacao`);
     revalidatePath('/guia', 'layout');
 
     return { success: true };
@@ -2417,13 +2407,15 @@ export async function upsertAdminMasonicLinkAction(
 
     // Sincroniza campos na tabela businesses
     const businessUpdates: Record<string, any> = {
+      is_verified: isApproved,
+      masonic_validation_status:
+        dbStatus === 'approved' ? 'verified' : dbStatus === 'pending_verification' ? 'pending' : dbStatus,
       updated_at: new Date().toISOString(),
     };
     if (payload.lodge_name.trim()) {
       businessUpdates.masonic_lodge = payload.lodge_name.trim();
       businessUpdates.masonic_potency = payload.potency?.trim() || null;
       businessUpdates.masonic_link_type = dbLinkType;
-      businessUpdates.masonic_validation_status = dbStatus;
     }
     if (nextCommercialStatus) {
       businessUpdates.commercial_status = nextCommercialStatus;
@@ -2465,11 +2457,19 @@ export async function upsertAdminMasonicLinkAction(
       }
     }
 
-    await Promise.all(finishPromises);
+    const finishResults = await Promise.all(finishPromises);
+    const businessUpdateError = finishResults[0]?.error;
+    if (businessUpdateError) {
+      return {
+        success: false,
+        error: `Vínculo salvo, mas o status comercial não foi sincronizado: ${businessUpdateError.message}`,
+      };
+    }
 
     revalidatePath('/admin/empresas');
     revalidatePath(`/admin/empresas/${businessId}`);
     revalidatePath(`/admin/empresas/${businessId}/vinculo-maconico`);
+    revalidatePath(`/admin/empresas/${businessId}/contratacao`);
 
     return { success: true };
   } catch (err: any) {
@@ -2655,16 +2655,63 @@ export async function confirmAdminCommercialTermsAction(
     // 2. Consulta da empresa
     const { data: biz, error: bizErr } = await (supabase as any)
       .from('businesses')
-      .select('id, tenant_id, commercial_status, plan_tier, city, state')
+      .select('id, tenant_id, commercial_status, plan_tier')
       .eq('id', input.business_id)
       .single();
 
-    if (bizErr || !biz) {
+    if (bizErr) {
+      console.error('[confirmAdminCommercialTermsAction] Erro ao consultar empresa:', {
+        businessId: input.business_id,
+        code: bizErr.code,
+        message: bizErr.message,
+        details: bizErr.details,
+        hint: bizErr.hint,
+      });
+      return { success: false, error: `Falha ao consultar empresa: ${bizErr.message}` };
+    }
+
+    if (!biz) {
       return { success: false, error: 'Empresa não encontrada no banco de dados.' };
     }
 
     // 3. Validação da máquina de estados
-    const currentStatus = (biz.commercial_status || 'pre_cadastro') as CommercialStatus;
+    let currentStatus = (biz.commercial_status || 'pre_cadastro') as CommercialStatus;
+
+    // Reconcilia registros legados em que o vínculo foi aprovado, mas a máquina
+    // comercial permaneceu em uma etapa anterior. Nunca regride estados posteriores.
+    if (currentStatus === 'pre_cadastro' || currentStatus === 'vinculo_informado') {
+      const { data: verifiedLink, error: verifiedLinkError } = await (supabase as any)
+        .from('business_masonic_links')
+        .select('id, status, verified_at')
+        .eq('business_id', biz.id)
+        .in('status', ['approved', 'verified'])
+        .not('verified_at', 'is', null)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (verifiedLinkError) {
+        return { success: false, error: `Falha ao validar o vínculo maçônico: ${verifiedLinkError.message}` };
+      }
+
+      if (verifiedLink) {
+        const { error: reconcileError } = await (supabase as any)
+          .from('businesses')
+          .update({
+            commercial_status: 'vinculo_verificado',
+            is_verified: true,
+            masonic_validation_status: 'verified',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', biz.id)
+          .in('commercial_status', ['pre_cadastro', 'vinculo_informado']);
+
+        if (reconcileError) {
+          return { success: false, error: `Falha ao sincronizar o status comercial: ${reconcileError.message}` };
+        }
+        currentStatus = 'vinculo_verificado';
+      }
+    }
 
     if (currentStatus !== 'dados_comerciais_conferidos') {
       try {
@@ -2709,20 +2756,14 @@ export async function confirmAdminCommercialTermsAction(
 
     // 4.1. Atualização do Endereço se fornecido no formulário
     let fullAddressToSync: string | undefined = undefined;
-    let cityToSync = biz.city;
-    let stateToSync = biz.state;
-
     if (input.address && (input.address.street?.trim() || input.address.city?.trim())) {
       const street = input.address.street?.trim() || '';
-      const city = input.address.city?.trim() || biz.city || 'São Paulo';
-      const state = input.address.state?.trim() || biz.state || 'SP';
+      const city = input.address.city?.trim() || 'São Paulo';
+      const state = input.address.state?.trim() || 'SP';
       const number = input.address.number?.trim() || null;
       const complement = input.address.complement?.trim() || null;
       const neighborhood = input.address.neighborhood?.trim() || null;
       const postal_code = input.address.postal_code?.trim() || null;
-
-      cityToSync = city;
-      stateToSync = state;
 
       const parts = [
         street ? `${street}${number ? ', ' + number : ''}` : '',
@@ -2782,8 +2823,6 @@ export async function confirmAdminCommercialTermsAction(
     };
     if (fullAddressToSync) {
       bizUpdatePayload.address = fullAddressToSync;
-      bizUpdatePayload.city = cityToSync;
-      bizUpdatePayload.state = stateToSync;
     }
 
     const [termsRes, bizRes] = await Promise.all([

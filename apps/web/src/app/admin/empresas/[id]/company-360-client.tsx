@@ -152,6 +152,9 @@ export default function Company360Client({ initialData }: Props) {
 
   // 6.4: Governança do Prontuário 360
   const commercialStatus = data.business.commercial_status || 'pre_cadastro';
+  const contractSigned = data.commercial_activation.contract_signed;
+  const paymentConfirmed = data.commercial_activation.payment_confirmed;
+  const masonicLinkVerified = data.masonic_link_detail?.status === 'verified';
   const [isUnlockingDossier, setIsUnlockingDossier] = useState(false);
   const [isAdvancingToReady, setIsAdvancingToReady] = useState(false);
 
@@ -236,9 +239,9 @@ export default function Company360Client({ initialData }: Props) {
   const publicationGate = validateBusinessPublicationGate({
     commercial_status: commercialStatus,
     masonic_validation_status: data.masonic_link_detail?.status === 'verified' || data.business.is_verified ? 'verified' : null,
-    has_verified_masonic_link: data.masonic_link_detail?.status === 'verified',
-    has_signed_contract: Boolean(data.contract?.signed_at || data.contract?.id),
-    has_confirmed_payment: ['pronto_para_publicar', 'publicado'].includes(commercialStatus) || data.payments_history?.some(p => p.status === 'succeeded' || p.status === 'paid'),
+    has_verified_masonic_link: masonicLinkVerified,
+    has_signed_contract: contractSigned,
+    has_confirmed_payment: paymentConfirmed,
     profile: {
       name,
       legal_name: legalName,
@@ -1413,6 +1416,13 @@ export default function Company360Client({ initialData }: Props) {
 
         <div className="flex items-center gap-2">
           <Link
+            href={`/admin/empresas/${data.business.id}/contratacao`}
+            className="px-4 py-2 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl border border-[#C9A227]/40 transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <FileText className="w-4 h-4" />
+            <span>Acompanhar ativação</span>
+          </Link>
+          <Link
             href={`/guia/${data.business.slug || data.business.id}`}
             target="_blank"
             className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-xs rounded-xl border border-stone-300 transition-all flex items-center gap-1.5 cursor-pointer"
@@ -1477,17 +1487,17 @@ export default function Company360Client({ initialData }: Props) {
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-semibold">
-                <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                  Vínculo validado
+                <span className={`inline-flex items-center gap-1 border px-2.5 py-0.5 rounded-md ${masonicLinkVerified ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-stone-600 bg-stone-50 border-stone-200'}`}>
+                  {masonicLinkVerified ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Clock className="h-3.5 w-3.5" />}
+                  {masonicLinkVerified ? 'Vínculo validado' : 'Vínculo pendente'}
                 </span>
-                <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                  Contrato assinado
+                <span className={`inline-flex items-center gap-1 border px-2.5 py-0.5 rounded-md ${contractSigned ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-stone-600 bg-stone-50 border-stone-200'}`}>
+                  {contractSigned ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Clock className="h-3.5 w-3.5" />}
+                  {contractSigned ? 'Contrato assinado' : 'Assinatura pendente'}
                 </span>
-                <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                  Pagamento confirmado
+                <span className={`inline-flex items-center gap-1 border px-2.5 py-0.5 rounded-md ${paymentConfirmed ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-stone-600 bg-stone-50 border-stone-200'}`}>
+                  {paymentConfirmed ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Clock className="h-3.5 w-3.5" />}
+                  {paymentConfirmed ? 'Pagamento confirmado' : 'Pagamento pendente'}
                 </span>
               </div>
             </div>
@@ -3203,7 +3213,27 @@ export default function Company360Client({ initialData }: Props) {
       )}
 
       {/* ABA 5: CONTRATO */}
-      {activeTab === 'contrato' && (
+      {activeTab === 'contrato' && !data.contract && (
+        <div className="bg-white border border-stone-300 rounded-2xl p-8 shadow-xs text-center space-y-4">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-stone-100 text-stone-500">
+            <FileText className="h-6 w-6" />
+          </div>
+          <div>
+            <h3 className="font-serif font-bold text-lg text-stone-900">Contrato ainda não gerado</h3>
+            <p className="mt-1 text-sm text-stone-500">
+              Esta empresa não possui contrato, snapshot ou aceite registrados.
+            </p>
+          </div>
+          <Link
+            href={`/admin/empresas/${data.business.id}/contratacao`}
+            className="inline-flex items-center gap-2 rounded-xl bg-[#3B0B14] px-5 py-2.5 text-xs font-bold text-[#C9A227] hover:bg-[#4B161B]"
+          >
+            Iniciar contratação
+            <ExternalLink className="h-4 w-4" />
+          </Link>
+        </div>
+      )}
+      {activeTab === 'contrato' && data.contract && (
         <div className="bg-white border border-stone-300 rounded-2xl p-6 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-stone-200 pb-4">
             <div>
@@ -3248,8 +3278,8 @@ export default function Company360Client({ initialData }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl space-y-1">
               <span className="text-stone-500 font-bold block">Status Jurídico:</span>
-              <span className="inline-block px-3 py-1 bg-emerald-100 text-emerald-900 font-bold rounded-full">
-                ✓ Assinado e Válido
+              <span className={`inline-block px-3 py-1 font-bold rounded-full ${contractSigned ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'}`}>
+                {contractSigned ? '✓ Assinado e válido' : 'Assinatura pendente'}
               </span>
             </div>
             <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl space-y-1">
@@ -3257,13 +3287,13 @@ export default function Company360Client({ initialData }: Props) {
               <strong className="text-stone-900 font-mono text-xs block">
                 {data.contract?.signed_at
                   ? `${new Date(data.contract.signed_at).toLocaleDateString('pt-BR')} às ${new Date(data.contract.signed_at).toLocaleTimeString('pt-BR')}`
-                  : new Date(data.business.created_at).toLocaleDateString('pt-BR')}
+                  : 'Ainda não assinado'}
               </strong>
             </div>
             <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl space-y-1">
               <span className="text-stone-500 font-bold block">Assinatura SHA-256:</span>
               <strong className="text-stone-800 font-mono text-[11px] block truncate" title={data.contract?.sha256_hash}>
-                {data.contract?.sha256_hash || '4f8a91b2c3d4e5f6a7b8c9d0e1f2a3b4...'}
+                {data.contract.sha256_hash}
               </strong>
             </div>
           </div>
@@ -3317,9 +3347,9 @@ export default function Company360Client({ initialData }: Props) {
                 </div>
                 <div>• <strong>Empresa Signatária:</strong> {data.business.name} ({data.business.legal_name || data.business.name})</div>
                 <div>• <strong>Documento CNPJ/CPF:</strong> {data.business.cnpj_cpf || 'Registrado na Plataforma'}</div>
-                <div>• <strong>Status Jurídico:</strong> CONTRATO VÁLIDO E HOMOLOGADO</div>
-                <div>• <strong>Data/Hora de Aceite:</strong> {data.contract?.signed_at ? new Date(data.contract.signed_at).toLocaleString('pt-BR') : new Date(data.business.created_at).toLocaleString('pt-BR')}</div>
-                <div className="truncate" title={data.contract?.sha256_hash}>• <strong>Hash SHA-256:</strong> {data.contract?.sha256_hash || '4f8a91b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0'}</div>
+                <div>• <strong>Status Jurídico:</strong> {contractSigned ? 'CONTRATO ASSINADO E HOMOLOGADO' : 'AGUARDANDO ASSINATURA'}</div>
+                <div>• <strong>Data/Hora de Aceite:</strong> {data.contract.signed_at ? new Date(data.contract.signed_at).toLocaleString('pt-BR') : 'Ainda não assinado'}</div>
+                <div className="truncate" title={data.contract.sha256_hash}>• <strong>Hash SHA-256:</strong> {data.contract.sha256_hash}</div>
               </div>
             </div>
           </div>

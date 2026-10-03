@@ -67,21 +67,26 @@ export async function getAdminContractDraftPreviewAction(
         cnpj,
         cnpj_cpf,
         phone,
-        whatsapp,
         email,
-        street,
-        number,
         address,
-        city,
-        state,
         commercial_status,
-        is_pedra_fundamental,
         owner_id
       `)
       .eq('id', businessId)
       .single();
 
-    if (bizErr || !biz) {
+    if (bizErr) {
+      console.error('[getAdminContractDraftPreviewAction] Erro ao consultar empresa:', {
+        businessId,
+        code: bizErr.code,
+        message: bizErr.message,
+        details: bizErr.details,
+        hint: bizErr.hint,
+      });
+      return { success: false, error: `Falha ao consultar empresa: ${bizErr.message}` };
+    }
+
+    if (!biz) {
       return { success: false, error: 'Empresa não encontrada no banco de dados.' };
     }
 
@@ -104,6 +109,23 @@ export async function getAdminContractDraftPreviewAction(
       .from('business_responsibles')
       .select('name, business_role, whatsapp')
       .eq('business_id', businessId)
+      .maybeSingle();
+
+    const { data: contacts } = await (supabase as any)
+      .from('business_contacts')
+      .select('type, value')
+      .eq('business_id', businessId);
+    const contactsMap = new Map<string, string>(
+      (contacts || []).map((contact: any) => [contact.type, contact.value]),
+    );
+
+    const { data: pedraFundamentalRecognition } = await (supabase as any)
+      .from('business_recognitions')
+      .select('id')
+      .eq('business_id', businessId)
+      .eq('recognition_key', 'pedra_fundamental')
+      .eq('is_active', true)
+      .limit(1)
       .maybeSingle();
 
     let ownerProfile: any = null;
@@ -146,11 +168,8 @@ export async function getAdminContractDraftPreviewAction(
           locRow.postal_code ? `CEP ${locRow.postal_code}` : '',
         ].filter(Boolean);
         if (parts.length > 0) formattedAddress = parts.join(', ');
-      } else if (biz.address || biz.street) {
-        formattedAddress = [
-          biz.street ? `${biz.street}${biz.number ? `, ${biz.number}` : ''}` : biz.address,
-          biz.city ? `${biz.city} - ${biz.state || 'SP'}` : '',
-        ].filter(Boolean).join(', ');
+      } else if (biz.address) {
+        formattedAddress = biz.address;
       }
     }
 
@@ -190,14 +209,15 @@ export async function getAdminContractDraftPreviewAction(
     }
 
     // 6. Normalização e mapeamento das variáveis do template
-    const rawCnpj = biz.cnpj_cpf || biz.cnpj || '00000000000000';
+    const rawCnpj = biz.cnpj || biz.cnpj_cpf || '00000000000000';
     const formattedCnpj = formatCpfCnpj(rawCnpj);
 
     const responsavelNome = resp?.name || ownerProfile?.name || 'Responsável Legal';
     const rawCpf = ownerProfile?.document_number || '00000000000';
     const formattedCpf = formatCpfCnpj(rawCpf);
     const responsavelEmail = ownerProfile?.email || biz.email || 'contato@anunciante.com.br';
-    const empresaTelefone = biz.phone || biz.whatsapp || 'Não informado';
+    const empresaTelefone =
+      resp?.whatsapp || contactsMap.get('whatsapp') || contactsMap.get('phone') || biz.phone || 'Não informado';
 
     const variables: AdvertiserContractVariables = {
       razao_social: biz.legal_name || biz.name,
@@ -216,9 +236,7 @@ export async function getAdminContractDraftPreviewAction(
       forma_pagamento: ctRow.payment_method === 'avista' ? 'À vista' : 'Parcelado',
       parcelas: `${ctRow.installments_count}x`,
       valor_parcela: formatCurrencyBRL(ctRow.installment_amount_cents),
-      selo_pedra_fundamental: formatSeloPedraFundamental(
-        Boolean(ctRow.is_pedra_fundamental || biz.is_pedra_fundamental)
-      ),
+      selo_pedra_fundamental: formatSeloPedraFundamental(Boolean(pedraFundamentalRecognition)),
       data_emissao: formatDataEmissao(new Date()),
     };
 
@@ -292,21 +310,26 @@ export async function generateAdminContractSnapshotAction(
         cnpj,
         cnpj_cpf,
         phone,
-        whatsapp,
         email,
-        street,
-        number,
         address,
-        city,
-        state,
         commercial_status,
-        is_pedra_fundamental,
         owner_id
       `)
       .eq('id', businessId)
       .single();
 
-    if (bizErr || !biz) {
+    if (bizErr) {
+      console.error('[generateAdminContractSnapshotAction] Erro ao consultar empresa:', {
+        businessId,
+        code: bizErr.code,
+        message: bizErr.message,
+        details: bizErr.details,
+        hint: bizErr.hint,
+      });
+      return { success: false, error: `Falha ao consultar empresa: ${bizErr.message}` };
+    }
+
+    if (!biz) {
       return { success: false, error: 'Empresa não encontrada no banco de dados.' };
     }
 
@@ -437,6 +460,23 @@ export async function generateAdminContractSnapshotAction(
       .eq('business_id', businessId)
       .maybeSingle();
 
+    const { data: contacts } = await (supabase as any)
+      .from('business_contacts')
+      .select('type, value')
+      .eq('business_id', businessId);
+    const contactsMap = new Map<string, string>(
+      (contacts || []).map((contact: any) => [contact.type, contact.value]),
+    );
+
+    const { data: pedraFundamentalRecognition } = await (supabase as any)
+      .from('business_recognitions')
+      .select('id')
+      .eq('business_id', businessId)
+      .eq('recognition_key', 'pedra_fundamental')
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+
     let ownerProfile: any = null;
     if (biz.owner_id) {
       const { data: prof } = await (supabase as any)
@@ -477,11 +517,8 @@ export async function generateAdminContractSnapshotAction(
           locRow.postal_code ? `CEP ${locRow.postal_code}` : '',
         ].filter(Boolean);
         if (parts.length > 0) formattedAddress = parts.join(', ');
-      } else if (biz.address || biz.street) {
-        formattedAddress = [
-          biz.street ? `${biz.street}${biz.number ? `, ${biz.number}` : ''}` : biz.address,
-          biz.city ? `${biz.city} - ${biz.state || 'SP'}` : '',
-        ].filter(Boolean).join(', ');
+      } else if (biz.address) {
+        formattedAddress = biz.address;
       }
     }
 
@@ -490,14 +527,15 @@ export async function generateAdminContractSnapshotAction(
     }
 
     // 8. Normalização e mapeamento obrigatório de variáveis
-    const rawCnpj = biz.cnpj_cpf || biz.cnpj || '00000000000000';
+    const rawCnpj = biz.cnpj || biz.cnpj_cpf || '00000000000000';
     const formattedCnpj = formatCpfCnpj(rawCnpj);
 
     const responsavelNome = resp?.name || ownerProfile?.name || 'Responsável Legal';
     const rawCpf = ownerProfile?.document_number || '00000000000';
     const formattedCpf = formatCpfCnpj(rawCpf);
     const responsavelEmail = ownerProfile?.email || biz.email || 'contato@anunciante.com.br';
-    const empresaTelefone = biz.phone || biz.whatsapp || 'Não informado';
+    const empresaTelefone =
+      resp?.whatsapp || contactsMap.get('whatsapp') || contactsMap.get('phone') || biz.phone || 'Não informado';
 
     const variables: AdvertiserContractVariables = {
       razao_social: biz.legal_name || biz.name,
@@ -516,9 +554,7 @@ export async function generateAdminContractSnapshotAction(
       forma_pagamento: ctRow.payment_method === 'avista' ? 'À vista' : 'Parcelado',
       parcelas: `${ctRow.installments_count}x`,
       valor_parcela: formatCurrencyBRL(ctRow.installment_amount_cents),
-      selo_pedra_fundamental: formatSeloPedraFundamental(
-        Boolean(ctRow.is_pedra_fundamental || biz.is_pedra_fundamental)
-      ),
+      selo_pedra_fundamental: formatSeloPedraFundamental(Boolean(pedraFundamentalRecognition)),
       data_emissao: formatDataEmissao(new Date()),
     };
 
@@ -2246,6 +2282,4 @@ export async function signPublicContractAction(
     };
   }
 }
-
-
 

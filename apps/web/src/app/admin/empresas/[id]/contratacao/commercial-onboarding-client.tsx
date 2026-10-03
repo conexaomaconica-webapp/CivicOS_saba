@@ -61,11 +61,12 @@ interface CommercialOnboardingClientProps {
 const ONBOARDING_STEPS = [
   { step: 1, name: 'Pré-cadastro' },
   { step: 2, name: 'Vínculo maçônico' },
-  { step: 3, name: 'Contratação' },
+  { step: 3, name: 'Dados comerciais' },
   { step: 4, name: 'Contrato' },
-  { step: 5, name: 'Pagamento' },
-  { step: 6, name: 'Prontuário' },
-  { step: 7, name: 'Publicação' },
+  { step: 5, name: 'Assinatura' },
+  { step: 6, name: 'Pagamento' },
+  { step: 7, name: 'Prontuário 360' },
+  { step: 8, name: 'Publicação' },
 ];
 
 // Presets comerciais canônicos
@@ -138,13 +139,16 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
   );
   const [amountCents, setAmountCents] = useState<number>(
     savedTerms?.amount_cents ||
-      (isPedraFundamental
-        ? (paymentMethod === 'avista' ? 120000 : 130000)
-        : (paymentMethod === 'avista' ? PLAN_PRESETS[initialPlanTier].payInFullCents : PLAN_PRESETS[initialPlanTier].installmentTotalCents))
+    (isPedraFundamental
+      ? (paymentMethod === 'avista' ? 120000 : 130000)
+      : (paymentMethod === 'avista' ? PLAN_PRESETS[initialPlanTier].payInFullCents : PLAN_PRESETS[initialPlanTier].installmentTotalCents))
   );
   const [notes, setNotes] = useState<string>(savedTerms?.notes || '');
   const [commercialStatus, setCommercialStatus] = useState<string>(
-    business.commercial_status || 'pre_cadastro'
+    masonic_link_detail?.status === 'verified' &&
+      ['pre_cadastro', 'vinculo_informado'].includes(business.commercial_status || 'pre_cadastro')
+      ? 'vinculo_verificado'
+      : business.commercial_status || 'pre_cadastro'
   );
   const [lastSaved, setLastSaved] = useState(savedTerms || null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -157,12 +161,12 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
   const [generatedSnapshot, setGeneratedSnapshot] = useState<GenerateContractSnapshotResult['data'] | null>(
     dto.contract
       ? {
-          contract_id: dto.contract.id,
-          snapshot_id: dto.contract.id,
-          sha256_hash: dto.contract.sha256_hash,
-          commercial_status: business.commercial_status || 'contrato_gerado',
-          created_at: dto.contract.signed_at || new Date().toISOString(),
-        }
+        contract_id: dto.contract.id,
+        snapshot_id: dto.contract.snapshot_id,
+        sha256_hash: dto.contract.sha256_hash,
+        commercial_status: business.commercial_status || 'contrato_gerado',
+        created_at: dto.contract.signed_at || new Date().toISOString(),
+      }
       : null
   );
 
@@ -326,8 +330,10 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
     commercialStatus === 'contrato_assinado';
 
   // Bloqueio de conferência se vínculo não estiver verificado
-  const isBlockedByMasonicLink =
-    commercialStatus === 'pre_cadastro' || commercialStatus === 'vinculo_informado';
+  const isBlockedByMasonicLink = !isMasonicVerified;
+  const hasMasonicStatusMismatch =
+    isMasonicVerified &&
+    ['pre_cadastro', 'vinculo_informado'].includes(business.commercial_status || 'pre_cadastro');
 
   // Detecção de alterações em relação ao que foi formalmente gravado
   const isDirty = useMemo(() => {
@@ -438,14 +444,14 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
         address:
           street.trim() || cep.trim()
             ? {
-                postal_code: cep.trim() || undefined,
-                street: street.trim() || undefined,
-                number: number.trim() || undefined,
-                complement: complement.trim() || undefined,
-                neighborhood: neighborhood.trim() || undefined,
-                city: city.trim() || undefined,
-                state: state.trim().toUpperCase() || undefined,
-              }
+              postal_code: cep.trim() || undefined,
+              street: street.trim() || undefined,
+              number: number.trim() || undefined,
+              complement: complement.trim() || undefined,
+              neighborhood: neighborhood.trim() || undefined,
+              city: city.trim() || undefined,
+              state: state.trim().toUpperCase() || undefined,
+            }
             : undefined,
       });
 
@@ -546,7 +552,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
       await navigator.clipboard.writeText(contractDraft.rendered_markdown);
       setCopiedFeedback(true);
       setTimeout(() => setCopiedFeedback(false), 2500);
-    } catch (_e) {}
+    } catch (_e) { }
   };
 
   const handleGenerateSnapshot = async () => {
@@ -677,7 +683,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
       await navigator.clipboard.writeText(signatureTokenData.public_url);
       setCopiedLinkFeedback(true);
       setTimeout(() => setCopiedLinkFeedback(false), 2500);
-    } catch (_e) {}
+    } catch (_e) { }
   };
 
   const handleOpenWhatsAppShare = () => {
@@ -767,32 +773,34 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800 border border-amber-200">
-              <Clock className="h-3.5 w-3.5 text-amber-600" /> Etapa 3: Contratação
+              <Clock className="h-3.5 w-3.5 text-amber-600" /> Etapa atual:{' '}
+              {COMMERCIAL_STATUS_LABELS[commercialStatus as keyof typeof COMMERCIAL_STATUS_LABELS] || commercialStatus}
             </span>
           )}
         </div>
       </div>
 
-      {/* Stepper (7 Etapas) */}
+      {/* Stepper canônico da ativação comercial */}
       <nav aria-label="Progresso do Onboarding" className="rounded-2xl border border-stone-200 bg-white p-4 shadow-xs">
-        <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-7">
+        <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
           {ONBOARDING_STEPS.map((s) => {
-            const isStep1Done = true;
-            const isStep2Done = isMasonicVerified;
-            const isStep3Done = isConferred;
-            const isContractGenerated =
-              commercialStatus === 'contrato_gerado' ||
-              commercialStatus === 'contrato_enviado' ||
-              commercialStatus === 'contrato_assinado';
-            const isStep4Done = isContractGenerated;
-            const isStep4Current = isConferred && !isStep4Done;
-
-            let status: 'completed' | 'current' | 'upcoming' = 'upcoming';
-            if (s.step === 1 && isStep1Done) status = 'completed';
-            else if (s.step === 2 && isStep2Done) status = 'completed';
-            else if (s.step === 3) status = isStep3Done ? 'completed' : 'current';
-            else if (s.step === 4) status = isStep4Done ? 'completed' : isStep4Current ? 'current' : 'upcoming';
-            else if (s.step === 5) status = isStep4Done ? 'current' : 'upcoming';
+            const currentStepByStatus: Record<string, number> = {
+              pre_cadastro: 2,
+              vinculo_informado: 2,
+              vinculo_verificado: 3,
+              dados_comerciais_conferidos: 4,
+              contrato_gerado: 5,
+              contrato_enviado: 5,
+              contrato_assinado: 6,
+              aguardando_pagamento: 6,
+              pagamento_confirmado: 7,
+              prontuario_em_configuracao: 7,
+              pronto_para_publicar: 8,
+              publicado: 9,
+            };
+            const currentStep = currentStepByStatus[commercialStatus] || 1;
+            const status: 'completed' | 'current' | 'upcoming' =
+              s.step < currentStep ? 'completed' : s.step === currentStep ? 'current' : 'upcoming';
 
             const isCompleted = status === 'completed';
             const isCurrent = status === 'current';
@@ -800,13 +808,12 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
             return (
               <li
                 key={s.step}
-                className={`flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-medium transition ${
-                  isCurrent
-                    ? 'bg-[#3B0B14]/10 text-[#3B0B14] font-bold border border-[#3B0B14]/20'
-                    : isCompleted
+                className={`flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-medium transition ${isCurrent
+                  ? 'bg-[#3B0B14]/10 text-[#3B0B14] font-bold border border-[#3B0B14]/20'
+                  : isCompleted
                     ? 'text-emerald-700 bg-emerald-50/70 border border-emerald-200'
                     : 'text-stone-400'
-                }`}
+                  }`}
               >
                 {isCompleted ? (
                   <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 stroke-[2.5]" />
@@ -829,11 +836,10 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
       {/* Alertas de Estado e Notificações */}
       {feedback && (
         <div
-          className={`flex items-start gap-3 rounded-2xl p-4 text-xs font-medium border ${
-            feedback.type === 'success'
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-              : 'bg-rose-50 border-rose-200 text-rose-900'
-          }`}
+          className={`flex items-start gap-3 rounded-2xl p-4 text-xs font-medium border ${feedback.type === 'success'
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+            : 'bg-rose-50 border-rose-200 text-rose-900'
+            }`}
         >
           {feedback.type === 'success' ? (
             <Check className="h-5 w-5 shrink-0 text-emerald-600 stroke-[2.5]" />
@@ -885,6 +891,18 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
+          </div>
+        </div>
+      )}
+
+      {hasMasonicStatusMismatch && (
+        <div className="flex items-start gap-3 rounded-2xl bg-sky-50 p-4 border border-sky-200 text-sky-950 text-xs">
+          <ShieldCheck className="h-5 w-5 shrink-0 text-sky-700" />
+          <div className="space-y-1">
+            <p className="font-bold text-sm">Vínculo verificado — sincronização comercial pendente</p>
+            <p className="text-sky-800">
+              O vínculo está aprovado. Ao conferir os dados comerciais, o status legado será sincronizado automaticamente para Vínculo verificado e o fluxo avançará normalmente.
+            </p>
           </div>
         </div>
       )}
@@ -970,9 +988,18 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
               <Building2 className="h-5 w-5 text-[#3B0B14]" />
               Dados da Empresa
             </h2>
-            <span className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">
-              {business.category || 'Geral'}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">
+                {business.category || 'Geral'}
+              </span>
+              <Link
+                href={`/admin/empresas/${business.id}`}
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-[#3B0B14] hover:underline"
+              >
+                Editar dados cadastrais
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
           </div>
 
           <div className="space-y-3 text-xs">
@@ -1148,11 +1175,10 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
         {/* Feedback do endereço */}
         {addressFeedback && (
           <div
-            className={`flex items-start gap-2.5 rounded-xl p-3 text-xs border ${
-              addressFeedback.type === 'success'
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                : 'bg-rose-50 border-rose-200 text-rose-900'
-            }`}
+            className={`flex items-start gap-2.5 rounded-xl p-3 text-xs border ${addressFeedback.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+              : 'bg-rose-50 border-rose-200 text-rose-900'
+              }`}
           >
             {addressFeedback.type === 'success' ? (
               <Check className="h-4 w-4 shrink-0 text-emerald-600 stroke-[2.5]" />
@@ -1360,11 +1386,10 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
                   type="button"
                   key={planKey}
                   onClick={() => handlePlanChange(planKey)}
-                  className={`flex flex-col justify-between text-left p-4 rounded-2xl border-2 transition ${
-                    isSelected
-                      ? 'border-[#3B0B14] bg-[#3B0B14]/5 shadow-xs'
-                      : 'border-stone-200 hover:border-stone-300 bg-white'
-                  }`}
+                  className={`flex flex-col justify-between text-left p-4 rounded-2xl border-2 transition ${isSelected
+                    ? 'border-[#3B0B14] bg-[#3B0B14]/5 shadow-xs'
+                    : 'border-stone-200 hover:border-stone-300 bg-white'
+                    }`}
                 >
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
@@ -1411,11 +1436,10 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
                   setBillingCycle('annual');
                   setFeedback(null);
                 }}
-                className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-bold transition ${
-                  billingCycle === 'annual'
-                    ? 'border-[#3B0B14] bg-[#3B0B14]/5 text-[#3B0B14]'
-                    : 'border-stone-200 text-stone-600 hover:bg-stone-50'
-                } ${isPedraFundamental ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-bold transition ${billingCycle === 'annual'
+                  ? 'border-[#3B0B14] bg-[#3B0B14]/5 text-[#3B0B14]'
+                  : 'border-stone-200 text-stone-600 hover:bg-stone-50'
+                  } ${isPedraFundamental ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <Calendar className="h-4 w-4" />
                 Anual (12 meses)
@@ -1427,11 +1451,10 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
                   setBillingCycle('biennial');
                   setFeedback(null);
                 }}
-                className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-bold transition ${
-                  billingCycle === 'biennial'
-                    ? 'border-[#3B0B14] bg-[#3B0B14]/5 text-[#3B0B14]'
-                    : 'border-stone-200 text-stone-600 hover:bg-stone-50'
-                }`}
+                className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-bold transition ${billingCycle === 'biennial'
+                  ? 'border-[#3B0B14] bg-[#3B0B14]/5 text-[#3B0B14]'
+                  : 'border-stone-200 text-stone-600 hover:bg-stone-50'
+                  }`}
               >
                 <Sparkles className="h-4 w-4" />
                 Bienal (24 meses)
@@ -1453,11 +1476,10 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
               <button
                 type="button"
                 onClick={() => handlePaymentMethodChange('avista')}
-                className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-bold transition ${
-                  paymentMethod === 'avista'
-                    ? 'border-[#3B0B14] bg-[#3B0B14]/5 text-[#3B0B14]'
-                    : 'border-stone-200 text-stone-600 hover:bg-stone-50'
-                }`}
+                className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-bold transition ${paymentMethod === 'avista'
+                  ? 'border-[#3B0B14] bg-[#3B0B14]/5 text-[#3B0B14]'
+                  : 'border-stone-200 text-stone-600 hover:bg-stone-50'
+                  }`}
               >
                 <CreditCard className="h-4 w-4" />
                 À vista (PIX / Boleto / Cartão)
@@ -1466,11 +1488,10 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
               <button
                 type="button"
                 onClick={() => handlePaymentMethodChange('parcelado')}
-                className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-bold transition ${
-                  paymentMethod === 'parcelado'
-                    ? 'border-[#3B0B14] bg-[#3B0B14]/5 text-[#3B0B14]'
-                    : 'border-stone-200 text-stone-600 hover:bg-stone-50'
-                }`}
+                className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-bold transition ${paymentMethod === 'parcelado'
+                  ? 'border-[#3B0B14] bg-[#3B0B14]/5 text-[#3B0B14]'
+                  : 'border-stone-200 text-stone-600 hover:bg-stone-50'
+                  }`}
               >
                 <CreditCard className="h-4 w-4" />
                 Parcelado no Cartão
@@ -1558,14 +1579,14 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
           />
         </div>
 
-        {/* 4b. Data de In\u00edcio da Vig\u00eancia Contratual */}
+        {/* 4b. Data de Início da Vigência Contratual */}
         <div className="space-y-2 pt-2 border-t border-stone-100">
           <label
             htmlFor="contract-start-date"
             className="text-xs font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1.5"
           >
             <Calendar className="h-3.5 w-3.5 text-[#3B0B14]" />
-            Data de In\u00edcio da Vig\u00eancia Contratual
+            Data de Início da Vigência Contratual
           </label>
           <input
             id="contract-start-date"
@@ -1578,9 +1599,9 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
             className="w-full sm:max-w-xs rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-xs font-mono font-bold text-stone-900 focus:border-[#3B0B14] focus:ring-[#3B0B14]"
           />
           <p className="text-[11px] text-stone-500 leading-relaxed">
-            Opcional. Define a data exata em que a vig&ecirc;ncia de{' '}
-            {billingCycle === 'biennial' ? '24' : '12'} meses come&ccedil;a a contar.{' '}
-            Deixe em branco para que a vig&ecirc;ncia conte <strong>a partir da data de assinatura</strong>.
+            Opcional. Define a data exata em que a vigência de{' '}
+            {billingCycle === 'biennial' ? '24' : '12'} meses começar a contar.{' '}
+            Deixe em branco para que a vigência conte <strong>a partir da data de assinatura</strong>.
           </p>
         </div>
       </section>
@@ -1603,16 +1624,14 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
           </div>
 
           <div
-            className={`flex items-center gap-3 p-2.5 rounded-xl border ${
-              isMasonicVerified
-                ? 'bg-emerald-50/60 border-emerald-100 text-emerald-900'
-                : 'bg-stone-50 border-stone-200 text-stone-600'
-            }`}
+            className={`flex items-center gap-3 p-2.5 rounded-xl border ${isMasonicVerified
+              ? 'bg-emerald-50/60 border-emerald-100 text-emerald-900'
+              : 'bg-stone-50 border-stone-200 text-stone-600'
+              }`}
           >
             <div
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
-                isMasonicVerified ? 'bg-emerald-600 text-white' : 'border border-stone-400 text-stone-500'
-              }`}
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${isMasonicVerified ? 'bg-emerald-600 text-white' : 'border border-stone-400 text-stone-500'
+                }`}
             >
               {isMasonicVerified ? (
                 <Check className="h-3.5 w-3.5 stroke-[3]" />
@@ -1626,16 +1645,14 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
           </div>
 
           <div
-            className={`flex items-center gap-3 p-2.5 rounded-xl border ${
-              isConferred
-                ? 'bg-emerald-50/60 border-emerald-100 text-emerald-900'
-                : 'bg-stone-50 border-stone-200 text-stone-600'
-            }`}
+            className={`flex items-center gap-3 p-2.5 rounded-xl border ${isConferred
+              ? 'bg-emerald-50/60 border-emerald-100 text-emerald-900'
+              : 'bg-stone-50 border-stone-200 text-stone-600'
+              }`}
           >
             <div
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
-                isConferred ? 'bg-emerald-600 text-white' : 'border border-stone-400 text-stone-500'
-              }`}
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${isConferred ? 'bg-emerald-600 text-white' : 'border border-stone-400 text-stone-500'
+                }`}
             >
               {isConferred ? (
                 <Check className="h-3.5 w-3.5 stroke-[3]" />
@@ -1835,11 +1852,10 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
                 return (
                   <div
                     key={item.contract_id}
-                    className={`rounded-xl border p-4 transition text-xs space-y-3 ${
-                      item.is_current
-                        ? 'border-emerald-300 bg-emerald-50/40 shadow-2xs'
-                        : 'border-stone-200 bg-stone-50/60 opacity-80'
-                    }`}
+                    className={`rounded-xl border p-4 transition text-xs space-y-3 ${item.is_current
+                      ? 'border-emerald-300 bg-emerald-50/40 shadow-2xs'
+                      : 'border-stone-200 bg-stone-50/60 opacity-80'
+                      }`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -1944,13 +1960,12 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
             type="button"
             disabled={isBlockedByMasonicLink || isPending}
             onClick={handleConfirmCommercialTerms}
-            className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition shadow-xs ${
-              isBlockedByMasonicLink
-                ? 'bg-stone-200 text-stone-400 cursor-not-allowed'
-                : isConferred
+            className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition shadow-xs ${isBlockedByMasonicLink
+              ? 'bg-stone-200 text-stone-400 cursor-not-allowed'
+              : isConferred
                 ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
                 : 'bg-[#3B0B14] hover:bg-[#2b080f] text-white'
-            }`}
+              }`}
           >
             {isPending ? (
               <>
@@ -2060,20 +2075,19 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
               !canOpenDraft
                 ? 'Conclua a conferência comercial para liberar a visualização da minuta.'
                 : isContractSent
-                ? 'Visualizar Minuta Enviada para Assinatura'
-                : isContractGenerated
-                ? 'Visualizar Contrato Gerado e Snapshot Imutável (Fase 4: Microetapa 4.2)'
-                : 'Visualizar Minuta do Contrato (Fase 4: Microetapa 4.1)'
+                  ? 'Visualizar Minuta Enviada para Assinatura'
+                  : isContractGenerated
+                    ? 'Visualizar Contrato Gerado e Snapshot Imutável (Fase 4: Microetapa 4.2)'
+                    : 'Visualizar Minuta do Contrato (Fase 4: Microetapa 4.1)'
             }
-            className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition shadow-xs ${
-              isContractSent
-                ? 'bg-emerald-800 hover:bg-emerald-900 text-white cursor-pointer'
-                : isContractGenerated
+            className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition shadow-xs ${isContractSent
+              ? 'bg-emerald-800 hover:bg-emerald-900 text-white cursor-pointer'
+              : isContractGenerated
                 ? 'bg-amber-700 hover:bg-amber-800 text-white cursor-pointer'
                 : isConferred
-                ? 'bg-amber-600 hover:bg-amber-700 text-white cursor-pointer'
-                : 'bg-stone-200 text-stone-400 cursor-not-allowed'
-            }`}
+                  ? 'bg-amber-600 hover:bg-amber-700 text-white cursor-pointer'
+                  : 'bg-stone-200 text-stone-400 cursor-not-allowed'
+              }`}
           >
             <FileText className="h-4 w-4" />
             {isContractSent ? 'Ver Contrato Enviado' : isContractGenerated ? 'Ver Contrato Gerado' : 'Visualizar Minuta'}

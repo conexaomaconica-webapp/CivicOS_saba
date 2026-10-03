@@ -380,10 +380,10 @@ export default async function AdminDashboardPage() {
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <Link
-                        href={`/admin/aprovacoes/${app.id}`}
+                        href={`/admin/empresas/${app.id}/contratacao`}
                         className="px-3 py-1.5 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl transition-all inline-flex items-center gap-1 border border-[#C9A227]/40"
                       >
-                        <span>Analisar</span>
+                        <span>Acompanhar ativação</span>
                         <ArrowIcon className="w-3.5 h-3.5 text-[#C9A227]" />
                       </Link>
                     </td>
