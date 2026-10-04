@@ -61,12 +61,30 @@ export async function unlockAdminCommercialDossierAction(businessId: string): Pr
 
     const { data: biz, error: bizErr } = await (adminClient as any)
       .from('businesses')
-      .select('id, tenant_id, name, commercial_status, masonic_validation_status, is_active, publication_status')
+      .select('id, tenant_id, name, commercial_status, is_active, publication_status')
       .eq('id', businessId)
       .single();
 
-    if (bizErr || !biz) {
-      return { success: false, error: 'Empresa não localizada.' };
+    if (bizErr) {
+      console.error('[unlockAdminCommercialDossierAction] Falha ao consultar empresa:', {
+        businessId,
+        code: bizErr.code,
+        message: bizErr.message,
+        details: bizErr.details,
+        hint: bizErr.hint,
+      });
+
+      return {
+        success: false,
+        error: `Falha ao consultar empresa: ${bizErr.message}`,
+      };
+    }
+
+    if (!biz) {
+      return {
+        success: false,
+        error: 'Empresa não localizada.',
+      };
     }
 
     // 2. Valida status atual: estritamente 'pagamento_confirmado'
@@ -77,34 +95,92 @@ export async function unlockAdminCommercialDossierAction(businessId: string): Pr
       };
     }
 
-    // 3. Valida contrato assinado
-    const { data: contract, error: contractErr } = await (adminClient as any)
-      .from('contracts')
-      .select('id, status')
+    // 3. Valida vínculo maçônico verificado
+    const { data: masonicLink, error: masonicErr } = await (adminClient as any)
+      .from('business_masonic_links')
+      .select('id, status, verified_at, verification_status')
       .eq('business_id', businessId)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (contractErr || !contract || contract.status !== 'signed') {
+    if (masonicErr) {
+      console.error('[unlockAdminCommercialDossierAction] Falha ao consultar vínculo maçônico:', masonicErr);
+    }
+
+    const isLinkVerified =
+      masonicLink &&
+      (masonicLink.status === 'approved' ||
+        masonicLink.status === 'verified' ||
+        masonicLink.status === 'active' ||
+        masonicLink.verification_status === 'approved' ||
+        Boolean(masonicLink.verified_at));
+
+    if (!isLinkVerified) {
+      return {
+        success: false,
+        error: 'O vínculo maçônico do anunciante precisa estar verificado antes da liberação do prontuário.',
+      };
+    }
+
+    // 4. Valida contrato assinado
+    const { data: contract, error: contractErr } = await (adminClient as any)
+      .from('contracts')
+      .select('id, status')
+      .eq('business_id', businessId)
+      .eq('status', 'signed')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (contractErr || !contract) {
       return {
         success: false,
         error: 'O contrato comercial precisa estar assinado antes da liberação do prontuário.',
       };
     }
 
-    // 4. Valida vínculo maçônico verificado
-    const { data: masonicLink } = await (adminClient as any)
-      .from('business_masonic_links')
-      .select('status')
-      .eq('business_id', businessId)
+    // 5. Valida aceite formal do contrato
+    const { data: acceptance, error: accErr } = await (adminClient as any)
+      .from('contract_acceptances')
+      .select('id, accepted_at')
+      .eq('contract_id', contract.id)
+      .order('accepted_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    const isLinkVerified = masonicLink?.status === 'verified' || biz.masonic_validation_status === 'verified';
-    if (!isLinkVerified) {
+    if (accErr || !acceptance) {
       return {
         success: false,
-        error: 'O vínculo maçônico do anunciante precisa estar verificado antes da liberação do prontuário.',
+        error: 'Não foi encontrado o registro formal de aceite/assinatura digital do contrato.',
+      };
+    }
+
+    // 6. Validação de pagamento / faturas
+    const { data: paidInvoice } = await (adminClient as any)
+      .from('invoices')
+      .select('id, status')
+      .eq('business_id', businessId)
+      .eq('status', 'paid')
+      .limit(1)
+      .maybeSingle();
+
+    const { data: activeSub } = await (adminClient as any)
+      .from('subscriptions')
+      .select('id, status')
+      .eq('business_id', businessId)
+      .in('status', ['active', 'paid', 'trialing'])
+      .limit(1)
+      .maybeSingle();
+
+    const hasPaymentRecord = Boolean(
+      paidInvoice || activeSub || biz.commercial_status === COMMERCIAL_STATUS.PAGAMENTO_CONFIRMADO
+    );
+
+    if (!hasPaymentRecord) {
+      return {
+        success: false,
+        error: 'O pagamento da adesão comercial precisa estar confirmado para liberar o prontuário.',
       };
     }
 
@@ -357,9 +433,8 @@ export async function publishAdminBusinessAction(businessId: string): Promise<{
     const { data: biz, error: bizErr } = await (supabase as any)
       .from('businesses')
       .select(`
-        id, tenant_id, name, slug, legal_name, description, category, category_id,
-        city, state, address, phone, whatsapp, logo_url, website, instagram, facebook,
-        commercial_status, masonic_validation_status, is_active, publication_status, is_published
+        id, tenant_id, name, slug, legal_name, description, logo_url, website, instagram, facebook,
+        commercial_status, is_active, publication_status
       `)
       .eq('id', businessId)
       .single();
@@ -369,19 +444,17 @@ export async function publishAdminBusinessAction(businessId: string): Promise<{
     }
 
     // 2. Consulta vínculo maçônico complementar se necessário
-    let hasVerifiedMasonicLink = biz.masonic_validation_status === 'verified';
-    if (!hasVerifiedMasonicLink) {
-      const { data: links } = await (supabase as any)
-        .from('business_masonic_links')
-        .select('id, status')
-        .eq('business_id', businessId)
-        .eq('status', 'verified')
-        .limit(1);
+    const { data: links } = await (supabase as any)
+      .from('business_masonic_links')
+      .select('id, status, verification_status')
+      .eq('business_id', businessId)
+      .limit(1);
 
-      if (links && links.length > 0) {
-        hasVerifiedMasonicLink = true;
-      }
-    }
+    const hasVerifiedMasonicLink = Boolean(
+      links &&
+      links.length > 0 &&
+      ['verified', 'approved', 'active'].includes(links[0].status || links[0].verification_status)
+    );
 
     // 3. Consulta contrato assinado no banco
     const { data: signedContracts } = await (supabase as any)

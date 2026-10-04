@@ -43,6 +43,7 @@ import { MASONIC_ELIGIBILITY_TYPE_LABELS } from '@/lib/masonic/masonic-links-ser
 import { COMMERCIAL_STATUS_LABELS } from '@/lib/commercial-onboarding-status';
 import {
   getAdminContractDraftPreviewAction,
+  getAdminSignedContractAction,
   generateAdminContractSnapshotAction,
   getAdminContractSnapshotsHistoryAction,
   invalidateAdminContractSnapshotAction,
@@ -50,6 +51,7 @@ import {
   renewAdminContractPaymentLinkAction,
   revokeAdminContractSignatureTokenAction,
   ContractDraftPreviewResult,
+  AdminSignedContractResult,
   GenerateContractSnapshotResult,
   ContractSnapshotHistoryItem,
   SendContractForSignatureResult,
@@ -211,12 +213,19 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
 
   // Estado da data de início do contrato
   const [contractStartDate, setContractStartDate] = useState<string>(
-    (savedTerms as any)?.contract_start_date || ''
+    savedTerms?.contract_start_date || ''
   );
   const [responsibleCpf, setResponsibleCpf] = useState<string>(() => {
     const digits = (savedTerms?.responsible_cpf || '').replace(/\D/g, '').slice(0, 11);
     return digits.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
   });
+
+  // Estados para Visualização do Contrato Efetivamente Assinado (Snapshot Imutável)
+  const [showSignedContractModal, setShowSignedContractModal] = useState<boolean>(false);
+  const [signedContractData, setSignedContractData] = useState<AdminSignedContractResult | null>(null);
+  const [isLoadingSignedContract, setIsLoadingSignedContract] = useState<boolean>(false);
+  const [signedContractError, setSignedContractError] = useState<string | null>(null);
+  const [copiedSignedHash, setCopiedSignedHash] = useState<boolean>(false);
 
   const currentFormattedAddress = useMemo(() => {
     const parts: string[] = [];
@@ -377,10 +386,14 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
     );
   }, [lastSaved, selectedPlan, billingCycle, paymentMethod, installmentsCount, amountCents, isPedraFundamental, contractStartDate, responsibleCpf]);
 
-  // Estado conferido ativo, contrato gerado e contrato enviado
+  // Estado conferido ativo, contrato gerado, enviado e assinado
   const isConferred = Boolean(lastSaved) && !isDirty;
   const isContractGenerated = commercialStatus === 'contrato_gerado';
   const isContractSent = commercialStatus === 'contrato_enviado';
+  const isContractSigned =
+    dto.contract?.status === 'signed' ||
+    Boolean(dto.contract?.acceptance_id) ||
+    ['contrato_assinado', 'aguardando_pagamento', 'pagamento_confirmado', 'prontuario_em_configuracao', 'pronto_para_publicar', 'publicado'].includes(commercialStatus);
   const hasContractSnapshot = Boolean(generatedSnapshot || dto.contract);
   const canOpenDraft = isConferred || hasContractSnapshot;
 
@@ -541,6 +554,45 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
       setDraftError(err?.message || 'Falha ao buscar minuta.');
     } finally {
       setIsLoadingDraft(false);
+    }
+  };
+
+  const handleOpenSignedContract = async () => {
+    setShowSignedContractModal(true);
+    setSignedContractError(null);
+
+    // Se o DTO já carrega os dados congelados do snapshot assinado, exibe de imediato
+    if (dto.contract?.rendered_text && dto.contract.status === 'signed') {
+      setSignedContractData({
+        contract_id: dto.contract.id,
+        contract_status: 'signed',
+        snapshot_id: dto.contract.snapshot_id,
+        rendered_text: dto.contract.rendered_text,
+        sha256_hash: dto.contract.sha256_hash,
+        signature_image_data: dto.contract.signature_image_data || null,
+        signer_cpf: savedTerms?.responsible_cpf || null,
+        signer_name: dto.contract.signer_name || business.name,
+        accepted_at: dto.contract.signed_at || new Date().toISOString(),
+        template_version: dto.contract.version || 'v1.0',
+        acceptance_id: dto.contract.acceptance_id || '',
+      });
+    }
+
+    // Consulta de integridade no servidor
+    setIsLoadingSignedContract(true);
+    try {
+      const res = await getAdminSignedContractAction(business.id);
+      if (res.success && res.data) {
+        setSignedContractData(res.data);
+      } else if (!dto.contract?.rendered_text) {
+        setSignedContractError(res.error || 'Não foi possível carregar o contrato assinado.');
+      }
+    } catch (err: any) {
+      if (!dto.contract?.rendered_text) {
+        setSignedContractError(err?.message || 'Erro ao consultar contrato assinado.');
+      }
+    } finally {
+      setIsLoadingSignedContract(false);
     }
   };
 
@@ -1007,7 +1059,35 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
         </div>
       )}
 
-      {commercialStatus === 'contrato_gerado' ? (
+      {isContractSigned ? (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl bg-emerald-50/90 p-4 border border-emerald-300 text-emerald-950 text-xs">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-700 text-white shrink-0">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-bold text-sm text-emerald-950">Contrato assinado pelo anunciante ✓</p>
+              <p className="text-emerald-800 text-[11px]">
+                Snapshot congelado com hash SHA-256 e evidências probatórias de aceite digital.
+                {dto.contract?.signed_at && (
+                  <span className="block text-[11px] text-emerald-700 mt-0.5 font-medium">
+                    Assinado em: {new Date(dto.contract.signed_at).toLocaleString('pt-BR')} · Versão: {dto.contract.version}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleOpenSignedContract}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-800 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-900 transition shrink-0 cursor-pointer"
+          >
+            <FileText className="h-4 w-4" />
+            Abrir Contrato Assinado
+            <ArrowRight className="h-4 w-4 text-emerald-200" />
+          </button>
+        </div>
+      ) : commercialStatus === 'contrato_gerado' ? (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl bg-amber-50/90 p-4 border border-amber-300 text-amber-950 text-xs">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-600 text-white shrink-0">
@@ -1829,8 +1909,8 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
         </section>
       )}
 
-      {/* Card de Assinatura Ativa (Fase 4: Microetapa 4.4) */}
-      {['contrato_enviado', 'contrato_assinado', 'aguardando_pagamento'].includes(commercialStatus) && (
+      {/* Card de Assinatura Ativa (Fase 4: Microetapa 4.4 - Aguardando Assinatura) */}
+      {commercialStatus === 'contrato_enviado' && (
         <section id="signature-sharing-card" className="scroll-mt-24 rounded-2xl border-2 border-emerald-400 bg-emerald-50/70 p-6 shadow-xs space-y-4 animate-in fade-in">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-emerald-200/80 pb-4">
             <div className="flex items-center gap-3">
@@ -1941,6 +2021,100 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
               <RotateCcw className={`h-3.5 w-3.5 ${isSendingForSignature ? 'animate-spin' : ''}`} />
               Renovar link seguro
             </button>
+          </div>
+        </section>
+      )}
+
+      {/* Card de Contrato Assinado ✓ (Fase 4 Concluída) */}
+      {isContractSigned && (
+        <section id="signed-contract-card" className="scroll-mt-24 rounded-2xl border-2 border-emerald-500 bg-emerald-50/80 p-6 shadow-xs space-y-4 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-emerald-200/80 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-white shadow-xs">
+                <Check className="h-5 w-5 stroke-[3]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-serif font-bold text-base text-emerald-950">
+                    Contrato Assinado ✓
+                  </h3>
+                  <span className="rounded-full bg-emerald-200/90 px-2.5 py-0.5 text-[10px] font-bold text-emerald-900">
+                    Assinatura Válida
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-800">
+                  Assinado em: {dto.contract?.signed_at ? new Date(dto.contract.signed_at).toLocaleString('pt-BR') : 'Data registrada'}
+                  {dto.contract?.version && ` · Versão: ${dto.contract.version}`}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleOpenSignedContract}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 text-xs font-bold transition shadow-xs cursor-pointer"
+            >
+              <FileText className="h-4 w-4" />
+              Abrir Contrato Assinado
+              <ArrowRight className="h-4 w-4 text-emerald-200" />
+            </button>
+          </div>
+
+          {/* Metadados Probatórios */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-white/70 rounded-xl p-3 border border-emerald-200">
+            <div>
+              <span className="text-stone-500 block text-[11px] font-medium">Hash Criptográfico (SHA-256)</span>
+              <span className="font-mono text-[11px] text-stone-800 font-semibold break-all">
+                {dto.contract?.sha256_hash ? `${dto.contract.sha256_hash.slice(0, 20)}...${dto.contract.sha256_hash.slice(-10)}` : 'Registrado no snapshot'}
+              </span>
+            </div>
+            <div>
+              <span className="text-stone-500 block text-[11px] font-medium">Responsável / Signatário</span>
+              <span className="font-semibold text-stone-800">
+                {dto.owner?.full_name || business.name}
+              </span>
+            </div>
+            <div>
+              <span className="text-stone-500 block text-[11px] font-medium">CPF do Responsável</span>
+              <span className="font-mono font-semibold text-stone-800">
+                {responsibleCpf || savedTerms?.responsible_cpf || 'Informado na conferência'}
+              </span>
+            </div>
+          </div>
+
+          {/* Status do Pagamento associado */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
+            <div className="flex items-center gap-2">
+              {commercialStatus === 'pagamento_confirmado' || commercialStatus === 'prontuario_em_configuracao' || commercialStatus === 'pronto_para_publicar' || commercialStatus === 'publicado' ? (
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 text-white px-3 py-1 text-xs font-bold shadow-2xs">
+                  <Check className="h-3.5 w-3.5 stroke-[3]" />
+                  Pagamento Confirmado ✓
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 text-white px-3 py-1 text-xs font-bold shadow-2xs">
+                  <Clock className="h-3.5 w-3.5" />
+                  Aguardando Pagamento da Adesão
+                </span>
+              )}
+              <span className="text-xs text-stone-600 font-medium">
+                {commercialStatus === 'pagamento_confirmado'
+                  ? 'Fatura quitada. A liberação do Prontuário 360 está pronta para execução.'
+                  : 'Link de pagamento ativo disponibilizado ao anunciante.'}
+              </span>
+            </div>
+
+            {signatureTokenData?.public_url && commercialStatus !== 'pagamento_confirmado' && (
+              <div className="flex items-center gap-2">
+                <a
+                  href={signatureTokenData.public_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition shadow-2xs"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 text-stone-500" />
+                  Acessar Portal do Pagamento
+                </a>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -2194,33 +2368,46 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
             </Link>
           )}
 
-          {/* Botão para Minuta / Fase 4 */}
-          <button
-            type="button"
-            disabled={!canOpenDraft}
-            onClick={handleOpenDraftPreview}
-            title={
-              !canOpenDraft
-                ? 'Conclua a conferência comercial para liberar a visualização da minuta.'
-                : isContractSent
-                  ? 'Visualizar Minuta Enviada para Assinatura'
-                  : isContractGenerated
-                    ? 'Visualizar Contrato Gerado e Snapshot Imutável (Fase 4: Microetapa 4.2)'
-                    : 'Visualizar Minuta do Contrato (Fase 4: Microetapa 4.1)'
-            }
-            className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition shadow-xs ${isContractSent
-              ? 'bg-emerald-800 hover:bg-emerald-900 text-white cursor-pointer'
-              : isContractGenerated
-                ? 'bg-amber-700 hover:bg-amber-800 text-white cursor-pointer'
-                : isConferred
-                  ? 'bg-amber-600 hover:bg-amber-700 text-white cursor-pointer'
-                  : 'bg-stone-200 text-stone-400 cursor-not-allowed'
-              }`}
-          >
-            <FileText className="h-4 w-4" />
-            {isContractSent ? 'Ver Contrato Enviado' : isContractGenerated ? 'Ver Contrato Gerado' : 'Visualizar Minuta'}
-            <ArrowRight className="h-4 w-4 text-white/70" />
-          </button>
+          {/* Botão para Minuta ou Contrato Assinado */}
+          {isContractSigned ? (
+            <button
+              type="button"
+              onClick={handleOpenSignedContract}
+              title="Abrir cópia fiel do contrato assinado com snapshot imutável"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white px-5 py-2.5 text-xs font-bold transition shadow-xs cursor-pointer"
+            >
+              <FileText className="h-4 w-4" />
+              Abrir Contrato Assinado
+              <ArrowRight className="h-4 w-4 text-emerald-200" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={!canOpenDraft}
+              onClick={handleOpenDraftPreview}
+              title={
+                !canOpenDraft
+                  ? 'Conclua a conferência comercial para liberar a visualização da minuta.'
+                  : isContractSent
+                    ? 'Visualizar Minuta Enviada para Assinatura'
+                    : isContractGenerated
+                      ? 'Visualizar Contrato Gerado e Snapshot Imutável (Fase 4: Microetapa 4.2)'
+                      : 'Visualizar Minuta do Contrato (Fase 4: Microetapa 4.1)'
+              }
+              className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition shadow-xs ${isContractSent
+                ? 'bg-emerald-800 hover:bg-emerald-900 text-white cursor-pointer'
+                : isContractGenerated
+                  ? 'bg-amber-700 hover:bg-amber-800 text-white cursor-pointer'
+                  : isConferred
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white cursor-pointer'
+                    : 'bg-stone-200 text-stone-400 cursor-not-allowed'
+                }`}
+            >
+              <FileText className="h-4 w-4" />
+              {isContractSent ? 'Ver Contrato Enviado' : isContractGenerated ? 'Ver Contrato Gerado' : 'Visualizar Minuta'}
+              <ArrowRight className="h-4 w-4 text-white/70" />
+            </button>
+          )}
         </div>
       </div>
 

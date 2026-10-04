@@ -2440,3 +2440,122 @@ export async function signPublicContractAction(
     };
   }
 }
+
+export interface AdminSignedContractResult {
+  contract_id: string;
+  contract_status: 'signed';
+  snapshot_id: string;
+  rendered_text: string;
+  sha256_hash: string;
+  signature_image_data?: string | null;
+  signer_cpf?: string | null;
+  signer_name?: string;
+  accepted_at: string;
+  template_version: string;
+  acceptance_id: string;
+}
+
+/**
+ * Consulta sob demanda o contrato efetivamente assinado pelo anunciante,
+ * resgatando seu snapshot imutável (rendered_text, sha256_hash, signature_image_data, etc.),
+ * garantindo validade jurídica e conformidade probatória sem recalcular a minuta.
+ */
+export async function getAdminSignedContractAction(
+  businessId: string
+): Promise<{ success: boolean; data?: AdminSignedContractResult; error?: string }> {
+  try {
+    const { supabase } = await assertPlatformAdminAccess();
+
+    if (!businessId?.trim()) {
+      return { success: false, error: 'Identificador da empresa é obrigatório.' };
+    }
+
+    // 1. Busca contrato com status 'signed'
+    const { data: contract, error: contractErr } = await (supabase as any)
+      .from('contracts')
+      .select('id, status, version_id, created_at')
+      .eq('business_id', businessId)
+      .eq('status', 'signed')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (contractErr) {
+      console.error('[getAdminSignedContractAction] Falha ao consultar contrato:', contractErr);
+      return { success: false, error: `Falha ao consultar contrato: ${contractErr.message}` };
+    }
+
+    if (!contract) {
+      return { success: false, error: 'Nenhum contrato assinado foi localizado para esta empresa.' };
+    }
+
+    // 2. Busca snapshot imutável associado
+    const { data: snapshot, error: snapErr } = await (supabase as any)
+      .from('contract_snapshots')
+      .select('id, rendered_text, sha256_hash, signature_image_data, signer_cpf, created_at')
+      .eq('contract_id', contract.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (snapErr || !snapshot || !snapshot.rendered_text) {
+      return {
+        success: false,
+        error: 'Snapshot imutável do contrato assinado não localizado.',
+      };
+    }
+
+    // 3. Busca metadados de versão, aceite e empresa
+    const [{ data: versionRow }, { data: acceptanceRow }, { data: termsRow }, { data: bizRow }] = await Promise.all([
+      (supabase as any)
+        .from('contract_versions')
+        .select('version')
+        .eq('id', contract.version_id)
+        .maybeSingle(),
+      (supabase as any)
+        .from('contract_acceptances')
+        .select('id, accepted_at, ip_address, user_agent, sha256_hash')
+        .eq('contract_id', contract.id)
+        .eq('snapshot_id', snapshot.id)
+        .order('accepted_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      (supabase as any)
+        .from('business_commercial_terms')
+        .select('responsible_cpf')
+        .eq('business_id', businessId)
+        .maybeSingle(),
+      (supabase as any)
+        .from('businesses')
+        .select('name')
+        .eq('id', businessId)
+        .maybeSingle(),
+    ]);
+
+    const signerCpf = snapshot.signer_cpf || termsRow?.responsible_cpf || null;
+
+    return {
+      success: true,
+      data: {
+        contract_id: contract.id,
+        contract_status: 'signed',
+        snapshot_id: snapshot.id,
+        rendered_text: snapshot.rendered_text,
+        sha256_hash: snapshot.sha256_hash,
+        signature_image_data: snapshot.signature_image_data || null,
+        signer_cpf: signerCpf,
+        signer_name: bizRow?.name || 'Anunciante Titular',
+        accepted_at: acceptanceRow?.accepted_at || contract.created_at,
+        template_version: versionRow?.version || 'v1.0',
+        acceptance_id: acceptanceRow?.id || '',
+      },
+    };
+  } catch (err: any) {
+    console.error('[getAdminSignedContractAction] Exception:', err);
+    return {
+      success: false,
+      error: err?.message || 'Erro inesperado ao consultar contrato assinado.',
+    };
+  }
+}
+
