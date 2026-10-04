@@ -6,6 +6,7 @@ import { deriveCanonicalBillingStatus } from '@/lib/payment/canonical-billing-st
 
 export interface AdminPaymentListItem {
   id: string;
+  webhook_event_id?: string | null;
   asaas_payment_id: string;
   business_id: string;
   business_name: string;
@@ -109,6 +110,17 @@ export async function getAdminPaymentsDashboardAction(params?: {
     const reconciliationRequired: AdminPaymentsDashboardDTO['reconciliationRequired'] = [];
 
     const invoiceList = invoicesData || [];
+    let providerEvents: any[] = [];
+    try {
+      let eventsQuery = (supabase as any).from('payment_provider_events').select('*');
+      if (eventsQuery && typeof eventsQuery.order === 'function') {
+        eventsQuery = eventsQuery.order('created_at', { ascending: false });
+      }
+      const { data: eventsData } = await eventsQuery;
+      providerEvents = eventsData || [];
+    } catch {
+      providerEvents = [];
+    }
 
     if (invoiceList.length > 0) {
       for (const inv of invoiceList) {
@@ -126,11 +138,25 @@ export async function getAdminPaymentsDashboardAction(params?: {
         const status = canonical.status === 'paid' ? 'paid' : canonical.status === 'overdue' ? 'overdue' : canonical.status === 'failed' ? 'failed' : 'pending';
         const gatewayStatus = status === 'paid' ? 'RECEIVED' : status === 'overdue' ? 'OVERDUE' : 'PENDING';
         const platformStatus = sub?.status || 'pending';
+        const webhookEvent = providerEvents.find((event: any) => {
+          const payload = event?.payload || event?.raw_payload || {};
+          const payment = payload?.payment || {};
+          return (
+            event?.id === inv.id ||
+            event?.event_id === inv.id ||
+            event?.provider_event_id === inv.id ||
+            payment?.id === inv.idempotency_key ||
+            payment?.invoiceNumber === inv.id ||
+            payload?.invoice_id === inv.id ||
+            payload?.invoiceId === inv.id
+          );
+        });
 
         const hasDivergence = gatewayStatus === 'RECEIVED' && platformStatus === 'past_due';
 
         items.push({
           id: inv.id,
+          webhook_event_id: webhookEvent?.id || null,
           asaas_payment_id: inv.idempotency_key || `pay_${inv.id.slice(0, 8)}`,
           business_id: inv.business_id,
           business_name: biz?.name || 'Empresa Anunciante',
@@ -153,7 +179,7 @@ export async function getAdminPaymentsDashboardAction(params?: {
 
         if (hasDivergence) {
           reconciliationRequired.push({
-            id: inv.id,
+            id: webhookEvent?.id || inv.id,
             business_id: inv.business_id,
             business_name: biz?.name || 'Empresa Anunciante',
             gateway_status: gatewayStatus,
@@ -254,11 +280,11 @@ export async function getAdminPaymentsDashboardAction(params?: {
  * Reprocessa evento do gateway.
  * PROTEÇÃO P0: Exige autorização RPC e resolve 100% dos parâmetros CANÔNICOS do banco (0 parâmetros adulteráveis do cliente).
  */
-export async function reprocessPaymentWebhookAction(eventId: string) {
+export async function reprocessPaymentWebhookAction(recordId: string) {
   const { supabase, user } = await assertPlatformAdminAccess();
 
   try {
-    if (!eventId || typeof eventId !== 'string') {
+    if (!recordId || typeof recordId !== 'string') {
       throw new Error('INVALID_EVENT_ID: Identificador de evento inválido.');
     }
 
@@ -266,24 +292,53 @@ export async function reprocessPaymentWebhookAction(eventId: string) {
     const { data: eventRecord, error: evtErr } = await (supabase as any)
       .from('payment_provider_events')
       .select('*')
-      .eq('id', eventId)
+      .eq('id', recordId)
       .maybeSingle();
 
     if (evtErr || !eventRecord) {
-      throw new Error(`EVENT_NOT_FOUND: Evento ${eventId} não foi encontrado na tabela payment_provider_events.`);
+      // A listagem financeira é baseada em faturas. Se o client enviou o ID
+      // da fatura, diferencie "webhook ainda não recebido" de evento inválido.
+      const { data: invoice } = await (supabase as any)
+        .from('invoices')
+        .select('id')
+        .eq('id', recordId)
+        .maybeSingle();
+
+      if (invoice) {
+        throw new Error(
+          'WEBHOOK_EVENT_NOT_RECEIVED: Esta cobrança ainda não possui evento do Asaas registrado. Reenvie o evento no log de Webhooks do Asaas após configurar a URL e o token.'
+        );
+      }
+
+      throw new Error(`EVENT_NOT_FOUND: Evento ${recordId} não foi encontrado na tabela payment_provider_events.`);
     }
 
     // 2. Executa a RPC canônica com os dados resolvidos do banco
+    const payload = eventRecord.payload || eventRecord.raw_payload || {};
+    const payment = payload?.payment || {};
+    const provider = eventRecord.provider || eventRecord.provider_code || 'asaas';
+    const providerEventId = eventRecord.provider_event_id || eventRecord.event_id;
+    const canonicalEvent = eventRecord.canonical_event || eventRecord.event_type || 'payment_confirmed';
+    const businessId =
+      eventRecord.business_id ||
+      payment.externalReference ||
+      payload.externalReference ||
+      '00000000-0000-0000-0000-000000000001';
+    const planCode = eventRecord.plan_code || payment.planCode || 'ouro';
+    const amountCents =
+      eventRecord.amount_cents ||
+      (typeof payment.value === 'number' ? Math.round(payment.value * 100) : 238800);
+
     const { data: rpcRes, error: rpcErr } = await (supabase as any).rpc('process_canonical_billing_event', {
-      p_tenant_id: eventRecord.tenant_id,
-      p_provider: eventRecord.provider || 'asaas',
-      p_provider_event_id: eventRecord.provider_event_id,
-      p_canonical_event: eventRecord.canonical_event || 'payment_confirmed',
-      p_business_id: eventRecord.business_id,
+      p_tenant_id: eventRecord.tenant_id || '00000000-0000-0000-0000-000000000001',
+      p_provider: provider,
+      p_provider_event_id: providerEventId,
+      p_canonical_event: canonicalEvent,
+      p_business_id: businessId,
       p_user_id: user.id,
-      p_plan_code: eventRecord.plan_code || 'ouro',
-      p_amount_cents: eventRecord.amount_cents || 238800,
-      p_payload: eventRecord.payload || {},
+      p_plan_code: planCode,
+      p_amount_cents: amountCents,
+      p_payload: payload,
     });
 
     if (rpcErr) {
@@ -292,11 +347,11 @@ export async function reprocessPaymentWebhookAction(eventId: string) {
 
     // 3. Grava log de auditoria do Admin (somente se a operação for concluída com sucesso)
     await (supabase as any).from('admin_audit_logs').insert({
-      tenant_id: eventRecord.tenant_id,
+      tenant_id: eventRecord.tenant_id || '00000000-0000-0000-0000-000000000001',
       actor_id: user.id,
       action: 'REPROCESS_PAYMENT_WEBHOOK',
       entity_type: 'payment_provider_event',
-      entity_id: eventId,
+      entity_id: recordId,
       after_value: { rpc_result: rpcRes, status: 'reprocessed' },
       reason: 'Conciliação manual auditada pelo admin de plataforma',
     });

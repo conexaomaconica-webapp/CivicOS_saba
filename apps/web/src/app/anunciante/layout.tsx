@@ -2,6 +2,8 @@ import React from 'react';
 import { AdvertiserLayoutWrapper } from './advertiser-layout-wrapper';
 import { getAdvertiserDashboardDTOAction } from '@/lib/advertiser/advertiser-portal-service';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'Portal do Anunciante | Conexão Maçônica',
   description: 'Gerencie seu anúncio, acompanhe seus resultados e faturas comerciais no Guia Conexão Maçônica.',

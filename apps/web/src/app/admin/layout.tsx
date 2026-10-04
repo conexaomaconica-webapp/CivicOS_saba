@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { getAsaasDynamicConfig } from '@/lib/payment/asaas-config-service';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Painel Administrativo · Conexão Maçônica',
   robots: { index: false, follow: false },

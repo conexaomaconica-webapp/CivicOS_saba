@@ -57,10 +57,10 @@ export default function PaymentManagementClient({
     loadDashboard(selectedFilter);
   }, [selectedFilter, searchQuery]);
 
-  const handleReprocessWebhook = async (paymentId: string) => {
-    setReprocessingId(paymentId);
+  const handleReprocessWebhook = async (recordId: string) => {
+    setReprocessingId(recordId);
     setActionMsg(null);
-    const res = await reprocessPaymentWebhookAction(paymentId);
+    const res = await reprocessPaymentWebhookAction(recordId);
     if (res.success) {
       setActionMsg({ type: 'success', text: res.message || 'Evento reprocessado com sucesso.' });
       loadDashboard(selectedFilter);
@@ -397,11 +397,20 @@ export default function PaymentManagementClient({
 
               <button
                 type="button"
-                onClick={() => handleReprocessWebhook(selectedPaymentDetail.id)}
-                disabled={reprocessingId === selectedPaymentDetail.id}
-                className="px-4 py-2 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs border border-[#C9A227]/40"
-              >
-                {reprocessingId === selectedPaymentDetail.id ? (
+                  onClick={() => {
+                    if (!selectedPaymentDetail.webhook_event_id) {
+                      setActionMsg({
+                        type: 'error',
+                        text: 'Esta cobrança ainda não possui evento do Asaas registrado. Reenvie o webhook no painel do Asaas depois de corrigir URL e token.',
+                      });
+                      return;
+                    }
+                    handleReprocessWebhook(selectedPaymentDetail.webhook_event_id);
+                  }}
+                  disabled={!selectedPaymentDetail.webhook_event_id || reprocessingId === selectedPaymentDetail.webhook_event_id}
+                  className="px-4 py-2 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs border border-[#C9A227]/40"
+                >
+                {reprocessingId === selectedPaymentDetail.webhook_event_id ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
                   <RefreshCw className="w-3.5 h-3.5 text-[#C9A227]" />
