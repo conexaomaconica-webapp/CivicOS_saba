@@ -3,6 +3,13 @@
 import { assertPlatformAdminAccess } from './admin-auth-helper';
 import { revalidatePath } from 'next/cache';
 import { deriveCanonicalBillingStatus } from '@/lib/payment/canonical-billing-status';
+import { reconcileCommercialPaymentWebhook } from '@/lib/payment/commercial-onboarding-webhook-service';
+import {
+  COMMERCIAL_STATUS,
+  COMMERCIAL_STATUS_ORDER,
+  type CommercialStatus,
+  isCommercialStatus,
+} from '@/lib/commercial-onboarding-status';
 
 export interface AdminPaymentListItem {
   id: string;
@@ -146,7 +153,9 @@ export async function getAdminPaymentsDashboardAction(params?: {
             event?.event_id === inv.id ||
             event?.provider_event_id === inv.id ||
             payment?.id === inv.idempotency_key ||
+            payment?.externalReference === inv.idempotency_key ||
             payment?.invoiceNumber === inv.id ||
+            payload?.externalReference === inv.idempotency_key ||
             payload?.invoice_id === inv.id ||
             payload?.invoiceId === inv.id
           );
@@ -329,6 +338,29 @@ export async function reprocessPaymentWebhookAction(recordId: string) {
       eventRecord.amount_cents ||
       (typeof payment.value === 'number' ? Math.round(payment.value * 100) : 238800);
 
+    if (provider === 'asaas' && payment?.id) {
+      const commercialRes = await reconcileCommercialPaymentWebhook(payload, providerEventId);
+      if (commercialRes.success && commercialRes.reconciled) {
+        await (supabase as any).from('admin_audit_logs').insert({
+          tenant_id: eventRecord.tenant_id || '00000000-0000-0000-0000-000000000001',
+          actor_id: user.id,
+          action: 'REPROCESS_ASAAS_COMMERCIAL_PAYMENT_WEBHOOK',
+          entity_type: 'payment_provider_event',
+          entity_id: recordId,
+          after_value: { reconcile_result: commercialRes, status: 'reprocessed' },
+          reason: 'Conciliação manual do webhook comercial Asaas pelo admin de plataforma',
+        });
+
+        revalidatePath('/admin/pagamentos');
+        revalidatePath(`/admin/empresas/${commercialRes.data?.business_id}`);
+        return { success: true, message: 'Pagamento Asaas reconciliado com sucesso.' };
+      }
+
+      if (commercialRes.error) {
+        throw new Error(`ASAAS_RECONCILE_ERROR: ${commercialRes.error}`);
+      }
+    }
+
     const { data: rpcRes, error: rpcErr } = await (supabase as any).rpc('process_canonical_billing_event', {
       p_tenant_id: eventRecord.tenant_id || '00000000-0000-0000-0000-000000000001',
       p_provider: provider,
@@ -360,5 +392,108 @@ export async function reprocessPaymentWebhookAction(recordId: string) {
     return { success: true, message: 'Evento reprocessado e conciliação efetuada com sucesso.' };
   } catch (err: any) {
     return { success: false, error: err instanceof Error ? err.message : 'Erro ao reprocessar evento.' };
+  }
+}
+
+export async function confirmPaymentManuallyAction(invoiceId: string) {
+  const { supabase, user } = await assertPlatformAdminAccess();
+
+  try {
+    if (!invoiceId || typeof invoiceId !== 'string') {
+      throw new Error('INVALID_INVOICE_ID: Identificador de fatura inválido.');
+    }
+
+    const { data: invoice, error: invoiceErr } = await (supabase as any)
+      .from('invoices')
+      .select('id, tenant_id, business_id, amount_due, amount_cents, amount_paid, status, payment_method')
+      .eq('id', invoiceId)
+      .maybeSingle();
+
+    if (invoiceErr || !invoice) {
+      throw new Error(`INVOICE_NOT_FOUND: Fatura ${invoiceId} não foi localizada.`);
+    }
+
+    const { data: business, error: businessErr } = await (supabase as any)
+      .from('businesses')
+      .select('id, tenant_id, commercial_status')
+      .eq('id', invoice.business_id)
+      .maybeSingle();
+
+    if (businessErr || !business) {
+      throw new Error('BUSINESS_NOT_FOUND: Empresa vinculada à fatura não foi localizada.');
+    }
+
+    const now = new Date().toISOString();
+    const amountPaid =
+      invoice.amount_paid ||
+      invoice.amount_due ||
+      (typeof invoice.amount_cents === 'number' ? invoice.amount_cents / 100 : 0);
+
+    await (supabase as any)
+      .from('invoices')
+      .update({
+        status: 'paid',
+        amount_paid: amountPaid,
+        paid_at: now,
+        updated_at: now,
+      })
+      .eq('id', invoice.id);
+
+    await (supabase as any)
+      .from('payment_attempts')
+      .update({
+        status: 'success',
+        response_received: {
+          manual_confirmation: true,
+          confirmed_by: user.id,
+          confirmed_at: now,
+          source: 'admin_manual_asaas_sandbox_verification',
+        },
+      })
+      .eq('invoice_id', invoice.id);
+
+    const currentStatus = business.commercial_status || COMMERCIAL_STATUS.PRE_CADASTRO;
+    const shouldAdvanceCommercialStatus =
+      isCommercialStatus(currentStatus) &&
+      COMMERCIAL_STATUS_ORDER.indexOf(currentStatus as CommercialStatus) <=
+        COMMERCIAL_STATUS_ORDER.indexOf(COMMERCIAL_STATUS.PAGAMENTO_CONFIRMADO);
+
+    if (shouldAdvanceCommercialStatus && currentStatus !== COMMERCIAL_STATUS.PAGAMENTO_CONFIRMADO) {
+      await (supabase as any)
+        .from('businesses')
+        .update({
+          commercial_status: COMMERCIAL_STATUS.PAGAMENTO_CONFIRMADO,
+          updated_at: now,
+        })
+        .eq('id', business.id);
+    }
+
+    await (supabase as any).from('admin_audit_logs').insert({
+      tenant_id: invoice.tenant_id || business.tenant_id || '00000000-0000-0000-0000-000000000001',
+      actor_id: user.id,
+      action: 'CONFIRM_PAYMENT_MANUALLY',
+      entity_type: 'invoice',
+      entity_id: invoice.id,
+      before_value: {
+        invoice_status: invoice.status,
+        commercial_status: business.commercial_status,
+      },
+      after_value: {
+        invoice_status: 'paid',
+        commercial_status: shouldAdvanceCommercialStatus
+          ? COMMERCIAL_STATUS.PAGAMENTO_CONFIRMADO
+          : business.commercial_status,
+        amount_paid: amountPaid,
+        confirmed_at: now,
+      },
+      reason: 'Confirmação manual de pagamento após verificação administrativa no Asaas Sandbox.',
+    });
+
+    revalidatePath('/admin/pagamentos');
+    revalidatePath(`/admin/empresas/${business.id}`);
+
+    return { success: true, message: 'Pagamento confirmado manualmente com auditoria registrada.' };
+  } catch (err: any) {
+    return { success: false, error: err instanceof Error ? err.message : 'Erro ao confirmar pagamento manualmente.' };
   }
 }

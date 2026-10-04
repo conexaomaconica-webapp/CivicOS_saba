@@ -115,6 +115,33 @@ export function renderContractTemplate(
 /**
  * Formata valores monetários em centavos para o padrão BRL (R$ 1.500,00).
  */
+export function appendSignatureImageToContractText(
+  renderedText: string,
+  signatureImageData: string,
+  contractorName: string
+): string {
+  const text = String(renderedText || '').trim();
+  const signature = String(signatureImageData || '').trim();
+  const name = String(contractorName || '').trim();
+
+  if (!text) {
+    throw new Error('Texto contratual renderizado e obrigatorio para anexar assinatura.');
+  }
+
+  if (!signature.startsWith('data:image/') || signature.length < 200) {
+    throw new Error('Imagem de assinatura invalida para anexar ao contrato.');
+  }
+
+  const finalText = text.replace(/\n*<section data-contract-signature[\s\S]*$/m, '').trimEnd();
+
+  return `${finalText}
+
+<section data-contract-signature="representante-legal" style="margin-top:40px;text-align:center;page-break-inside:avoid">
+  <img src="${signature}" alt="Assinatura eletronica do representante legal" style="display:block;max-width:320px;max-height:130px;margin:0 auto 6px;object-fit:contain" />
+  <div style="width:360px;max-width:100%;margin:0 auto;border-top:1px solid #333;padding-top:6px;font-size:12px;font-weight:bold">CONTRATANTE: ${name || 'CONTRATANTE'}</div>
+</section>`;
+}
+
 export function formatCurrencyBRL(cents: number): string {
   const safeCents = Number.isFinite(cents) ? cents : 0;
   return new Intl.NumberFormat('pt-BR', {

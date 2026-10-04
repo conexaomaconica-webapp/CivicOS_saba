@@ -6,6 +6,7 @@ import {
   formatVigencia,
   formatSeloPedraFundamental,
   formatDataEmissao,
+  appendSignatureImageToContractText,
   AdvertiserContractVariables,
 } from './contract-template-renderer';
 
@@ -130,6 +131,29 @@ Plano: {{plano_nome}} — {{plano_valor}} — {{vigencia}}`;
       expect(() => assertContractVariablesComplete(incomplete)).toThrowError(
         /Dados obrigatórios ausentes para geração do contrato: cnpj, responsavel_cpf, valor_total/
       );
+    });
+  });
+
+  describe('appendSignatureImageToContractText', () => {
+    it('anexa a imagem da assinatura no fim acima do campo CONTRATANTE', () => {
+      const signature = `data:image/png;base64,${'A'.repeat(300)}`;
+      const rendered = appendSignatureImageToContractText(
+        'Contrato renderizado\n\n**Data de emissao:** 01/10/2026',
+        signature,
+        'Empresa Teste Ltda.'
+      );
+
+      expect(rendered).toContain('<img src="data:image/png;base64,');
+      expect(rendered).toContain('CONTRATANTE: Empresa Teste Ltda.');
+      expect(rendered.indexOf('<img')).toBeLessThan(rendered.indexOf('CONTRATANTE: Empresa Teste Ltda.'));
+    });
+
+    it('substitui bloco de assinatura anterior sem duplicar imagem', () => {
+      const signature = `data:image/png;base64,${'B'.repeat(300)}`;
+      const first = appendSignatureImageToContractText('Contrato renderizado', signature, 'Empresa Teste Ltda.');
+      const second = appendSignatureImageToContractText(first, signature, 'Empresa Teste Ltda.');
+
+      expect((second.match(/data-contract-signature/g) || [])).toHaveLength(1);
     });
   });
 

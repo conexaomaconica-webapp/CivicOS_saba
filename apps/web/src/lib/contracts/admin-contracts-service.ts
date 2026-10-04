@@ -20,6 +20,7 @@ import {
   formatSeloPedraFundamental,
   formatDataEmissao,
   formatDataInicioVigencia,
+  appendSignatureImageToContractText,
 } from './contract-template-renderer';
 import {
   CANONICAL_ADVERTISER_CONTRACT_CODE,
@@ -2214,6 +2215,16 @@ export async function signPublicContractAction(
     }
 
     // 5. Captura evidências técnicas com anonimização de IP para conformidade LGPD
+    const signedRenderedText = appendSignatureImageToContractText(
+      snapshot.rendered_text,
+      sigData,
+      biz.name
+    );
+    const signedSha256Hash = crypto
+      .createHash('sha256')
+      .update(signedRenderedText, 'utf8')
+      .digest('hex');
+
     let rawIp = '127.0.0.1';
     let userAgent = 'Browser';
     try {
@@ -2250,11 +2261,28 @@ export async function signPublicContractAction(
       // Fallback defensivo se a RPC não estiver disponível no ambiente
     }
 
+    if (atomicSuccess) {
+      await (dbClient as any)
+        .from('contract_snapshots')
+        .update({
+          rendered_text: signedRenderedText,
+          sha256_hash: signedSha256Hash,
+        })
+        .eq('id', snapshot.id);
+
+      await (dbClient as any)
+        .from('contract_acceptances')
+        .update({ sha256_hash: signedSha256Hash })
+        .eq('snapshot_id', snapshot.id);
+    }
+
     if (!atomicSuccess) {
       // Atualiza snapshot com imagem da assinatura e dados probatórios
       const { error: updateSnapErr } = await (dbClient as any)
         .from('contract_snapshots')
         .update({
+          rendered_text: signedRenderedText,
+          sha256_hash: signedSha256Hash,
           signature_image_data: sigData,
           signer_cpf: cleanCpf,
           ip_address: sanitizedIp,
@@ -2276,7 +2304,7 @@ export async function signPublicContractAction(
           accepted_at: acceptedAt,
           ip_address: sanitizedIp,
           user_agent: userAgent,
-          sha256_hash: snapshot.sha256_hash,
+          sha256_hash: signedSha256Hash,
         });
 
       if (insertAcceptanceErr) {

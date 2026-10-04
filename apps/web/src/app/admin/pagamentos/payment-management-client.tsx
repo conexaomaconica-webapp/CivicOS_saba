@@ -20,6 +20,7 @@ import {
 import {
   getAdminPaymentsDashboardAction,
   reprocessPaymentWebhookAction,
+  confirmPaymentManuallyAction,
   AdminPaymentsDashboardDTO,
   AdminPaymentListItem,
 } from '@/lib/admin/admin-payments-service';
@@ -41,6 +42,7 @@ export default function PaymentManagementClient({
   const [_activeMainTab, _setActiveMainTab] = useState<'visao_geral' | 'transacoes' | 'conciliacao' | 'assinaturas' | 'gateway'>('visao_geral');
   const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<AdminPaymentListItem | null>(null);
   const [reprocessingId, setReprocessingId] = useState<string | null>(null);
+  const [manualConfirmingId, setManualConfirmingId] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const loadDashboard = async (filter: string) => {
@@ -60,14 +62,43 @@ export default function PaymentManagementClient({
   const handleReprocessWebhook = async (recordId: string) => {
     setReprocessingId(recordId);
     setActionMsg(null);
-    const res = await reprocessPaymentWebhookAction(recordId);
-    if (res.success) {
-      setActionMsg({ type: 'success', text: res.message || 'Evento reprocessado com sucesso.' });
-      loadDashboard(selectedFilter);
-    } else {
-      setActionMsg({ type: 'error', text: res.error || 'Falha ao reprocessar evento.' });
+    try {
+      const res = await reprocessPaymentWebhookAction(recordId);
+      if (res.success) {
+        setActionMsg({ type: 'success', text: res.message || 'Evento reprocessado com sucesso.' });
+        await loadDashboard(selectedFilter);
+      } else {
+        setActionMsg({ type: 'error', text: res.error || 'Falha ao reprocessar evento.' });
+      }
+    } catch (err: any) {
+      setActionMsg({ type: 'error', text: err?.message || 'Falha inesperada ao reprocessar evento.' });
+    } finally {
+      setReprocessingId(null);
     }
-    setReprocessingId(null);
+  };
+
+  const handleManualConfirmPayment = async (invoiceId: string) => {
+    const ok = window.confirm(
+      'Confirmar manualmente este pagamento? Use apenas se o pagamento foi verificado no Asaas Sandbox. A ação será auditada.'
+    );
+    if (!ok) return;
+
+    setManualConfirmingId(invoiceId);
+    setActionMsg(null);
+    try {
+      const res = await confirmPaymentManuallyAction(invoiceId);
+      if (res.success) {
+        setActionMsg({ type: 'success', text: res.message || 'Pagamento confirmado manualmente.' });
+        await loadDashboard(selectedFilter);
+        setSelectedPaymentDetail((prev) => prev ? { ...prev, status: 'paid', gateway_status: 'RECEIVED' } : prev);
+      } else {
+        setActionMsg({ type: 'error', text: res.error || 'Falha ao confirmar pagamento manualmente.' });
+      }
+    } catch (err: any) {
+      setActionMsg({ type: 'error', text: err?.message || 'Falha inesperada ao confirmar pagamento manualmente.' });
+    } finally {
+      setManualConfirmingId(null);
+    }
   };
 
   return (
@@ -386,7 +417,7 @@ export default function PaymentManagementClient({
               </div>
             </div>
 
-            <div className="flex justify-between items-center pt-2">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pt-2">
               <Link
                 href={`/admin/empresas/${selectedPaymentDetail.business_id}`}
                 className="text-xs font-bold text-[#3B0B14] hover:underline flex items-center gap-1"
@@ -395,8 +426,25 @@ export default function PaymentManagementClient({
                 <span>Abrir Prontuário da Empresa →</span>
               </Link>
 
-              <button
-                type="button"
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                {selectedPaymentDetail.status !== 'paid' && (
+                  <button
+                    type="button"
+                    onClick={() => handleManualConfirmPayment(selectedPaymentDetail.id)}
+                    disabled={manualConfirmingId === selectedPaymentDetail.id}
+                    className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs border border-emerald-900/20 disabled:opacity-60"
+                  >
+                    {manualConfirmingId === selectedPaymentDetail.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <ShieldCheck className="w-3.5 h-3.5 text-white" />
+                    )}
+                    <span>Confirmar pagamento manualmente</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
                   onClick={() => {
                     if (!selectedPaymentDetail.webhook_event_id) {
                       setActionMsg({
@@ -416,7 +464,8 @@ export default function PaymentManagementClient({
                   <RefreshCw className="w-3.5 h-3.5 text-[#C9A227]" />
                 )}
                 <span>Reprocessar Evento Asaas</span>
-              </button>
+                </button>
+              </div>
             </div>
           </div>
         </div>

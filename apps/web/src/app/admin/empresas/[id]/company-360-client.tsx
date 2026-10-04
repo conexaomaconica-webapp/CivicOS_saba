@@ -529,7 +529,12 @@ export default function Company360Client({ initialData }: Props) {
       window.print();
       return;
     }
-    const safeText = (data.contract?.rendered_text || '')
+    const rawContractText = data.contract?.rendered_text || '';
+    const signatureSectionMatch = rawContractText.match(/<section data-contract-signature[\s\S]*?<\/section>/);
+    const contractTextWithoutSignature = signatureSectionMatch
+      ? rawContractText.replace(signatureSectionMatch[0], '').trimEnd()
+      : rawContractText;
+    const safeText = contractTextWithoutSignature
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
@@ -537,11 +542,13 @@ export default function Company360Client({ initialData }: Props) {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
-    const signatureBlock = data.contract?.signature_image_data
+    const signatureBlock = signatureSectionMatch
+      ? signatureSectionMatch[0]
+      : data.contract?.signature_image_data
       ? `<div style="margin-top:28px;text-align:center;page-break-inside:avoid">
           <p style="font-family:Georgia,serif;font-weight:bold;color:#3B0B14">ASSINATURA ELETRÔNICA DO REPRESENTANTE LEGAL</p>
           <img src="${data.contract.signature_image_data}" alt="Assinatura do representante legal" style="display:block;max-width:320px;max-height:130px;margin:12px auto 4px;object-fit:contain" />
-          <div style="width:360px;max-width:100%;margin:0 auto;border-top:1px solid #333;padding-top:6px;font-size:11px">${safeSignerName}</div>
+          <div style="width:360px;max-width:100%;margin:0 auto;border-top:1px solid #333;padding-top:6px;font-size:11px;font-weight:bold">CONTRATANTE: ${safeSignerName}</div>
         </div>`
       : '';
 
