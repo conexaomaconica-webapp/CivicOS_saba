@@ -36,6 +36,7 @@ import {
   ArrowDown,
   Globe,
   ExternalLink,
+  Pipette,
 } from 'lucide-react';
 import {
   upsertBusinessEventAction,
@@ -493,13 +494,6 @@ export default function Company360Client({ initialData }: Props) {
       setShowMasonicUpsertModal(false);
       setData((prev) => ({
         ...prev,
-        business: {
-          ...prev.business,
-          masonic_lodge: masonicLodgeInput,
-          masonic_potency: masonicPotencyInput,
-          masonic_link_type: masonicLinkTypeInput,
-          masonic_validation_status: masonicStatusInput,
-        },
         masonic_link_detail: {
           id: prev.masonic_link_detail?.id || `masonic-${Date.now()}`,
           organization_id: prev.masonic_link_detail?.organization_id || null,
@@ -1168,12 +1162,43 @@ export default function Company360Client({ initialData }: Props) {
   const [imageOffsetY, setImageOffsetY] = useState(50);
   const [imageZoom, setImageZoom] = useState(1.0);
   const [imageFitMode, setImageFitMode] = useState<'cover' | 'contain'>('cover');
+  const [imageBackgroundColor, setImageBackgroundColor] = useState('#ffffff');
   const [selectedFileForCrop, setSelectedFileForCrop] = useState<File | null>(null);
+
+  const reprocessSelectedImage = (backgroundColor: string) => {
+    if (!selectedFileForCrop) return;
+    void handleAdminFileUpload(
+      { target: { files: [selectedFileForCrop] } } as unknown as React.ChangeEvent<HTMLInputElement>,
+      undefined,
+      undefined,
+      backgroundColor
+    );
+  };
+
+  const handlePickImageBackground = async () => {
+    const EyeDropperCtor = (window as typeof window & {
+      EyeDropper?: new () => { open: () => Promise<{ sRGBHex: string }> };
+    }).EyeDropper;
+
+    if (!EyeDropperCtor) {
+      setMessage({ type: 'error', text: 'O conta-gotas não é suportado neste navegador. Use o seletor de cor.' });
+      return;
+    }
+
+    try {
+      const { sRGBHex } = await new EyeDropperCtor().open();
+      setImageBackgroundColor(sRGBHex);
+      reprocessSelectedImage(sRGBHex);
+    } catch {
+      // O navegador rejeita a promessa quando o usuário cancela o conta-gotas.
+    }
+  };
 
   const handleAdminFileUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
     customOffsetY?: number,
-    customZoom?: number
+    customZoom?: number,
+    customBackgroundColor?: string
   ) => {
     const files = Array.from(e.target.files || (selectedFileForCrop ? [selectedFileForCrop] : []));
     if (files.length === 0) return;
@@ -1211,7 +1236,17 @@ export default function Company360Client({ initialData }: Props) {
           });
 
           // Compress image client-side to WebP with position framing and zoom
-          const file = await compressImageOnClient(rawFile, 1920, 0.82, offsetYToUse / 100, imageFitMode, zoomToUse);
+        const file = await compressImageOnClient(
+          rawFile,
+          1920,
+          0.82,
+          offsetYToUse / 100,
+          imageFitMode,
+          zoomToUse,
+          ['update_logo', 'update_cover'].includes(mediaMode)
+            ? (customBackgroundColor || imageBackgroundColor)
+            : undefined
+        );
 
           setUploadProgress({
             current: i + 1,
@@ -1266,7 +1301,17 @@ export default function Company360Client({ initialData }: Props) {
         });
 
         // Compress image client-side to WebP with position framing and zoom
-        const file = await compressImageOnClient(rawFile, 1920, 0.82, offsetYToUse / 100, imageFitMode, zoomToUse);
+        const file = await compressImageOnClient(
+          rawFile,
+          1920,
+          0.82,
+          offsetYToUse / 100,
+          imageFitMode,
+          zoomToUse,
+          ['update_logo', 'update_cover'].includes(mediaMode)
+            ? (customBackgroundColor || imageBackgroundColor)
+            : undefined
+        );
 
         setUploadProgress({
           current: 1,
@@ -1816,8 +1861,8 @@ export default function Company360Client({ initialData }: Props) {
                   ✓ Publicada
                 </span>
               ) : (
-                <span className="px-2.5 py-0.5 rounded-full bg-rose-700 text-white font-extrabold text-[10px] uppercase">
-                  Suspensa
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-600 text-white font-extrabold text-[10px] uppercase">
+                  {commercialStatus === 'publicado' ? 'Despublicada' : 'Rascunho'}
                 </span>
               )}
             </div>
@@ -1855,27 +1900,18 @@ export default function Company360Client({ initialData }: Props) {
 
         {/* AÇÕES DE GOVERNANÇA NO TOPO EXECUTIVO */}
         <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
-          <button
-            type="button"
-            onClick={() => {
-              setTargetStatus(data.business.publication_status === 'published' ? 'suspended' : 'published');
-              setShowStatusModal(true);
-            }}
-            className={`px-4 py-2 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md ${data.business.publication_status === 'published'
-              ? 'bg-rose-700 hover:bg-rose-800 text-white'
-              : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-              }`}
-          >
-            {data.business.publication_status === 'published' ? (
-              <>
-                <XCircle className="w-4 h-4" /> Suspender Anúncio
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="w-4 h-4" /> Reativar Anúncio
-              </>
-            )}
-          </button>
+          {commercialStatus === 'publicado' && data.business.publication_status === 'published' && (
+            <button
+              type="button"
+              onClick={() => {
+                setTargetStatus('suspended');
+                setShowStatusModal(true);
+              }}
+              className="px-4 py-2 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md bg-rose-700 hover:bg-rose-800 text-white"
+            >
+              <XCircle className="w-4 h-4" /> Suspender Anúncio
+            </button>
+          )}
 
           <button
             type="button"
@@ -2364,7 +2400,7 @@ export default function Company360Client({ initialData }: Props) {
                       <div className="flex items-center gap-2 min-w-0">
                         <Building2 className="w-4 h-4 text-[#C9A227] shrink-0" />
                         <span className="truncate text-stone-700">
-                          Loja Maçônica: <strong className="text-[#3B0B14] font-bold">{data.masonic_link_detail?.lodge_name || (data.business as any).masonic_lodge || 'Não configurada'}</strong>
+                          Loja Maçônica: <strong className="text-[#3B0B14] font-bold">{data.masonic_link_detail?.lodge_name || 'Não configurada'}</strong>
                         </span>
                       </div>
                       <span className="text-[10px] text-stone-500 font-medium bg-stone-100 px-2 py-0.5 rounded-md shrink-0">
@@ -4108,7 +4144,10 @@ export default function Company360Client({ initialData }: Props) {
                     </label>
 
                     {mediaUrlInput && (
-                      <div className="relative w-full h-44 rounded-2xl bg-stone-200 border border-stone-300 overflow-hidden flex items-center justify-center shadow-inner group">
+                      <div
+                        className={`relative w-full rounded-2xl border border-stone-300 overflow-hidden flex items-center justify-center shadow-inner group ${mediaMode === 'update_cover' ? 'aspect-[16/6]' : 'h-44'}`}
+                        style={{ backgroundColor: ['update_logo', 'update_cover'].includes(mediaMode) ? imageBackgroundColor : '#e7e5e4' }}
+                      >
                         <img
                           src={mediaUrlInput}
                           alt="Pré-visualização do Enquadramento"
@@ -4250,9 +4289,11 @@ export default function Company360Client({ initialData }: Props) {
                             />
                           </div>
 
-                          {mediaMode === 'update_logo' && (
+                          {(mediaMode === 'update_logo' || mediaMode === 'update_cover') && (
                             <div className="flex items-center justify-between pt-1.5 border-t border-stone-200">
-                              <span className="font-bold text-stone-700">Enquadramento Logo:</span>
+                              <span className="font-bold text-stone-700">
+                                {mediaMode === 'update_logo' ? 'Enquadramento Logo:' : 'Enquadramento Banner:'}
+                              </span>
                               <div className="flex items-center gap-1">
                                 <button
                                   type="button"
@@ -4260,7 +4301,7 @@ export default function Company360Client({ initialData }: Props) {
                                   className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${imageFitMode === 'contain' ? 'bg-[#3B0B14] text-[#C9A227]' : 'bg-stone-200 hover:bg-stone-300 text-stone-800'
                                     }`}
                                 >
-                                  Contido
+                                  {mediaMode === 'update_logo' ? 'Contido' : 'Banner inteiro'}
                                 </button>
                                 <button
                                   type="button"
@@ -4268,7 +4309,7 @@ export default function Company360Client({ initialData }: Props) {
                                   className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${imageFitMode === 'cover' ? 'bg-[#3B0B14] text-[#C9A227]' : 'bg-stone-200 hover:bg-stone-300 text-stone-800'
                                     }`}
                                 >
-                                  Preencher
+                                  Preencher área
                                 </button>
                               </div>
                             </div>
@@ -4315,6 +4356,56 @@ export default function Company360Client({ initialData }: Props) {
                         </p>
                       </div>
                     </div>
+
+                    {(mediaMode === 'update_logo' || mediaMode === 'update_cover') && (
+                      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-3.5 space-y-2.5">
+                        <div>
+                          <label className="block font-bold text-stone-800">
+                            {mediaMode === 'update_logo' ? 'Cor de fundo da logomarca' : 'Cor de fundo do banner'}
+                          </label>
+                          <p className="mt-0.5 text-[10px] text-stone-500">
+                            A cor será incorporada à imagem otimizada e preencherá as áreas livres do enquadramento.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={imageBackgroundColor}
+                            onChange={(event) => setImageBackgroundColor(event.target.value)}
+                            aria-label="Selecionar cor de fundo da imagem"
+                            className="h-10 w-12 cursor-pointer rounded-lg border border-stone-300 bg-white p-1"
+                          />
+                          <input
+                            type="text"
+                            value={imageBackgroundColor.toUpperCase()}
+                            onChange={(event) => {
+                              const value = event.target.value.trim();
+                              if (/^#[0-9a-f]{6}$/i.test(value)) setImageBackgroundColor(value.toLowerCase());
+                            }}
+                            aria-label="Cor hexadecimal do fundo da logomarca"
+                            className="min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-3 py-2 font-mono text-xs font-bold uppercase text-stone-800"
+                          />
+                          <button
+                            type="button"
+                            onClick={handlePickImageBackground}
+                            title="Selecionar uma cor diretamente da tela"
+                            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#3B0B14]/30 bg-white px-3 text-[11px] font-bold text-[#3B0B14] hover:bg-amber-50"
+                          >
+                            <Pipette className="h-4 w-4" /> Conta-gotas
+                          </button>
+                        </div>
+                        {selectedFileForCrop && (
+                          <button
+                            type="button"
+                            disabled={uploadingFile}
+                            onClick={() => reprocessSelectedImage(imageBackgroundColor)}
+                            className="w-full rounded-xl bg-stone-800 px-3 py-2 text-[11px] font-bold text-white hover:bg-stone-900 disabled:opacity-50"
+                          >
+                            Aplicar cor ao arquivo selecionado
+                          </button>
+                        )}
+                      </div>
+                    )}
 
                     {mediaMode !== 'update_logo' && (
                       <div>

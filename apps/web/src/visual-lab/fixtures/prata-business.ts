@@ -35,6 +35,7 @@ export const prataBusinessFixture: PublicBusinessPresentation = {
     colunaDeHonra: false,
   },
   identity: {
+    id: 'visual-lab-prata',
     slug: 'auto-centro-express-compasso',
     name: 'Auto Centro Express',
     category: 'Manutenção Automotiva',

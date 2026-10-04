@@ -9,7 +9,8 @@ export async function compressImageOnClient(
   quality = 0.82,
   offsetY = 0.5, // 0 = top, 0.5 = center, 1 = bottom
   fitMode: 'cover' | 'contain' = 'cover',
-  zoom = 1.0 // 0.5x to 3.0x
+  zoom = 1.0, // 0.5x to 3.0x
+  backgroundColor?: string
 ): Promise<File> {
   if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') {
     return file;
@@ -48,10 +49,20 @@ export async function compressImageOnClient(
       }
 
       const effectiveZoom = Math.max(0.4, Math.min(3.0, zoom));
+      const validBackgroundColor = backgroundColor && /^#[0-9a-f]{6}$/i.test(backgroundColor)
+        ? backgroundColor
+        : null;
+
+      if (validBackgroundColor) {
+        ctx.fillStyle = validBackgroundColor;
+        ctx.fillRect(0, 0, targetWidth, targetHeight);
+      }
 
       if (fitMode === 'contain' || effectiveZoom < 1.0) {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, targetWidth, targetHeight);
+        if (!validBackgroundColor) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, targetWidth, targetHeight);
+        }
 
         const scaledW = targetWidth * effectiveZoom;
         const scaledH = targetHeight * effectiveZoom;

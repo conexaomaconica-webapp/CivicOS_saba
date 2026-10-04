@@ -114,6 +114,7 @@ export type PublicBusinessPresentation = {
     catalog?: InstitutionalRecognitionDTO[];
   };
   identity: {
+    id: string;
     slug: string;
     name: string;
     category: string | null;
@@ -471,6 +472,7 @@ export function toPublicBusinessPresentation(
       catalog: recognitionsCatalog || (row as any).recognitionsCatalog,
     },
     identity: {
+      id: text((row as DetailRow & { business_id?: string }).business_id, 64) || '',
       slug: row.business_slug,
       name: row.business_name,
       category: row.primary_category_name,

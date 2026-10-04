@@ -143,6 +143,7 @@ export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
 
         {/* BARRA DE AÇÕES RÁPIDAS COM NAVEGAÇÃO EM ABAS */}
         <QuickActionBar
+          businessId={identity.id}
           contacts={contacts}
           location={location}
           businessName={identity.name}

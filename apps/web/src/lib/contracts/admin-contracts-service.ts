@@ -927,7 +927,7 @@ export interface InvalidateContractSnapshotResult {
   data?: {
     contract_id: string;
     previous_status: string;
-    new_status: 'superseded';
+    new_status: 'superseded' | 'voided';
     commercial_status: 'dados_comerciais_conferidos';
     superseded_at: string;
   };
@@ -940,7 +940,7 @@ export interface InvalidateContractSnapshotResult {
  * - Justificativa administrativa obrigatória registrada em admin_audit_logs.
  * - Marca contracts.status = 'superseded' para a versão anterior, preservando 100% o histórico imutável.
  * - Retorna businesses.commercial_status para 'dados_comerciais_conferidos'.
- * - Bloqueia se o contrato já estiver assinado ('signed').
+ * - Contrato assinado pode ser anulado administrativamente, preservando aceite e evidências.
  * - Bloqueia se o contrato estiver aguardando assinatura ('awaiting_signature'), exigindo revogação prévia.
  */
 export async function invalidateAdminContractSnapshotAction(
@@ -1003,16 +1003,7 @@ export async function invalidateAdminContractSnapshotAction(
       };
     }
 
-    // 3. Guardrails estritos da Microetapa 4.3:
-    // - Contrato assinado NÃO PODE ser substituído
-    if (activeContract.status === 'signed') {
-      return {
-        success: false,
-        error: 'Contrato já assinado não pode ser substituído ou invalidado.',
-      };
-    }
-
-    // - Contrato aguardando assinatura exige cancelamento/revogação antes de nova geração
+    // 3. Contrato aguardando assinatura exige cancelamento/revogação antes de nova geração
     if (activeContract.status === 'awaiting_signature') {
       return {
         success: false,
@@ -1021,12 +1012,13 @@ export async function invalidateAdminContractSnapshotAction(
     }
 
     const supersededAt = new Date().toISOString();
+    const nextContractStatus = activeContract.status === 'signed' ? 'voided' : 'superseded';
 
     // 4. Marcação do contracts.status = 'superseded' para a versão anterior (preserva histórico)
     const { error: updateContractErr } = await (dbClient as any)
       .from('contracts')
       .update({
-        status: 'superseded',
+        status: nextContractStatus,
         updated_at: supersededAt,
       })
       .eq('id', activeContract.id);
@@ -1034,16 +1026,20 @@ export async function invalidateAdminContractSnapshotAction(
     if (updateContractErr) {
       return {
         success: false,
-        error: `Falha ao marcar contrato como substituído: ${updateContractErr.message}`,
+        error: `Falha ao invalidar o contrato atual: ${updateContractErr.message}`,
       };
     }
 
     // 5. Retorno de commercial_status para dados_comerciais_conferidos via validação administrativa auditada
-    assertAdministrativeCommercialRollback(biz.commercial_status as CommercialStatus, 'dados_comerciais_conferidos');
+    if (activeContract.status !== 'signed') {
+      assertAdministrativeCommercialRollback(biz.commercial_status as CommercialStatus, 'dados_comerciais_conferidos');
+    }
     const { error: updateBizErr } = await (dbClient as any)
       .from('businesses')
       .update({
         commercial_status: 'dados_comerciais_conferidos',
+        publication_status: 'draft',
+        is_published: false,
         updated_at: supersededAt,
       })
       .eq('id', businessId);
@@ -1060,7 +1056,7 @@ export async function invalidateAdminContractSnapshotAction(
       await (dbClient as any).from('admin_audit_logs').insert({
         tenant_id: biz.tenant_id,
         actor_id: user.id,
-        action: 'INVALIDATE_CONTRACT_SNAPSHOT',
+        action: activeContract.status === 'signed' ? 'VOID_SIGNED_CONTRACT' : 'INVALIDATE_CONTRACT_SNAPSHOT',
         entity_type: 'contract',
         entity_id: activeContract.id,
         before_value: {
@@ -1068,8 +1064,10 @@ export async function invalidateAdminContractSnapshotAction(
           commercial_status: biz.commercial_status,
         },
         after_value: {
-          contract_status: 'superseded',
+          contract_status: nextContractStatus,
           commercial_status: 'dados_comerciais_conferidos',
+          publication_status: 'draft',
+          is_published: false,
           reason: trimmedReason,
         },
         reason: trimmedReason,
@@ -1086,7 +1084,7 @@ export async function invalidateAdminContractSnapshotAction(
       data: {
         contract_id: activeContract.id,
         previous_status: activeContract.status,
-        new_status: 'superseded',
+        new_status: nextContractStatus,
         commercial_status: 'dados_comerciais_conferidos',
         superseded_at: supersededAt,
       },
@@ -2464,14 +2462,23 @@ export async function getAdminSignedContractAction(
   businessId: string
 ): Promise<{ success: boolean; data?: AdminSignedContractResult; error?: string }> {
   try {
-    const { supabase } = await assertPlatformAdminAccess();
+    await assertPlatformAdminAccess();
 
     if (!businessId?.trim()) {
       return { success: false, error: 'Identificador da empresa é obrigatório.' };
     }
 
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) {
+      return { success: false, error: 'Configuração segura do Supabase indisponível.' };
+    }
+    const dbClient = createClient<Database>(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
     // 1. Busca contrato com status 'signed'
-    const { data: contract, error: contractErr } = await (supabase as any)
+    const { data: contract, error: contractErr } = await (dbClient as any)
       .from('contracts')
       .select('id, status, version_id, created_at')
       .eq('business_id', businessId)
@@ -2489,13 +2496,27 @@ export async function getAdminSignedContractAction(
       return { success: false, error: 'Nenhum contrato assinado foi localizado para esta empresa.' };
     }
 
-    // 2. Busca snapshot imutável associado
-    const { data: snapshot, error: snapErr } = await (supabase as any)
-      .from('contract_snapshots')
-      .select('id, rendered_text, sha256_hash, signature_image_data, signer_cpf, created_at')
+    // 2. Resolve primeiro o aceite e usa exatamente o snapshot que foi aceito.
+    const { data: acceptanceRow, error: acceptanceErr } = await (dbClient as any)
+      .from('contract_acceptances')
+      .select('id, snapshot_id, accepted_at, sha256_hash')
       .eq('contract_id', contract.id)
-      .order('created_at', { ascending: false })
+      .order('accepted_at', { ascending: false })
       .limit(1)
+      .maybeSingle();
+
+    if (acceptanceErr) {
+      return { success: false, error: `Falha ao consultar aceite do contrato: ${acceptanceErr.message}` };
+    }
+    if (!acceptanceRow) {
+      return { success: false, error: 'Registro formal de aceite do contrato não localizado.' };
+    }
+
+    const { data: snapshot, error: snapErr } = await (dbClient as any)
+      .from('contract_snapshots')
+      .select('id, rendered_text, sha256_hash, signature_image_data, signer_cpf')
+      .eq('id', acceptanceRow.snapshot_id)
+      .eq('contract_id', contract.id)
       .maybeSingle();
 
     if (snapErr || !snapshot || !snapshot.rendered_text) {
@@ -2506,26 +2527,18 @@ export async function getAdminSignedContractAction(
     }
 
     // 3. Busca metadados de versão, aceite e empresa
-    const [{ data: versionRow }, { data: acceptanceRow }, { data: termsRow }, { data: bizRow }] = await Promise.all([
-      (supabase as any)
+    const [{ data: versionRow }, { data: termsRow }, { data: bizRow }] = await Promise.all([
+      (dbClient as any)
         .from('contract_versions')
         .select('version')
         .eq('id', contract.version_id)
         .maybeSingle(),
-      (supabase as any)
-        .from('contract_acceptances')
-        .select('id, accepted_at, ip_address, user_agent, sha256_hash')
-        .eq('contract_id', contract.id)
-        .eq('snapshot_id', snapshot.id)
-        .order('accepted_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      (supabase as any)
+      (dbClient as any)
         .from('business_commercial_terms')
         .select('responsible_cpf')
         .eq('business_id', businessId)
         .maybeSingle(),
-      (supabase as any)
+      (dbClient as any)
         .from('businesses')
         .select('name')
         .eq('id', businessId)
@@ -2541,7 +2554,7 @@ export async function getAdminSignedContractAction(
         contract_status: 'signed',
         snapshot_id: snapshot.id,
         rendered_text: snapshot.rendered_text,
-        sha256_hash: snapshot.sha256_hash,
+        sha256_hash: acceptanceRow.sha256_hash || snapshot.sha256_hash,
         signature_image_data: snapshot.signature_image_data || null,
         signer_cpf: signerCpf,
         signer_name: bizRow?.name || 'Anunciante Titular',
@@ -2558,4 +2571,3 @@ export async function getAdminSignedContractAction(
     };
   }
 }
-

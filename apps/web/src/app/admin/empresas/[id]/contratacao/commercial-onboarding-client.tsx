@@ -31,6 +31,7 @@ import {
   MapPin,
   Search,
   Save,
+  Globe,
 } from 'lucide-react';
 import type { AdminBusiness360DTO } from '@/lib/admin/admin-businesses-service';
 import {
@@ -56,7 +57,7 @@ import {
   ContractSnapshotHistoryItem,
   SendContractForSignatureResult,
 } from '@/lib/contracts/admin-contracts-service';
-import { unlockAdminCommercialDossierAction } from '@/lib/admin/admin-commercial-dossier-service';
+import { publishAdminBusinessAction, unlockAdminCommercialDossierAction } from '@/lib/admin/admin-commercial-dossier-service';
 
 interface CommercialOnboardingClientProps {
   dto: AdminBusiness360DTO;
@@ -391,9 +392,8 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
   const isContractGenerated = commercialStatus === 'contrato_gerado';
   const isContractSent = commercialStatus === 'contrato_enviado';
   const isContractSigned =
-    dto.contract?.status === 'signed' ||
-    Boolean(dto.contract?.acceptance_id) ||
-    ['contrato_assinado', 'aguardando_pagamento', 'pagamento_confirmado', 'prontuario_em_configuracao', 'pronto_para_publicar', 'publicado'].includes(commercialStatus);
+    dto.contract?.status === 'signed' &&
+    Boolean(dto.contract.acceptance_id);
   const hasContractSnapshot = Boolean(generatedSnapshot || dto.contract);
   const canOpenDraft = isConferred || hasContractSnapshot;
 
@@ -505,7 +505,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
           message: result.error || 'Falha ao confirmar dados comerciais.',
         });
       } else {
-        setCommercialStatus('dados_comerciais_conferidos');
+        setCommercialStatus(result.commercial_status || commercialStatus);
         setAddressSavedSuccess(true);
         setLastSaved({
           id: `terms-${business.id}`,
@@ -570,7 +570,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
         rendered_text: dto.contract.rendered_text,
         sha256_hash: dto.contract.sha256_hash,
         signature_image_data: dto.contract.signature_image_data || null,
-        signer_cpf: savedTerms?.responsible_cpf || null,
+        signer_cpf: dto.contract.signer_cpf || null,
         signer_name: dto.contract.signer_name || business.name,
         accepted_at: dto.contract.signed_at || new Date().toISOString(),
         template_version: dto.contract.version || 'v1.0',
@@ -692,8 +692,9 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
       setInvalidationReason('');
       setFeedback({
         type: 'success',
-        message:
-          'Snapshot anterior marcado como "Substituído" e preservado no histórico. O status comercial retornou para "Dados Comerciais Conferidos" para nova conferência e regeração ✓',
+        message: isContractSigned
+          ? 'Contrato assinado anulado administrativamente e preservado no histórico. A empresa foi liberada para gerar uma nova versão ✓'
+          : 'Snapshot anterior marcado como "Substituído" e preservado no histórico. O status comercial retornou para "Dados Comerciais Conferidos" para nova conferência e regeração ✓',
       });
       await loadSnapshotHistory();
       router.refresh();
@@ -823,6 +824,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
 
   // Microetapa 6.4A: Liberação Formal do Prontuário 360 pelo Administrador
   const [isUnlockingDossier, setIsUnlockingDossier] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const handleUnlockDossier = async () => {
     setIsUnlockingDossier(true);
@@ -851,6 +853,25 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
       });
     } finally {
       setIsUnlockingDossier(false);
+    }
+  };
+
+  const handlePublishBusiness = async () => {
+    setIsPublishing(true);
+    setFeedback(null);
+    try {
+      const res = await publishAdminBusinessAction(business.id);
+      if (res.success) {
+        setCommercialStatus(res.commercial_status || 'publicado');
+        setFeedback({ type: 'success', message: 'Empresa publicada com sucesso no Guia.' });
+        router.refresh();
+      } else {
+        setFeedback({ type: 'error', message: res.error || 'A publicação foi bloqueada pelo Gate Final.' });
+      }
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err?.message || 'Erro inesperado ao publicar a empresa.' });
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -2057,6 +2078,17 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
               Abrir Contrato Assinado
               <ArrowRight className="h-4 w-4 text-emerald-200" />
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setInvalidationReason('Anulação administrativa do contrato assinado para emissão de uma nova versão.');
+                setShowInvalidateModal(true);
+              }}
+              className="inline-flex items-center gap-2 rounded-xl border border-rose-300 bg-white px-4 py-2 text-xs font-bold text-rose-800 hover:bg-rose-50 transition shadow-xs cursor-pointer"
+            >
+              <Ban className="h-4 w-4" />
+              Anular e criar novo contrato
+            </button>
           </div>
 
           {/* Metadados Probatórios */}
@@ -2357,6 +2389,18 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
             </button>
           )}
 
+          {commercialStatus === 'pronto_para_publicar' && (
+            <button
+              type="button"
+              disabled={isPublishing}
+              onClick={handlePublishBusiness}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2.5 text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
+            >
+              {isPublishing ? <Clock className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />}
+              {isPublishing ? 'Validando e publicando...' : 'Publicar Empresa no Guia'}
+            </button>
+          )}
+
           {/* Atalho para Prontuário em Configuração ou Pronto */}
           {(commercialStatus === 'prontuario_em_configuracao' || commercialStatus === 'pronto_para_publicar' || commercialStatus === 'publicado') && (
             <Link
@@ -2647,6 +2691,77 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
         </div>
       )}
 
+      {/* Contrato assinado: exibe exclusivamente o snapshot vinculado ao aceite. */}
+      {showSignedContractModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-emerald-200 bg-emerald-50 px-6 py-4">
+              <div>
+                <h3 className="font-serif text-base font-bold text-emerald-950">Contrato Assinado ✓</h3>
+                <p className="text-xs text-emerald-800">Cópia fiel do snapshot imutável aceito pelo signatário.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSignedContractModal(false)}
+                aria-label="Fechar contrato assinado"
+                className="rounded-lg p-1.5 text-stone-500 transition hover:bg-emerald-100 hover:text-stone-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto p-6">
+              {signedContractError && (
+                <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">
+                  {signedContractError}
+                </div>
+              )}
+              {isLoadingSignedContract && !signedContractData ? (
+                <div className="flex items-center justify-center gap-2 py-16 text-sm text-stone-600">
+                  <Clock className="h-5 w-5 animate-spin" /> Carregando contrato assinado...
+                </div>
+              ) : signedContractData ? (
+                <div className="space-y-5">
+                  <div className="grid grid-cols-1 gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-xs sm:grid-cols-2 lg:grid-cols-4">
+                    <div><span className="block text-stone-500">Assinado em</span><strong>{new Date(signedContractData.accepted_at).toLocaleString('pt-BR')}</strong></div>
+                    <div><span className="block text-stone-500">Versão</span><strong>{signedContractData.template_version}</strong></div>
+                    <div><span className="block text-stone-500">Responsável</span><strong>{signedContractData.signer_name || business.name}</strong></div>
+                    <div><span className="block text-stone-500">CPF</span><strong>{signedContractData.signer_cpf || 'Não informado'}</strong></div>
+                  </div>
+                  <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-stone-600">Integridade Verificada — SHA-256</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(signedContractData.sha256_hash);
+                          setCopiedSignedHash(true);
+                          window.setTimeout(() => setCopiedSignedHash(false), 1800);
+                        }}
+                        className="text-[11px] font-bold text-emerald-800 hover:underline"
+                      >
+                        {copiedSignedHash ? 'Copiado ✓' : 'Copiar hash'}
+                      </button>
+                    </div>
+                    <p className="break-all font-mono text-[11px] text-stone-700">{signedContractData.sha256_hash}</p>
+                  </div>
+                  <article className="whitespace-pre-wrap rounded-xl border border-stone-200 bg-white p-6 text-sm leading-relaxed text-stone-800 shadow-inner">
+                    {signedContractData.rendered_text}
+                  </article>
+                  {signedContractData.signature_image_data && (
+                    <div className="rounded-xl border border-stone-200 p-4">
+                      <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-stone-600">Assinatura registrada</p>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- assinatura é evidência data URL imutável */}
+                      <img src={signedContractData.signature_image_data} alt="Assinatura digital registrada no contrato" className="max-h-32 max-w-full object-contain" />
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de Invalidação Administrativa (Fase 4: Microetapa 4.3) */}
       {showInvalidateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
@@ -2658,7 +2773,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
                 </div>
                 <div>
                   <h3 className="font-serif font-bold text-base text-stone-900">
-                    Invalidar Snapshot do Contrato
+                    {isContractSigned ? 'Anular Contrato Assinado' : 'Invalidar Snapshot do Contrato'}
                   </h3>
                   <p className="text-xs text-stone-500">
                     Microetapa 4.3 — Versionamento e Invalidação
@@ -2681,7 +2796,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
                   Regras de Integridade Jurídica:
                 </p>
                 <ul className="list-disc pl-4 space-y-1 text-[11px] text-amber-900">
-                  <li>O contrato atual será marcado como <strong>superseded (Substituído)</strong>.</li>
+                  <li>O contrato atual será marcado como <strong>{isContractSigned ? 'voided (Anulado)' : 'superseded (Substituído)'}</strong>.</li>
                   <li>O texto renderizado e o hash SHA-256 serão <strong>100% preservados no histórico</strong>.</li>
                   <li>O status da empresa retornará para <strong>dados_comerciais_conferidos</strong>.</li>
                   <li>Você poderá revisar plano, vigência ou dados cadastrais e gerar um <strong>novo snapshot com novo hash</strong>.</li>
@@ -2732,12 +2847,12 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
                 {isInvalidating ? (
                   <>
                     <Clock className="h-4 w-4 animate-spin" />
-                    Invalidando...
+                    {isContractSigned ? 'Anulando...' : 'Invalidando...'}
                   </>
                 ) : (
                   <>
                     <RotateCcw className="h-4 w-4" />
-                    Confirmar Invalidação
+                    {isContractSigned ? 'Confirmar Anulação' : 'Confirmar Invalidação'}
                   </>
                 )}
               </button>

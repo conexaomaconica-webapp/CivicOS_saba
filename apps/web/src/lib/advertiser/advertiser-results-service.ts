@@ -79,16 +79,9 @@ export async function getAdvertiserResultsDTOAction(
       b = userBiz;
     }
 
-    if (!b) {
-      const { data: fallbackBiz } = await supabase
-        .from('businesses')
-        .select('id, name, slug')
-        .limit(1)
-        .maybeSingle();
-      b = fallbackBiz;
-    }
+    if (!userRes?.user || !b) throw new Error('Empresa do anunciante não localizada.');
 
-    const businessId = b?.id || '00000000-0000-0000-0000-000000000001';
+    const businessId = b.id;
 
     const periodLabel = period === '7d' ? 'Últimos 7 dias' : period === '90d' ? 'Últimos 90 dias' : 'Últimos 30 dias';
     const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
@@ -97,7 +90,7 @@ export async function getAdvertiserResultsDTOAction(
     try {
       const { data } = await (supabase as any)
         .from('analytics_events')
-        .select('event_type, created_at')
+        .select('event_name, created_at')
         .eq('business_id', businessId);
       if (Array.isArray(data)) realEvents = data;
     } catch {
@@ -112,10 +105,10 @@ export async function getAdvertiserResultsDTOAction(
     let websiteClicks = 0;
 
     if (hasRealEvents) {
-      views = realEvents.filter((e: any) => e.event_type === 'view' || e.event_type === 'page_view').length;
-      whatsappClicks = realEvents.filter((e: any) => e.event_type === 'whatsapp_click').length;
-      routeClicks = realEvents.filter((e: any) => e.event_type === 'route_click').length;
-      websiteClicks = realEvents.filter((e: any) => e.event_type === 'website_click').length;
+      views = realEvents.filter((e: any) => e.event_name === 'view' || e.event_name === 'page_view').length;
+      whatsappClicks = realEvents.filter((e: any) => e.event_name === 'whatsapp_click').length;
+      routeClicks = realEvents.filter((e: any) => e.event_name === 'route_click' || e.event_name === 'directions_click').length;
+      websiteClicks = realEvents.filter((e: any) => e.event_name === 'website_click').length;
     } else if (isTestEnv) {
       const multiplier = period === '7d' ? 0.25 : period === '90d' ? 2.8 : 1.0;
       views = Math.round(1284 * multiplier);

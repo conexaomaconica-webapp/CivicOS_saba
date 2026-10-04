@@ -275,6 +275,7 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
 
         <QuickActionBar
+          businessId={identity.id}
           contacts={contacts}
           location={location}
           businessName={identity.name}

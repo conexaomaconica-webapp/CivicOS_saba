@@ -4,8 +4,19 @@ import React, { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { updateAdminLodgeAction } from '@/lib/admin/admin-lodges-service';
-import { Landmark, ArrowLeft, Save, Loader2, Eye, Upload, Image as ImageIcon } from 'lucide-react';
+import { geocodeAdminLodgeAddressAction, updateAdminLodgeAction } from '@/lib/admin/admin-lodges-service';
+import { compressImageOnClient } from '@/lib/media/client-image-compressor';
+import {
+  LODGE_GALLERY_MAX_DIMENSION,
+  LODGE_GALLERY_MAX_PHOTOS,
+  LODGE_GALLERY_WEBP_QUALITY,
+  LODGE_IMAGE_MAX_OPTIMIZED_BYTES,
+  validateLodgeGalleryCount,
+  validateLodgeSourceImage,
+} from '@/lib/media/lodge-media-policy';
+import { systemConfirm, systemNotify } from '@/components/system/SystemFeedback';
+import { BrazilianLocationFields } from '@/components/admin/BrazilianLocationFields';
+import { Landmark, ArrowLeft, Save, Loader2, Eye, Upload, Image as ImageIcon, Trash2, MapPin } from 'lucide-react';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -18,10 +29,12 @@ export default function AdminEditarLojaPage({ params }: Props) {
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [potencies, setPotencies] = useState<{ id: string; slug: string; name: string; abbreviation: string }[]>([]);
   const [rites, setRites] = useState<{ id: string; slug: string; name: string }[]>([]);
+  const [tenantId, setTenantId] = useState('');
 
   // Form States
   const [name, setName] = useState('');
@@ -35,12 +48,16 @@ export default function AdminEditarLojaPage({ params }: Props) {
   // Media (Logo e Capa/Sede)
   const [logoUrl, setLogoUrl] = useState('');
   const [coverUrl, setCoverUrl] = useState('');
+  const [gallery, setGallery] = useState<Array<{ url: string; alt: string }>>([]);
 
   // Location
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [cep, setCep] = useState('');
   const [address, setAddress] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
+  const [geocoding, setGeocoding] = useState(false);
 
   // Status & Flags de Visibilidade
   const [isPublished, setIsPublished] = useState(true);
@@ -58,6 +75,8 @@ export default function AdminEditarLojaPage({ params }: Props) {
   const [whatsapp, setWhatsapp] = useState('');
   const [email, setEmail] = useState('');
   const [website, setWebsite] = useState('');
+  const [instagram, setInstagram] = useState('');
+  const [fraternityInstagram, setFraternityInstagram] = useState('');
 
   useEffect(() => {
     async function loadData() {
@@ -73,6 +92,7 @@ export default function AdminEditarLojaPage({ params }: Props) {
         if (riteData) setRites(riteData);
 
         if (lodgeData) {
+          setTenantId(lodgeData.tenant_id || '');
           setName(lodgeData.name || '');
           setCodeNumber(lodgeData.code_number != null ? String(lodgeData.code_number) : '');
           setPotencyId(lodgeData.potency_id || '');
@@ -86,6 +106,8 @@ export default function AdminEditarLojaPage({ params }: Props) {
           setState(lodgeData.state || '');
           setCep(lodgeData.cep || '');
           setAddress(lodgeData.address || '');
+          setLatitude(lodgeData.latitude != null ? String(lodgeData.latitude) : '');
+          setLongitude(lodgeData.longitude != null ? String(lodgeData.longitude) : '');
           setIsPublished(lodgeData.is_published ?? true);
           setIsFeatured(lodgeData.is_featured ?? false);
           setIsActive(lodgeData.is_active ?? true);
@@ -93,9 +115,10 @@ export default function AdminEditarLojaPage({ params }: Props) {
           setShowAddress(lodgeData.show_address ?? true);
 
           // Carregar reunião principal
-          const [{ data: meetingData }, { data: contactData }] = await Promise.all([
+          const [{ data: meetingData }, { data: contactData }, { data: mediaData }] = await Promise.all([
             (supabase as any).from('organization_meetings').select('*').eq('organization_id', id).limit(1),
             (supabase as any).from('organization_contacts').select('*').eq('organization_id', id),
+            (supabase as any).from('organization_media').select('url, alt').eq('organization_id', id).eq('type', 'photo').order('sort_order'),
           ]);
 
           if (meetingData && meetingData[0]) {
@@ -109,8 +132,11 @@ export default function AdminEditarLojaPage({ params }: Props) {
               if (c.type === 'whatsapp') setWhatsapp(c.value);
               if (c.type === 'email') setEmail(c.value);
               if (c.type === 'website') setWebsite(c.value);
+              if (c.type === 'instagram') setInstagram(c.value);
+              if (c.type === 'fraternity_instagram') setFraternityInstagram(c.value);
             });
           }
+          if (mediaData) setGallery(mediaData.map((item: any) => ({ url: item.url, alt: item.alt || '' })));
         }
       } catch (err) {
         console.error('Erro ao carregar loja:', err);
@@ -123,14 +149,18 @@ export default function AdminEditarLojaPage({ params }: Props) {
 
   // Handler de Upload de Logo/Brasão
   const handleUploadLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
 
     setUploadingLogo(true);
     setErrorMessage(null);
     try {
+      const validationError = validateLodgeSourceImage(rawFile);
+      if (validationError) throw new Error(validationError);
+      const file = await compressImageOnClient(rawFile, 800, 0.85, 0.5, 'contain');
+      if (file.size > LODGE_IMAGE_MAX_OPTIMIZED_BYTES) throw new Error('O brasão permaneceu muito grande apó a otimização. Escolha outra imagem.');
       const supabase = createClient();
-      const tenantId = '00000000-0000-0000-0000-000000000010';
+      if (!tenantId) throw new Error('Tenant da Loja não identificado. Recarregue a página.');
       const fileExt = file.name.split('.').pop();
       const fileName = `logo-${Date.now()}.${fileExt}`;
       const filePath = `${tenantId}/lodges/${id}/logo/${fileName}`;
@@ -146,24 +176,76 @@ export default function AdminEditarLojaPage({ params }: Props) {
         .getPublicUrl(filePath);
 
       setLogoUrl(publicUrlData.publicUrl);
+      systemNotify({ type: 'success', title: 'Brasão otimizado', message: 'Imagem preparada em WebP. Clique em Salvar Alterações para concluir.' });
     } catch (err: any) {
       console.error('Erro no upload da logo:', err);
       setErrorMessage(err.message || 'Falha ao enviar logomarca/brasão.');
+      systemNotify({ type: 'danger', title: 'Falha no envio', message: err.message || 'Falha ao enviar logomarca/brasão.' });
     } finally {
       setUploadingLogo(false);
     }
   };
 
+  const handleUploadGallery = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const countError = validateLodgeGalleryCount(gallery.length, files.length);
+    const fileError = files.map(validateLodgeSourceImage).find(Boolean);
+    if (countError || fileError) {
+      const message = countError || fileError || 'Não foi possível validar as imagens.';
+      setErrorMessage(message);
+      systemNotify({ type: 'danger', title: 'Galeria não atualizada', message });
+      e.target.value = '';
+      return;
+    }
+    const confirmed = await systemConfirm({
+      title: 'Adicionar fotos à galeria',
+      message: `${files.length} foto(s) serão otimizadas em WebP antes do envio. A galeria permite até ${LODGE_GALLERY_MAX_PHOTOS} fotos.`,
+      confirmLabel: 'Otimizar e enviar',
+    });
+    if (!confirmed) { e.target.value = ''; return; }
+
+    setUploadingGallery(true);
+    setErrorMessage(null);
+    try {
+      const supabase = createClient();
+      const uploaded = await Promise.all(files.map(async (rawFile, index) => {
+        const file = await compressImageOnClient(rawFile, LODGE_GALLERY_MAX_DIMENSION, LODGE_GALLERY_WEBP_QUALITY);
+        if (file.size > LODGE_IMAGE_MAX_OPTIMIZED_BYTES) throw new Error(`A imagem "${rawFile.name}" permaneceu muito grande apó a otimização.`);
+        const fileExt = file.name.split('.').pop();
+        if (!tenantId) throw new Error('Tenant da Loja não identificado. Recarregue a página.');
+        const filePath = `${tenantId}/lodges/${id}/gallery/${Date.now()}-${index}.${fileExt}`;
+        const { error } = await supabase.storage.from('business-assets').upload(filePath, file, { upsert: false });
+        if (error) throw error;
+        const { data } = supabase.storage.from('business-assets').getPublicUrl(filePath);
+        return { url: data.publicUrl, alt: file.name.replace(/\.[^.]+$/, '') };
+      }));
+      setGallery((current) => [...current, ...uploaded]);
+      systemNotify({ type: 'success', title: 'Fotos otimizadas', message: `${uploaded.length} foto(s) preparada(s). Clique em Salvar Alterações para concluir.` });
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : 'Falha ao enviar fotos para a galeria.');
+      systemNotify({ type: 'danger', title: 'Falha no envio', message: err instanceof Error ? err.message : 'Falha ao enviar fotos para a galeria.' });
+    } finally {
+      setUploadingGallery(false);
+      e.target.value = '';
+    }
+  };
+
   // Handler de Upload da Foto da Sede/Fachada
   const handleUploadCover = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
 
     setUploadingCover(true);
     setErrorMessage(null);
     try {
+      const validationError = validateLodgeSourceImage(rawFile);
+      if (validationError) throw new Error(validationError);
+      const file = await compressImageOnClient(rawFile, 1920, 0.82);
+      if (file.size > LODGE_IMAGE_MAX_OPTIMIZED_BYTES) throw new Error('A foto de capa permaneceu muito grande apó a otimização. Escolha outra imagem.');
       const supabase = createClient();
-      const tenantId = '00000000-0000-0000-0000-000000000010';
+      if (!tenantId) throw new Error('Tenant da Loja não identificado. Recarregue a página.');
       const fileExt = file.name.split('.').pop();
       const fileName = `cover-${Date.now()}.${fileExt}`;
       const filePath = `${tenantId}/lodges/${id}/cover/${fileName}`;
@@ -179,9 +261,11 @@ export default function AdminEditarLojaPage({ params }: Props) {
         .getPublicUrl(filePath);
 
       setCoverUrl(publicUrlData.publicUrl);
+      systemNotify({ type: 'success', title: 'Capa otimizada', message: 'Imagem preparada em WebP. Clique em Salvar Alterações para concluir.' });
     } catch (err: any) {
       console.error('Erro no upload da foto da sede:', err);
       setErrorMessage(err.message || 'Falha ao enviar foto da sede.');
+      systemNotify({ type: 'danger', title: 'Falha no envio', message: err.message || 'Falha ao enviar foto da sede.' });
     } finally {
       setUploadingCover(false);
     }
@@ -190,6 +274,13 @@ export default function AdminEditarLojaPage({ params }: Props) {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
+
+    const confirmed = await systemConfirm({
+      title: 'Salvar alterações da Loja',
+      message: 'Confirma a atualização dos dados, imagens, contatos e reuniões desta Loja Maçônica?',
+      confirmLabel: 'Confirmar e salvar',
+    });
+    if (!confirmed) return;
 
     setSaving(true);
     setErrorMessage(null);
@@ -211,6 +302,8 @@ export default function AdminEditarLojaPage({ params }: Props) {
         state: state || null,
         cep: cep || null,
         address: address || null,
+        latitude: latitude.trim() ? Number(latitude) : null,
+        longitude: longitude.trim() ? Number(longitude) : null,
         logo_url: logoUrl || null,
         cover_url: coverUrl || null,
         slug: slug || undefined,
@@ -225,19 +318,41 @@ export default function AdminEditarLojaPage({ params }: Props) {
         whatsapp,
         email,
         website,
+        instagram,
+        fraternity_instagram: fraternityInstagram,
+        gallery,
       });
 
       if (!res.success) {
         setErrorMessage(res.error || 'Erro ao atualizar Loja Maçônica.');
+        systemNotify({ type: 'danger', title: 'Alterações não salvas', message: res.error || 'Erro ao atualizar Loja Maçônica.' });
       } else {
-        alert('Loja Maçônica atualizada com sucesso!');
-        router.push('/admin/lojas');
+        systemNotify({ type: 'success', title: 'Loja atualizada', message: 'As informações e imagens foram salvas com sucesso.' });
+        router.push(`/admin/lojas/${id}`);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro ao atualizar loja';
       setErrorMessage(msg);
+      systemNotify({ type: 'danger', title: 'Alterações não salvas', message: msg });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleGeocodeAddress = async () => {
+    setGeocoding(true);
+    setErrorMessage(null);
+    try {
+      const result = await geocodeAdminLodgeAddressAction({ address, city, state, cep });
+      if (!result.success || !result.data) {
+        systemNotify({ type: 'danger', title: 'Endereço não localizado', message: result.error || 'Confira os dados informados.' });
+        return;
+      }
+      setLatitude(String(result.data.latitude));
+      setLongitude(String(result.data.longitude));
+      systemNotify({ type: 'success', title: 'Coordenadas encontradas', message: result.data.displayName });
+    } finally {
+      setGeocoding(false);
     }
   };
 
@@ -255,9 +370,9 @@ export default function AdminEditarLojaPage({ params }: Props) {
     <form onSubmit={handleSave} className="space-y-6 max-w-4xl mx-auto pb-16 text-left">
       {/* Top Header */}
       <div className="flex items-center justify-between">
-        <Link href="/admin/lojas" className="flex items-center gap-1 text-xs font-bold text-stone-600 hover:text-amber-900">
+        <Link href={`/admin/lojas/${id}`} className="flex items-center gap-1 text-xs font-bold text-stone-600 hover:text-amber-900">
           <ArrowLeft className="w-4 h-4" />
-          <span>Voltar para Lojas Maçônicas</span>
+          <span>Voltar ao Prontuário 360º</span>
         </Link>
         <div className="flex items-center gap-3">
           {isPubliclyAccessible ? (
@@ -349,7 +464,42 @@ export default function AdminEditarLojaPage({ params }: Props) {
           </div>
         </div>
 
-        {/* 2. Identificação Institucional */}
+        <div className="space-y-4 pt-4 border-t border-stone-200">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">2. Galeria de fotos</h3>
+              <p className="text-[11px] text-stone-500 mt-1">Fotos salvas aqui aparecem na página pública da Loja. Limite: {gallery.length}/{LODGE_GALLERY_MAX_PHOTOS}.</p>
+            </div>
+            <label className="inline-flex items-center gap-1.5 px-3 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors">
+              {uploadingGallery ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+              <span>{uploadingGallery ? 'Enviando...' : 'Adicionar fotos'}</span>
+              <input type="file" accept="image/*" multiple onChange={handleUploadGallery} disabled={uploadingGallery} className="hidden" />
+            </label>
+          </div>
+          {gallery.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {gallery.map((item, index) => (
+                <div key={`${item.url}-${index}`} className="relative overflow-hidden rounded-xl border border-stone-200 bg-stone-100 aspect-square group">
+                  <img src={item.url} alt={item.alt || `Foto ${index + 1} da Loja`} className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setGallery((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                    className="absolute right-2 top-2 rounded-lg bg-red-700 p-2 text-white opacity-90 hover:bg-red-600"
+                    aria-label={`Remover foto ${index + 1}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50 p-6 text-center text-xs text-stone-500">
+              Nenhuma foto cadastrada na galeria.
+            </div>
+          )}
+        </div>
+
+        {/* 3. Identificação Institucional */}
         <div className="space-y-4 pt-4 border-t border-stone-200">
           <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">2. Identificação da Oficina</h3>
           
@@ -427,6 +577,45 @@ export default function AdminEditarLojaPage({ params }: Props) {
               className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
             />
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-stone-800 mb-1">Latitude</label>
+              <input
+                type="number"
+                step="any"
+                min="-90"
+                max="90"
+                value={latitude}
+                onChange={(e) => setLatitude(e.target.value)}
+                placeholder="Ex: -12.2664"
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-stone-800 mb-1">Longitude</label>
+              <input
+                type="number"
+                step="any"
+                min="-180"
+                max="180"
+                value={longitude}
+                onChange={(e) => setLongitude(e.target.value)}
+                placeholder="Ex: -38.9663"
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void handleGeocodeAddress()}
+            disabled={geocoding || !address.trim() || !city.trim() || !state.trim()}
+            className="inline-flex items-center gap-2 rounded-xl border border-amber-900 px-4 py-2 text-xs font-bold text-amber-950 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {geocoding ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+            Buscar coordenadas pelo endereço
+          </button>
         </div>
 
         {/* 3. Administração & Reuniões */}
@@ -481,26 +670,7 @@ export default function AdminEditarLojaPage({ params }: Props) {
           <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">4. Localização & Endereço</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-stone-800 mb-1">Cidade / Oriente</label>
-              <input
-                type="text"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-stone-800 mb-1">Estado (UF)</label>
-              <input
-                type="text"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
-                maxLength={2}
-                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900 uppercase"
-              />
-            </div>
+            <BrazilianLocationFields state={state} city={city} onStateChange={setState} onCityChange={setCity} />
 
             <div>
               <label className="block text-xs font-bold text-stone-800 mb-1">CEP</label>
@@ -565,6 +735,28 @@ export default function AdminEditarLojaPage({ params }: Props) {
                 type="text"
                 value={website}
                 onChange={(e) => setWebsite(e.target.value)}
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-stone-800 mb-1">Instagram da Loja</label>
+              <input
+                type="text"
+                value={instagram}
+                onChange={(e) => setInstagram(e.target.value)}
+                placeholder="@nomedaloja ou URL completa"
+                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-stone-800 mb-1">Instagram da Fraternidade Feminina</label>
+              <input
+                type="text"
+                value={fraternityInstagram}
+                onChange={(e) => setFraternityInstagram(e.target.value)}
+                placeholder="Opcional: @fraternidade ou URL completa"
                 className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
               />
             </div>

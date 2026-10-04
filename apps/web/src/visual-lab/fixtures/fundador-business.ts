@@ -38,6 +38,7 @@ export const fundadorBusinessFixture: PublicBusinessPresentation = {
     colunaDeHonra: false,
   },
   identity: {
+    id: 'visual-lab-fundador',
     slug: 'grupo-construtor-alfa-fundador',
     name: 'Grupo Construtor Alfa',
     category: 'Imóveis e Construção',

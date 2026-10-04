@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Heart, Share2, MapPin, Briefcase, Star, Crown, Award, ShieldCheck, Users } from 'lucide-react';
 import { useFavorites } from '@/lib/directory/favorites-context';
 import { usePedraCardDisplay, usePedraHorizontalSeal, type PedraCardDisplay } from '@/lib/directory/pedra-card-display-context';
+import { trackDirectoryEventAction } from '@/lib/analytics/analytics-service';
 
 export type BusinessCardData = {
   id: string;
@@ -473,6 +474,7 @@ export function BusinessCard({
           {/* Botão Ver Empresa */}
           <Link
             href={`/guia/${data.slug}`}
+            onClick={() => void trackDirectoryEventAction({ businessId: data.id, eventType: 'view', source: 'directory_card' })}
             className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-xl border border-[#5d1523] text-[#5d1523] font-bold text-xs hover:bg-[#5d1523] hover:text-white transition-colors shrink-0"
           >
             Ver empresa

@@ -36,6 +36,7 @@ export const ouroBusinessFixture: PublicBusinessPresentation = {
     goldPlanBadge: true,
   },
   identity: {
+    id: 'visual-lab-ouro',
     slug: 'comandos-seguranca-acacia',
     name: 'Comandos Segurança & Terceirização',
     category: 'Segurança e Terceirização',

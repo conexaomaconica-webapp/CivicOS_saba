@@ -64,7 +64,7 @@ describe('Refinamento Guia Maçônico (/admin/lojas & /admin/guia/*)', () => {
   });
 
   it('2. Prontuário 360º de Loja Maçônica — Exibe reuniões, endereço geolocalizado e auditoria', async () => {
-    const dto = await getAdminLodge360DetailsAction('lodge-001');
+    const dto = await getAdminLodge360DetailsAction('00000000-0000-0000-0000-000000000020');
     expect(dto).not.toBeNull();
     if (dto) {
       expect(dto.lodge.name).toBeDefined();

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { createAdminLodgeAction, updateAdminLodgeAction } from '@/lib/admin/admin-lodges-service';
+import { BrazilianLocationFields } from '@/components/admin/BrazilianLocationFields';
 import { Landmark, ArrowLeft, Save, Loader2, Upload, Image as ImageIcon } from 'lucide-react';
 
 export default function AdminNovaLojaPage() {
@@ -108,7 +109,7 @@ export default function AdminNovaLojaPage() {
       const selectedRite = rites.find((r) => r.id === riteId);
 
       // Passo 1: Criar o registro da Loja no banco e obter o ID REAL
-      const res = await createAdminLodgeAction({
+      const lodgePayload = {
         name,
         code_number: num,
         potency_id: potencyId || null,
@@ -133,7 +134,9 @@ export default function AdminNovaLojaPage() {
         whatsapp,
         email,
         website,
-      });
+      };
+
+      const res = await createAdminLodgeAction(lodgePayload);
 
       if (!res.success || !res.data?.id) {
         setErrorMessage(res.error || 'Erro ao cadastrar Loja Maçônica.');
@@ -190,11 +193,17 @@ export default function AdminNovaLojaPage() {
 
       // Passo 3: Atualizar as URLs de mídia se houver uploads bem sucedidos
       if (uploadedLogoUrl || uploadedCoverUrl) {
-        await updateAdminLodgeAction(orgId, {
-          name,
+        const mediaUpdateResult = await updateAdminLodgeAction(orgId, {
+          ...lodgePayload,
           logo_url: uploadedLogoUrl || undefined,
           cover_url: uploadedCoverUrl || undefined,
         });
+
+        if (!mediaUpdateResult.success) {
+          setErrorMessage(mediaUpdateResult.error || 'A Loja foi cadastrada, mas não foi possível salvar as imagens.');
+          setSaving(false);
+          return;
+        }
       }
 
       alert('Loja Maçônica cadastrada com sucesso!');
@@ -433,28 +442,7 @@ export default function AdminNovaLojaPage() {
           <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">4. Localização & Endereço</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-stone-800 mb-1">Cidade / Oriente</label>
-              <input
-                type="text"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="Ex: São Paulo"
-                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-stone-800 mb-1">Estado (UF)</label>
-              <input
-                type="text"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
-                placeholder="Ex: SP"
-                maxLength={2}
-                className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900 uppercase"
-              />
-            </div>
+            <BrazilianLocationFields state={state} city={city} onStateChange={setState} onCityChange={setCity} />
 
             <div>
               <label className="block text-xs font-bold text-stone-800 mb-1">CEP</label>

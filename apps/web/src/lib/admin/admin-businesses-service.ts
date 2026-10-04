@@ -20,6 +20,7 @@ import {
 } from '@/lib/masonic/masonic-links-service';
 import {
   assertCommercialStatusTransition,
+  COMMERCIAL_STATUS_ORDER,
   type CommercialStatus,
 } from '@/lib/commercial-onboarding-status';
 import { evaluateBusinessProfileReadiness } from './admin-commercial-dossier-readiness';
@@ -280,8 +281,18 @@ export async function uploadAdminBusinessAssetAction(formData: FormData): Promis
     if (!supabaseUrl || !serviceRoleKey) return { success: false, error: 'Configuração segura do Storage indisponível.' };
     const adminClient = createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
     const { data: business, error: businessError } = await (adminClient as any).from('businesses')
-      .select('id, tenant_id, plan_tier, plan_code').eq('id', businessId).maybeSingle();
-    if (businessError || !business) return { success: false, error: 'Empresa não localizada.' };
+      .select('id, tenant_id, plan_tier').eq('id', businessId).maybeSingle();
+    if (businessError) {
+      console.error('[uploadAdminBusinessAssetAction] Falha ao consultar empresa:', {
+        businessId,
+        code: businessError.code,
+        message: businessError.message,
+        details: businessError.details,
+        hint: businessError.hint,
+      });
+      return { success: false, error: `Falha ao consultar empresa: ${businessError.message}` };
+    }
+    if (!business) return { success: false, error: 'Empresa não localizada.' };
 
     let galleryOrder = 0;
     if (assetType === 'gallery') {
@@ -290,7 +301,7 @@ export async function uploadAdminBusinessAssetAction(formData: FormData): Promis
         .eq('tenant_id', business.tenant_id).eq('business_id', businessId)
         .in('status', ['active', 'trialing', 'past_due', 'canceled'])
         .order('created_at', { ascending: false }).limit(1).maybeSingle();
-      const planCode = activeSubscription?.plan_versions?.plans?.code || business.plan_tier || business.plan_code || 'bronze';
+      const planCode = activeSubscription?.plan_versions?.plans?.code || business.plan_tier || 'bronze';
       const { data: entitlement } = await (adminClient as any).from('plan_entitlements').select('max_limit')
         .eq('tenant_id', business.tenant_id).eq('plan_code', planCode).eq('feature_code', 'gallery_photos_limit').maybeSingle();
       const limit = entitlement?.max_limit ?? getCanonicalDefaultLimit(planCode, 'gallery_photos_limit');
@@ -434,6 +445,7 @@ export interface AdminBusiness360DTO {
     acceptance_id: string | null;
     rendered_text: string;
     signer_name: string;
+    signer_cpf?: string | null;
     signature_image_data?: string | null;
   };
   commercial_activation: {
@@ -864,15 +876,28 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
     let subData: any = null;
 
     try {
-      const res = await (supabase as any)
+      const { data: subscriptionRow, error: subscriptionError } = await (supabase as any)
         .from('subscriptions')
-        .select('id, status, contract_term, payment_schedule, current_period_start, current_period_end, created_at, plan_versions!inner(id, plan_id, price_annual, plans!inner(code, name))')
+        .select('id, status, contract_term, payment_schedule, current_period_start, current_period_end, created_at, plan_version_id')
         .eq('business_id', businessId)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      subData = res?.data;
-    } catch (_e) {
+      if (subscriptionError) throw subscriptionError;
+      subData = subscriptionRow;
+
+      // A relação aninhada pode não estar disponível no cache do PostgREST.
+      // Busca o plano separadamente para não descartar as datas da assinatura.
+      if (subData?.plan_version_id) {
+        const { data: planVersion } = await (supabase as any)
+          .from('plan_versions')
+          .select('id, plan_id, price_annual, plans(code, name)')
+          .eq('id', subData.plan_version_id)
+          .maybeSingle();
+        if (planVersion) subData.plan_versions = planVersion;
+      }
+    } catch (error) {
+      console.error('[getAdminBusiness360Action] Falha ao carregar assinatura:', error);
       subData = null;
     }
 
@@ -966,7 +991,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       }
     } catch (_e) { }
 
-    // 1. Vínculo Maçônico (relacionado via organizations com fallback em businesses)
+    // 1. Vínculo Maçônico (fonte canônica: business_masonic_links + organizations)
     let masonic_link_detail: AdminBusiness360DTO['masonic_link_detail'] = undefined;
     try {
       const { data: linkData } = await (supabase as any)
@@ -978,11 +1003,11 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       if (linkData) {
         masonic_link_detail = {
           id: linkData.id,
-          status: normalizeMasonicStatus(linkData.status || b.masonic_validation_status),
+          status: normalizeMasonicStatus(linkData.status),
           organization_id: linkData.organization_id || null,
-          lodge_name: linkData.organizations?.name || b.masonic_lodge || 'Loja Não Identificada',
-          potency: linkData.organizations?.potency || b.masonic_potency || 'GLEB / GOB / GLMMG',
-          link_type: linkData.link_type || b.masonic_link_type || 'Membro',
+          lodge_name: linkData.organizations?.name || 'Loja Não Identificada',
+          potency: linkData.organizations?.potency || 'Potência não informada',
+          link_type: linkData.link_type,
           eligibility_type: linkData.eligibility_type || null,
           reference_mason_name: linkData.reference_mason_name || null,
           reference_mason_cim: linkData.reference_mason_cim || null,
@@ -991,32 +1016,8 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
           verified_at: linkData.verified_at || null,
           verified_by: linkData.verified_by || null,
         };
-      } else if (b.masonic_lodge || b.masonic_validation_status) {
-        masonic_link_detail = {
-          id: `link-${b.id}`,
-          status: normalizeMasonicStatus(b.masonic_validation_status),
-          organization_id: null,
-          lodge_name: b.masonic_lodge || 'Loja Não Identificada',
-          potency: b.masonic_potency || 'GLEB / GOB / GLMMG',
-          link_type: b.masonic_link_type || 'Membro',
-          verified_at: null,
-          verified_by: null,
-        };
       }
-    } catch (_e) {
-      if (b.masonic_lodge || b.masonic_validation_status) {
-        masonic_link_detail = {
-          id: `link-${b.id}`,
-          status: normalizeMasonicStatus(b.masonic_validation_status),
-          organization_id: null,
-          lodge_name: b.masonic_lodge || 'Loja Não Identificada',
-          potency: b.masonic_potency || 'GLEB / GOB / GLMMG',
-          link_type: b.masonic_link_type || 'Membro',
-          verified_at: null,
-          verified_by: null,
-        };
-      }
-    }
+    } catch (_e) { }
 
     // 2. Mídias (Capa media_type = 'cover', Galeria media_type = 'gallery')
     let mediaList: any[] = [];
@@ -1171,57 +1172,80 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
     // 6. Contrato digital: nunca inferir assinatura a partir da existência do contrato/snapshot.
     let contractDetail: AdminBusiness360DTO['contract'] = undefined;
     try {
-      const { data: contractRow } = await (supabase as any)
+      const { data: contractRows, error: contractsError } = await (supabase as any)
         .from('contracts')
         .select('id, status, version_id, created_at')
         .eq('business_id', businessId)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(20);
+      if (contractsError) throw contractsError;
+
+      const contracts = (contractRows || []).filter(
+        (contract: any) => !['voided', 'superseded'].includes(contract.status)
+      );
+      const contractIds = contracts.map((contract: any) => contract.id);
+      let acceptanceRow: any = null;
+      if (contractIds.length > 0) {
+        const { data: acceptance } = await (supabase as any)
+          .from('contract_acceptances')
+          .select('id, contract_id, snapshot_id, accepted_at')
+          .in('contract_id', contractIds)
+          .order('accepted_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        acceptanceRow = acceptance;
+      }
+
+      const contractRow = acceptanceRow
+        ? contracts.find((contract: any) => contract.id === acceptanceRow.contract_id)
+        : contracts.find((contract: any) => contract.status === 'signed') || contracts[0];
 
       let snapshotRow: any = null;
       if (contractRow) {
-        const { data: snap } = await (supabase as any)
+        let snapshotQuery = (supabase as any)
           .from('contract_snapshots')
-          .select('id, rendered_text, sha256_hash, signature_image_data, created_at')
-          .eq('contract_id', contractRow.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .select('id, rendered_text, sha256_hash, created_at')
+          .eq('contract_id', contractRow.id);
+        snapshotQuery = acceptanceRow?.snapshot_id
+          ? snapshotQuery.eq('id', acceptanceRow.snapshot_id)
+          : snapshotQuery.order('created_at', { ascending: false }).limit(1);
+        const { data: snap } = await snapshotQuery.maybeSingle();
         snapshotRow = snap;
+        if (snapshotRow) {
+          const { data: evidence } = await (supabase as any)
+            .from('contract_snapshots')
+            .select('signature_image_data, signer_cpf')
+            .eq('id', snapshotRow.id)
+            .maybeSingle();
+          if (evidence) snapshotRow = { ...snapshotRow, ...evidence };
+        }
       }
 
       if (snapshotRow && snapshotRow.rendered_text) {
-        const [{ data: versionRow }, { data: acceptanceRow }] = await Promise.all([
+        const [{ data: versionRow }] = await Promise.all([
           (supabase as any)
             .from('contract_versions')
             .select('version')
             .eq('id', contractRow.version_id)
-            .maybeSingle(),
-          (supabase as any)
-            .from('contract_acceptances')
-            .select('id, accepted_at')
-            .eq('contract_id', contractRow.id)
-            .eq('snapshot_id', snapshotRow.id)
-            .order('accepted_at', { ascending: false })
-            .limit(1)
             .maybeSingle(),
         ]);
 
         contractDetail = {
           id: contractRow.id,
           snapshot_id: snapshotRow.id,
-          status: contractRow.status,
+          status: acceptanceRow ? 'signed' : contractRow.status,
           version: versionRow?.version || 'sem versão',
           sha256_hash: snapshotRow.sha256_hash,
           signed_at: acceptanceRow?.accepted_at || null,
           acceptance_id: acceptanceRow?.id || null,
           rendered_text: snapshotRow.rendered_text,
           signer_name: acceptanceRow ? (b.name || 'Anunciante Titular') : '',
+          signer_cpf: snapshotRow.signer_cpf || null,
           signature_image_data: snapshotRow.signature_image_data || null,
         };
       }
-    } catch (_e) {
+    } catch (error) {
+      console.error('[getAdminBusiness360Action] Falha ao carregar contrato:', error);
       contractDetail = undefined;
     }
 
@@ -1286,16 +1310,18 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       const date30daysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const { data: eventsRaw } = await (supabase as any)
         .from('analytics_events')
-        .select('event_type, created_at')
+        .select('event_name, created_at')
         .eq('business_id', businessId)
         .gte('created_at', date30daysAgo);
 
       if (eventsRaw && eventsRaw.length > 0) {
-        const views = eventsRaw.filter((e: any) => e.event_type === 'view' || e.event_type === 'page_view').length;
-        const whatsappClicks = eventsRaw.filter((e: any) => e.event_type === 'whatsapp_click').length;
-        const routeClicks = eventsRaw.filter((e: any) => e.event_type === 'route_click' || e.event_type === 'directions_click').length;
-        const websiteClicks = eventsRaw.filter((e: any) => e.event_type === 'website_click' || e.event_type === 'phone_click').length;
-        const totalInteractions = whatsappClicks + routeClicks + websiteClicks;
+        const views = eventsRaw.filter((e: any) => e.event_name === 'view' || e.event_name === 'page_view').length;
+        const whatsappClicks = eventsRaw.filter((e: any) => e.event_name === 'whatsapp_click').length;
+        const routeClicks = eventsRaw.filter((e: any) => e.event_name === 'route_click' || e.event_name === 'directions_click').length;
+        const websiteClicks = eventsRaw.filter((e: any) => e.event_name === 'website_click').length;
+        const totalInteractions = eventsRaw.filter((e: any) =>
+          ['whatsapp_click', 'phone_click', 'website_click', 'route_click', 'directions_click', 'benefit_click', 'social_click'].includes(e.event_name)
+        ).length;
 
         analytics_summary = {
           views_30d: views,
@@ -1355,6 +1381,38 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
         };
       }
     } catch (_e) { }
+
+    const effectivePlanCode = subData?.plan_versions?.plans?.code || commercialTermsDetail?.plan_code || planCode;
+    const firstConfirmedPayment = payments_history
+      .filter((payment) => ['paid', 'succeeded'].includes(payment.status) && Boolean(payment.date))
+      .sort((a, b) => new Date(a.date as string).getTime() - new Date(b.date as string).getTime())[0];
+
+    const effectiveStartDate =
+      subData?.current_period_start ||
+      commercialTermsDetail?.contract_start_date ||
+      contractDetail?.signed_at ||
+      firstConfirmedPayment?.date ||
+      null;
+
+    const nextOpenInvoice = payments_history
+      .filter((payment) => !['paid', 'void'].includes(payment.status) && Boolean(payment.due_date))
+      .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())[0];
+
+    let effectiveNextBillingDate = subData?.current_period_end || nextOpenInvoice?.due_date || null;
+    if (!effectiveNextBillingDate && effectiveStartDate) {
+      const renewalDate = new Date(effectiveStartDate);
+      if (!Number.isNaN(renewalDate.getTime())) {
+        renewalDate.setUTCFullYear(
+          renewalDate.getUTCFullYear() + (commercialTermsDetail?.billing_cycle === 'biennial' ? 2 : 1),
+        );
+        effectiveNextBillingDate = renewalDate.toISOString();
+      }
+    }
+
+    const hasConfirmedCommercialPayment =
+      ['pagamento_confirmado', 'prontuario_em_configuracao', 'pronto_para_publicar', 'publicado'].includes(
+        b.commercial_status || '',
+      ) || payments_history.some((payment) => payment.status === 'paid' || payment.status === 'succeeded');
 
     return {
       business: {
@@ -1429,20 +1487,21 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
         contract_status: contractDetail?.status || null,
         snapshot_id: contractDetail?.snapshot_id || null,
         acceptance_id: contractDetail?.acceptance_id || null,
-        contract_signed: contractDetail?.status === 'signed' && Boolean(contractDetail.acceptance_id),
-        payment_confirmed:
-          ['pagamento_confirmado', 'prontuario_em_configuracao', 'pronto_para_publicar', 'publicado'].includes(
-            b.commercial_status || '',
-          ) || payments_history.some((payment) => payment.status === 'paid' || payment.status === 'succeeded'),
+        contract_signed: Boolean(contractDetail?.acceptance_id && contractDetail?.signed_at),
+        payment_confirmed: hasConfirmedCommercialPayment,
       },
       subscription: {
-        plan_code: planCode,
-        plan_name: `Plano ${getCommercialPlanName(planCode)}`,
-        amount_brl: subData ? Number(subData.plan_versions?.price_annual) : null,
-        periodicity: subData?.contract_term || null,
-        status: subData?.status || 'not_found',
-        start_date: subData?.current_period_start || null,
-        next_billing_date: subData?.current_period_end || null,
+        plan_code: effectivePlanCode,
+        plan_name: commercialTermsDetail?.plan_name || `Plano ${getCommercialPlanName(effectivePlanCode)}`,
+        amount_brl: subData?.plan_versions?.price_annual != null
+          ? Number(subData.plan_versions.price_annual)
+          : commercialTermsDetail
+            ? commercialTermsDetail.amount_cents / 100
+            : null,
+        periodicity: subData?.contract_term || commercialTermsDetail?.billing_cycle || null,
+        status: subData?.status || (hasConfirmedCommercialPayment ? 'active' : 'not_found'),
+        start_date: effectiveStartDate,
+        next_billing_date: effectiveNextBillingDate,
         entitlements: {
           services_limit: servicesLimit,
           benefits_limit: benefitsLimit,
@@ -1979,12 +2038,13 @@ export async function updateAdminBusinessDetailsAction(
 
       if (cleanVal) {
         if (existingContact) {
-          await (supabase as any)
+          const { error } = await (supabase as any)
             .from('business_contacts')
             .update({ value: cleanVal, is_public: true })
             .eq('id', existingContact.id);
+          if (error) throw new Error(`Falha ao atualizar contato ${contactType}: ${error.message}`);
         } else {
-          await (supabase as any)
+          const { error } = await (supabase as any)
             .from('business_contacts')
             .insert({
               tenant_id: existing.tenant_id,
@@ -1993,12 +2053,14 @@ export async function updateAdminBusinessDetailsAction(
               value: cleanVal,
               is_public: true,
             });
+          if (error) throw new Error(`Falha ao cadastrar contato ${contactType}: ${error.message}`);
         }
       } else if (existingContact) {
-        await (supabase as any)
+        const { error } = await (supabase as any)
           .from('business_contacts')
           .delete()
           .eq('id', existingContact.id);
+        if (error) throw new Error(`Falha ao remover contato ${contactType}: ${error.message}`);
       }
     };
 
@@ -2009,7 +2071,10 @@ export async function updateAdminBusinessDetailsAction(
     await upsertContact('instagram', payload.instagram);
     await upsertContact('facebook', payload.facebook);
     await upsertContact('linkedin', payload.linkedin);
-    await upsertContact('youtube', payload.youtube);
+    const normalizedYoutube = payload.youtube?.trim().startsWith('@')
+      ? `https://www.youtube.com/${payload.youtube.trim()}`
+      : payload.youtube;
+    await upsertContact('youtube', normalizedYoutube);
 
     revalidatePath(`/admin/empresas`);
     revalidatePath(`/admin/empresas/${businessId}`);
@@ -2253,7 +2318,6 @@ export async function verifyAdminMasonicLinkAction(
     }
 
     const businessUpdates: Record<string, any> = {
-      masonic_validation_status: newStatus,
       updated_at: new Date().toISOString(),
     };
     if (nextCommercialStatus) businessUpdates.commercial_status = nextCommercialStatus;
@@ -2467,17 +2531,11 @@ export async function upsertAdminMasonicLinkAction(
       }
     }
 
-    // Sincroniza campos na tabela businesses
+    // businesses guarda apenas o estado do funil comercial. Os dados do
+    // vínculo maçônico permanecem exclusivamente em business_masonic_links.
     const businessUpdates: Record<string, any> = {
-      masonic_validation_status:
-        dbStatus === 'approved' ? 'verified' : dbStatus === 'pending_verification' ? 'pending' : dbStatus,
       updated_at: new Date().toISOString(),
     };
-    if (payload.lodge_name.trim()) {
-      businessUpdates.masonic_lodge = payload.lodge_name.trim();
-      businessUpdates.masonic_potency = payload.potency?.trim() || null;
-      businessUpdates.masonic_link_type = dbLinkType;
-    }
     if (nextCommercialStatus) {
       businessUpdates.commercial_status = nextCommercialStatus;
     }
@@ -2577,7 +2635,6 @@ async function reconcileMasonicCommercialStatusWithClient(
     .from('businesses')
     .update({
       commercial_status: 'vinculo_verificado',
-      masonic_validation_status: 'verified',
       updated_at: new Date().toISOString(),
     })
     .eq('id', businessId)
@@ -2871,7 +2928,11 @@ export async function confirmAdminCommercialTermsAction(
     }
     currentStatus = reconcile.status;
 
-    if (currentStatus !== 'dados_comerciais_conferidos') {
+    const currentStatusIndex = COMMERCIAL_STATUS_ORDER.indexOf(currentStatus);
+    const commercialTermsStatusIndex = COMMERCIAL_STATUS_ORDER.indexOf('dados_comerciais_conferidos');
+    const hasAdvancedPastCommercialTerms = currentStatusIndex > commercialTermsStatusIndex;
+
+    if (currentStatus !== 'dados_comerciais_conferidos' && !hasAdvancedPastCommercialTerms) {
       try {
         assertCommercialStatusTransition(currentStatus, 'dados_comerciais_conferidos');
       } catch (transitionErr: any) {
@@ -2976,9 +3037,11 @@ export async function confirmAdminCommercialTermsAction(
 
     // 5. Gravação concorrente para máxima velocidade
     const bizUpdatePayload: Record<string, any> = {
-      commercial_status: 'dados_comerciais_conferidos',
       updated_at: new Date().toISOString(),
     };
+    if (!hasAdvancedPastCommercialTerms) {
+      bizUpdatePayload.commercial_status = 'dados_comerciais_conferidos';
+    }
     if (fullAddressToSync) {
       bizUpdatePayload.address = fullAddressToSync;
     }
@@ -3023,7 +3086,7 @@ export async function confirmAdminCommercialTermsAction(
 
     return {
       success: true,
-      commercial_status: 'dados_comerciais_conferidos',
+      commercial_status: hasAdvancedPastCommercialTerms ? currentStatus : 'dados_comerciais_conferidos',
     };
   } catch (err: any) {
     return {

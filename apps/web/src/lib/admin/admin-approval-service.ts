@@ -6,6 +6,7 @@ import { dispatchNotificationAction } from '@/lib/notifications/notification-ser
 import { getCommercialPlanName } from '@/lib/admin/approval-display';
 import { evaluateBusinessProfileReadiness } from '@/lib/admin/admin-commercial-dossier-readiness';
 import { resolveCanonicalApprovalFlags } from '@/lib/admin/approval-canonical-status';
+import { resolveSignedBusinessContract } from '@/lib/contracts/contract-signature-status';
 
 export interface ApprovalRequirement {
   id: string;
@@ -835,7 +836,20 @@ export async function finalizeApprovalDecisionAction(
     if (decision === 'publish') {
       const { data: linkRow } = await (supabase as any).from('business_masonic_links').select('status').eq('business_id', businessId).maybeSingle();
       const isMasonicApproved = linkRow?.status === 'approved' || linkRow?.status === 'active' || linkRow?.status === 'verified';
-      const { data: contractRow } = await (supabase as any).from('contracts').select('id, status').eq('business_id', businessId).eq('status', 'signed').maybeSingle();
+      let contractRow: any = null;
+      try {
+        const canonicalContract = await resolveSignedBusinessContract(supabase, businessId);
+        contractRow = canonicalContract.contract;
+      } catch (_contractResolutionError) {}
+      if (!contractRow) {
+        const { data: legacySignedContract } = await (supabase as any)
+          .from('contracts')
+          .select('id, status')
+          .eq('business_id', businessId)
+          .eq('status', 'signed')
+          .maybeSingle();
+        contractRow = legacySignedContract;
+      }
       const { data: bizRow } = await (supabase as any).from('businesses').select('id, commercial_status').eq('id', businessId).single();
       const { data: subRow } = await (supabase as any).from('subscriptions').select('status').eq('business_id', businessId).maybeSingle();
       const isPaymentConfirmed = subRow?.status === 'active' || bizRow?.commercial_status === 'pagamento_confirmado' || bizRow?.commercial_status === 'publicado';

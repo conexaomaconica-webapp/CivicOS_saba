@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS public.business_contacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL,
   business_id UUID NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('whatsapp', 'phone', 'email', 'instagram', 'linkedin', 'facebook', 'website')),
+  type TEXT NOT NULL CHECK (type IN ('whatsapp', 'phone', 'email', 'instagram', 'linkedin', 'facebook', 'youtube', 'website')),
   value TEXT NOT NULL,
   label TEXT,
   is_public BOOLEAN NOT NULL DEFAULT true,

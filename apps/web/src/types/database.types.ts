@@ -363,6 +363,7 @@ export type Database = {
           business_id: string
           conferred_at: string
           conferred_by: string | null
+          contract_start_date: string | null
           created_at: string
           id: string
           installment_amount_cents: number
@@ -383,6 +384,7 @@ export type Database = {
           business_id: string
           conferred_at?: string
           conferred_by?: string | null
+          contract_start_date?: string | null
           created_at?: string
           id?: string
           installment_amount_cents?: number
@@ -403,6 +405,7 @@ export type Database = {
           business_id?: string
           conferred_at?: string
           conferred_by?: string | null
+          contract_start_date?: string | null
           created_at?: string
           id?: string
           installment_amount_cents?: number

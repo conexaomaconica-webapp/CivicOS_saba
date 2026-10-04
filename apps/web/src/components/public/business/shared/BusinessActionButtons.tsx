@@ -1,13 +1,15 @@
 'use client';
 
-import React from 'react';
-import { Phone, Mail, MapPin } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { Phone, Mail, MapPin, Globe } from 'lucide-react';
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
+import { trackDirectoryEventAction, type AllowedEventType } from '@/lib/analytics/analytics-service';
 
 type BusinessActionButtonsProps = {
   contacts: PublicBusinessPresentation['contacts'];
   location: PublicBusinessPresentation['location'];
   businessName: string;
+  businessId: string;
   activeTab?: string;
   onTabChange?: (tab: string) => void;
   className?: string;
@@ -17,10 +19,17 @@ export function QuickActionBar({
   contacts,
   location,
   businessName,
+  businessId,
   activeTab = 'visao-geral',
   onTabChange,
   className = '',
 }: BusinessActionButtonsProps) {
+  const track = (eventType: AllowedEventType, source: string) => {
+    void trackDirectoryEventAction({ businessId, eventType, source });
+  };
+  useEffect(() => {
+    track('view', 'business_profile');
+  }, [businessId]);
   const whatsappDigits = contacts.whatsapp ? contacts.whatsapp.replace(/\D/g, '') : null;
   const whatsappUrl = whatsappDigits
     ? `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(`Olá! Vi o anúncio de ${businessName} no Guia Conexão Maçônica.`)}`
@@ -28,6 +37,9 @@ export function QuickActionBar({
 
   const phoneDigits = contacts.phone ? contacts.phone.replace(/\D/g, '') : null;
   const phoneUrl = phoneDigits ? `tel:${phoneDigits}` : null;
+  const websiteUrl = contacts.website
+    ? (/^https?:\/\//i.test(contacts.website) ? contacts.website : `https://${contacts.website}`)
+    : null;
 
   const mapsUrl = location
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${businessName}, ${location.address}`)}`
@@ -41,8 +53,9 @@ export function QuickActionBar({
     if (trimmed.includes('.') || (defaultDomain && trimmed.toLowerCase().includes(defaultDomain))) {
       return `https://${trimmed.replace(/^\/+/, '')}`;
     }
+    const isYoutubeHandle = defaultDomain === 'youtube.com' && trimmed.startsWith('@');
     const clean = trimmed.replace(/^@/, '').replace(/^\/+/, '');
-    return `https://${defaultDomain}/${clean}`;
+    return `https://${defaultDomain}/${isYoutubeHandle ? '@' : ''}${clean}`;
   };
 
   const instagramUrl = getSocialUrl(contacts.instagram, 'instagram.com');
@@ -69,6 +82,7 @@ export function QuickActionBar({
         {whatsappUrl && (
           <a
             href={whatsappUrl}
+            onClick={() => track('whatsapp_click', 'business_profile')}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-emerald-50 text-stone-800 transition-colors"
@@ -86,12 +100,28 @@ export function QuickActionBar({
         {phoneUrl && (
           <a
             href={phoneUrl}
+            onClick={() => track('phone_click', 'business_profile')}
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-amber-50 text-stone-800 transition-colors"
           >
             <span className="w-7 h-7 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-[#C9A227] shrink-0">
               <Phone className="w-3.5 h-3.5" />
             </span>
             <span className="font-semibold text-stone-800">Ligar</span>
+          </a>
+        )}
+
+        {websiteUrl && (
+          <a
+            href={websiteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => track('website_click', 'business_profile')}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-blue-50 text-stone-800 transition-colors"
+          >
+            <span className="w-7 h-7 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700 shrink-0">
+              <Globe className="w-3.5 h-3.5" />
+            </span>
+            <span className="font-semibold text-stone-800">Website</span>
           </a>
         )}
 
@@ -112,6 +142,7 @@ export function QuickActionBar({
         {mapsUrl && (
           <a
             href={mapsUrl}
+            onClick={() => track('directions_click', 'business_profile')}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-amber-50 text-stone-800 transition-colors"

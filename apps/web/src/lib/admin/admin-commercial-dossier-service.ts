@@ -8,6 +8,7 @@ import { assertPlatformAdminAccess } from '@/lib/admin/admin-auth-helper';
 import { revalidatePath } from 'next/cache';
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database.types';
+import { resolveSignedBusinessContract } from '@/lib/contracts/contract-signature-status';
 import {
   evaluateBusinessProfileReadiness,
   validateBusinessPublicationGate,
@@ -98,23 +99,25 @@ export async function unlockAdminCommercialDossierAction(businessId: string): Pr
     // 3. Valida vínculo maçônico verificado
     const { data: masonicLink, error: masonicErr } = await (adminClient as any)
       .from('business_masonic_links')
-      .select('id, status, verified_at, verification_status')
+      .select('id, status, verified_at')
       .eq('business_id', businessId)
+      .eq('tenant_id', biz.tenant_id)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (masonicErr) {
       console.error('[unlockAdminCommercialDossierAction] Falha ao consultar vínculo maçônico:', masonicErr);
+      return {
+        success: false,
+        error: `Falha ao consultar vínculo maçônico: ${masonicErr.message}`,
+      };
     }
 
     const isLinkVerified =
       masonicLink &&
-      (masonicLink.status === 'approved' ||
-        masonicLink.status === 'verified' ||
-        masonicLink.status === 'active' ||
-        masonicLink.verification_status === 'approved' ||
-        Boolean(masonicLink.verified_at));
+      masonicLink.status === 'approved' &&
+      Boolean(masonicLink.verified_at);
 
     if (!isLinkVerified) {
       return {
@@ -124,16 +127,14 @@ export async function unlockAdminCommercialDossierAction(businessId: string): Pr
     }
 
     // 4. Valida contrato assinado
-    const { data: contract, error: contractErr } = await (adminClient as any)
-      .from('contracts')
-      .select('id, status')
-      .eq('business_id', businessId)
-      .eq('status', 'signed')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const { contract, acceptance, error: contractErr } = await resolveSignedBusinessContract(adminClient, businessId);
 
-    if (contractErr || !contract) {
+    if (contractErr) {
+      console.error('[unlockAdminCommercialDossierAction] Falha ao consultar contrato:', contractErr);
+      return { success: false, error: `Falha ao consultar contrato: ${contractErr.message}` };
+    }
+
+    if (!contract) {
       return {
         success: false,
         error: 'O contrato comercial precisa estar assinado antes da liberação do prontuário.',
@@ -141,15 +142,7 @@ export async function unlockAdminCommercialDossierAction(businessId: string): Pr
     }
 
     // 5. Valida aceite formal do contrato
-    const { data: acceptance, error: accErr } = await (adminClient as any)
-      .from('contract_acceptances')
-      .select('id, accepted_at')
-      .eq('contract_id', contract.id)
-      .order('accepted_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (accErr || !acceptance) {
+    if (!acceptance) {
       return {
         success: false,
         error: 'Não foi encontrado o registro formal de aceite/assinatura digital do contrato.',
@@ -157,25 +150,21 @@ export async function unlockAdminCommercialDossierAction(businessId: string): Pr
     }
 
     // 6. Validação de pagamento / faturas
-    const { data: paidInvoice } = await (adminClient as any)
+    const { data: paidInvoice, error: invoiceErr } = await (adminClient as any)
       .from('invoices')
       .select('id, status')
       .eq('business_id', businessId)
+      .eq('tenant_id', biz.tenant_id)
       .eq('status', 'paid')
       .limit(1)
       .maybeSingle();
 
-    const { data: activeSub } = await (adminClient as any)
-      .from('subscriptions')
-      .select('id, status')
-      .eq('business_id', businessId)
-      .in('status', ['active', 'paid', 'trialing'])
-      .limit(1)
-      .maybeSingle();
+    if (invoiceErr) {
+      console.error('[unlockAdminCommercialDossierAction] Falha ao consultar pagamento:', invoiceErr);
+      return { success: false, error: `Falha ao consultar pagamento: ${invoiceErr.message}` };
+    }
 
-    const hasPaymentRecord = Boolean(
-      paidInvoice || activeSub || biz.commercial_status === COMMERCIAL_STATUS.PAGAMENTO_CONFIRMADO
-    );
+    const hasPaymentRecord = Boolean(paidInvoice);
 
     if (!hasPaymentRecord) {
       return {
@@ -432,38 +421,38 @@ export async function publishAdminBusinessAction(businessId: string): Promise<{
     // 1. Carrega dados completos da empresa no servidor
     const { data: biz, error: bizErr } = await (supabase as any)
       .from('businesses')
-      .select(`
-        id, tenant_id, name, slug, legal_name, description, logo_url, website, instagram, facebook,
-        commercial_status, is_active, publication_status
-      `)
+      .select('*')
       .eq('id', businessId)
-      .single();
+      .maybeSingle();
 
-    if (bizErr || !biz) {
+    if (bizErr) {
+      return { success: false, error: `Falha ao consultar a empresa para publicação: ${bizErr.message}` };
+    }
+    if (!biz) {
       return { success: false, error: 'Empresa não encontrada no banco de dados.' };
     }
 
     // 2. Consulta vínculo maçônico complementar se necessário
-    const { data: links } = await (supabase as any)
+    const { data: links, error: linksError } = await (supabase as any)
       .from('business_masonic_links')
-      .select('id, status, verification_status')
+      .select('id, status, verified_at')
       .eq('business_id', businessId)
       .limit(1);
+
+    if (linksError) {
+      return { success: false, error: `Falha ao consultar vínculo maçônico: ${linksError.message}` };
+    }
 
     const hasVerifiedMasonicLink = Boolean(
       links &&
       links.length > 0 &&
-      ['verified', 'approved', 'active'].includes(links[0].status || links[0].verification_status)
+      links[0].status === 'approved' &&
+      links[0].verified_at
     );
 
     // 3. Consulta contrato assinado no banco
-    const { data: signedContracts } = await (supabase as any)
-      .from('contracts')
-      .select('id, status')
-      .eq('business_id', businessId)
-      .eq('status', 'signed')
-      .limit(1);
-    const hasSignedContract = Boolean(signedContracts && signedContracts.length > 0);
+    const signedContractResult = await resolveSignedBusinessContract(supabase, businessId);
+    const hasSignedContract = Boolean(signedContractResult.contract);
 
     // 4. Consulta status de pagamento no banco
     let hasConfirmedPayment = ['pronto_para_publicar', 'publicado'].includes(biz.commercial_status);
@@ -494,7 +483,6 @@ export async function publishAdminBusinessAction(businessId: string): Promise<{
     // 6. Executa a validação formal do Gate
     const gate = validateBusinessPublicationGate({
       commercial_status: biz.commercial_status,
-      masonic_validation_status: biz.masonic_validation_status,
       has_verified_masonic_link: hasVerifiedMasonicLink,
       has_signed_contract: hasSignedContract,
       has_confirmed_payment: hasConfirmedPayment,

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Upload, ArrowLeft, CheckCircle2, FileSpreadsheet, Loader2, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { extractLodgesFromUrlAction } from '@/app/actions/lodge-url-import';
 
 type ParsedLodgeRow = {
   raw: any;
@@ -27,6 +28,9 @@ type ParsedLodgeRow = {
   email?: string;
   website?: string;
   instagram?: string;
+  logo_url?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export default function AdminImportarLojasPage() {
@@ -36,6 +40,41 @@ export default function AdminImportarLojasPage() {
   const [parsedRows, setParsedRows] = useState<ParsedLodgeRow[]>([]);
   const [summary, setSummary] = useState({ newCount: 0, updateCount: 0, dupCount: 0, errCount: 0 });
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [sourcePotency, setSourcePotency] = useState('');
+
+  const handleLoadUrl = async () => {
+    setLoading(true);
+    setSuccessMsg(null);
+    try {
+      const result = await extractLodgesFromUrlAction({ url: sourceUrl, potency: sourcePotency });
+      if (!result.success || !result.data) {
+        alert(result.error || 'Não foi possível extrair os cadastros desse endereço.');
+        return;
+      }
+      const supabase = createClient();
+      const { data: existing } = await (supabase as any).from('organizations').select('name, code_number, potency, city');
+      let newCount = 0;
+      let updateCount = 0;
+      let dupCount = 0;
+      const rows: ParsedLodgeRow[] = result.data.map((row) => {
+        const byNumber = (existing || []).find((item: any) => item.potency?.toLowerCase() === row.potency.toLowerCase() && Number(item.code_number) === row.code_number);
+        const byNameCity = (existing || []).find((item: any) => item.name?.trim().toLowerCase() === row.name.toLowerCase() && item.city?.trim().toLowerCase() === row.city.toLowerCase());
+        const status = byNumber ? 'update' : byNameCity ? 'duplicate' : 'new';
+        if (status === 'update') updateCount++; else if (status === 'duplicate') dupCount++; else newCount++;
+        return {
+          raw: row,
+          ...row,
+          status,
+          reason: status === 'update' ? 'Potência e número cadastral já existentes: atualizar' : status === 'duplicate' ? 'Nome e cidade já cadastrados: revisar duplicidade' : 'Nova loja pronta para cadastro',
+        };
+      });
+      setParsedRows(rows);
+      setSummary({ newCount, updateCount, dupCount, errCount: 0 });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Download Sample Excel (.xlsx)
   const handleDownloadSampleXlsx = () => {
@@ -268,6 +307,9 @@ export default function AdminImportarLojasPage() {
           state: row.state || null,
           cep: row.cep || null,
           address: row.address || null,
+          logo_url: row.logo_url || null,
+          latitude: row.latitude ?? null,
+          longitude: row.longitude ?? null,
           worshipful_master_name: row.worshipful_master_name || null,
           slug,
           is_published: true,
@@ -363,13 +405,37 @@ export default function AdminImportarLojasPage() {
       <div className="bg-white p-6 rounded-2xl border shadow-2xs space-y-4">
         <h1 className="font-serif font-bold text-2xl text-gray-900 flex items-center gap-2">
           <FileSpreadsheet className="w-6 h-6 text-amber-900" />
-          <span>Importação de Lojas via Planilha Excel (.xlsx)</span>
+          <span>Importação de Lojas por Link ou Planilha</span>
         </h1>
         <p className="text-xs text-stone-500 max-w-2xl">
-          Envie sua planilha Excel (.xlsx) ou CSV. O sistema valida os registros, analisa correspondências em 3 níveis (potência+número, potência+nome+cidade) e exige sua confirmação antes de gravar qualquer dado no banco.
+          Informe um link público com dados estruturados ou envie uma planilha. O sistema analisa correspondências por potência, número, nome e cidade e exige confirmação antes de gravar no banco.
         </p>
 
-        <div className="flex items-center gap-3 pt-2">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-3 pt-2">
+          <input
+            type="url"
+            value={sourceUrl}
+            onChange={(e) => setSourceUrl(e.target.value)}
+            placeholder="https://site-da-potencia.org.br/lojas"
+            className="rounded-xl border border-stone-300 px-3 py-2 text-xs"
+          />
+          <input
+            type="text"
+            value={sourcePotency}
+            onChange={(e) => setSourcePotency(e.target.value)}
+            placeholder="Potência (ex.: GOBA)"
+            className="rounded-xl border border-stone-300 px-3 py-2 text-xs uppercase"
+          />
+          <button
+            onClick={() => void handleLoadUrl()}
+            disabled={loading || !sourceUrl.trim() || !sourcePotency.trim()}
+            className="text-xs font-bold text-white bg-[#3b0b14] hover:bg-[#5d1523] disabled:opacity-50 px-4 py-2 rounded-xl transition-colors flex items-center gap-1.5"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            <span>Extrair dados do link</span>
+          </button>
+        </div>
+        <div className="flex items-center gap-3">
           <button
             onClick={handleDownloadSampleXlsx}
             className="text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-4 py-2 rounded-xl transition-colors flex items-center gap-1.5"

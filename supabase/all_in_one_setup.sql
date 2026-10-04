@@ -1,3 +1,8 @@
+-- ATENÇÃO: ARQUIVO LEGADO PARA BOOTSTRAP DE BANCO VAZIO.
+-- NÃO executar sobre banco já migrado ou produção. A concatenação histórica
+-- contém estados intermediários substituídos por migrations posteriores.
+-- Em bancos existentes, aplique somente as migrations pendentes, em ordem.
+-- Nomenclatura comercial vigente: esquadro, compasso e acacia.
 -- ============================================================================
 -- CivicOS / Conexão Maçônica - Bundle Completo de Migrations + Seed + Smoke Test
 -- ============================================================================
@@ -393,7 +398,7 @@ CREATE TABLE IF NOT EXISTS public.business_reviews (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   business_id UUID NOT NULL REFERENCES public.businesses(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  author_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
   comment TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -473,20 +478,20 @@ DROP POLICY IF EXISTS "Logged in users can post reviews" ON public.business_revi
 CREATE POLICY "Logged in users can post reviews"
   ON public.business_reviews
   FOR INSERT
-  WITH CHECK (auth.uid() = user_id AND tenant_id = public.current_tenant_id());
+  WITH CHECK (auth.uid() = author_id AND tenant_id = public.current_tenant_id());
 
 DROP POLICY IF EXISTS "Users can manage own reviews" ON public.business_reviews;
 CREATE POLICY "Users can manage own reviews"
   ON public.business_reviews
   FOR UPDATE
-  USING (user_id = auth.uid() OR public.get_current_user_role() = 'master')
-  WITH CHECK (user_id = auth.uid() OR public.get_current_user_role() = 'master');
+  USING (author_id = auth.uid() OR public.get_current_user_role() = 'master')
+  WITH CHECK (author_id = auth.uid() OR public.get_current_user_role() = 'master');
 
 DROP POLICY IF EXISTS "Users can delete own reviews" ON public.business_reviews;
 CREATE POLICY "Users can delete own reviews"
   ON public.business_reviews
   FOR DELETE
-  USING (user_id = auth.uid() OR public.get_current_user_role() = 'master');
+  USING (author_id = auth.uid() OR public.get_current_user_role() = 'master');
 
 -- --- Favorites Policies ---
 DROP POLICY IF EXISTS "Users can view own favorites" ON public.business_favorites;
@@ -515,12 +520,21 @@ CREATE POLICY "Users can manage own favorites"
 CREATE TABLE IF NOT EXISTS public.tenant_plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  tier TEXT NOT NULL CHECK (tier IN ('bronze', 'prata', 'ouro')),
+  tier TEXT NOT NULL CHECK (tier IN ('esquadro', 'compasso', 'acacia')),
   price_annual NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE(tenant_id, tier)
 );
+
+-- Compatibilidade idempotente: instalações antigas podem possuir uma
+-- tenant_plans_tier_check com nomenclaturas legadas. NOT VALID preserva esses
+-- registros históricos, mas aplica os códigos canônicos em novos inserts.
+ALTER TABLE public.tenant_plans
+  DROP CONSTRAINT IF EXISTS tenant_plans_tier_check;
+ALTER TABLE public.tenant_plans
+  ADD CONSTRAINT tenant_plans_tier_check
+  CHECK (tier IN ('esquadro', 'compasso', 'acacia')) NOT VALID;
 
 CREATE INDEX IF NOT EXISTS idx_tenant_plans_tenant ON public.tenant_plans(tenant_id);
 
@@ -531,8 +545,14 @@ CREATE OR REPLACE TRIGGER trg_tenant_plans_updated_at
 
 -- 2. Modify businesses table
 ALTER TABLE public.businesses DROP COLUMN IF EXISTS is_premium;
-ALTER TABLE public.businesses ADD COLUMN IF NOT EXISTS plan_tier TEXT NOT NULL DEFAULT 'bronze' CHECK (plan_tier IN ('bronze', 'prata', 'ouro'));
+ALTER TABLE public.businesses ADD COLUMN IF NOT EXISTS plan_tier TEXT NOT NULL DEFAULT 'esquadro' CHECK (plan_tier IN ('esquadro', 'compasso', 'acacia'));
 ALTER TABLE public.businesses ADD COLUMN IF NOT EXISTS slug TEXT UNIQUE;
+
+ALTER TABLE public.businesses
+  DROP CONSTRAINT IF EXISTS businesses_plan_tier_check;
+ALTER TABLE public.businesses
+  ADD CONSTRAINT businesses_plan_tier_check
+  CHECK (plan_tier IN ('esquadro', 'compasso', 'acacia')) NOT VALID;
 
 -- Add index on slug for routing search performance
 CREATE INDEX IF NOT EXISTS idx_businesses_slug ON public.businesses(slug);
@@ -555,15 +575,15 @@ CREATE POLICY "Admins can manage tenant plans"
 
 -- 4. Prepopulate plans for all existing tenants
 INSERT INTO public.tenant_plans (tenant_id, tier, price_annual)
-SELECT id, 'bronze', 0.00 FROM public.tenants
+SELECT id, 'esquadro', 0.00 FROM public.tenants
 ON CONFLICT (tenant_id, tier) DO NOTHING;
 
 INSERT INTO public.tenant_plans (tenant_id, tier, price_annual)
-SELECT id, 'prata', 299.00 FROM public.tenants
+SELECT id, 'compasso', 299.00 FROM public.tenants
 ON CONFLICT (tenant_id, tier) DO NOTHING;
 
 INSERT INTO public.tenant_plans (tenant_id, tier, price_annual)
-SELECT id, 'ouro', 499.00 FROM public.tenants
+SELECT id, 'acacia', 499.00 FROM public.tenants
 ON CONFLICT (tenant_id, tier) DO NOTHING;
 
 
@@ -1259,7 +1279,7 @@ CREATE TABLE IF NOT EXISTS public.business_contacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL,
   business_id UUID NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('whatsapp', 'phone', 'email', 'instagram', 'linkedin', 'facebook', 'website')),
+  type TEXT NOT NULL CHECK (type IN ('whatsapp', 'phone', 'email', 'instagram', 'linkedin', 'facebook', 'youtube', 'website')),
   value TEXT NOT NULL,
   label TEXT,
   is_public BOOLEAN NOT NULL DEFAULT true,
@@ -5542,10 +5562,10 @@ ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.tenant_plans (tenant_id, tier, price_annual)
 VALUES
-  ('00000000-0000-0000-0000-000000000010', 'bronze', 0.00),
-  ('00000000-0000-0000-0000-000000000010', 'prata', 299.00),
-  ('00000000-0000-0000-0000-000000000010', 'ouro', 499.00),
-  ('00000000-0000-0000-0000-000000000011', 'bronze', 0.00)
+  ('00000000-0000-0000-0000-000000000010', 'esquadro', 0.00),
+  ('00000000-0000-0000-0000-000000000010', 'compasso', 299.00),
+  ('00000000-0000-0000-0000-000000000010', 'acacia', 499.00),
+  ('00000000-0000-0000-0000-000000000011', 'esquadro', 0.00)
 ON CONFLICT (tenant_id, tier) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
@@ -5591,7 +5611,7 @@ VALUES (
   '00000000-0000-0000-0000-000000000103',
   'Padaria Estrela', 'Padaria artesanal com tradição familiar.', 'alimentos-e-bebidas',
   NULL, '+5511988887777', 'contato@padariaestrela.local', 'https://padariaestrela.local', 'Rua das Flores, 123',
-  'ouro', 'padaria-estrela', 'commercial', 'published', true
+  'acacia', 'padaria-estrela', 'commercial', 'published', true
 )
 ON CONFLICT (id) DO NOTHING;
 

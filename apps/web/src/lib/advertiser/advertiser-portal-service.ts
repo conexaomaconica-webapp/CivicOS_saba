@@ -64,14 +64,7 @@ export async function getAdvertiserDashboardDTOAction(_userId?: string): Promise
       businessData = biz;
     }
 
-    if (!businessData) {
-      const { data: fallbackBiz } = await supabase
-        .from('businesses')
-        .select('*')
-        .limit(1)
-        .maybeSingle();
-      businessData = fallbackBiz;
-    }
+    if (!userRes?.user || !businessData) throw new Error('Empresa do anunciante não localizada.');
 
     const b = businessData;
 
@@ -111,6 +104,24 @@ export async function getAdvertiserDashboardDTOAction(_userId?: string): Promise
       .eq('business_id', bizId)
       .eq('is_active', true);
 
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+    const [{ data: analyticsRows }, { data: subscription }] = await Promise.all([
+      (supabase as any).from('analytics_events').select('event_name, created_at')
+        .eq('business_id', bizId).gte('created_at', sixtyDaysAgo.toISOString()),
+      (supabase as any).from('subscriptions').select('status, current_period_end')
+        .eq('business_id', bizId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    const events30d = (analyticsRows || []).filter((event: any) => new Date(event.created_at) >= thirtyDaysAgo);
+    const previousViews = (analyticsRows || []).filter((event: any) => new Date(event.created_at) < thirtyDaysAgo && ['view', 'page_view'].includes(event.event_name)).length;
+    const views = events30d.filter((event: any) => ['view', 'page_view'].includes(event.event_name)).length;
+    const whatsappClicks = events30d.filter((event: any) => event.event_name === 'whatsapp_click').length;
+    const routeClicks = events30d.filter((event: any) => ['route_click', 'directions_click'].includes(event.event_name)).length;
+    const websiteClicks = events30d.filter((event: any) => event.event_name === 'website_click').length;
+    const interactions = events30d.filter((event: any) => ['whatsapp_click', 'phone_click', 'website_click', 'route_click', 'directions_click', 'benefit_click', 'social_click'].includes(event.event_name)).length;
+    const growthPercent = previousViews > 0 ? Math.round(((views - previousViews) / previousViews) * 100) : 0;
+    const isPaymentUpToDate = subscription?.status === 'active';
+
     const dto: AdvertiserDashboardDTO = {
       business: {
         id: b?.id || '',
@@ -118,23 +129,23 @@ export async function getAdvertiserDashboardDTOAction(_userId?: string): Promise
         slug: b?.slug || '',
         publication_status_label: b?.publication_status === 'published' ? 'Anúncio publicado' : 'Aguardando análise',
         is_published: b?.publication_status === 'published',
-        payment_status_label: 'Pagamento em dia',
-        is_payment_up_to_date: true,
+        payment_status_label: isPaymentUpToDate ? 'Pagamento em dia' : 'Pagamento pendente',
+        is_payment_up_to_date: isPaymentUpToDate,
         plan_code: b?.plan_code || b?.plan_tier || '',
-        plan_name: '',
-        expiration_date: '',
+        plan_name: activePlanCode,
+        expiration_date: subscription?.current_period_end || '',
         completeness_percent: 86,
         missing_fields: [],
         logo_url: resolveLogoUrl(media.logo_url),
         cover_url: resolveCoverUrl(media.cover_url),
       },
       results30d: {
-        views: 1284,
-        interactions: 137,
-        whatsapp_clicks: 86,
-        route_clicks: 24,
-        website_clicks: 18,
-        growth_percent: 18,
+        views,
+        interactions,
+        whatsapp_clicks: whatsappClicks,
+        route_clicks: routeClicks,
+        website_clicks: websiteClicks,
+        growth_percent: growthPercent,
       },
       quotas: {
         photos_used: photosCount || 0,
@@ -146,7 +157,7 @@ export async function getAdvertiserDashboardDTOAction(_userId?: string): Promise
         events_used: eventsCount || 0,
         events_limit: dashEntMap['events_limit'] ?? 0,
       },
-      attention_alerts: [
+      attention_alerts: ([
         {
           id: 'alt-1',
           type: 'info',
@@ -171,7 +182,7 @@ export async function getAdvertiserDashboardDTOAction(_userId?: string): Promise
           action_label: 'Ver Faturas',
           action_url: '/anunciante/financeiro',
         },
-      ],
+      ].filter((alert) => alert.id === 'alt-1' && !media.cover_url) as AdvertiserDashboardDTO['attention_alerts']),
     };
 
     return dto;

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { Landmark, MapPin, Calendar, Phone, Mail, Globe, Navigation, ChevronRight, Image as ImageIcon } from 'lucide-react';
+import { Landmark, MapPin, Calendar, Phone, Mail, Globe, Navigation, ChevronRight, Image as ImageIcon, AtSign } from 'lucide-react';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
@@ -12,6 +12,17 @@ import '@/styles/directory-home.css';
 
 function appUrl(path: string) {
   return `https://conexaomaconica.com.br${path}`;
+}
+
+function contactHref(type: string, value: string): string | null {
+  if (type === 'email') return `mailto:${value}`;
+  if (type === 'website') return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  if (type === 'instagram' || type === 'fraternity_instagram') {
+    if (/^https?:\/\//i.test(value)) return value;
+    return `https://instagram.com/${value.trim().replace(/^@/, '')}`;
+  }
+  if (type === 'whatsapp') return `https://wa.me/55${value.replace(/\D/g, '').replace(/^55/, '')}`;
+  return null;
 }
 
 type Props = {
@@ -78,6 +89,11 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
       .maybeSingle();
 
     if (rawOrg) {
+      const [{ data: rawContacts }, { data: rawMeetings }, { data: rawGallery }] = await Promise.all([
+        (supabase as any).from('organization_contacts').select('id, type, value, label').eq('organization_id', rawOrg.id).eq('is_public', true),
+        (supabase as any).from('organization_meetings').select('id, meeting_day, meeting_time, label').eq('organization_id', rawOrg.id).eq('is_public', true).order('sort_order'),
+        (supabase as any).from('organization_media').select('id, url, alt, type').eq('organization_id', rawOrg.id).order('sort_order'),
+      ]);
       lodge = {
         id: rawOrg.id,
         slug: rawOrg.slug || rawOrg.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
@@ -98,9 +114,9 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
         worshipful_master_name: rawOrg.show_worshipful_master ? rawOrg.worshipful_master_name : null,
         show_worshipful_master: rawOrg.show_worshipful_master,
         show_address: rawOrg.show_address,
-        contacts: [],
-        meetings: [],
-        gallery: [],
+        contacts: rawContacts || [],
+        meetings: (rawMeetings || []).map((meeting: any) => ({ id: meeting.id, day: meeting.meeting_day, time: meeting.meeting_time, label: meeting.label })),
+        gallery: rawGallery || [],
       };
     }
   }
@@ -292,19 +308,31 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
 
             {lodge.contacts && lodge.contacts.length > 0 ? (
               <div className="space-y-3">
-                {lodge.contacts.map((c: any) => (
-                  <div key={c.id} className="flex items-center gap-3 text-xs p-2.5 rounded-xl bg-stone-50 border border-stone-200">
+                {lodge.contacts.map((c: any) => {
+                  const href = contactHref(c.type, c.value);
+                  const content = (
+                    <>
                     {c.type === 'phone' && <Phone className="w-4 h-4 text-amber-900 shrink-0" />}
                     {c.type === 'whatsapp' && <Phone className="w-4 h-4 text-emerald-600 shrink-0" />}
                     {c.type === 'email' && <Mail className="w-4 h-4 text-blue-600 shrink-0" />}
                     {c.type === 'website' && <Globe className="w-4 h-4 text-amber-900 shrink-0" />}
-                    {c.type === 'instagram' && <Globe className="w-4 h-4 text-pink-600 shrink-0" />}
+                    {(c.type === 'instagram' || c.type === 'fraternity_instagram') && <AtSign className="w-4 h-4 text-pink-600 shrink-0" />}
                     <div className="flex-1 min-w-0">
                       {c.label && <p className="text-[10px] font-bold text-stone-500 uppercase">{c.label}</p>}
                       <p className="font-semibold text-stone-900 truncate">{c.value}</p>
                     </div>
-                  </div>
-                ))}
+                    </>
+                  );
+                  return href ? (
+                    <a key={c.id} href={href} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-xs p-2.5 rounded-xl bg-stone-50 border border-stone-200 hover:border-pink-300 hover:bg-pink-50/40 transition-colors">
+                      {content}
+                    </a>
+                  ) : (
+                    <div key={c.id} className="flex items-center gap-3 text-xs p-2.5 rounded-xl bg-stone-50 border border-stone-200">
+                      {content}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-xs text-stone-500">Contatos sob consulta institucional.</p>

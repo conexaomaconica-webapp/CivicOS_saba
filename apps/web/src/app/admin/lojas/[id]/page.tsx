@@ -15,6 +15,7 @@ import {
   ExternalLink,
   ShieldCheck,
   FileSpreadsheet,
+  Pencil,
 } from 'lucide-react';
 import { getAdminLodge360DetailsAction } from '@/lib/admin/admin-lodges-service';
 import LodgeGovernanceControls from './lodge-governance-client';
@@ -77,14 +78,23 @@ export default async function AdminLodge360Page({ params }: AdminLodge360PagePro
         </div>
 
         {/* PRÉ-VISUALIZAÇÃO DA PÁGINA PÚBLICA */}
-        <Link
-          href={`/guia/lojas/${lodge.slug}`}
-          target="_blank"
-          className="px-4 py-2 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl border border-[#C9A227]/40 transition-all flex items-center gap-2 cursor-pointer shadow-sm shrink-0"
-        >
-          <ExternalLink className="w-4 h-4" />
-          <span>Pré-visualizar Página Pública</span>
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/admin/lojas/editar/${lodge.id}`}
+            className="px-4 py-2 bg-[#C9A227] hover:bg-[#b89220] text-[#27170b] font-bold text-xs rounded-xl border border-[#9f7f1d] transition-all flex items-center gap-2 cursor-pointer shadow-sm shrink-0"
+          >
+            <Pencil className="w-4 h-4" />
+            <span>Editar dados da Loja</span>
+          </Link>
+          <Link
+            href={`/guia/lojas/${lodge.slug}`}
+            target="_blank"
+            className="px-4 py-2 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl border border-[#C9A227]/40 transition-all flex items-center gap-2 cursor-pointer shadow-sm shrink-0"
+          >
+            <ExternalLink className="w-4 h-4" />
+            <span>Pré-visualizar Página Pública</span>
+          </Link>
+        </div>
       </div>
 
       {/* REVISÃO DE POSSÍVEIS DUPLICIDADES (SE HOUVER) */}
@@ -230,6 +240,11 @@ export default async function AdminLodge360Page({ params }: AdminLodge360PagePro
                 {m.notes && <p className="text-[11px] text-stone-500">{m.notes}</p>}
               </div>
             ))}
+            {meetings.length === 0 && (
+              <p className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900">
+                Nenhum dia de reunião cadastrado.
+              </p>
+            )}
           </div>
 
           {/* Contatos */}

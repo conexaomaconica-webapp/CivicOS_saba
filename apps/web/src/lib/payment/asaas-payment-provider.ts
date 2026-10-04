@@ -150,9 +150,10 @@ export class AsaasPaymentProvider implements IPaymentProvider {
         return { customerId: createJson.id };
       }
 
-      return { customerId: `cus_fallback_${Date.now()}` };
-    } catch (_err) {
-      return { customerId: `cus_fallback_${Date.now()}` };
+      const providerMessage = await createRes.text().catch(() => '');
+      throw new Error(`Falha ao criar cliente no Asaas (${createRes.status}): ${providerMessage || 'resposta sem detalhes'}`);
+    } catch (error) {
+      throw error instanceof Error ? error : new Error('Falha de comunicação ao criar cliente no Asaas.');
     }
   }
 

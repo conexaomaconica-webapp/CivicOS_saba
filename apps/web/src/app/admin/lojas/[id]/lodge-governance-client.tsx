@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react';
-import { toggleLodgePublicationStatusAction } from '@/lib/admin/admin-lodges-service';
+import { useRouter } from 'next/navigation';
+import { CheckCircle2, AlertTriangle, ShieldCheck, Trash2 } from 'lucide-react';
+import { deleteAdminLodgeAction, toggleLodgePublicationStatusAction } from '@/lib/admin/admin-lodges-service';
 
 type LodgeGovernanceProps = {
   lodgeId: string;
@@ -10,9 +11,11 @@ type LodgeGovernanceProps = {
 };
 
 export default function LodgeGovernanceControls({ lodgeId, initialStatus }: LodgeGovernanceProps) {
+  const router = useRouter();
   const [isActive, setIsActive] = useState(initialStatus);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const handleToggleStatus = async (targetStatus: boolean) => {
     setLoading(true);
@@ -36,6 +39,26 @@ export default function LodgeGovernanceControls({ lodgeId, initialStatus }: Lodg
       setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Erro ao processar ação.' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    const confirmed = window.confirm(
+      'Excluir definitivamente esta Loja Maçônica? Contatos, reuniões e galeria vinculados também serão removidos. Esta ação não pode ser desfeita.'
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setMessage(null);
+    try {
+      const result = await deleteAdminLodgeAction(lodgeId);
+      if (!result.success) throw new Error(result.error || 'Falha ao excluir Loja Maçônica.');
+      router.replace('/admin/lojas');
+      router.refresh();
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Erro ao excluir Loja Maçônica.' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -76,6 +99,15 @@ export default function LodgeGovernanceControls({ lodgeId, initialStatus }: Lodg
             <span>{loading ? 'Salvando...' : 'Inativar Loja'}</span>
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => void handleDelete()}
+          disabled={loading || deleting}
+          className="ml-auto px-3.5 py-2 bg-red-700 hover:bg-red-800 text-white font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+        >
+          <Trash2 className="w-4 h-4" />
+          <span>{deleting ? 'Excluindo...' : 'Excluir Loja'}</span>
+        </button>
       </div>
     </div>
   );

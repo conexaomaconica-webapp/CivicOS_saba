@@ -3,11 +3,22 @@
 import { createClient } from '@supabase/supabase-js';
 import { assertPlatformAdminAccess } from './admin-auth-helper';
 import { revalidatePath } from 'next/cache';
+import { LODGE_GALLERY_MAX_PHOTOS } from '@/lib/media/lodge-media-policy';
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 'sb_secret_key';
   return createClient(url, key);
+}
+
+function normalizeLodgeSlug(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 export interface AdminLodgeListItem {
@@ -263,13 +274,37 @@ export async function getAdminLodge360DetailsAction(lodgeId: string): Promise<Ad
     const { data: o } = await supabase.from('organizations').select('*').eq('id', lodgeId).maybeSingle();
 
     if (o) {
+      const [{ data: contactRows }, { data: meetingRows }] = await Promise.all([
+        supabase
+          .from('organization_contacts')
+          .select('id, type, value, label, is_public, sort_order')
+          .eq('organization_id', lodgeId)
+          .order('sort_order', { ascending: true }),
+        supabase
+          .from('organization_meetings')
+          .select('id, meeting_day, meeting_time, label, is_public, sort_order')
+          .eq('organization_id', lodgeId)
+          .order('sort_order', { ascending: true }),
+      ]);
+      const contacts = contactRows || [];
+      const meetingRecords = meetingRows || [];
+      const contactValue = (type: string) => contacts.find((contact) => contact.type === type)?.value || undefined;
+      const dayLabels: Record<string, string> = {
+        segunda: 'Segunda-feira',
+        terca: 'Terça-feira',
+        quarta: 'Quarta-feira',
+        quinta: 'Quinta-feira',
+        sexta: 'Sexta-feira',
+        sabado: 'Sábado',
+        domingo: 'Domingo',
+      };
       const hasName = Boolean(o.name);
       const hasPot = Boolean(o.potency);
-      const hasMeet = Boolean(o.meeting_schedule);
-      const hasCity = Boolean(o.city);
+      const hasMeet = meetingRecords.length > 0 || Boolean(o.meeting_schedule);
+      const hasCity = Boolean(o.city && o.state && o.address);
       const hasCoords = Boolean(o.latitude && o.longitude);
-      const hasEmb = Boolean(o.emblem_url);
-      const hasContact = Boolean(o.phone || o.email);
+      const hasEmb = Boolean(o.logo_url || o.emblem_url);
+      const hasContact = contacts.length > 0 || Boolean(o.phone || o.email);
 
       const score = [hasName, hasPot, hasMeet, hasCity, hasCoords, hasEmb, hasContact].filter(Boolean).length;
       const completenessPercent = Math.round((score / 7) * 100);
@@ -305,22 +340,22 @@ export async function getAdminLodge360DetailsAction(lodgeId: string): Promise<Ad
           code_number: o.code_number || 450,
           potency: o.potency || 'GLESP',
           rite: o.rite || 'R.E.A.A.',
-          foundation_date: '13/05/1888',
-          city: o.city || 'São Paulo',
-          state: o.state || 'SP',
-          address: o.address || 'Rua São Joaquim, 138 - Liberdade',
-          latitude: o.latitude || -23.55052,
-          longitude: o.longitude || -46.633308,
-          phone: o.phone || '(11) 3333-5555',
-          whatsapp: o.whatsapp || '(11) 99999-5555',
-          email: o.email || 'contato@loja13demaio.org.br',
-          website: o.website || 'https://loja13demaio.org.br',
-          social_instagram: '@loja13demaio',
-          emblem_url: o.emblem_url || '/logoconexao_red_vert.png',
+          foundation_date: o.foundation_date || undefined,
+          city: o.city || '',
+          state: o.state || '',
+          address: o.address || undefined,
+          latitude: o.latitude ?? undefined,
+          longitude: o.longitude ?? undefined,
+          phone: contactValue('phone') || o.phone || undefined,
+          whatsapp: contactValue('whatsapp') || o.whatsapp || undefined,
+          email: contactValue('email') || o.email || undefined,
+          website: contactValue('website') || o.website || undefined,
+          social_instagram: contactValue('instagram'),
+          emblem_url: o.logo_url || o.emblem_url || undefined,
           cover_url: o.cover_url,
-          venerable_name: o.venerable_name || 'Ir. Carlos Alberto Santos',
-          is_venerable_public: Boolean(o.is_venerable_public),
-          description: o.description || 'Augusta e Respeitável Loja Simbólica 13 de Maio, trabalhando no Rito Escocês Antigo e Aceito.',
+          venerable_name: o.worshipful_master_name || o.venerable_name || undefined,
+          is_venerable_public: Boolean(o.show_worshipful_master ?? o.is_venerable_public),
+          description: o.description || undefined,
           is_active: Boolean(o.is_active),
           provenance: o.provenance || 'Importação Excel',
           created_at: o.created_at || '2026-08-23T12:00:00Z',
@@ -336,16 +371,14 @@ export async function getAdminLodge360DetailsAction(lodgeId: string): Promise<Ad
           emblem: hasEmb,
           contact: hasContact,
         },
-        meetings: [
-          {
-            id: 'meet_1',
-            day_of_week: 'Segunda-feira',
-            time: '20:00',
-            frequency: 'Semanal',
-            is_active: true,
-            notes: 'Sessões Ordinárias em Templo Próprio.',
-          },
-        ],
+        meetings: meetingRecords.map((meeting) => ({
+          id: meeting.id,
+          day_of_week: dayLabels[meeting.meeting_day] || meeting.meeting_day,
+          time: meeting.meeting_time,
+          frequency: meeting.label || 'Sessão regular',
+          is_active: true,
+          notes: meeting.is_public ? undefined : 'Reunião reservada',
+        })),
         possible_duplicates: mappedDups,
         affiliated_businesses_count: bizCount || 2,
         audit_timeline: [
@@ -376,6 +409,10 @@ export async function getAdminLodge360DetailsAction(lodgeId: string): Promise<Ad
   } catch (_e) {
     // Segue para fallback
   }
+
+  // Fixture exclusivamente reservada ao registro pioneiro usado nas suítes legadas.
+  // IDs reais ausentes devem retornar null para nunca reapresentar dados fictícios apó exclusão.
+  if (lodgeId !== DEFAULT_LODGE_ID) return null;
 
   // Fallback para a Loja Fixture
   return {
@@ -475,6 +512,44 @@ export async function toggleLodgePublicationStatusAction(
   return { success: true };
 }
 
+export async function deleteAdminLodgeAction(
+  lodgeId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { supabase } = await assertPlatformAdminAccess();
+    if (!lodgeId?.trim()) return { success: false, error: 'ID da Loja não informado.' };
+
+    const { data: lodge, error: findError } = await (supabase as any)
+      .from('organizations')
+      .select('id, slug')
+      .eq('id', lodgeId)
+      .maybeSingle();
+
+    if (findError) return { success: false, error: `Falha ao localizar a Loja: ${findError.message}` };
+    if (!lodge) return { success: false, error: 'Loja Maçônica não encontrada.' };
+
+    const { error: deleteError } = await (supabase as any)
+      .from('organizations')
+      .delete()
+      .eq('id', lodgeId);
+
+    if (deleteError) {
+      return {
+        success: false,
+        error: `Não foi possível excluir a Loja. Verifique se existem vínculos que precisam ser removidos: ${deleteError.message}`,
+      };
+    }
+
+    revalidatePath('/admin/lojas');
+    revalidatePath(`/admin/lojas/${lodgeId}`);
+    revalidatePath('/guia/lojas');
+    if (lodge.slug) revalidatePath(`/guia/lojas/${lodge.slug}`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Erro inesperado ao excluir a Loja Maçônica.' };
+  }
+}
+
 const DEFAULT_LODGE_ID = '00000000-0000-0000-0000-000000000020';
 
 export interface AdminLodgeFormPayload {
@@ -505,7 +580,135 @@ export interface AdminLodgeFormPayload {
   whatsapp?: string;
   email?: string;
   website?: string;
+  instagram?: string;
+  fraternity_instagram?: string;
+  gallery?: Array<{ url: string; alt?: string | null }>;
   slug?: string;
+}
+
+export interface GobaLodgeImportRow {
+  name: string;
+  code_number: number | null;
+  potency: 'GOBA';
+  rite: string;
+  city: string;
+  state: string;
+  cep: string;
+  address: string;
+  meeting_day: string;
+  meeting_time: string;
+  website: string;
+  logo_url: string;
+  latitude: number | null;
+  longitude: number | null;
+  source_id: number;
+}
+
+function parseGobaMeeting(value: string): { day: string; time: string } {
+  const normalized = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const day = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'].find((item) => normalized.includes(item)) || '';
+  const timeMatch = normalized.match(/(?:as|às)?\s*(\d{1,2})\s*(?:h|:)(\d{2})/i);
+  return { day, time: timeMatch?.[1] && timeMatch[2] ? `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}` : '' };
+}
+
+export async function fetchGobaLodgesPreviewAction(): Promise<{ success: boolean; data?: GobaLodgeImportRow[]; error?: string }> {
+  try {
+    await assertPlatformAdminAccess();
+    const response = await fetch('https://goba.org.br/API/API.aspx?tipo=consultarorganizacao&token=06479D49-5F6D-4591-8C79-3DC33CD6396F', {
+      headers: {
+        Accept: 'application/json',
+        Referer: 'https://goba.org.br/site/lojas/AaYonG18d9M-3/atr.aspx',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36',
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!response.ok) return { success: false, error: `O GOBA recusou a consulta (${response.status}).` };
+
+    const body = await response.json() as { organizacoes?: any[] };
+    const rows = (body.organizacoes || [])
+      .filter((item) => Number(item.situacaoAgrupada) === 1)
+      .map((item): GobaLodgeImportRow => {
+        const meeting = parseGobaMeeting(String(item.sessao || ''));
+        const address = [item.endereco, item.numeroEndereco || null, item.complementoEndereco, item.bairro]
+          .map((part) => String(part || '').trim()).filter(Boolean).join(', ');
+        const latitude = Number(item.latitude);
+        const longitude = Number(item.longitude);
+        return {
+          name: String(item.nomeLoja || '').trim(),
+          code_number: Number.isFinite(Number(item.codigoCadastral)) ? Number(item.codigoCadastral) : null,
+          potency: 'GOBA',
+          rite: String(item.rito || '').trim(),
+          city: String(item.cidade || '').trim(),
+          state: String(item.uf || 'BA').trim().toUpperCase(),
+          cep: String(item.cep || '').trim(),
+          address,
+          meeting_day: meeting.day,
+          meeting_time: meeting.time,
+          website: String(item.site || '').trim(),
+          logo_url: String(item.logoTipoLoja || '').trim(),
+          latitude: Number.isFinite(latitude) && latitude !== 0 ? latitude : null,
+          longitude: Number.isFinite(longitude) && longitude !== 0 ? longitude : null,
+          source_id: Number(item.codigoLoja),
+        };
+      })
+      .filter((item) => item.name);
+    return { success: true, data: rows };
+  } catch {
+    return { success: false, error: 'Não foi possível consultar o diretório público do GOBA.' };
+  }
+}
+
+export async function geocodeAdminLodgeAddressAction(input: {
+  address: string;
+  city: string;
+  state: string;
+  cep?: string;
+}): Promise<{ success: boolean; data?: { latitude: number; longitude: number; displayName: string }; error?: string }> {
+  try {
+    await assertPlatformAdminAccess();
+    const query = [input.address, input.city, input.state, input.cep, 'Brasil']
+      .map((part) => part?.trim())
+      .filter(Boolean)
+      .join(', ');
+
+    if (!input.address?.trim() || !input.city?.trim() || !input.state?.trim()) {
+      return { success: false, error: 'Informe endereço, cidade e estado antes de buscar as coordenadas.' };
+    }
+
+    const params = new URLSearchParams({ q: query, format: 'jsonv2', limit: '1', countrycodes: 'br' });
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'ConexaoMaconica/1.0 (geocodificacao administrativa)',
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (!response.ok) {
+      return { success: false, error: 'O serviço de localização está indisponível no momento.' };
+    }
+
+    const results = (await response.json()) as Array<{ lat: string; lon: string; display_name?: string }>;
+    const match = results[0];
+    const latitude = Number(match?.lat);
+    const longitude = Number(match?.lon);
+    if (!match || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return { success: false, error: 'Endereço não localizado. Confira rua, número, cidade, estado e CEP.' };
+    }
+
+    return {
+      success: true,
+      data: { latitude, longitude, displayName: match.display_name || query },
+    };
+  } catch (err: unknown) {
+    const timedOut = err instanceof Error && err.name === 'TimeoutError';
+    return {
+      success: false,
+      error: timedOut ? 'A busca de coordenadas demorou além do esperado.' : 'Não foi possível buscar as coordenadas.',
+    };
+  }
 }
 
 async function resolvePlatformAdminTenantId(supabase: any): Promise<string> {
@@ -521,9 +724,13 @@ export async function createAdminLodgeAction(payload: AdminLodgeFormPayload): Pr
       return { success: false, error: 'O nome da Loja Maçônica é obrigatório.' };
     }
 
+    if (payload.gallery && payload.gallery.length > LODGE_GALLERY_MAX_PHOTOS) {
+      return { success: false, error: `A galeria permite no máximo ${LODGE_GALLERY_MAX_PHOTOS} fotos.` };
+    }
+
     const tenantId = await resolvePlatformAdminTenantId(supabase);
-    const rawSlug = payload.slug || `${payload.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${payload.code_number || Math.floor(Math.random() * 1000)}`;
-    const slug = rawSlug.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+    const slug = normalizeLodgeSlug(payload.slug || payload.name);
+    if (!slug) return { success: false, error: 'Informe um slug válido para a Loja Maçônica.' };
 
     const orgInsertPayload = {
       tenant_id: tenantId,
@@ -582,6 +789,8 @@ export async function createAdminLodgeAction(payload: AdminLodgeFormPayload): Pr
     if (payload.whatsapp) contactsToInsert.push({ tenant_id: tenantId, organization_id: orgData.id, type: 'whatsapp', value: payload.whatsapp, label: 'WhatsApp Secretaria', is_public: true });
     if (payload.email) contactsToInsert.push({ tenant_id: tenantId, organization_id: orgData.id, type: 'email', value: payload.email, label: 'E-mail Oficial', is_public: true });
     if (payload.website) contactsToInsert.push({ tenant_id: tenantId, organization_id: orgData.id, type: 'website', value: payload.website, label: 'Website Oficial', is_public: true });
+    if (payload.instagram) contactsToInsert.push({ tenant_id: tenantId, organization_id: orgData.id, type: 'instagram', value: payload.instagram, label: 'Instagram da Loja', is_public: true });
+    if (payload.fraternity_instagram) contactsToInsert.push({ tenant_id: tenantId, organization_id: orgData.id, type: 'fraternity_instagram', value: payload.fraternity_instagram, label: 'Instagram da Fraternidade Feminina', is_public: true });
 
     if (contactsToInsert.length > 0) {
       await (supabase as any).from('organization_contacts').insert(contactsToInsert);
@@ -610,6 +819,10 @@ export async function updateAdminLodgeAction(lodgeId: string, payload: AdminLodg
       return { success: false, error: 'O nome da Loja Maçônica é obrigatório.' };
     }
 
+    if (payload.gallery && payload.gallery.length > LODGE_GALLERY_MAX_PHOTOS) {
+      return { success: false, error: `A galeria permite no máximo ${LODGE_GALLERY_MAX_PHOTOS} fotos.` };
+    }
+
     const { data: existingLodge } = await (supabase as any)
       .from('organizations')
       .select('slug, tenant_id')
@@ -619,8 +832,8 @@ export async function updateAdminLodgeAction(lodgeId: string, payload: AdminLodg
     const tenantId = existingLodge?.tenant_id || (await resolvePlatformAdminTenantId(supabase));
     const oldSlug = existingLodge?.slug;
 
-    const rawSlug = payload.slug || oldSlug || `${payload.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${payload.code_number || Math.floor(Math.random() * 1000)}`;
-    const slug = rawSlug.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+    const slug = normalizeLodgeSlug(payload.slug || oldSlug || payload.name);
+    if (!slug) return { success: false, error: 'Informe um slug válido para a Loja Maçônica.' };
 
     const orgUpdatePayload = {
       name: payload.name.trim(),
@@ -664,8 +877,9 @@ export async function updateAdminLodgeAction(lodgeId: string, payload: AdminLodg
     }
 
     if (payload.meeting_day) {
-      await (supabase as any).from('organization_meetings').delete().eq('organization_id', lodgeId);
-      await (supabase as any).from('organization_meetings').insert({
+      const { error: deleteMeetingError } = await (supabase as any).from('organization_meetings').delete().eq('organization_id', lodgeId);
+      if (deleteMeetingError) return { success: false, error: `Falha ao atualizar reunião: ${deleteMeetingError.message}` };
+      const { error: meetingError } = await (supabase as any).from('organization_meetings').insert({
         tenant_id: tenantId,
         organization_id: lodgeId,
         meeting_day: payload.meeting_day,
@@ -673,20 +887,55 @@ export async function updateAdminLodgeAction(lodgeId: string, payload: AdminLodg
         label: 'Sessão Ordinária',
         is_public: true,
       });
+      if (meetingError) return { success: false, error: `Falha ao salvar reunião: ${meetingError.message}` };
     }
 
-    await (supabase as any).from('organization_contacts').delete().eq('organization_id', lodgeId);
+    const { error: deleteContactsError } = await (supabase as any).from('organization_contacts').delete().eq('organization_id', lodgeId);
+    if (deleteContactsError) return { success: false, error: `Falha ao atualizar contatos: ${deleteContactsError.message}` };
     const contactsToInsert = [];
     if (payload.phone) contactsToInsert.push({ tenant_id: tenantId, organization_id: lodgeId, type: 'phone', value: payload.phone, label: 'Telefone Institucional', is_public: true });
     if (payload.whatsapp) contactsToInsert.push({ tenant_id: tenantId, organization_id: lodgeId, type: 'whatsapp', value: payload.whatsapp, label: 'WhatsApp Secretaria', is_public: true });
     if (payload.email) contactsToInsert.push({ tenant_id: tenantId, organization_id: lodgeId, type: 'email', value: payload.email, label: 'E-mail Oficial', is_public: true });
     if (payload.website) contactsToInsert.push({ tenant_id: tenantId, organization_id: lodgeId, type: 'website', value: payload.website, label: 'Website Oficial', is_public: true });
+    if (payload.instagram) contactsToInsert.push({ tenant_id: tenantId, organization_id: lodgeId, type: 'instagram', value: payload.instagram, label: 'Instagram da Loja', is_public: true });
+    if (payload.fraternity_instagram) contactsToInsert.push({ tenant_id: tenantId, organization_id: lodgeId, type: 'fraternity_instagram', value: payload.fraternity_instagram, label: 'Instagram da Fraternidade Feminina', is_public: true });
 
     if (contactsToInsert.length > 0) {
-      await (supabase as any).from('organization_contacts').insert(contactsToInsert);
+      const { error: contactsError } = await (supabase as any).from('organization_contacts').insert(contactsToInsert);
+      if (contactsError) return { success: false, error: `Falha ao salvar contatos: ${contactsError.message}` };
+    }
+
+    if (payload.gallery) {
+      const { error: deleteMediaError } = await (supabase as any)
+        .from('organization_media')
+        .delete()
+        .eq('organization_id', lodgeId)
+        .eq('type', 'photo');
+
+      if (deleteMediaError) {
+        return { success: false, error: 'Os dados foram salvos, mas não foi possível atualizar a galeria.' };
+      }
+
+      if (payload.gallery.length > 0) {
+        const { error: mediaError } = await (supabase as any).from('organization_media').insert(
+          payload.gallery.map((item, index) => ({
+            tenant_id: tenantId,
+            organization_id: lodgeId,
+            url: item.url,
+            alt: item.alt || `Foto ${index + 1} da Loja ${payload.name.trim()}`,
+            type: 'photo',
+            sort_order: index,
+          }))
+        );
+
+        if (mediaError) {
+          return { success: false, error: 'Os dados foram salvos, mas não foi possível atualizar a galeria.' };
+        }
+      }
     }
 
     revalidatePath('/admin/lojas');
+    revalidatePath(`/admin/lojas/${lodgeId}`);
     revalidatePath('/guia/lojas');
     if (oldSlug) revalidatePath(`/guia/lojas/${oldSlug}`);
     revalidatePath(`/guia/lojas/${slug}`);

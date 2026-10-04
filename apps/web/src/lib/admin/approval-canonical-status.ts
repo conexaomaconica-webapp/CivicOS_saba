@@ -15,7 +15,6 @@ export interface CanonicalApprovalFlags {
   has_valid_payment: boolean;
 }
 
-const APPROVED_LINK_STATUSES = new Set(['approved', 'active', 'verified']);
 const VALID_SUBSCRIPTION_STATUSES = new Set(['active', 'paid', 'trialing']);
 
 function commercialStageAtLeast(status: string | null | undefined, stage: CommercialStatus): boolean {
@@ -46,10 +45,10 @@ export async function resolveCanonicalApprovalFlags(
       try {
         const { data } = await supabase
           .from('business_masonic_links')
-          .select('business_id, status, verification_status')
+          .select('business_id, status, verified_at')
           .in('business_id', ids);
         for (const row of data || []) {
-          if (APPROVED_LINK_STATUSES.has(row.status) || row.verification_status === 'approved') {
+          if (row.status === 'approved' && row.verified_at) {
             linkOk.add(row.business_id);
           }
         }
@@ -59,10 +58,23 @@ export async function resolveCanonicalApprovalFlags(
       try {
         const { data } = await supabase
           .from('contracts')
-          .select('business_id')
-          .in('business_id', ids)
-          .eq('status', 'signed');
-        for (const row of data || []) contractOk.add(row.business_id);
+          .select('id, business_id, status')
+          .in('business_id', ids);
+        const contracts = data || [];
+        for (const row of contracts) {
+          if (row.status === 'signed') contractOk.add(row.business_id);
+        }
+        if (contracts.length > 0) {
+          const businessByContract = new Map(contracts.map((row: any) => [row.id, row.business_id]));
+          const { data: acceptances } = await supabase
+            .from('contract_acceptances')
+            .select('contract_id')
+            .in('contract_id', contracts.map((row: any) => row.id));
+          for (const acceptance of acceptances || []) {
+            const businessId = businessByContract.get(acceptance.contract_id);
+            if (businessId) contractOk.add(businessId as string);
+          }
+        }
       } catch (_e) {}
     })(),
     (async () => {

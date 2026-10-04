@@ -94,16 +94,9 @@ export async function getAdvertiserProfileDataAction(): Promise<AdvertiserProfil
       b = userBiz;
     }
 
-    if (!b) {
-      const { data: fallbackBiz } = await supabase
-        .from('businesses')
-        .select('*')
-        .limit(1)
-        .maybeSingle();
-      b = fallbackBiz;
-    }
+    if (!userRes?.user || !b) throw new Error('Empresa do anunciante não localizada.');
 
-    const businessId = b?.id || '00000000-0000-0000-0000-000000000001';
+    const businessId = b.id;
 
     // Resolver mídia via helper centralizado (fonte canônica: business_media)
     const media = await resolveBusinessMedia(supabase, businessId, { logoUrl: b?.logo_url });
@@ -210,24 +203,15 @@ export async function updateAdvertiserProfileFieldsAction(
     const supabase = await createServerSideClient();
     const { data: userRes } = await supabase.auth.getUser();
 
-    let targetBizId = fields.business_id;
-
-    if (!targetBizId && userRes?.user) {
-      const { data: userBiz } = await supabase
-        .from('businesses')
-        .select('id')
-        .eq('owner_id', userRes.user.id)
-        .maybeSingle();
-      targetBizId = userBiz?.id;
-    }
-
-    if (!targetBizId) {
-      const { data: fallbackBiz } = await supabase
-        .from('businesses')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
-      targetBizId = fallbackBiz?.id || '00000000-0000-0000-0000-000000000001';
+    if (!userRes?.user) return { success: false, message: 'Sessão inválida.', requiresReview: false };
+    const { data: userBiz } = await supabase
+      .from('businesses')
+      .select('id')
+      .eq('owner_id', userRes.user.id)
+      .maybeSingle();
+    const targetBizId = userBiz?.id;
+    if (!targetBizId || (fields.business_id && fields.business_id !== targetBizId)) {
+      return { success: false, message: 'Empresa do anunciante não localizada.', requiresReview: false };
     }
 
     const sensitiveFieldsChanged = Boolean(fields.legal_name || fields.document_number || fields.category);
@@ -330,7 +314,7 @@ export async function uploadAdvertiserAssetAction(formData: FormData): Promise<{
 }> {
   try {
     const file = formData.get('file') as File | null;
-    const businessId = (formData.get('businessId') as string) || '00000000-0000-0000-0000-000000000001';
+    const businessId = (formData.get('businessId') as string) || '';
     const assetType = (formData.get('assetType') as 'logo' | 'cover' | 'gallery' | 'avatar') || 'gallery';
     const title = (formData.get('title') as string) || null;
 
@@ -353,14 +337,18 @@ export async function uploadAdvertiserAssetAction(formData: FormData): Promise<{
     }
 
     const supabase = await createServerSideClient();
+    const { data: userRes } = await supabase.auth.getUser();
+    if (!userRes?.user || !businessId) return { success: false, message: 'Sessão ou empresa inválida.' };
 
     const { data: bizRecord } = await (supabase as any)
       .from('businesses')
       .select('id, tenant_id')
       .eq('id', businessId)
+      .eq('owner_id', userRes.user.id)
       .maybeSingle();
+    if (!bizRecord) return { success: false, message: 'Empresa do anunciante não localizada.' };
 
-    const tenantId = bizRecord?.tenant_id || '00000000-0000-0000-0000-000000000001';
+    const tenantId = bizRecord.tenant_id;
 
     const timestamp = Date.now();
     const safeFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');

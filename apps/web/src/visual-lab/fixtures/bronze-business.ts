@@ -35,6 +35,7 @@ export const bronzeBusinessFixture: PublicBusinessPresentation = {
     colunaDeHonra: false,
   },
   identity: {
+    id: 'visual-lab-bronze',
     slug: 'saba-advocacia-esquadro',
     name: 'Saba Advocacia & Consultoria',
     category: 'Serviços Jurídicos',

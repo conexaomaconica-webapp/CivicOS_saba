@@ -99,8 +99,9 @@ export function BusinessContacts({
       if (fullUrl.includes('.') || (defaultDomain && fullUrl.toLowerCase().includes(defaultDomain))) {
         fullUrl = `https://${fullUrl.replace(/^\/+/, '')}`;
       } else if (defaultDomain) {
+        const isYoutubeHandle = defaultDomain === 'youtube.com' && fullUrl.startsWith('@');
         const cleanHandle = fullUrl.replace(/^@/, '').replace(/^\/+/, '');
-        fullUrl = `https://${defaultDomain}/${cleanHandle}`;
+        fullUrl = `https://${defaultDomain}/${isYoutubeHandle ? '@' : ''}${cleanHandle}`;
       } else {
         fullUrl = `https://${fullUrl.replace(/^\/+/, '')}`;
       }
