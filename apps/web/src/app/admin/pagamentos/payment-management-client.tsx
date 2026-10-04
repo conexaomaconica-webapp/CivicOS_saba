@@ -459,10 +459,10 @@ export default function PaymentManagementClient({
                     }
                     handleReprocessWebhook(selectedPaymentDetail.webhook_event_id);
                   }}
-                  disabled={!selectedPaymentDetail.webhook_event_id || reprocessingId === selectedPaymentDetail.webhook_event_id}
-                  className="px-4 py-2 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs border border-[#C9A227]/40"
+                  disabled={!selectedPaymentDetail.webhook_event_id || (Boolean(selectedPaymentDetail.webhook_event_id) && reprocessingId === selectedPaymentDetail.webhook_event_id)}
+                  className="px-4 py-2 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs border border-[#C9A227]/40 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                {reprocessingId === selectedPaymentDetail.webhook_event_id ? (
+                {Boolean(selectedPaymentDetail.webhook_event_id) && reprocessingId === selectedPaymentDetail.webhook_event_id ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
                   <RefreshCw className="w-3.5 h-3.5 text-[#C9A227]" />

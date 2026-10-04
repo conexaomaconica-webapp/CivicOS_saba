@@ -342,11 +342,12 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
     let overduePaymentsCount = 0;
     let monthlyRevenueBrl = 0;
     let annualRevenueBrl = 0;
+    const paymentStatusByBusinessId = new Map<string, 'paid' | 'pending' | 'overdue'>();
 
     try {
       const { data: invoicesData } = await (dbClient as any)
         .from('invoices')
-        .select('id, status, amount_paid, amount_due, created_at');
+        .select('id, business_id, status, amount_paid, amount_due, paid_at, created_at');
 
       const invoices = (invoicesData || []) as any[];
       const paidInvoices = invoices.filter((i) => i.status === 'paid');
@@ -357,12 +358,58 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
       pendingPaymentsCount = openInvoices.length;
       overduePaymentsCount = overdueInvoices.length;
 
-      const totalPaidAmount = paidInvoices.reduce((sum, inv) => sum + Number(inv.amount_paid || inv.amount_due || 0), 0);
+      invoices.forEach((inv) => {
+        if (!inv.business_id) return;
 
-      // Se houver faturas pagas reais, usa o montante real
+        const currentStatus = paymentStatusByBusinessId.get(inv.business_id);
+
+        if (inv.status === 'paid') {
+          paymentStatusByBusinessId.set(inv.business_id, 'paid');
+          return;
+        }
+
+        if (currentStatus === 'paid') return;
+
+        if (inv.status === 'overdue') {
+          paymentStatusByBusinessId.set(inv.business_id, 'overdue');
+          return;
+        }
+
+        if (!currentStatus && ['draft', 'open', 'pending'].includes(inv.status)) {
+          paymentStatusByBusinessId.set(inv.business_id, 'pending');
+        }
+      });
+
+      const now = new Date();
+      const paidInvoiceAmount = (inv: any) => Number(inv.amount_paid || inv.amount_due || 0);
+      const paidInvoiceDate = (inv: any) => {
+        const rawDate = inv.paid_at || inv.created_at;
+        if (!rawDate) return null;
+        const parsedDate = new Date(rawDate);
+        return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+      };
+      const totalPaidAmount = paidInvoices.reduce((sum, inv) => sum + paidInvoiceAmount(inv), 0);
+      const currentMonthPaidAmount = paidInvoices.reduce((sum, inv) => {
+        const paidDate = paidInvoiceDate(inv);
+        if (!paidDate || paidDate.getFullYear() !== now.getFullYear() || paidDate.getMonth() !== now.getMonth()) {
+          return sum;
+        }
+
+        return sum + paidInvoiceAmount(inv);
+      }, 0);
+      const currentYearPaidAmount = paidInvoices.reduce((sum, inv) => {
+        const paidDate = paidInvoiceDate(inv);
+        if (!paidDate || paidDate.getFullYear() !== now.getFullYear()) {
+          return sum;
+        }
+
+        return sum + paidInvoiceAmount(inv);
+      }, 0);
+
+      // Se houver faturas pagas reais, usa caixa confirmado por perÃ­odo.
       if (totalPaidAmount > 0) {
-        annualRevenueBrl = Math.round(totalPaidAmount);
-        monthlyRevenueBrl = Math.round(annualRevenueBrl / 12);
+        annualRevenueBrl = Math.round(currentYearPaidAmount > 0 ? currentYearPaidAmount : totalPaidAmount);
+        monthlyRevenueBrl = Math.round(currentMonthPaidAmount);
       } else {
         // Recorrência calculada pela carteira de planos comerciais das empresas publicadas
         // Acácia/Ouro = R$ 1.080/ano | Compasso/Prata = R$ 855/ano | Esquadro/Bronze = R$ 635/ano
@@ -438,7 +485,13 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
       if (b.publication_status === 'published') completeness += 15;
 
       const planCode = (sub?.plan_versions?.plans?.code || b.plan_tier || 'bronze').toLowerCase();
-      const isPaid = Boolean(sub) || b.publication_status === 'published';
+      const invoicePaymentStatus = paymentStatusByBusinessId.get(b.id);
+      const commercialStatus = b.commercial_status || 'pre_cadastro';
+      const isPaid =
+        invoicePaymentStatus === 'paid' ||
+        Boolean(sub) ||
+        b.publication_status === 'published' ||
+        ['pagamento_confirmado', 'prontuario_em_configuracao', 'pronto_para_publicar', 'publicado'].includes(commercialStatus);
 
       return {
         id: b.id,
@@ -448,9 +501,9 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
         owner_email: owner?.email || b.email || 'Não informado',
         plan_code: planCode,
         completeness_percent: Math.min(completeness, 100),
-        payment_status: isPaid ? 'paid' : 'pending',
+        payment_status: isPaid ? 'paid' : invoicePaymentStatus === 'overdue' ? 'overdue' : 'pending',
         publication_status: b.publication_status || 'draft',
-        commercial_status: b.commercial_status || 'pre_cadastro',
+        commercial_status: commercialStatus,
         created_at: b.created_at || new Date().toISOString(),
       };
     });

@@ -6,6 +6,8 @@ import {
 } from '@/lib/commercial-onboarding-status';
 import { assertPlatformAdminAccess } from '@/lib/admin/admin-auth-helper';
 import { revalidatePath } from 'next/cache';
+import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/database.types';
 import {
   evaluateBusinessProfileReadiness,
   validateBusinessPublicationGate,
@@ -39,14 +41,25 @@ export async function unlockAdminCommercialDossierAction(businessId: string): Pr
   error?: string;
 }> {
   try {
-    const { supabase, user } = await assertPlatformAdminAccess();
+    const { user } = await assertPlatformAdminAccess();
 
     if (!businessId) {
       return { success: false, error: 'ID da empresa não informado.' };
     }
 
     // 1. Carrega dados da empresa
-    const { data: biz, error: bizErr } = await (supabase as any)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return { success: false, error: 'Configuração segura do Supabase indisponível.' };
+    }
+
+    const adminClient = createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const { data: biz, error: bizErr } = await (adminClient as any)
       .from('businesses')
       .select('id, tenant_id, name, commercial_status, masonic_validation_status, is_active, publication_status')
       .eq('id', businessId)
@@ -65,7 +78,7 @@ export async function unlockAdminCommercialDossierAction(businessId: string): Pr
     }
 
     // 3. Valida contrato assinado
-    const { data: contract, error: contractErr } = await (supabase as any)
+    const { data: contract, error: contractErr } = await (adminClient as any)
       .from('contracts')
       .select('id, status')
       .eq('business_id', businessId)
@@ -81,7 +94,7 @@ export async function unlockAdminCommercialDossierAction(businessId: string): Pr
     }
 
     // 4. Valida vínculo maçônico verificado
-    const { data: masonicLink } = await (supabase as any)
+    const { data: masonicLink } = await (adminClient as any)
       .from('business_masonic_links')
       .select('status')
       .eq('business_id', businessId)
@@ -105,7 +118,7 @@ export async function unlockAdminCommercialDossierAction(businessId: string): Pr
     // is_active = true (cliente ativo no sistema)
     // publication_status = 'draft' (NUNCA publica automaticamente no Guia)
     // commercial_status = 'prontuario_em_configuracao'
-    const { error: updateErr } = await (supabase as any)
+    const { error: updateErr } = await (adminClient as any)
       .from('businesses')
       .update({
         commercial_status: COMMERCIAL_STATUS.PRONTUARIO_EM_CONFIGURACAO,
@@ -121,7 +134,7 @@ export async function unlockAdminCommercialDossierAction(businessId: string): Pr
 
     // 7. Registro de auditoria administrativa
     try {
-      await (supabase as any).from('admin_audit_logs').insert({
+      await (adminClient as any).from('admin_audit_logs').insert({
         tenant_id: biz.tenant_id,
         actor_id: user.id,
         action: 'UNLOCK_COMMERCIAL_DOSSIER_360',
@@ -612,4 +625,3 @@ export async function unpublishAdminBusinessAction(
     };
   }
 }
-

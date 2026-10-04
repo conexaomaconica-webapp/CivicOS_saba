@@ -249,6 +249,8 @@ export async function getApprovalDirectoryListAction(statusFilter: string = 'tod
     const locationMap: Record<string, { city?: string; state?: string }> = {};
     const contactMap: Record<string, { phone?: string; whatsapp?: string }> = {};
     const categoryMap: Record<string, { id?: string; name?: string }> = {};
+    const responsibleMap: Record<string, { name?: string | null; email?: string | null }> = {};
+    const ownerProfileMap: Record<string, { name?: string | null; email?: string | null }> = {};
 
     if (businessIds.length > 0) {
       try {
@@ -290,6 +292,37 @@ export async function getApprovalDirectoryListAction(statusFilter: string = 'tod
           }
         }
       } catch (_error) { }
+
+      try {
+        const { data: responsibles } = await (supabase as any)
+          .from('business_responsibles')
+          .select('business_id, name')
+          .in('business_id', businessIds);
+        for (const responsible of responsibles || []) {
+          if (!responsibleMap[responsible.business_id] && responsible.name) {
+            responsibleMap[responsible.business_id] = { name: responsible.name };
+          }
+        }
+      } catch (_error) { }
+
+      try {
+        const ownerIds = Array.from(
+          new Set(
+            businesses
+              .map((business) => business.owner_id)
+              .filter(Boolean)
+          )
+        );
+        if (ownerIds.length > 0) {
+          const { data: profiles } = await (supabase as any)
+            .from('profiles')
+            .select('id, name, email')
+            .in('id', ownerIds);
+          for (const profile of profiles || []) {
+            ownerProfileMap[profile.id] = { name: profile.name, email: profile.email };
+          }
+        }
+      } catch (_error) { }
     }
 
     const canonicalFlags = await resolveCanonicalApprovalFlags(supabase, businesses);
@@ -318,6 +351,19 @@ export async function getApprovalDirectoryListAction(statusFilter: string = 'tod
 
       return {
         ...item,
+        owner_name:
+          item.owner_name ||
+          responsibleMap[item.id]?.name ||
+          business.responsible?.name ||
+          ownerProfileMap[business.owner_id]?.name ||
+          null ||
+          undefined,
+        owner_email:
+          item.owner_email ||
+          responsibleMap[item.id]?.email ||
+          ownerProfileMap[business.owner_id]?.email ||
+          business.email ||
+          undefined,
         category: categoryMap[item.id]?.name || item.category,
         city: locationMap[item.id]?.city || item.city,
         has_business_data: readiness.details.nome,

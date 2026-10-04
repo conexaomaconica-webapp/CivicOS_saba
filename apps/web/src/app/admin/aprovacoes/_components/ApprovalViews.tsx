@@ -214,10 +214,10 @@ export function ApprovalTable({ items, onDelete }: { items: ApprovalDirectoryIte
               <td className="py-3.5 px-4 text-right">
                 <div className="flex items-center justify-end gap-2">
                   <Link
-                    href={`/admin/empresas/${item.id}/contratacao`}
+                    href={item.is_ready_for_approval ? `/admin/empresas/${item.id}` : `/admin/empresas/${item.id}/contratacao`}
                     className="px-3.5 py-1.5 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-extrabold text-xs rounded-xl transition-all inline-flex items-center gap-1.5 shadow-xs border border-[#C9A227]/40 cursor-pointer"
                   >
-                    <span>Analisar</span>
+                    <span>{item.is_ready_for_approval ? 'Abrir Prontuário 360' : 'Analisar'}</span>
                     <ArrowRight className="w-3.5 h-3.5 text-[#C9A227]" />
                   </Link>
                   {onDelete && (
@@ -326,10 +326,10 @@ export function ApprovalGrid({ items, onDelete }: { items: ApprovalDirectoryItem
           {/* Footer Action */}
           <div className="flex items-center gap-2">
             <Link
-              href={`/admin/empresas/${item.id}/contratacao`}
+              href={item.is_ready_for_approval ? `/admin/empresas/${item.id}` : `/admin/empresas/${item.id}/contratacao`}
               className="flex-1 py-2.5 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-extrabold text-sm rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs border border-[#C9A227]/40 cursor-pointer"
             >
-              <span>Analisar cadastro</span>
+              <span>{item.is_ready_for_approval ? 'Abrir Prontuário 360' : 'Analisar cadastro'}</span>
               <ArrowRight className="w-4 h-4 text-[#C9A227]" />
             </Link>
             {onDelete && (
