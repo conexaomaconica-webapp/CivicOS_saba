@@ -94,5 +94,8 @@ export function anonymizeIpForAudit(ip: string): string {
   if (clean === '127.0.0.1' || clean === '::1' || clean === 'localhost') {
     return '127.0.0.1';
   }
-  return crypto.createHash('sha256').update(clean, 'utf8').digest('hex');
+  // contract_snapshots.ip_address mantém compatibilidade com VARCHAR(45).
+  // O prefixo identifica o formato e os 38 hexadecimais preservam 152 bits
+  // do SHA-256 sem persistir o endereço IP bruto.
+  return `sha256:${crypto.createHash('sha256').update(clean, 'utf8').digest('hex').slice(0, 38)}`;
 }

@@ -372,6 +372,7 @@ export type Database = {
           payment_method: string
           plan_code: string
           plan_name: string
+          responsible_cpf: string | null
           status: string
           tenant_id: string
           updated_at: string
@@ -391,6 +392,7 @@ export type Database = {
           payment_method?: string
           plan_code: string
           plan_name: string
+          responsible_cpf?: string | null
           status?: string
           tenant_id: string
           updated_at?: string
@@ -410,6 +412,7 @@ export type Database = {
           payment_method?: string
           plan_code?: string
           plan_name?: string
+          responsible_cpf?: string | null
           status?: string
           tenant_id?: string
           updated_at?: string

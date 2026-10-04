@@ -4,7 +4,7 @@ import { assertPlatformAdminAccess } from './admin-auth-helper';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { resolveLogoUrl } from '@/lib/business/business-media-helpers';
-import { validatePhone, sanitizeCnpj } from '@/lib/onboarding/onboarding-validation';
+import { validateCpf, validatePhone, sanitizeCnpj } from '@/lib/onboarding/onboarding-validation';
 import {
   getCanonicalDefaultLimit,
   getCommercialPlanName,
@@ -434,6 +434,7 @@ export interface AdminBusiness360DTO {
     acceptance_id: string | null;
     rendered_text: string;
     signer_name: string;
+    signature_image_data?: string | null;
   };
   commercial_activation: {
     commercial_status: string;
@@ -458,6 +459,8 @@ export interface AdminBusiness360DTO {
     status: 'conferido' | 'desatualizado' | 'contratado';
     conferred_at: string;
     conferred_by?: string | null;
+    responsible_cpf?: string | null;
+    contract_start_date?: string | null;
   };
   subscription: {
     plan_code: string;
@@ -1180,7 +1183,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       if (contractRow) {
         const { data: snap } = await (supabase as any)
           .from('contract_snapshots')
-          .select('id, rendered_text, sha256_hash, created_at')
+          .select('id, rendered_text, sha256_hash, signature_image_data, created_at')
           .eq('contract_id', contractRow.id)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -1215,6 +1218,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
           acceptance_id: acceptanceRow?.id || null,
           rendered_text: snapshotRow.rendered_text,
           signer_name: acceptanceRow ? (b.name || 'Anunciante Titular') : '',
+          signature_image_data: snapshotRow.signature_image_data || null,
         };
       }
     } catch (_e) {
@@ -1346,6 +1350,8 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
           status: ctRow.status,
           conferred_at: ctRow.conferred_at,
           conferred_by: ctRow.conferred_by || null,
+          responsible_cpf: ctRow.responsible_cpf || null,
+          contract_start_date: ctRow.contract_start_date || null,
         };
       }
     } catch (_e) { }
@@ -2663,6 +2669,7 @@ export interface ConfirmAdminCommercialTermsInput {
   is_pedra_fundamental?: boolean;
   notes?: string;
   contract_start_date?: string | null; // ISO date string YYYY-MM-DD ou null
+  responsible_cpf?: string;
   address?: {
     street?: string;
     number?: string;
@@ -2826,6 +2833,11 @@ export async function confirmAdminCommercialTermsAction(
     if (typeof input.installments_count !== 'number' || input.installments_count < 1) {
       return { success: false, error: 'Quantidade de parcelas deve ser de no mínimo 1.' };
     }
+    const responsibleCpf = input.responsible_cpf?.replace(/\D/g, '') || '';
+    const cpfValidationError = validateCpf(responsibleCpf);
+    if (cpfValidationError) {
+      return { success: false, error: cpfValidationError };
+    }
 
     // 2. Consulta da empresa
     const { data: biz, error: bizErr } = await (supabase as any)
@@ -2848,7 +2860,6 @@ export async function confirmAdminCommercialTermsAction(
     if (!biz) {
       return { success: false, error: 'Empresa não encontrada no banco de dados.' };
     }
-
     // 3. Validação da máquina de estados
     let currentStatus = (biz.commercial_status || 'pre_cadastro') as CommercialStatus;
 
@@ -2895,6 +2906,7 @@ export async function confirmAdminCommercialTermsAction(
       is_pedra_fundamental: Boolean(input.is_pedra_fundamental),
       notes: input.notes?.trim() || null,
       contract_start_date: input.contract_start_date?.trim() || null,
+      responsible_cpf: responsibleCpf,
       status: 'conferido',
       conferred_at: new Date().toISOString(),
       conferred_by: user.id,

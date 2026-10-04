@@ -23,6 +23,9 @@ export interface CreditCardPayload {
   ccv: string;
   cpfCnpj: string;
   postalCode?: string;
+  /** Número do endereço do titular (obrigatório no Asaas: creditCardHolderInfo.addressNumber) */
+  addressNumber?: string;
+  addressComplement?: string;
 }
 
 export interface PixChargeResult {

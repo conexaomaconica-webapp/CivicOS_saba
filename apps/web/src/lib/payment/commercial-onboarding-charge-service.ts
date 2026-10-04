@@ -6,6 +6,7 @@ import type { Database } from '@/types/database.types';
 import { AsaasPaymentProvider } from './asaas-payment-provider';
 import { getAsaasDynamicConfig } from './asaas-config-service';
 import type { CreditCardPayload } from './payment-provider.interface';
+import { buildOnboardingPaymentReference } from './payment-idempotency';
 import {
   COMMERCIAL_STATUS,
   assertCommercialStatusTransition,
@@ -19,6 +20,8 @@ export interface CommercialOnboardingCreditCardInput {
   ccv: string;
   cpfCnpj?: string;
   postalCode?: string;
+  addressNumber?: string;
+  addressComplement?: string;
   installments?: number;
 }
 
@@ -72,6 +75,16 @@ export async function createCommercialOnboardingChargeAction(
 
     if (payload.payment_method === 'credit_card' && !payload.credit_card) {
       return { success: false, error: 'Dados do cartão de crédito são obrigatórios para este método de pagamento.' };
+    }
+
+    if (payload.payment_method === 'credit_card') {
+      const cep = payload.credit_card!.postalCode?.replace(/\D/g, '') || '';
+      if (cep.length !== 8) {
+        return { success: false, error: 'Informe o CEP do endereço do titular do cartão (8 dígitos).' };
+      }
+      if (!payload.credit_card!.addressNumber?.trim()) {
+        return { success: false, error: 'Informe o número do endereço do titular do cartão.' };
+      }
     }
 
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -222,7 +235,13 @@ export async function createCommercialOnboardingChargeAction(
     }
 
     // 7. Idempotência e criação de fatura (invoices)
-    const idempotencyKey = `onboarding_inv_${biz.tenant_id}_${biz.id}_${contract.id}_${terms.plan_code}`;
+    const legacyIdempotencyKey = `onboarding_inv_${biz.tenant_id}_${biz.id}_${contract.id}_${terms.plan_code}`;
+    const idempotencyKey = buildOnboardingPaymentReference({
+      tenantId: biz.tenant_id,
+      businessId: biz.id,
+      contractId: contract.id,
+      planCode: terms.plan_code,
+    });
 
     // Validação rígida do parcelamento: nunca excede o limite congelado em business_commercial_terms
     const maxAllowedInstallments = terms.installments_count || 1;
@@ -232,13 +251,26 @@ export async function createCommercialOnboardingChargeAction(
       : 1;
 
     let invoiceId: string;
-    const { data: existingInv } = await (dbClient as any)
+    let { data: existingInv } = await (dbClient as any)
       .from('invoices')
       .select('id, status, amount_due')
       .eq('tenant_id', biz.tenant_id)
       .eq('business_id', biz.id)
       .eq('idempotency_key', idempotencyKey)
       .maybeSingle();
+
+    // Compatibilidade com a fatura interna criada antes da correção do limite
+    // de 100 caracteres do externalReference do Asaas.
+    if (!existingInv) {
+      const legacyInvoiceResult = await (dbClient as any)
+        .from('invoices')
+        .select('id, status, amount_due')
+        .eq('tenant_id', biz.tenant_id)
+        .eq('business_id', biz.id)
+        .eq('idempotency_key', legacyIdempotencyKey)
+        .maybeSingle();
+      existingInv = legacyInvoiceResult.data;
+    }
 
     if (existingInv) {
       invoiceId = existingInv.id;
@@ -333,6 +365,8 @@ export async function createCommercialOnboardingChargeAction(
           ccv: payload.credit_card!.ccv,
           cpfCnpj: payload.credit_card!.cpfCnpj || customerCpfCnpj || '',
           postalCode: payload.credit_card!.postalCode,
+          addressNumber: payload.credit_card!.addressNumber,
+          addressComplement: payload.credit_card!.addressComplement,
         };
         const ccRes = await paymentProvider.createCreditCardCharge(
           chargePayload,
@@ -340,7 +374,16 @@ export async function createCommercialOnboardingChargeAction(
           cardPayload
         );
         if (!ccRes.success) {
-          return { success: false, error: 'Falha no processamento do cartão de crédito.' };
+          console.warn('[commercial-onboarding] Cartão recusado pelo gateway', {
+            businessId: biz.id,
+            environment: asaasConfig.environment,
+            gatewayStatus: ccRes.status,
+            hasGatewayMessage: Boolean(ccRes.error),
+          });
+          return {
+            success: false,
+            error: ccRes.error || 'Não foi possível processar o cartão. Tente novamente ou utilize Pix. [PAY-CARD-001]',
+          };
         }
         paymentId = ccRes.paymentId;
         chargeStatus = ccRes.status;

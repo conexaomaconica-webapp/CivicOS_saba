@@ -58,11 +58,8 @@ export function ContractSignatureClient({
   );
 
   // 5.1 — Confirmação de Identidade e Aceite
-  const [signerCpf, setSignerCpf] = useState(
-    contractData.responsavel_cpf ? contractData.responsavel_cpf.replace(/\D/g, '') : ''
-  );
+  const signerCpf = contractData.responsavel_cpf?.replace(/\D/g, '') || '';
   const [agreeTerms, setAgreeTerms] = useState(false);
-  const [cpfError, setCpfError] = useState<string | null>(null);
 
   // 5.2 — Canvas de Assinatura
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -90,12 +87,36 @@ export function ContractSignatureClient({
   const [cardExpiryMonth, setCardExpiryMonth] = useState('12');
   const [cardExpiryYear, setCardExpiryYear] = useState('2028');
   const [cardCcv, setCardCcv] = useState('');
+  const [cardPostalCode, setCardPostalCode] = useState('');
+  const [cardAddressNumber, setCardAddressNumber] = useState('');
+  const [cardAddressComplement, setCardAddressComplement] = useState('');
   const [selectedInstallments, setSelectedInstallments] = useState(maxAllowedInstallments);
+  const [cardSuccessMsg, setCardSuccessMsg] = useState<string | null>(null);
+  const cardFeedbackRef = useRef<HTMLDivElement | null>(null);
+  // Contador de espera da confirmação (webhook Asaas) após cartão enviado
+  const [cardPendingSince, setCardPendingSince] = useState<number | null>(null);
+  const [pendingElapsed, setPendingElapsed] = useState(0);
+  const [paidMethodLabel, setPaidMethodLabel] = useState<string | null>(null);
+
+  // Rola até o feedback do cartão (erro/sucesso) para que fique visível junto ao botão
+  useEffect(() => {
+    if (paymentMethod !== 'credit_card') return;
+    if (!chargeError && !cardSuccessMsg) return;
+    cardFeedbackRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [chargeError, cardSuccessMsg, paymentMethod]);
 
   const effectivePaymentToken = signedState?.payment_token || contractData.payment_token || token;
   const [isPaymentConfirmed, setIsPaymentConfirmed] = useState(
     contractData.commercial_status === 'pagamento_confirmado'
   );
+
+  useEffect(() => {
+    if (!cardPendingSince || isPaymentConfirmed) return;
+    const tick = setInterval(() => {
+      setPendingElapsed(Math.floor((Date.now() - cardPendingSince) / 1000));
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [cardPendingSince, isPaymentConfirmed]);
 
   // Microetapa 6.3: Polling seguro para detecção de liquidação em tempo real via Webhook Asaas
   useEffect(() => {
@@ -116,21 +137,6 @@ export function ContractSignatureClient({
       clearInterval(interval);
     };
   }, [signedState, isPaymentConfirmed, effectivePaymentToken]);
-
-  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, '').slice(0, 11);
-    setSignerCpf(raw);
-    if (cpfError) {
-      setCpfError(null);
-    }
-  };
-
-  const handleCpfBlur = () => {
-    if (signerCpf.length > 0) {
-      const err = validateCpf(signerCpf);
-      setCpfError(err);
-    }
-  };
 
   const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -205,8 +211,7 @@ export function ContractSignatureClient({
     // Validação 2: CPF
     const err = validateCpf(signerCpf);
     if (err) {
-      setCpfError(err);
-      setSubmitError(err);
+      setSubmitError('O CPF cadastrado para o representante legal é inválido. Solicite a correção dos dados antes de assinar.');
       return;
     }
 
@@ -271,6 +276,7 @@ export function ContractSignatureClient({
   // 6.2: Pagamento com Cartão de Crédito
   const handlePayCreditCard = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (cardSuccessMsg) return; // evita cobrança duplicada após aprovação
     setChargeError(null);
 
     const cleanNumber = cardNumber.replace(/\D/g, '');
@@ -289,6 +295,17 @@ export function ContractSignatureClient({
       return;
     }
 
+    const cleanCep = cardPostalCode.replace(/\D/g, '');
+    if (cleanCep.length !== 8) {
+      setChargeError('Informe o CEP do endereço do titular do cartão (8 dígitos).');
+      return;
+    }
+
+    if (!cardAddressNumber.trim()) {
+      setChargeError('Informe o número do endereço do titular do cartão.');
+      return;
+    }
+
     setIsGeneratingCharge(true);
 
     try {
@@ -302,6 +319,9 @@ export function ContractSignatureClient({
           expiryYear: cardExpiryYear,
           ccv: cardCcv.trim(),
           cpfCnpj: contractData.responsavel_cpf?.replace(/\D/g, '') || contractData.cnpj?.replace(/\D/g, '') || '',
+          postalCode: cleanCep,
+          addressNumber: cardAddressNumber.trim(),
+          addressComplement: cardAddressComplement.trim() || undefined,
           installments: Math.min(selectedInstallments, maxAllowedInstallments),
         },
       });
@@ -310,6 +330,23 @@ export function ContractSignatureClient({
         setChargeError(res.error || 'Falha na aprovação do pagamento com cartão de crédito.');
       } else {
         setActiveCharge(res.data);
+        setCardNumber('');
+        setCardCcv('');
+        const installments = Math.min(selectedInstallments, maxAllowedInstallments);
+        setPaidMethodLabel(
+          installments > 1 ? `Cartão de crédito em ${installments}x` : 'Cartão de crédito (à vista)'
+        );
+        const gatewayStatus = String(res.data.status || '').toUpperCase();
+        if (gatewayStatus === 'CONFIRMED' || gatewayStatus === 'RECEIVED') {
+          // Asaas já confirmou a transação no cartão: exibe a tela de sucesso imediatamente.
+          // O webhook segue atualizando o status comercial no backend.
+          setIsPaymentConfirmed(true);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          setCardPendingSince(Date.now());
+          setPendingElapsed(0);
+          setCardSuccessMsg('Pagamento enviado. Aguardando a confirmação do Asaas.');
+        }
       }
     } catch (err: any) {
       setChargeError(err?.message || 'Erro inesperado ao processar cartão de crédito.');
@@ -452,6 +489,12 @@ export function ContractSignatureClient({
                 <span>Valor Contratado:</span>
                 <strong className="text-stone-900">{signedState?.formatted_amount || contractData.formatted_amount}</strong>
               </div>
+              {paidMethodLabel && (
+                <div className="flex justify-between items-center text-stone-600">
+                  <span>Forma de Pagamento:</span>
+                  <strong className="text-stone-900">{paidMethodLabel}</strong>
+                </div>
+              )}
               <div className="flex justify-between items-center border-t border-stone-100 pt-2 text-stone-600">
                 <span>Status Atual:</span>
                 <span className="inline-flex items-center gap-1 text-emerald-700 font-bold">
@@ -486,7 +529,7 @@ export function ContractSignatureClient({
             </div>
           </div>
 
-          {chargeError && (
+          {chargeError && paymentMethod === 'pix' && (
             <div className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-xs text-rose-800 flex items-start gap-2.5 animate-in fade-in">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-600" />
               <span>{chargeError}</span>
@@ -752,6 +795,60 @@ export function ContractSignatureClient({
                   />
                 </div>
 
+                {/* Endereço de cobrança do titular (exigido pelo antifraude do gateway) */}
+                <div className="space-y-1">
+                  <label htmlFor="card-postal-code" className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block">
+                    CEP do Titular *
+                  </label>
+                  <input
+                    id="card-postal-code"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="postal-code"
+                    required
+                    maxLength={9}
+                    value={cardPostalCode}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
+                      setCardPostalCode(digits.replace(/^(\d{5})(\d)/, '$1-$2'));
+                    }}
+                    placeholder="00000-000"
+                    className="w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 font-mono text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label htmlFor="card-address-number" className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block">
+                      Número *
+                    </label>
+                    <input
+                      id="card-address-number"
+                      type="text"
+                      required
+                      maxLength={10}
+                      value={cardAddressNumber}
+                      onChange={(e) => setCardAddressNumber(e.target.value)}
+                      placeholder="123"
+                      className="w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="card-address-complement" className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block">
+                      Complemento
+                    </label>
+                    <input
+                      id="card-address-complement"
+                      type="text"
+                      maxLength={60}
+                      value={cardAddressComplement}
+                      onChange={(e) => setCardAddressComplement(e.target.value)}
+                      placeholder="Apto, sala..."
+                      className="w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                    />
+                  </div>
+                </div>
+
                 {/* Seletor Estrito de Parcelas (Máximo congelado em business_commercial_terms) */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block">
@@ -781,6 +878,39 @@ export function ContractSignatureClient({
                 </div>
               </div>
 
+              <div ref={cardFeedbackRef} aria-live="polite">
+                {chargeError && (
+                  <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-xs text-rose-800 flex items-start gap-2.5 animate-in fade-in">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-600" />
+                    <span>{chargeError}</span>
+                  </div>
+                )}
+                {cardSuccessMsg && (
+                  <div role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-xs text-emerald-800 space-y-3 animate-in fade-in">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <div className="h-4 w-4 shrink-0 mt-0.5 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+                        <span className="font-semibold">{cardSuccessMsg}</span>
+                      </div>
+                      <span className="font-mono tabular-nums text-emerald-700">
+                        {String(Math.floor(pendingElapsed / 60)).padStart(2, '0')}:{String(pendingElapsed % 60).padStart(2, '0')}
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-emerald-100">
+                      <div
+                        className="h-full rounded-full bg-emerald-600 transition-[width] duration-1000 ease-linear"
+                        style={{ width: `${Math.min(95, Math.round(100 * (1 - Math.exp(-pendingElapsed / 20))))}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-emerald-700">
+                      {pendingElapsed < 60
+                        ? 'Normalmente leva poucos segundos. Esta tela será atualizada automaticamente — não feche nem recarregue.'
+                        : 'A confirmação está demorando mais que o normal. Seu pagamento já foi enviado ao gateway — você pode aguardar aqui ou fechar e voltar por este mesmo link para ver o status atualizado.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <div className="pt-2 flex items-center justify-between border-t border-stone-100">
                 <span className="text-[11px] text-stone-500 flex items-center gap-1.5">
                   <Lock className="h-3.5 w-3.5 text-stone-400" />
@@ -788,7 +918,7 @@ export function ContractSignatureClient({
                 </span>
                 <button
                   type="submit"
-                  disabled={isGeneratingCharge}
+                  disabled={isGeneratingCharge || Boolean(cardSuccessMsg)}
                   className="inline-flex items-center gap-2 rounded-xl bg-[#3B0B14] hover:bg-[#2A080E] text-white px-6 py-3 text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
                 >
                   {isGeneratingCharge ? (
@@ -858,23 +988,11 @@ export function ContractSignatureClient({
           <input
             id="signer-cpf"
             type="text"
+            readOnly
             value={formatCpfCnpj(signerCpf)}
-            onChange={handleCpfChange}
-            onBlur={handleCpfBlur}
-            placeholder="000.000.000-00"
-            maxLength={14}
-            className={`w-full rounded-xl border px-3.5 py-2.5 font-mono text-xs text-stone-900 focus:outline-none focus:ring-2 ${
-              cpfError
-                ? 'border-rose-300 focus:ring-rose-400 bg-rose-50/50'
-                : 'border-stone-300 focus:ring-[#3B0B14] bg-white'
-            }`}
+            className="w-full cursor-not-allowed rounded-xl border border-stone-200 bg-stone-100 px-3.5 py-2.5 font-mono text-xs text-stone-700"
           />
-          {cpfError && (
-            <p className="text-[11px] text-rose-600 flex items-center gap-1">
-              <AlertCircle className="h-3 w-3" />
-              {cpfError}
-            </p>
-          )}
+          <p className="text-[11px] text-stone-500">Dado cadastral congelado na minuta.</p>
         </div>
       </div>
 

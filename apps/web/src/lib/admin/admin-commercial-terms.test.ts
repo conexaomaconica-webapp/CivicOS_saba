@@ -4,6 +4,7 @@ import {
   assertCommercialStatusTransition,
 } from '@/lib/commercial-onboarding-status';
 import type { ConfirmAdminCommercialTermsInput } from '@/lib/admin/admin-businesses-service';
+import { validateCpf } from '@/lib/onboarding/onboarding-validation';
 
 function validateCommercialTermsInput(input: ConfirmAdminCommercialTermsInput): { valid: boolean; error?: string } {
   if (!input.business_id?.trim()) {
@@ -86,6 +87,12 @@ describe('Microetapa 3.2: Conferência Comercial & Transição de Estados', () =
 
     it('aceita payload completo e válido', () => {
       expect(validateCommercialTermsInput(validPayload).valid).toBe(true);
+    });
+
+    it('aceita CPF válido com ou sem máscara e rejeita dígitos inválidos', () => {
+      expect(validateCpf('529.982.247-25')).toBeNull();
+      expect(validateCpf('52998224725')).toBeNull();
+      expect(validateCpf('529.982.247-24')).toMatch(/inválido/i);
     });
 
     it('bloqueia se business_id estiver vazio', () => {

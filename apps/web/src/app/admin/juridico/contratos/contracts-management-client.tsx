@@ -229,12 +229,14 @@ E, por manifestação eletrônica de vontade, o ANUNCIANTE declara que teve aces
   }, [initialDocType]);
 
   const variablesList = [
-    { name: '{{empresa_anunciante}}', desc: 'Nome Fantasia / Razão Social da Empresa Anunciante' },
-    { name: '{{documento_anunciante}}', desc: 'CNPJ ou CPF cadastrado na plataforma' },
-    { name: '{{responsavel_legal}}', desc: 'Nome completo do Responsável Legal' },
-    { name: '{{email_responsavel}}', desc: 'E-mail autenticado do Responsável Legal' },
+    { name: '{{razao_social}}', desc: 'Razão Social da Empresa Anunciante' },
+    { name: '{{nome_fantasia}}', desc: 'Nome Fantasia da Empresa Anunciante' },
+    { name: '{{cnpj}}', desc: 'CNPJ cadastrado na plataforma' },
+    { name: '{{responsavel_nome}}', desc: 'Nome completo do Responsável Legal' },
+    { name: '{{responsavel_cpf}}', desc: 'CPF do Responsável Legal' },
+    { name: '{{responsavel_email}}', desc: 'E-mail autenticado do Responsável Legal' },
     { name: '{{plano_nome}}', desc: 'Nome comercial do plano (ex: Plano Acácia, Plano Compasso)' },
-    { name: '{{plano_valor}}', desc: 'Valor oficial do plano contratado (ex: R$ 2.388,00/ano)' },
+    { name: '{{valor_total}}', desc: 'Valor oficial total do plano contratado' },
     { name: '{{vigencia}}', desc: 'Período contratual (ex: 12 meses / 1 ano)' },
     { name: '{{sha256_hash}}', desc: 'Hash criptográfico gerado no aceite eletrônico' },
   ];

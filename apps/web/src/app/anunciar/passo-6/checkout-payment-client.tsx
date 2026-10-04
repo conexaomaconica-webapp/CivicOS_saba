@@ -41,6 +41,8 @@ export default function CheckoutPaymentClient({
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCcv, setCardCcv] = useState('');
   const [cardCpfCnpj, setCardCpfCnpj] = useState('');
+  const [cardPostalCode, setCardPostalCode] = useState('');
+  const [cardAddressNumber, setCardAddressNumber] = useState('');
 
   // Carrega regras do plano no servidor
   useEffect(() => {
@@ -104,6 +106,8 @@ export default function CheckoutPaymentClient({
           expiryYear: expiryYear || '30',
           ccv: cardCcv,
           cpfCnpj: cardCpfCnpj,
+          postalCode: cardPostalCode.replace(/\D/g, ''),
+          addressNumber: cardAddressNumber.trim(),
         },
       });
 
@@ -260,6 +264,42 @@ export default function CheckoutPaymentClient({
                   placeholder="000.000.000-00"
                   value={cardCpfCnpj}
                   onChange={(e) => setCardCpfCnpj(e.target.value)}
+                  className="w-full bg-stone-900 text-white text-xs rounded-xl p-2.5 border border-stone-700 outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {/* CEP do Titular */}
+              <div className="space-y-1">
+                <label htmlFor="checkout-card-postal-code" className="text-[11px] font-semibold text-stone-300">CEP do Titular</label>
+                <input
+                  id="checkout-card-postal-code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="postal-code"
+                  required
+                  maxLength={9}
+                  pattern="\d{5}-?\d{3}"
+                  placeholder="00000-000"
+                  value={cardPostalCode}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
+                    setCardPostalCode(digits.replace(/^(\d{5})(\d)/, '$1-$2'));
+                  }}
+                  className="w-full bg-stone-900 text-white text-xs rounded-xl p-2.5 border border-stone-700 outline-none focus:border-amber-500 font-mono"
+                />
+              </div>
+
+              {/* Número do Endereço do Titular */}
+              <div className="space-y-1">
+                <label htmlFor="checkout-card-address-number" className="text-[11px] font-semibold text-stone-300">Número do Endereço</label>
+                <input
+                  id="checkout-card-address-number"
+                  type="text"
+                  required
+                  maxLength={10}
+                  placeholder="123"
+                  value={cardAddressNumber}
+                  onChange={(e) => setCardAddressNumber(e.target.value)}
                   className="w-full bg-stone-900 text-white text-xs rounded-xl p-2.5 border border-stone-700 outline-none focus:border-amber-500"
                 />
               </div>

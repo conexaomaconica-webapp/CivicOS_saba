@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import {
   ShieldCheck,
   FileText,
@@ -32,6 +33,14 @@ export default async function ContratacaoPublicPage({ params }: ContratacaoPageP
     return (
       <main className="min-h-screen bg-stone-100 flex items-center justify-center p-4">
         <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl border border-stone-200 text-center space-y-4">
+          <Image
+            src="/logoconexao_red.png"
+            alt="Conexão Maçônica"
+            width={220}
+            height={72}
+            className="mx-auto h-auto w-44 object-contain"
+            priority
+          />
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
             <AlertTriangle className="h-7 w-7" />
           </div>
@@ -90,25 +99,37 @@ export default async function ContratacaoPublicPage({ params }: ContratacaoPageP
     <main className="min-h-screen bg-stone-100 py-10 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-4xl space-y-6">
         {/* Top Header Institucional */}
-        <header className="rounded-2xl border border-stone-200 bg-white p-6 sm:p-8 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-stone-100 pb-5">
-            <div className="space-y-1">
-              <span className="text-[11px] font-bold tracking-widest text-[#3B0B14] uppercase block">
+        <header className="rounded-2xl border border-[#C9A227]/35 bg-[#3B0B14] p-6 text-white shadow-lg sm:p-8 space-y-4">
+          <div className="flex flex-col items-center gap-5 border-b border-white/15 pb-6 text-center">
+            <div className="flex min-w-0 flex-col items-center gap-4">
+              <div className="flex shrink-0 items-center justify-center">
+                <Image
+                  src="/logoconexao_red.png"
+                  alt="Conexão Maçônica"
+                  width={220}
+                  height={72}
+                  className="h-auto w-52 object-contain sm:w-60"
+                  priority
+                />
+              </div>
+              <div className="min-w-0 max-w-2xl space-y-2">
+              <span className="text-[11px] font-bold tracking-widest text-[#E6C659] uppercase block">
                 Conexão Maçônica · Guia Comercial Oficial
               </span>
-              <h1 className="font-serif text-2xl sm:text-3xl font-bold text-stone-900">
+              <h1 className="font-serif text-3xl font-bold leading-tight text-white sm:text-4xl">
                 {template_title}
               </h1>
-              <p className="text-xs text-stone-500">
-                Versão do Instrumento: <span className="font-mono font-semibold text-stone-700">{template_version}</span> · Emissão: {formattedEmissionDate}
+              <p className="text-xs text-white/70">
+                Versão do Instrumento: <span className="font-mono font-semibold text-white">{template_version}</span> · Emissão: {formattedEmissionDate}
               </p>
+              </div>
             </div>
-            <div className="flex flex-col sm:items-end gap-1.5 shrink-0">
+            <div className="flex shrink-0 flex-col items-center gap-2">
               <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3.5 py-1 text-xs font-bold text-emerald-800 border border-emerald-300">
                 <ShieldCheck className="h-4 w-4 text-emerald-600" />
                 Integridade do documento verificada por SHA-256
               </div>
-              <span className="text-[11px] text-stone-400 flex items-center gap-1">
+              <span className="text-[11px] text-white/65 flex items-center gap-1">
                 <Clock className="h-3.5 w-3.5" />
                 Válido até {formattedExpirationDate}
               </span>
@@ -116,22 +137,22 @@ export default async function ContratacaoPublicPage({ params }: ContratacaoPageP
           </div>
 
           {/* Dados Resumidos das Partes */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs bg-stone-50 p-4 rounded-xl border border-stone-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 rounded-xl border border-white/15 bg-white/10 p-4 text-xs">
             <div>
-              <span className="text-stone-500 font-medium block">Empresa / Razão Social:</span>
-              <strong className="text-stone-900 font-semibold">{business_legal_name}</strong>
+              <span className="text-white/65 font-medium block">Empresa / Razão Social:</span>
+              <strong className="text-white font-semibold">{business_legal_name}</strong>
             </div>
             <div>
-              <span className="text-stone-500 font-medium block">Nome Fantasia:</span>
-              <strong className="text-stone-900 font-semibold">{business_name}</strong>
+              <span className="text-white/65 font-medium block">Nome Fantasia:</span>
+              <strong className="text-white font-semibold">{business_name}</strong>
             </div>
             <div>
-              <span className="text-stone-500 font-medium block">CNPJ:</span>
-              <strong className="font-mono text-stone-900">{cnpj}</strong>
+              <span className="text-white/65 font-medium block">CNPJ:</span>
+              <strong className="font-mono text-white">{cnpj}</strong>
             </div>
             <div>
-              <span className="text-stone-500 font-medium block">Representante Legal:</span>
-              <strong className="text-stone-900 font-semibold">{responsavel_nome}</strong>
+              <span className="text-white/65 font-medium block">Representante Legal:</span>
+              <strong className="text-white font-semibold">{responsavel_nome}</strong>
             </div>
           </div>
         </header>

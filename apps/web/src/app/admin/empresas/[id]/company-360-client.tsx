@@ -533,6 +533,17 @@ export default function Company360Client({ initialData }: Props) {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
+    const safeSignerName = (data.contract?.signer_name || data.business.name)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    const signatureBlock = data.contract?.signature_image_data
+      ? `<div style="margin-top:28px;text-align:center;page-break-inside:avoid">
+          <p style="font-family:Georgia,serif;font-weight:bold;color:#3B0B14">ASSINATURA ELETRÔNICA DO REPRESENTANTE LEGAL</p>
+          <img src="${data.contract.signature_image_data}" alt="Assinatura do representante legal" style="display:block;max-width:320px;max-height:130px;margin:12px auto 4px;object-fit:contain" />
+          <div style="width:360px;max-width:100%;margin:0 auto;border-top:1px solid #333;padding-top:6px;font-size:11px">${safeSignerName}</div>
+        </div>`
+      : '';
 
     const htmlContent = `<!DOCTYPE html>
 <html>
@@ -569,6 +580,7 @@ export default function Company360Client({ initialData }: Props) {
         </div>
       </div>
     <div class="content">${safeText}</div>
+    ${signatureBlock}
     <div class="footer">
       Documento gerado via Plataforma Conexão Maçônica em ${new Date().toLocaleDateString('pt-BR')} — Hash SHA-256: ${data.contract?.sha256_hash || 'Verificado'}
     </div>
@@ -3341,6 +3353,27 @@ export default function Company360Client({ initialData }: Props) {
               <div className="font-serif text-xs text-stone-900 leading-relaxed whitespace-pre-wrap max-h-[450px] overflow-y-auto select-text pr-2 text-justify">
                 {data.contract?.rendered_text || 'Carregando termo contratual...'}
               </div>
+
+              {data.contract.signature_image_data && (
+                <div className="mx-auto w-full max-w-md space-y-2 border-t border-stone-300 pt-6 text-center">
+                  <p className="font-serif text-xs font-bold uppercase tracking-wider text-[#3B0B14]">
+                    Assinatura eletrônica do representante legal
+                  </p>
+                  <div className="flex min-h-28 items-center justify-center rounded-xl bg-white p-3">
+                    <img
+                      src={data.contract.signature_image_data}
+                      alt={`Assinatura de ${data.contract.signer_name || data.business.name}`}
+                      className="max-h-28 max-w-full object-contain"
+                    />
+                  </div>
+                  <div className="border-t border-stone-700 pt-1.5 text-xs font-semibold text-stone-900">
+                    {data.contract.signer_name || data.business.name}
+                  </div>
+                  <p className="text-[10px] text-stone-500">
+                    Registrada em {data.contract.signed_at ? new Date(data.contract.signed_at).toLocaleString('pt-BR') : 'data não disponível'}
+                  </p>
+                </div>
+              )}
 
               {/* Dossiê de Assinatura Eletrônica e Timbre de Segurança */}
               <div className="p-4 bg-white border border-[#C9A227]/60 rounded-xl space-y-1.5 font-serif text-[11px] text-stone-800 shadow-xs">

@@ -73,6 +73,21 @@ Data: {{data_emissao}}`;
       expect(rendered).not.toContain('{{selo_pedra_fundamental}}');
     });
 
+    it('renderiza aliases legados usados por versões já publicadas no Jurídico', () => {
+      const legacyTemplate = `Empresa: {{empresa_anunciante}}
+CNPJ: {{documento_anunciante}}
+Responsável: {{responsavel_legal}}
+E-mail: {{email_responsavel}}
+Plano: {{plano_nome}} — {{plano_valor}} — {{vigencia}}`;
+
+      const rendered = renderContractTemplate(legacyTemplate, validVariables);
+      expect(rendered).toContain('Empresa: Comércio de Materiais ABC Ltda.');
+      expect(rendered).toContain('Responsável: João da Silva');
+      expect(rendered).toContain('E-mail: joao@materiaisabc.com.br');
+      expect(rendered).toContain('R$ 1.500,00');
+      expect(rendered).not.toContain('{{');
+    });
+
     it('lança erro se variável obrigatória estiver faltando na validação prévia', () => {
       const invalidVars = {
         ...validVariables,

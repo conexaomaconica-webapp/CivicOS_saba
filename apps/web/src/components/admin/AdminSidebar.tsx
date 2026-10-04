@@ -224,9 +224,9 @@ export function AdminSidebar({ isMobileOpen = false, onMobileClose, userRole = '
   useEffect(() => {
     async function fetchPendingApprovals() {
       try {
-        const res = await getApprovalDirectoryListAction('pending_review');
-        if (res.success && res.items) {
-          setPendingCount(res.items.length);
+        const res = await getApprovalDirectoryListAction('todos');
+        if (res.success) {
+          setPendingCount(res.counts?.total ?? res.items?.length ?? 0);
         }
       } catch (_err) {
         setPendingCount(1);

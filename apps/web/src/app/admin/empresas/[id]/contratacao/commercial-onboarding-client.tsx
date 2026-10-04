@@ -47,6 +47,7 @@ import {
   getAdminContractSnapshotsHistoryAction,
   invalidateAdminContractSnapshotAction,
   sendAdminContractForSignatureAction,
+  renewAdminContractPaymentLinkAction,
   revokeAdminContractSignatureTokenAction,
   ContractDraftPreviewResult,
   GenerateContractSnapshotResult,
@@ -212,6 +213,10 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
   const [contractStartDate, setContractStartDate] = useState<string>(
     (savedTerms as any)?.contract_start_date || ''
   );
+  const [responsibleCpf, setResponsibleCpf] = useState<string>(() => {
+    const digits = (savedTerms?.responsible_cpf || '').replace(/\D/g, '').slice(0, 11);
+    return digits.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  });
 
   const currentFormattedAddress = useMemo(() => {
     const parts: string[] = [];
@@ -366,15 +371,18 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
       paymentMethod !== lastSaved.payment_method ||
       installmentsCount !== lastSaved.installments_count ||
       amountCents !== lastSaved.amount_cents ||
-      isPedraFundamental !== lastSaved.is_pedra_fundamental
+      isPedraFundamental !== lastSaved.is_pedra_fundamental ||
+      contractStartDate !== (lastSaved.contract_start_date || '') ||
+      responsibleCpf.replace(/\D/g, '') !== (lastSaved.responsible_cpf || '').replace(/\D/g, '')
     );
-  }, [lastSaved, selectedPlan, billingCycle, paymentMethod, installmentsCount, amountCents, isPedraFundamental]);
+  }, [lastSaved, selectedPlan, billingCycle, paymentMethod, installmentsCount, amountCents, isPedraFundamental, contractStartDate, responsibleCpf]);
 
   // Estado conferido ativo, contrato gerado e contrato enviado
-  const isConferred = commercialStatus === 'dados_comerciais_conferidos' && !isDirty;
+  const isConferred = Boolean(lastSaved) && !isDirty;
   const isContractGenerated = commercialStatus === 'contrato_gerado';
   const isContractSent = commercialStatus === 'contrato_enviado';
-  const canOpenDraft = isConferred || isContractGenerated || isContractSent;
+  const hasContractSnapshot = Boolean(generatedSnapshot || dto.contract);
+  const canOpenDraft = isConferred || hasContractSnapshot;
 
   // Atualização de valores ao mudar plano ou condição
   const handlePlanChange = (plan: 'bronze' | 'prata' | 'ouro') => {
@@ -463,6 +471,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
         is_pedra_fundamental: isPedraFundamental,
         notes: notes.trim() || undefined,
         contract_start_date: contractStartDate.trim() || null,
+        responsible_cpf: responsibleCpf,
         address:
           street.trim() || cep.trim()
             ? {
@@ -501,6 +510,8 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
           status: 'conferido',
           conferred_at: new Date().toISOString(),
           conferred_by: null,
+          responsible_cpf: responsibleCpf.replace(/\D/g, ''),
+          contract_start_date: contractStartDate.trim() || null,
         });
         setFeedback({
           type: 'success',
@@ -518,7 +529,8 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
     try {
       const res = await getAdminContractDraftPreviewAction(
         business.id,
-        currentFormattedAddress || undefined
+        undefined,
+        responsibleCpf || undefined
       );
       if (!res.success || !res.data) {
         setDraftError(res.error || 'Não foi possível carregar a minuta do contrato.');
@@ -549,8 +561,11 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
             created_at: res.data.active_snapshot.created_at,
           });
         }
-        if (commercialStatus === 'contrato_enviado') {
-          sendAdminContractForSignatureAction(business.id).then((tokenRes) => {
+        if (['contrato_enviado', 'contrato_assinado', 'aguardando_pagamento'].includes(commercialStatus)) {
+          const linkAction = commercialStatus === 'contrato_enviado'
+            ? sendAdminContractForSignatureAction
+            : renewAdminContractPaymentLinkAction;
+          linkAction(business.id).then((tokenRes) => {
             if (tokenRes.success && tokenRes.data) {
               setSignatureTokenData(tokenRes.data);
             }
@@ -581,10 +596,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
     setIsGeneratingSnapshot(true);
     setDraftError(null);
     try {
-      const res = await generateAdminContractSnapshotAction(
-        business.id,
-        currentFormattedAddress || undefined
-      );
+      const res = await generateAdminContractSnapshotAction(business.id);
       if (!res.success || !res.data) {
         setDraftError(res.error || 'Falha ao gerar snapshot do contrato.');
       } else {
@@ -654,13 +666,40 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
           type: 'success',
           message: res.data.already_sent
             ? 'Link de assinatura ativo recuperado com sucesso ✓'
-            : 'Contrato enviado para assinatura com sucesso! Token seguro gerado ✓',
+            : 'Link seguro de assinatura gerado. Escolha abaixo WhatsApp, e-mail ou copie o link ✓',
         });
         await loadSnapshotHistory();
         router.refresh();
+        setTimeout(() => {
+          document.getElementById('signature-sharing-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 150);
       }
     } catch (err: any) {
       setSendError(err?.message || 'Erro inesperado ao enviar contrato para assinatura.');
+    } finally {
+      setIsSendingForSignature(false);
+    }
+  };
+
+  const handleRenewPublicAccessLink = async () => {
+    setIsSendingForSignature(true);
+    setSendError(null);
+    try {
+      const action = commercialStatus === 'contrato_enviado'
+        ? sendAdminContractForSignatureAction
+        : renewAdminContractPaymentLinkAction;
+      const res = await action(business.id);
+      if (!res.success || !res.data) {
+        setSendError(res.error || 'Falha ao renovar o link seguro.');
+        return;
+      }
+      setSignatureTokenData(res.data);
+      setFeedback({
+        type: 'success',
+        message: 'Novo link seguro gerado. O link anterior foi revogado e este já pode ser reenviado ao cliente ✓',
+      });
+    } catch (err: any) {
+      setSendError(err?.message || 'Erro inesperado ao renovar o link seguro.');
     } finally {
       setIsSendingForSignature(false);
     }
@@ -712,9 +751,11 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
     if (!signatureTokenData?.public_url) return;
     const name = signatureTokenData.responsavel_nome || business.name;
     const message = `Olá, ${name}.\n\nSeu contrato da Conexão Maçônica está disponível para conferência e assinatura:\n\n${signatureTokenData.public_url}\n\nApós a assinatura, você poderá prosseguir para a etapa de pagamento.`;
-    const cleanPhone = signatureTokenData.responsavel_whatsapp?.replace(/\D/g, '') || '';
+    const rawPhone = signatureTokenData.responsavel_whatsapp || owner.whatsapp || business.whatsapp || business.phone || '';
+    const cleanPhone = rawPhone.replace(/\D/g, '');
+    const internationalPhone = cleanPhone.startsWith('55') ? cleanPhone : cleanPhone ? `55${cleanPhone}` : '';
     const waUrl = cleanPhone
-      ? `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`
+      ? `https://wa.me/${internationalPhone}?text=${encodeURIComponent(message)}`
       : `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(waUrl, '_blank');
   };
@@ -724,7 +765,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
     const name = signatureTokenData.responsavel_nome || business.name;
     const subject = `Contrato de Adesão — ${business.name} | Conexão Maçônica`;
     const body = `Olá, ${name}.\n\nSeu contrato da Conexão Maçônica está disponível para conferência e assinatura eletrônica:\n\n${signatureTokenData.public_url}\n\nO link possui validade de 7 dias.\n\nAtenciosamente,\nEquipe Conexão Maçônica`;
-    const mailtoUrl = `mailto:${business.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const mailtoUrl = `mailto:${owner.email || business.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailtoUrl;
   };
 
@@ -828,27 +869,32 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
             const isCurrent = status === 'current';
 
             return (
-              <li
-                key={s.step}
-                className={`flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-medium transition ${isCurrent
-                  ? 'bg-[#3B0B14]/10 text-[#3B0B14] font-bold border border-[#3B0B14]/20'
-                  : isCompleted
-                    ? 'text-emerald-700 bg-emerald-50/70 border border-emerald-200'
-                    : 'text-stone-400'
-                  }`}
-              >
-                {isCompleted ? (
-                  <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 stroke-[2.5]" />
-                ) : isCurrent ? (
-                  <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-[#3B0B14] text-[9px] font-bold text-white">
-                    {s.step}
-                  </span>
-                ) : (
-                  <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-stone-300 text-[9px] text-stone-400">
-                    {s.step}
-                  </span>
-                )}
-                <span className="truncate">{s.name}</span>
+              <li key={s.step}>
+                <button
+                  type="button"
+                  disabled={s.step !== 3}
+                  onClick={() => document.getElementById('responsible-cpf-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                  title={s.step === 3 ? 'Ir para os dados comerciais e CPF do responsável' : undefined}
+                  className={`w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-medium transition text-left ${s.step === 3 ? 'cursor-pointer hover:ring-2 hover:ring-[#C9A227]/40' : 'cursor-default'} ${isCurrent
+                    ? 'bg-[#3B0B14]/10 text-[#3B0B14] font-bold border border-[#3B0B14]/20'
+                    : isCompleted
+                      ? 'text-emerald-700 bg-emerald-50/70 border border-emerald-200'
+                      : 'text-stone-400'
+                    }`}
+                >
+                  {isCompleted ? (
+                    <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 stroke-[2.5]" />
+                  ) : isCurrent ? (
+                    <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-[#3B0B14] text-[9px] font-bold text-white">
+                      {s.step}
+                    </span>
+                  ) : (
+                    <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-stone-300 text-[9px] text-stone-400">
+                      {s.step}
+                    </span>
+                  )}
+                  <span className="truncate">{s.name}</span>
+                </button>
               </li>
             );
           })}
@@ -1032,13 +1078,14 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
               <span className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">
                 {business.category || 'Geral'}
               </span>
-              <Link
-                href={`/admin/empresas/${business.id}`}
+              <button
+                type="button"
+                onClick={() => document.getElementById('responsible-cpf-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
                 className="inline-flex items-center gap-1 text-[11px] font-bold text-[#3B0B14] hover:underline"
               >
-                Editar dados cadastrais
+                Editar dados da etapa 3
                 <ArrowRight className="h-3 w-3" />
-              </Link>
+              </button>
             </div>
           </div>
 
@@ -1644,6 +1691,35 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
             Deixe em branco para que a vigência conte <strong>a partir da data de assinatura</strong>.
           </p>
         </div>
+
+        {/* 4c. CPF do responsável legal */}
+        <div id="responsible-cpf-section" className="space-y-2 pt-4 border-t border-stone-100 scroll-mt-24 rounded-xl focus-within:ring-2 focus-within:ring-[#C9A227]/40">
+          <label htmlFor="responsible-cpf" className="text-xs font-bold text-stone-700 uppercase tracking-wider block">
+            CPF do Responsável pela Empresa
+          </label>
+          <input
+            id="responsible-cpf"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            value={responsibleCpf}
+            maxLength={14}
+            onChange={(e) => {
+              const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
+              const formatted = digits
+                .replace(/(\d{3})(\d)/, '$1.$2')
+                .replace(/(\d{3})(\d)/, '$1.$2')
+                .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+              setResponsibleCpf(formatted);
+              setFeedback(null);
+            }}
+            placeholder="000.000.000-00"
+            className="w-full sm:max-w-xs rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-xs font-mono font-bold text-stone-900 focus:border-[#3B0B14] focus:ring-[#3B0B14]"
+          />
+          <p className="text-[11px] text-stone-500">
+            Obrigatório. Será salvo nos termos comerciais protegidos e utilizado na qualificação da minuta contratual.
+          </p>
+        </div>
       </section>
 
       {/* Card 4: Checklist de Prontidão para Contrato */}
@@ -1705,9 +1781,9 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
             </span>
           </div>
 
-          <div className="flex items-center gap-3 p-2.5 rounded-xl bg-stone-50 border border-stone-200 text-stone-600">
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-stone-400 text-stone-500">
-              <span className="h-1.5 w-1.5 rounded-full bg-stone-400" />
+          <div className={`flex items-center gap-3 p-2.5 rounded-xl border ${hasContractSnapshot ? 'bg-emerald-50/60 border-emerald-100 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
+            <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${hasContractSnapshot ? 'bg-emerald-600 text-white' : 'border border-stone-400 text-stone-500'}`}>
+              {hasContractSnapshot ? <Check className="h-3.5 w-3.5 stroke-[3]" /> : <span className="h-1.5 w-1.5 rounded-full bg-stone-400" />}
             </div>
             <span>
               <strong>Geração de Minuta Contratual (Fase 4):</strong> Snapshot imutável com hash criptográfico SHA-256 e token seguro de assinatura.
@@ -1754,8 +1830,8 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
       )}
 
       {/* Card de Assinatura Ativa (Fase 4: Microetapa 4.4) */}
-      {commercialStatus === 'contrato_enviado' && (
-        <section className="rounded-2xl border-2 border-emerald-400 bg-emerald-50/70 p-6 shadow-xs space-y-4 animate-in fade-in">
+      {['contrato_enviado', 'contrato_assinado', 'aguardando_pagamento'].includes(commercialStatus) && (
+        <section id="signature-sharing-card" className="scroll-mt-24 rounded-2xl border-2 border-emerald-400 bg-emerald-50/70 p-6 shadow-xs space-y-4 animate-in fade-in">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-emerald-200/80 pb-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-white shadow-xs">
@@ -1764,7 +1840,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="font-serif font-bold text-base text-emerald-950">
-                    Contrato Enviado para Assinatura ✓
+                    Link de Assinatura Gerado ✓
                   </h3>
                   <span className="rounded-full bg-emerald-200/80 px-2.5 py-0.5 text-[10px] font-bold text-emerald-900">
                     Aguardando Assinatura
@@ -1776,6 +1852,9 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
                   ) : (
                     <>Link criptográfico emitido e disponível para conferência e assinatura do anunciante.</>
                   )}
+                </p>
+                <p className="text-[11px] font-semibold text-emerald-900 mt-1">
+                  O link ainda não foi enviado automaticamente. Escolha um canal abaixo para compartilhá-lo.
                 </p>
               </div>
             </div>
@@ -1843,7 +1922,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3.5 py-2 text-xs font-semibold text-emerald-900 hover:bg-emerald-100/60 transition shadow-2xs cursor-pointer"
             >
               <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
-              Enviar por WhatsApp
+              Abrir e enviar pelo WhatsApp
             </button>
             <button
               type="button"
@@ -1852,6 +1931,15 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
             >
               <Mail className="h-3.5 w-3.5 text-stone-600" />
               Enviar por e-mail
+            </button>
+            <button
+              type="button"
+              disabled={isSendingForSignature}
+              onClick={handleRenewPublicAccessLink}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 transition shadow-2xs cursor-pointer disabled:cursor-wait disabled:opacity-60"
+            >
+              <RotateCcw className={`h-3.5 w-3.5 ${isSendingForSignature ? 'animate-spin' : ''}`} />
+              Renovar link seguro
             </button>
           </div>
         </section>

@@ -309,6 +309,8 @@ export class AsaasPaymentProvider implements IPaymentProvider {
           cpfCnpj: card.cpfCnpj.replace(/\D/g, ''),
           phone: customer.phone ? customer.phone.replace(/\D/g, '') : '11999999999',
           postalCode: card.postalCode ? card.postalCode.replace(/\D/g, '') : '01001000',
+          addressNumber: card.addressNumber?.trim() || 'S/N',
+          ...(card.addressComplement?.trim() ? { addressComplement: card.addressComplement.trim() } : {}),
         },
       };
 

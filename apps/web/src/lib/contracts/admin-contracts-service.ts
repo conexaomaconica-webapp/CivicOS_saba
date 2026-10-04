@@ -47,10 +47,19 @@ export interface ContractDraftPreviewResult {
  */
 export async function getAdminContractDraftPreviewAction(
   businessId: string,
-  overrideAddress?: string
+  overrideAddress?: string,
+  overrideResponsibleCpf?: string
 ): Promise<ContractDraftPreviewResult> {
   try {
     const { supabase } = await assertPlatformAdminAccess();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) {
+      return { success: false, error: 'Configuração segura do Supabase indisponível no servidor.' };
+    }
+    const dbClient = createClient<Database>(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
 
     if (!businessId?.trim()) {
       return { success: false, error: 'Identificador da empresa é obrigatório.' };
@@ -132,7 +141,7 @@ export async function getAdminContractDraftPreviewAction(
     if (biz.owner_id) {
       const { data: prof } = await (supabase as any)
         .from('profiles')
-        .select('name, email, document_number')
+        .select('name, email')
         .eq('id', biz.owner_id)
         .maybeSingle();
       ownerProfile = prof;
@@ -177,35 +186,40 @@ export async function getAdminContractDraftPreviewAction(
       formattedAddress = 'Endereço não informado';
     }
 
-    // 5. Busca versão ativa do template de contrato no banco (com fallback para template oficial)
+    // 5. Busca a versão ativa do template com acesso administrativo seguro.
     let templateMarkdown = CANONICAL_ADVERTISER_CONTRACT_MARKDOWN;
     let templateTitle = 'Contrato de Adesão — Anunciante Conexão Maçônica';
     let templateVersion = CANONICAL_ADVERTISER_CONTRACT_VERSION;
 
     try {
-      const { data: versionRow } = await (supabase as any)
+      const { data: templateRow, error: templateError } = await (dbClient as any)
+        .from('contract_templates')
+        .select('id, code, title')
+        .eq('code', CANONICAL_ADVERTISER_CONTRACT_CODE)
+        .single();
+      if (templateError || !templateRow) throw templateError || new Error('Template canônico não encontrado.');
+
+      const { data: versionRow, error: versionError } = await (dbClient as any)
         .from('contract_versions')
-        .select(`
-          id,
-          version,
-          content_markdown,
-          template:contract_templates!inner(id, code, title)
-        `)
-        .eq('template.code', CANONICAL_ADVERTISER_CONTRACT_CODE)
+        .select('id, version, content_markdown')
+        .eq('template_id', templateRow.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (versionRow && versionRow.content_markdown) {
-        templateMarkdown = versionRow.content_markdown;
-        templateVersion = versionRow.version;
-        if (versionRow.template?.title) {
-          templateTitle = versionRow.template.title;
-        }
+      if (versionError) throw versionError;
+
+      if (!versionRow?.content_markdown) {
+        return { success: false, error: 'Nenhuma versão ativa do contrato foi encontrada. Publique uma versão no módulo Jurídico.' };
       }
-    } catch (_vErr) {
-      // Usa fallback canônico
+
+      templateMarkdown = versionRow.content_markdown;
+      templateVersion = versionRow.version;
+      templateTitle = templateRow.title || templateTitle;
+    } catch (versionError) {
+      console.error('[getAdminContractDraftPreviewAction] Falha ao consultar versão ativa:', versionError);
+      return { success: false, error: 'Não foi possível carregar a versão ativa do contrato.' };
     }
 
     // 6. Normalização e mapeamento das variáveis do template
@@ -213,7 +227,12 @@ export async function getAdminContractDraftPreviewAction(
     const formattedCnpj = formatCpfCnpj(rawCnpj);
 
     const responsavelNome = resp?.name || ownerProfile?.name || 'Responsável Legal';
-    const rawCpf = ownerProfile?.document_number || '00000000000';
+    const overrideCpfDigits = overrideResponsibleCpf?.replace(/\D/g, '') || '';
+    const overrideCpfError = overrideCpfDigits ? validateCpf(overrideCpfDigits) : null;
+    if (overrideCpfError) {
+      return { success: false, error: overrideCpfError };
+    }
+    const rawCpf = overrideCpfDigits || ctRow.responsible_cpf || '00000000000';
     const formattedCpf = formatCpfCnpj(rawCpf);
     const responsavelEmail = ownerProfile?.email || biz.email || 'contato@anunciante.com.br';
     const empresaTelefone =
@@ -398,29 +417,28 @@ export async function generateAdminContractSnapshotAction(
       }
     }
 
-    // 5. Consulta versão ativa do template de contrato
-    let { data: versionRow } = await (dbClient as any)
-      .from('contract_versions')
-      .select(`
-        id,
-        version,
-        content_markdown,
-        template:contract_templates!inner(id, code, title)
-      `)
-      .eq('template.code', CANONICAL_ADVERTISER_CONTRACT_CODE)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
+    // 5. Resolve primeiro o template canônico e consulta versões exclusivamente pelo ID.
+    let { data: tpl } = await (dbClient as any)
+      .from('contract_templates')
+      .select('id, title')
+      .eq('code', CANONICAL_ADVERTISER_CONTRACT_CODE)
       .maybeSingle();
+
+    let versionRow: any = null;
+    if (tpl) {
+      const versionResult = await (dbClient as any)
+        .from('contract_versions')
+        .select('id, version, content_markdown')
+        .eq('template_id', tpl.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      versionRow = versionResult.data;
+    }
 
     // Se ainda não existir registro no banco físico, instancia de forma idempotente
     if (!versionRow) {
-      let { data: tpl } = await (dbClient as any)
-        .from('contract_templates')
-        .select('id')
-        .eq('code', CANONICAL_ADVERTISER_CONTRACT_CODE)
-        .maybeSingle();
-
       if (!tpl) {
         const { data: nTpl } = await (dbClient as any)
           .from('contract_templates')
@@ -481,7 +499,7 @@ export async function generateAdminContractSnapshotAction(
     if (biz.owner_id) {
       const { data: prof } = await (supabase as any)
         .from('profiles')
-        .select('name, email, document_number')
+        .select('name, email')
         .eq('id', biz.owner_id)
         .maybeSingle();
       ownerProfile = prof;
@@ -531,7 +549,7 @@ export async function generateAdminContractSnapshotAction(
     const formattedCnpj = formatCpfCnpj(rawCnpj);
 
     const responsavelNome = resp?.name || ownerProfile?.name || 'Responsável Legal';
-    const rawCpf = ownerProfile?.document_number || '00000000000';
+    const rawCpf = ctRow.responsible_cpf || '00000000000';
     const formattedCpf = formatCpfCnpj(rawCpf);
     const responsavelEmail = ownerProfile?.email || biz.email || 'contato@anunciante.com.br';
     const empresaTelefone =
@@ -571,12 +589,13 @@ export async function generateAdminContractSnapshotAction(
         .select('id, status, created_at')
         .eq('business_id', biz.id)
         .eq('version_id', versionId)
-        .eq('status', 'draft')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (existingContract) {
+      // Só reutiliza quando o registro mais recente desta versão ainda é o draft ativo.
+      // Se foi superseded/voided, rascunhos históricos anteriores não podem bloquear a nova geração.
+      if (existingContract?.status === 'draft') {
         const { data: existingSnapshot } = await (dbClient as any)
           .from('contract_snapshots')
           .select('id, sha256_hash, created_at')
@@ -1179,6 +1198,92 @@ export interface SignPublicContractResult {
   };
 }
 
+/** Gera um novo link de continuidade quando o contrato já foi assinado. */
+export async function renewAdminContractPaymentLinkAction(
+  businessId: string
+): Promise<SendContractForSignatureResult> {
+  try {
+    const { supabase } = await assertPlatformAdminAccess();
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const dbClient = serviceRoleKey && supabaseUrl
+      ? createClient<Database>(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+      : supabase;
+
+    const { data: biz } = await (dbClient as any)
+      .from('businesses')
+      .select('id, name, commercial_status, owner_id')
+      .eq('id', businessId)
+      .single();
+    if (!biz || !['contrato_assinado', 'aguardando_pagamento'].includes(biz.commercial_status)) {
+      return { success: false, error: 'A empresa ainda não possui contrato assinado para continuar o pagamento.' };
+    }
+
+    const { data: contract } = await (dbClient as any)
+      .from('contracts')
+      .select('id')
+      .eq('business_id', businessId)
+      .eq('status', 'signed')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!contract) return { success: false, error: 'Contrato assinado não localizado.' };
+
+    const { data: snapshot } = await (dbClient as any)
+      .from('contract_snapshots')
+      .select('id')
+      .eq('contract_id', contract.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!snapshot) return { success: false, error: 'Snapshot do contrato assinado não localizado.' };
+
+    await (dbClient as any)
+      .from('business_onboarding_tokens')
+      .update({ is_revoked: true, revoked_at: new Date().toISOString() })
+      .eq('business_id', businessId)
+      .eq('token_type', 'onboarding_payment')
+      .eq('is_revoked', false);
+
+    const token = crypto.randomBytes(48).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token, 'utf8').digest('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { error: tokenError } = await (dbClient as any).from('business_onboarding_tokens').insert({
+      business_id: businessId,
+      contract_id: contract.id,
+      snapshot_id: snapshot.id,
+      token_hash: tokenHash,
+      token_type: 'onboarding_payment',
+      token: null,
+      expires_at: expiresAt,
+      is_revoked: false,
+    });
+    if (tokenError) return { success: false, error: `Falha ao gerar link de continuidade: ${tokenError.message}` };
+
+    const { data: resp } = await (dbClient as any)
+      .from('business_responsibles')
+      .select('name, whatsapp')
+      .eq('business_id', businessId)
+      .maybeSingle();
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://conexaomaconica.com.br';
+    return {
+      success: true,
+      data: {
+        contract_id: contract.id,
+        token,
+        public_url: `${baseUrl.replace(/\/$/, '')}/contratacao/${token}`,
+        expires_at: expiresAt,
+        commercial_status: 'contrato_enviado',
+        already_sent: true,
+        responsavel_nome: resp?.name || biz.name,
+        responsavel_whatsapp: resp?.whatsapp || undefined,
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Erro inesperado ao recuperar o acesso ao pagamento.' };
+  }
+}
+
 /**
  * Envia o contrato para assinatura eletrônica (Microetapa 4.4).
  *
@@ -1769,7 +1874,7 @@ export async function getPublicContractByTokenAction(
     // 5. Busca dados dos termos comerciais conferidos
     const { data: terms } = await (dbClient as any)
       .from('business_commercial_terms')
-      .select('plan_name, amount_cents, billing_cycle, payment_method, installments_count, installment_amount_cents, is_pedra_fundamental')
+      .select('plan_name, amount_cents, billing_cycle, payment_method, installments_count, installment_amount_cents, is_pedra_fundamental, responsible_cpf')
       .eq('business_id', biz.id)
       .maybeSingle();
 
@@ -1788,7 +1893,7 @@ export async function getPublicContractByTokenAction(
       .maybeSingle();
 
     let responsavelNome = resp?.name;
-    let responsavelCpf: string | undefined = snap.signer_cpf || undefined;
+    let responsavelCpf: string | undefined = snap.signer_cpf || terms?.responsible_cpf || undefined;
     let responsavelEmail = biz.email;
 
     if (biz.owner_id) {
@@ -2038,6 +2143,30 @@ export async function signPublicContractAction(
       return { success: false, error: 'Empresa associada não encontrada.' };
     }
 
+    // A identidade do signatário é a já conferida nos termos comerciais.
+    // O navegador não pode substituir o CPF cadastrado pelo administrador.
+    const { data: commercialTerms, error: termsErr } = await (dbClient as any)
+      .from('business_commercial_terms')
+      .select('responsible_cpf')
+      .eq('business_id', biz.id)
+      .maybeSingle();
+
+    if (termsErr) {
+      return { success: false, error: 'Não foi possível conferir o CPF cadastrado do representante legal.' };
+    }
+
+    const registeredCpf = commercialTerms?.responsible_cpf?.replace(/\D/g, '') || '';
+    if (validateCpf(registeredCpf)) {
+      return {
+        success: false,
+        error: 'O CPF cadastrado para o representante legal é inválido. Solicite a correção dos dados antes de assinar.',
+      };
+    }
+
+    if (cleanCpf !== registeredCpf) {
+      return { success: false, error: 'O CPF informado não corresponde ao representante legal cadastrado.' };
+    }
+
     // 3. Valida contrato
     let contractQuery = (dbClient as any)
       .from('contracts')
@@ -2094,7 +2223,8 @@ export async function signPublicContractAction(
       userAgent = reqHeaders.get('user-agent') || 'Browser';
     } catch (_e) {}
 
-    const sanitizedIp = anonymizeIpForAudit(rawIp);
+    // Compatibilidade defensiva enquanto a migration 147 não tiver sido aplicada.
+    const sanitizedIp = anonymizeIpForAudit(rawIp).slice(0, 45);
     const acceptedAt = new Date().toISOString();
 
     // 6. Execução com garantia de atomicidade transacional via RPC (Migration 131)
@@ -2282,4 +2412,3 @@ export async function signPublicContractAction(
     };
   }
 }
-

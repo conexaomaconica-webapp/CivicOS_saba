@@ -4,6 +4,8 @@ import { createServerSideClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { dispatchNotificationAction } from '@/lib/notifications/notification-service';
 import { getCommercialPlanName } from '@/lib/admin/approval-display';
+import { evaluateBusinessProfileReadiness } from '@/lib/admin/admin-commercial-dossier-readiness';
+import { resolveCanonicalApprovalFlags } from '@/lib/admin/approval-canonical-status';
 
 export interface ApprovalRequirement {
   id: string;
@@ -240,6 +242,94 @@ export async function getApprovalDirectoryListAction(statusFilter: string = 'tod
       });
     }
 
+    // A RPC legada calcula a completude com colunas antigas. Recalcula para todos
+    // os cards usando as mesmas fontes canônicas adotadas em /admin/empresas.
+    const businessIds = businesses.map((business) => business.id).filter(Boolean);
+    const businessById = new Map(businesses.map((business) => [business.id, business]));
+    const locationMap: Record<string, { city?: string; state?: string }> = {};
+    const contactMap: Record<string, { phone?: string; whatsapp?: string }> = {};
+    const categoryMap: Record<string, { id?: string; name?: string }> = {};
+
+    if (businessIds.length > 0) {
+      try {
+        const { data: locations } = await (supabase as any)
+          .from('business_locations')
+          .select('business_id, city, state, is_headquarters')
+          .in('business_id', businessIds);
+        for (const location of locations || []) {
+          if (!locationMap[location.business_id] || location.is_headquarters) {
+            locationMap[location.business_id] = { city: location.city, state: location.state };
+          }
+        }
+      } catch (_error) { }
+
+      try {
+        const { data: contacts } = await (supabase as any)
+          .from('business_contacts')
+          .select('business_id, type, value')
+          .in('business_id', businessIds)
+          .in('type', ['phone', 'whatsapp']);
+        for (const contact of contacts || []) {
+          contactMap[contact.business_id] ||= {};
+          contactMap[contact.business_id]![contact.type as 'phone' | 'whatsapp'] = contact.value;
+        }
+      } catch (_error) { }
+
+      try {
+        const { data: categories } = await (supabase as any)
+          .from('business_categories')
+          .select('business_id, category_id, is_primary, categories(name)')
+          .in('business_id', businessIds)
+          .order('is_primary', { ascending: false });
+        for (const category of categories || []) {
+          if (!categoryMap[category.business_id]) {
+            categoryMap[category.business_id] = {
+              id: category.category_id,
+              name: category.categories?.name,
+            };
+          }
+        }
+      } catch (_error) { }
+    }
+
+    const canonicalFlags = await resolveCanonicalApprovalFlags(supabase, businesses);
+
+    allItems = allItems.map((item) => {
+      const business = businessById.get(item.id);
+      if (!business) return item;
+
+      const readiness = evaluateBusinessProfileReadiness({
+        name: business.name,
+        legal_name: business.legal_name,
+        description: business.description,
+        category_id: categoryMap[item.id]?.id || business.category_id,
+        category: categoryMap[item.id]?.name || business.category,
+        city: locationMap[item.id]?.city || business.city,
+        state: locationMap[item.id]?.state || business.state,
+        phone: contactMap[item.id]?.phone || business.phone,
+        whatsapp: contactMap[item.id]?.whatsapp || business.whatsapp,
+        logo_url: business.logo_url,
+      });
+
+      const flags = canonicalFlags[item.id];
+      const hasMasonicLink = item.has_masonic_link || Boolean(flags?.has_masonic_link);
+      const hasSignedContract = item.has_signed_contract || Boolean(flags?.has_signed_contract);
+      const hasValidPayment = item.has_valid_payment || Boolean(flags?.has_valid_payment);
+
+      return {
+        ...item,
+        category: categoryMap[item.id]?.name || item.category,
+        city: locationMap[item.id]?.city || item.city,
+        has_business_data: readiness.details.nome,
+        has_masonic_link: hasMasonicLink,
+        has_signed_contract: hasSignedContract,
+        has_valid_payment: hasValidPayment,
+        is_ready_for_approval:
+          item.has_responsible && readiness.details.nome && hasMasonicLink && hasSignedContract && hasValidPayment,
+        completeness_percent: readiness.completion_percentage,
+      };
+    });
+
     allItems.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
 
     if (error && allItems.length === 0) {
@@ -337,8 +427,19 @@ export async function getApprovalDossierAction(businessId: string) {
       return { success: false, error: 'A RPC retornou um dossiê sem critérios de aprovação.' };
     }
 
-    const requirements = completeness.requirements as ApprovalRequirement[];
+    const canonical = (await resolveCanonicalApprovalFlags(supabase, [b]))[b.id];
+    const canonicalById: Record<string, boolean | undefined> = {
+      req_masonic_link: canonical?.has_masonic_link,
+      req_contract: canonical?.has_signed_contract,
+      req_payment: canonical?.has_valid_payment,
+    };
+    const requirements = (completeness.requirements as ApprovalRequirement[]).map((r) =>
+      canonicalById[r.id] ? { ...r, satisfied: true } : r
+    );
     const pendingItems = requirements.filter((r) => r.blocking && !r.satisfied).map((r) => r.label);
+    const satisfiedCount = requirements.filter((r) => r.satisfied).length;
+    const canonicalPercent = requirements.length > 0 ? Math.round((satisfiedCount * 100) / requirements.length) : 0;
+    const canonicalReady = requirements.filter((r) => r.blocking).every((r) => r.satisfied);
 
     const commercialPlanName = getCommercialPlanName(b.plan_code || 'prata');
     const planEntMap: Record<string, number> = {};
@@ -377,7 +478,7 @@ export async function getApprovalDossierAction(businessId: string) {
         gallery: [], // Not fetched in RPC, mock for now
       },
       completeness: {
-        percent: Number(completeness.percent),
+        percent: canonicalPercent,
         mandatory: {
           responsible: Boolean(requirements.find((r) => r.id === 'req_responsible')?.satisfied),
           business_data: Boolean(requirements.find((r) => r.id === 'req_business_data')?.satisfied),
@@ -394,13 +495,13 @@ export async function getApprovalDossierAction(businessId: string) {
           coordinates: false,
         },
         pending_items: pendingItems,
-        is_ready_for_approval: Boolean(completeness.is_ready_for_approval),
+        is_ready_for_approval: canonicalReady,
       },
       masonic_link: {
         affiliation_role: ma?.masonic_degree || bml?.role || null,
         lodge_name: ma?.lodge_name || bml?.lodge_name || null,
         potencia_name: ma?.potencia_name || bml?.potencia_name || null,
-        verification_status: ma?.verification_status === 'verified' ? 'verified' : bml?.verification_status === 'approved' ? 'verified' : 'pending',
+        verification_status: canonical?.has_masonic_link || ma?.verification_status === 'verified' || bml?.verification_status === 'approved' ? 'verified' : 'pending',
         public_exposure_consent: true,
       },
       contract: {
@@ -416,7 +517,7 @@ export async function getApprovalDossierAction(businessId: string) {
         amount_cents: s?.amount_cents || null,
         payment_method: s?.payment_method || null,
         installments_max: s?.installments_max || null,
-        status: s?.status || 'pending',
+        status: canonical?.has_valid_payment ? 'paid' : s?.status || 'pending',
         paid_at: s?.current_period_start || null,
       },
       plan_entitlements: {

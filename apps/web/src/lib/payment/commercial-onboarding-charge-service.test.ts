@@ -4,6 +4,7 @@ import {
   assertCommercialStatusTransition,
 } from '@/lib/commercial-onboarding-status';
 import { anonymizeIpForAudit } from '@/lib/contracts/contract-constants';
+import { buildOnboardingPaymentReference } from '@/lib/payment/payment-idempotency';
 
 describe('Microetapa 6.1 — Criação Segura de Cobrança Asaas e Hardenings', () => {
   describe('Hardening 1: Anonimização de IP para LGPD', () => {
@@ -17,8 +18,8 @@ describe('Microetapa 6.1 — Criação Segura de Cobrança Asaas e Hardenings', 
       const publicIp = '189.40.122.95';
       const hashedIp = anonymizeIpForAudit(publicIp);
 
-      expect(hashedIp).toHaveLength(64);
-      expect(hashedIp).toMatch(/^[0-9a-f]{64}$/);
+      expect(hashedIp).toHaveLength(45);
+      expect(hashedIp).toMatch(/^sha256:[0-9a-f]{38}$/);
       expect(hashedIp).not.toContain('189.40');
 
       // Determinístico para a mesma requisição probatória
@@ -60,11 +61,12 @@ describe('Microetapa 6.1 — Criação Segura de Cobrança Asaas e Hardenings', 
       const contractId = '22222222-2222-4222-8222-222222222222';
       const planCode = 'acacia';
 
-      const idempotencyKey = `onboarding_inv_${tenantId}_${businessId}_${contractId}_${planCode}`;
+      const idempotencyKey = buildOnboardingPaymentReference({ tenantId, businessId, contractId, planCode });
+      const repeatedKey = buildOnboardingPaymentReference({ tenantId, businessId, contractId, planCode });
 
-      expect(idempotencyKey).toBe(
-        'onboarding_inv_00000000-0000-0000-0000-000000000001_11111111-1111-4111-8111-111111111111_22222222-2222-4222-8222-222222222222_acacia'
-      );
+      expect(idempotencyKey).toBe(repeatedKey);
+      expect(idempotencyKey).toMatch(/^onb_[0-9a-f]{64}$/);
+      expect(idempotencyKey.length).toBeLessThanOrEqual(100);
     });
 
     it('permite a transição canônica: contrato_assinado -> aguardando_pagamento (Microetapa 6.4)', () => {
@@ -278,4 +280,3 @@ describe('Microetapa 6.1 — Criação Segura de Cobrança Asaas e Hardenings', 
     });
   });
 });
-

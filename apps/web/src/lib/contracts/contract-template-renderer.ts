@@ -79,10 +79,18 @@ export function renderContractTemplate(
   assertContractVariablesComplete(variables);
 
   // 2. Substitui as variáveis fornecidas
+  const legacyAliases: Record<string, keyof AdvertiserContractVariables> = {
+    empresa_anunciante: 'razao_social',
+    documento_anunciante: 'cnpj',
+    responsavel_legal: 'responsavel_nome',
+    email_responsavel: 'responsavel_email',
+    plano_valor: 'valor_total',
+  };
+
   const rendered = template.replace(
     /\{\{([a-zA-Z0-9_]+)\}\}/g,
     (_, rawKey: string) => {
-      const key = rawKey as keyof AdvertiserContractVariables;
+      const key = legacyAliases[rawKey] || (rawKey as keyof AdvertiserContractVariables);
       const value = variables[key];
 
       if (value === undefined || value === null) {
