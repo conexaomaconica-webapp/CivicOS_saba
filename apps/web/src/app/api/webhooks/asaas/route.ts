@@ -43,15 +43,11 @@ export async function POST(req: Request) {
     if (isTechnicalSmokeTest) {
       // Registra no log de auditoria sem alterar assinaturas comerciais ou status no Guia
       const { error: logErr } = await supabase.from('payment_provider_events').insert({
-        tenant_id: '00000000-0000-0000-0000-000000000001',
-        provider: canonicalEvent.provider,
-        provider_event_id: canonicalEvent.providerEventId,
-        canonical_event: canonicalEvent.canonicalEvent,
-        business_id: '00000000-0000-0000-0000-000000000001',
-        plan_code: 'technical_smoke_test',
-        amount_cents: canonicalEvent.amountCents,
-        raw_payload: { ...canonicalEvent.rawPayload, technical_smoke_test: true },
-        processing_status: 'processed',
+        provider_code: canonicalEvent.provider,
+        event_id: canonicalEvent.providerEventId,
+        event_type: canonicalEvent.canonicalEvent,
+        payload: { ...canonicalEvent.rawPayload, technical_smoke_test: true },
+        processed: true,
         processed_at: new Date().toISOString(),
       });
 
