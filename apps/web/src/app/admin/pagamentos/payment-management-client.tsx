@@ -25,6 +25,7 @@ import {
   AdminPaymentListItem,
 } from '@/lib/admin/admin-payments-service';
 import { getCommercialPlanName } from '@/lib/admin/approval-display';
+import { systemConfirm } from '@/components/system/SystemFeedback';
 
 export interface PaymentManagementClientProps {
   isAsaasConfigured: boolean;
@@ -78,9 +79,12 @@ export default function PaymentManagementClient({
   };
 
   const handleManualConfirmPayment = async (invoiceId: string) => {
-    const ok = window.confirm(
-      'Confirmar manualmente este pagamento? Use apenas se o pagamento foi verificado no Asaas Sandbox. A ação será auditada.'
-    );
+    const ok = await systemConfirm({
+      title: 'Confirmar pagamento manual',
+      message: 'Confirme apenas se o pagamento foi verificado no Asaas Sandbox. Esta ação será auditada no sistema.',
+      confirmLabel: 'Confirmar pagamento',
+      cancelLabel: 'Cancelar',
+    });
     if (!ok) return;
 
     setManualConfirmingId(invoiceId);

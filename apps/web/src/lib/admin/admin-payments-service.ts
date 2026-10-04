@@ -2,6 +2,8 @@
 
 import { assertPlatformAdminAccess } from './admin-auth-helper';
 import { revalidatePath } from 'next/cache';
+import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/database.types';
 import { deriveCanonicalBillingStatus } from '@/lib/payment/canonical-billing-status';
 import { reconcileCommercialPaymentWebhook } from '@/lib/payment/commercial-onboarding-webhook-service';
 import {
@@ -396,16 +398,27 @@ export async function reprocessPaymentWebhookAction(recordId: string) {
 }
 
 export async function confirmPaymentManuallyAction(invoiceId: string) {
-  const { supabase, user } = await assertPlatformAdminAccess();
+  const { user } = await assertPlatformAdminAccess();
 
   try {
     if (!invoiceId || typeof invoiceId !== 'string') {
       throw new Error('INVALID_INVOICE_ID: Identificador de fatura inválido.');
     }
 
-    const { data: invoice, error: invoiceErr } = await (supabase as any)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error('SUPABASE_ADMIN_UNAVAILABLE: Configuração segura do Supabase indisponível.');
+    }
+
+    const adminClient = createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const { data: invoice, error: invoiceErr } = await (adminClient as any)
       .from('invoices')
-      .select('id, tenant_id, business_id, amount_due, amount_cents, amount_paid, status, payment_method')
+      .select('id, tenant_id, business_id, amount_due, amount_paid, status')
       .eq('id', invoiceId)
       .maybeSingle();
 
@@ -413,9 +426,9 @@ export async function confirmPaymentManuallyAction(invoiceId: string) {
       throw new Error(`INVOICE_NOT_FOUND: Fatura ${invoiceId} não foi localizada.`);
     }
 
-    const { data: business, error: businessErr } = await (supabase as any)
+    const { data: business, error: businessErr } = await (adminClient as any)
       .from('businesses')
-      .select('id, tenant_id, commercial_status')
+      .select('id, tenant_id')
       .eq('id', invoice.business_id)
       .maybeSingle();
 
@@ -427,9 +440,9 @@ export async function confirmPaymentManuallyAction(invoiceId: string) {
     const amountPaid =
       invoice.amount_paid ||
       invoice.amount_due ||
-      (typeof invoice.amount_cents === 'number' ? invoice.amount_cents / 100 : 0);
+      0;
 
-    await (supabase as any)
+    await (adminClient as any)
       .from('invoices')
       .update({
         status: 'paid',
@@ -439,7 +452,7 @@ export async function confirmPaymentManuallyAction(invoiceId: string) {
       })
       .eq('id', invoice.id);
 
-    await (supabase as any)
+    await (adminClient as any)
       .from('payment_attempts')
       .update({
         status: 'success',
@@ -452,14 +465,29 @@ export async function confirmPaymentManuallyAction(invoiceId: string) {
       })
       .eq('invoice_id', invoice.id);
 
-    const currentStatus = business.commercial_status || COMMERCIAL_STATUS.PRE_CADASTRO;
+    let currentStatus: string | null = null;
+    let canUseCommercialStatus = true;
+
+    const { data: businessCommercialStatus, error: businessCommercialStatusErr } = await (adminClient as any)
+      .from('businesses')
+      .select('commercial_status')
+      .eq('id', business.id)
+      .maybeSingle();
+
+    if (businessCommercialStatusErr) {
+      canUseCommercialStatus = false;
+    } else {
+      currentStatus = businessCommercialStatus?.commercial_status || COMMERCIAL_STATUS.PRE_CADASTRO;
+    }
+
     const shouldAdvanceCommercialStatus =
+      canUseCommercialStatus &&
       isCommercialStatus(currentStatus) &&
       COMMERCIAL_STATUS_ORDER.indexOf(currentStatus as CommercialStatus) <=
         COMMERCIAL_STATUS_ORDER.indexOf(COMMERCIAL_STATUS.PAGAMENTO_CONFIRMADO);
 
     if (shouldAdvanceCommercialStatus && currentStatus !== COMMERCIAL_STATUS.PAGAMENTO_CONFIRMADO) {
-      await (supabase as any)
+      await (adminClient as any)
         .from('businesses')
         .update({
           commercial_status: COMMERCIAL_STATUS.PAGAMENTO_CONFIRMADO,
@@ -468,7 +496,7 @@ export async function confirmPaymentManuallyAction(invoiceId: string) {
         .eq('id', business.id);
     }
 
-    await (supabase as any).from('admin_audit_logs').insert({
+    await (adminClient as any).from('admin_audit_logs').insert({
       tenant_id: invoice.tenant_id || business.tenant_id || '00000000-0000-0000-0000-000000000001',
       actor_id: user.id,
       action: 'CONFIRM_PAYMENT_MANUALLY',
@@ -476,13 +504,13 @@ export async function confirmPaymentManuallyAction(invoiceId: string) {
       entity_id: invoice.id,
       before_value: {
         invoice_status: invoice.status,
-        commercial_status: business.commercial_status,
+        commercial_status: currentStatus,
       },
       after_value: {
         invoice_status: 'paid',
         commercial_status: shouldAdvanceCommercialStatus
           ? COMMERCIAL_STATUS.PAGAMENTO_CONFIRMADO
-          : business.commercial_status,
+          : currentStatus,
         amount_paid: amountPaid,
         confirmed_at: now,
       },

@@ -118,7 +118,7 @@ export default function LoginPage() {
         // Redirecionamento Automático Inteligente quando não houver duplicidade de perfis
         if (role === 'master') {
           // Permanece na tela para exibir o Portal Switcher completo para o Master
-        } else if (role === 'socio_admin' || role === 'master') {
+        } else if (isPlatformAdminRole(role)) {
           if (!isOwner) {
             router.push('/admin');
           }

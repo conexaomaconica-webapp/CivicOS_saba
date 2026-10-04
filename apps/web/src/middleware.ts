@@ -7,6 +7,7 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { createMiddlewareSideClient } from '@/lib/supabase/middleware';
+import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
@@ -76,7 +77,7 @@ export async function middleware(request: NextRequest) {
 
     // RBAC: Admin Routes (/admin/*)
     if (isAdminRoute) {
-      if (userRole !== 'master' && userRole !== 'socio_admin') {
+      if (!isPlatformAdminRole(userRole)) {
         // Unauthorized, redirect to home page
         const redirectUrl = request.nextUrl.clone();
         redirectUrl.pathname = '/';
@@ -86,8 +87,8 @@ export async function middleware(request: NextRequest) {
 
     // RBAC: Dashboard Routes (/dashboard/*)
     if (isDashboardRoute) {
-      const allowedRoles = ['master', 'socio_admin', 'anunciante'];
-      if (!allowedRoles.includes(userRole)) {
+      const allowedRoles = ['anunciante'];
+      if (!isPlatformAdminRole(userRole) && !allowedRoles.includes(userRole)) {
         // Unauthorized, redirect to home page
         const redirectUrl = request.nextUrl.clone();
         redirectUrl.pathname = '/';
