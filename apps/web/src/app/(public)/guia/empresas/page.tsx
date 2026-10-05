@@ -280,7 +280,7 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
             </p>
 
             {/* Barra de Busca Principal */}
-            <form action="/guia/empresas" method="GET" className="dh-search-box mt-6 max-w-3xl">
+            <form action="/guia/empresas" method="GET" className="dh-search-box mt-8 max-w-3xl">
               <Sparkles className="w-5 h-5 text-amber-500 ml-3 shrink-0" />
               <input
                 type="text"

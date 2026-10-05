@@ -20,7 +20,8 @@
 .dh-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 20px;
+  /* Só o lateral: "padding: 0 20px" zerava o vertical e anulava py-* do Tailwind nas seções (CSS fora de @layer vence os utilitários). */
+  padding-inline: 20px;
 }
 
 /* Glassmorphism Header Navbar */
@@ -39,11 +40,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 24px; /* respiro mínimo entre logo, menu e ações */
   height: 76px;
 }
 .dh-header__brand {
   display: flex;
   align-items: center;
+  flex-shrink: 0; /* a logo nunca encolhe nem é "empurrada" pelo menu */
   gap: 12px;
   color: #ffffff;
   text-decoration: none;
@@ -51,9 +54,13 @@
 .dh-header__nav {
   display: flex;
   align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-width: 0;
   gap: 24px;
 }
 .dh-header__link {
+  white-space: nowrap; /* "Lojas Maçônicas" não quebra em duas linhas */
   color: rgba(255, 255, 255, 0.82);
   font-size: 14px;
   font-weight: 500;
@@ -186,7 +193,8 @@
 /* Search Bar Box */
 .dh-search-box {
   max-width: 780px;
-  margin: 0 auto;
+  /* Só o horizontal: "margin: 0 auto" zerava a margem superior e anulava o mt-* do Tailwind. */
+  margin-inline: auto;
   background: #ffffff;
   border-radius: 16px;
   padding: 8px;
@@ -491,6 +499,16 @@
   margin-bottom: 24px;
   font-size: 14px;
   font-weight: 600;
+}
+
+/* Larguras médias (tablet / janela estreita): menu e ações mais compactos para caber sem apertar a logo */
+@media (min-width: 769px) and (max-width: 1180px) {
+  .dh-header__inner { gap: 16px; }
+  .dh-header__nav { gap: 14px; }
+  .dh-header__link { font-size: 13px; }
+  .dh-header__actions { gap: 8px; }
+  .dh-header__actions .dh-city-dropdown { max-width: 128px; }
+  .dh-header__actions .dh-city-dropdown select { max-width: 92px; text-overflow: ellipsis; }
 }
 
 @media (max-width: 768px) {

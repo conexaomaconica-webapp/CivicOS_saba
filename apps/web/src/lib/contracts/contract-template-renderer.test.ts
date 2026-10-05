@@ -136,19 +136,21 @@ Plano: {{plano_nome}} — {{plano_valor}} — {{vigencia}}`;
   });
 
   describe('appendSignatureImageToContractText', () => {
-    it('anexa a assinatura acima do nome fantasia e da razao social do contratante', () => {
+    it('anexa a assinatura acima da razao social e do nome completo do representante legal', () => {
       const signature = `data:image/png;base64,${'A'.repeat(300)}`;
       const rendered = appendSignatureImageToContractText(
         'Contrato renderizado\n\n**Data de emissao:** 01/10/2026',
         signature,
         'Empresa Teste',
-        'Empresa Teste Ltda.'
+        'Empresa Teste Ltda.',
+        'Maria da Silva Santos'
       );
 
       expect(rendered).toContain('<img src="data:image/png;base64,');
-      expect(rendered).toContain('NOME FANTASIA: Empresa Teste');
-      expect(rendered).toContain('CONTRATANTE / RAZAO SOCIAL: Empresa Teste Ltda.');
-      expect(rendered.indexOf('NOME FANTASIA:')).toBeLessThan(rendered.indexOf('CONTRATANTE / RAZAO SOCIAL:'));
+      expect(rendered).toContain('CONTRATANTE / RAZÃO SOCIAL: Empresa Teste Ltda.');
+      expect(rendered).toContain('REPRESENTANTE LEGAL: Maria da Silva Santos');
+      expect(rendered).not.toContain('NOME FANTASIA');
+      expect(rendered.indexOf('RAZÃO SOCIAL:')).toBeLessThan(rendered.indexOf('REPRESENTANTE LEGAL:'));
     });
 
     it('substitui bloco de assinatura anterior sem duplicar imagem', () => {

@@ -29,6 +29,8 @@ export type PublicSearchResultItem = {
   state?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  /** Endereço completo da sede (rua, número, bairro, cidade - UF, CEP), usado para posicionar o mapa. */
+  address_line?: string | null;
   is_verified?: boolean;
   is_founder?: boolean;
   effective_plan_code?: string | null;
@@ -163,12 +165,12 @@ export function DirectoryAllBusinesses({
             ) : totalPages > 1 ? (
               <>
                 Mostrando <strong className="text-amber-950 font-bold">{startItem}–{endItem}</strong> de{' '}
-                <strong className="text-amber-950 font-bold">{total}</strong> empresas cadastradas no Guia.
+                <strong className="text-amber-950 font-bold">{total}</strong> empresas cadastradas na Plataforma.
               </>
             ) : (
               <>
                 Exibindo <strong className="text-amber-950 font-bold">{total}</strong>{' '}
-                {total === 1 ? 'empresa cadastrada' : 'empresas cadastradas'} no Guia.
+                {total === 1 ? 'empresa cadastrada' : 'empresas cadastradas'} na Plataforma.
               </>
             )}
           </p>
@@ -178,17 +180,15 @@ export function DirectoryAllBusinesses({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setViewMode('grid')}
-            className={`p-2 rounded-md border text-xs font-semibold flex items-center gap-1 ${
-              viewMode === 'grid' ? 'bg-amber-950 text-white border-amber-950' : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
+            className={`p-2 rounded-md border text-xs font-semibold flex items-center gap-1 ${viewMode === 'grid' ? 'bg-amber-950 text-white border-amber-950' : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
           >
             <Grid className="w-4 h-4" /> Grid
           </button>
           <button
             onClick={() => setViewMode('list')}
-            className={`p-2 rounded-md border text-xs font-semibold flex items-center gap-1 ${
-              viewMode === 'list' ? 'bg-amber-950 text-white border-amber-950' : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
+            className={`p-2 rounded-md border text-xs font-semibold flex items-center gap-1 ${viewMode === 'list' ? 'bg-amber-950 text-white border-amber-950' : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
           >
             <List className="w-4 h-4" /> Lista
           </button>
@@ -394,11 +394,10 @@ export function DirectoryAllBusinesses({
                     key={pageNum}
                     onClick={() => updateFilters({ page: pageNum })}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`min-w-[34px] sm:min-w-[38px] h-9 sm:h-9 px-2 text-xs sm:text-sm font-semibold rounded-lg transition-all flex items-center justify-center ${
-                      isActive
-                        ? 'bg-[#3B0B14] text-[#C9A227] border border-[#C9A227]/40 shadow-sm font-bold scale-105'
-                        : 'bg-white text-stone-700 border border-stone-300 hover:bg-stone-50 hover:text-amber-950 hover:border-amber-900/30'
-                    }`}
+                    className={`min-w-[34px] sm:min-w-[38px] h-9 sm:h-9 px-2 text-xs sm:text-sm font-semibold rounded-lg transition-all flex items-center justify-center ${isActive
+                      ? 'bg-[#3B0B14] text-[#C9A227] border border-[#C9A227]/40 shadow-sm font-bold scale-105'
+                      : 'bg-white text-stone-700 border border-stone-300 hover:bg-stone-50 hover:text-amber-950 hover:border-amber-900/30'
+                      }`}
                   >
                     {pageNum}
                   </button>

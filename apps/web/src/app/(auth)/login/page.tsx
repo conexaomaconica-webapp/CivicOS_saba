@@ -66,13 +66,19 @@ export default function LoginPage() {
       } = await supabase.auth.getUser();
 
       if (user) {
+        // Já está logado e veio de uma página que pediu login: volta direto para ela, sem passar pela Central de Acessos.
+        const target = sanitizeInternalRedirect(new URLSearchParams(window.location.search).get('redirect'));
+        if (target) {
+          router.replace(target);
+          return;
+        }
         setActiveUser(user);
         await checkUserPermissions(user.id);
       }
       setCheckingSession(false);
     };
     void checkSession();
-  }, [supabase]);
+  }, [supabase, router]);
 
   const handleLogout = async () => {
     setLoading(true);
@@ -134,6 +140,13 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  // Mantém o destino (redirect) ao ir para o cadastro de membro.
+  const [registerHref, setRegisterHref] = useState('/register');
+  useEffect(() => {
+    const target = sanitizeInternalRedirect(new URLSearchParams(window.location.search).get('redirect'));
+    setRegisterHref(target ? `/register?redirect=${encodeURIComponent(target)}` : '/register');
+  }, []);
 
   if (checkingSession) {
     return (
@@ -359,6 +372,10 @@ export default function LoginPage() {
       {/* Link de Cadastro */}
       <div className="text-center text-xs text-stone-400 pt-2 border-t border-[#C9A227]/20 flex items-center justify-center gap-1">
         <span>Ainda não possui uma conta?</span>
+        <Link href={registerHref} className="text-[#C9A227] font-bold hover:underline">
+          Cadastre-se grátis como membro
+        </Link>
+        <span aria-hidden="true">·</span>
         <Link href="/anunciar/passo-1" className="text-[#C9A227] font-bold hover:underline">
           Anunciar Empresa
         </Link>

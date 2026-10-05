@@ -29,20 +29,25 @@ export function DirectoryMapExplore({ businesses = [], selectedCity }: Directory
     null;
 
   const hasCoordinates = selectedBiz?.latitude != null && selectedBiz?.longitude != null;
+  // Prioridade: coordenadas > endereço completo da sede. Só em último caso busca por nome + cidade,
+  // que pode cair em outro estabelecimento ou categoria homônima.
+  const locationQuery = (b: PublicSearchResultItem): string => {
+    if (b.latitude != null && b.longitude != null) return `${b.latitude},${b.longitude}`;
+    if (b.address_line) return b.address_line;
+    return `${b.name}, ${[b.city, b.state].filter(Boolean).join(' - ') || selectedCity || 'Brasil'}`;
+  };
   const mapQuery = selectedBiz
-    ? hasCoordinates
-      ? `${selectedBiz.latitude},${selectedBiz.longitude}`
-      : `${selectedBiz.name}, ${selectedBiz.city || selectedCity || 'Brasil'}`
+    ? locationQuery(selectedBiz)
     : selectedCity
     ? `Empresas em ${selectedCity}`
     : 'Brasil';
+  // Com coordenadas ou endereço o mapa aproxima mais (pino exato); sem eles, só a região.
+  const mapZoom = selectedBiz && (hasCoordinates || selectedBiz.address_line) ? 16 : 14;
 
-  const embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+  const embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&t=&z=${mapZoom}&ie=UTF8&iwloc=&output=embed`;
 
   const handleTravarRota = (b: PublicSearchResultItem) => {
-    const query = b.latitude != null && b.longitude != null
-      ? `${b.latitude},${b.longitude}`
-      : `${b.name}, ${b.city || ''} ${b.state || ''}`;
+    const query = locationQuery(b);
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query)}`, '_blank');
   };
 

@@ -83,7 +83,7 @@ export default async function PublicEventsDirectoryPage({ searchParams }: Props)
             </p>
 
             {/* Barra de Filtro e Busca */}
-            <form action="/guia/eventos" method="GET" className="dh-search-box mt-6 max-w-3xl">
+            <form action="/guia/eventos" method="GET" className="dh-search-box mt-8 max-w-3xl">
               <Search className="w-5 h-5 text-[#c59b27] ml-3 shrink-0" />
               <input
                 type="text"

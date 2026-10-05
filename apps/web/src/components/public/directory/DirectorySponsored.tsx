@@ -35,11 +35,11 @@ export function DirectorySponsored({
       <section className="dh-container dh-mobile-visible-section py-6" id="patrocinadas">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="dh-section-title text-stone-900">Empresas Patrocinadas</h2>
-            <p className="text-xs text-stone-500 mt-1">Parceiros em destaque e empresas pilares da nossa rede.</p>
+            <h2 className="dh-section-title text-stone-900">Empresas - Pedra Fundamental</h2>
+            <p className="text-xs text-stone-500 mt-1">Empresas fundadoras que impulsionam nossa rede.</p>
           </div>
           <span className="hidden sm:inline-flex text-[11px] font-semibold text-amber-900 bg-amber-100/80 px-2.5 py-1 rounded-full border border-amber-200">
-            ♾️ Destaques da Plataforma
+            ♾️ Empresas Fundadoras
           </span>
         </div>
 

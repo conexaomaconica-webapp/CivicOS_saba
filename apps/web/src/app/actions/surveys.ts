@@ -1,6 +1,7 @@
 'use server';
 
 import { createServerSideClient } from '@/lib/supabase/server';
+import { getQuestionChoices } from '@/lib/surveys/conditional';
 import { resolveRequestOperationalTenantId } from '@/lib/tenant/tenant-policy';
 import { dispatchNotificationAction } from '@/lib/notifications/notification-service';
 
@@ -355,7 +356,15 @@ export async function submitSurveyResponseAction(payload: SurveyResponseSubmissi
         completed_at: new Date().toISOString(),
       });
 
-    if (rErr) throw new Error('Erro ao registrar resposta principal.');
+    if (rErr) {
+      console.error('[submitSurveyResponseAction] insert survey_responses falhou:', {
+        code: rErr.code,
+        message: rErr.message,
+        details: rErr.details,
+        hint: rErr.hint,
+      });
+      throw new Error('Erro ao registrar resposta principal.');
+    }
 
     const answersToInsert = payload.answers.map((ans) => ({
       response_id: responseId,
@@ -499,6 +508,16 @@ export async function saveSurveyQuestionAction(
       if (error) throw error;
       if (!updatedQuestion) throw new Error('A pergunta não foi atualizada. Verifique suas permissões e tente novamente.');
     } else {
+      // Nova pergunta vai para o fim do bloco (antes todas recebiam 99, e o empate deixava a ordem indefinida).
+      const { data: lastInBlock } = await (supabase as any)
+        .from('survey_questions')
+        .select('order_index')
+        .eq('block_id', questionData.block_id)
+        .order('order_index', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextOrderIndex = (Number(lastInBlock?.order_index) || 0) + 1;
+
       const { data: newQ, error } = await (supabase as any)
         .from('survey_questions')
         .insert({
@@ -506,7 +525,7 @@ export async function saveSurveyQuestionAction(
           question_text: questionData.question_text,
           help_text: questionData.help_text || null,
           question_type: questionData.question_type,
-          order_index: 99,
+          order_index: nextOrderIndex,
           is_required: questionData.is_required ?? false,
           is_active: questionData.is_active ?? true,
           allow_other: questionData.allow_other ?? false,
@@ -635,7 +654,12 @@ export async function getSurveyAnalyticsAction(surveyId: string, versionNumber?:
 
     const survey = detailRes.data;
 
-    let query = (supabase as any).from('survey_responses').select('id, version_number').eq('survey_id', surveyId);
+    let query = (supabase as any)
+      .from('survey_responses')
+      .select('id, version_number, completed_at, consent_research, consent_commercial')
+      .eq('survey_id', surveyId)
+      .order('completed_at', { ascending: true })
+      .limit(10000);
     if (versionNumber) {
       query = query.eq('version_number', versionNumber);
     }
@@ -646,14 +670,41 @@ export async function getSurveyAnalyticsAction(surveyId: string, versionNumber?:
     const responseIds = (responses || []).map((r: any) => r.id);
 
     let answers: any[] = [];
-    if (responseIds.length > 0) {
-      const { data: aData, error: aErr } = await (supabase as any)
-        .from('survey_answers')
-        .select('*')
-        .in('response_id', responseIds);
-      if (aErr) throw aErr;
-      answers = aData || [];
+    // Lotes pequenos: evita URL gigante no .in() e o limite de linhas por requisição do PostgREST.
+    const ANSWER_BATCH = 15;
+    const batches: string[][] = [];
+    for (let i = 0; i < responseIds.length; i += ANSWER_BATCH) {
+      batches.push(responseIds.slice(i, i + ANSWER_BATCH));
     }
+    const batchResults = await Promise.all(
+      batches.map((ids) =>
+        (supabase as any)
+          .from('survey_answers')
+          .select('response_id, question_id, answer_value, selected_options, other_text')
+          .in('response_id', ids)
+          .limit(5000)
+      )
+    );
+    for (const { data: aData, error: aErr } of batchResults) {
+      if (aErr) throw aErr;
+      answers.push(...(aData || []));
+    }
+
+    const dayFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' });
+    const dayCounts: Record<string, number> = {};
+    const versionCounts: Record<number, number> = {};
+    let consentResearchCount = 0;
+    let consentCommercialCount = 0;
+    (responses || []).forEach((r: any) => {
+      if (r.completed_at) {
+        const day = dayFormatter.format(new Date(r.completed_at));
+        dayCounts[day] = (dayCounts[day] || 0) + 1;
+      }
+      versionCounts[r.version_number] = (versionCounts[r.version_number] || 0) + 1;
+      if (r.consent_research) consentResearchCount++;
+      if (r.consent_commercial) consentCommercialCount++;
+    });
+    const completedDates = (responses || []).map((r: any) => r.completed_at).filter(Boolean) as string[];
 
     const blockSummaries = (survey.blocks || []).map((block) => {
       const questionSummaries = (block.questions || []).map((q) => {
@@ -693,6 +744,7 @@ export async function getSurveyAnalyticsAction(surveyId: string, versionNumber?:
           question_text: q.question_text,
           question_type: q.question_type,
           total_answers: totalAnswers,
+          option_labels: Object.fromEntries(getQuestionChoices(q).map((o) => [o.value, o.label])),
           option_counts: optionCounts,
           text_samples: textSamples,
           average_rating: ratingCount > 0 ? Number((ratingSum / ratingCount).toFixed(1)) : 0,
@@ -710,6 +762,16 @@ export async function getSurveyAnalyticsAction(surveyId: string, versionNumber?:
       survey_id: surveyId,
       total_responses: totalResponses,
       version_number: versionNumber || survey.current_version,
+      responses_by_day: Object.entries(dayCounts)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, count]) => ({ date, count })),
+      consent_research_count: consentResearchCount,
+      consent_commercial_count: consentCommercialCount,
+      first_response_at: completedDates[0] ?? null,
+      last_response_at: completedDates[completedDates.length - 1] ?? null,
+      responses_by_version: Object.entries(versionCounts)
+        .map(([v, count]) => ({ version_number: Number(v), count }))
+        .sort((a, b) => a.version_number - b.version_number),
       block_summaries: blockSummaries,
     };
 

@@ -8,6 +8,9 @@ import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { StructuredData } from '@/components/seo/StructuredData';
+import { formatMeetingDay, formatMeetingTime } from '@/lib/lodges/format';
+import { canonicalPotencyCode } from '@/lib/lodges/potency';
+import { LodgeLogoZoom } from '@/components/public/directory/LodgeLogoZoom';
 import '@/styles/directory-home.css';
 
 function appUrl(path: string) {
@@ -27,16 +30,6 @@ function contactHref(type: string, value: string): string | null {
 
 type Props = {
   params: Promise<{ slug: string }>;
-};
-
-const DAY_LABELS: Record<string, string> = {
-  segunda: 'Segunda-feira',
-  terca: 'Terça-feira',
-  quarta: 'Quarta-feira',
-  quinta: 'Quinta-feira',
-  sexta: 'Sexta-feira',
-  sabado: 'Sábado',
-  domingo: 'Domingo',
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -70,6 +63,16 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
   const supabase = await createServerSideClient();
   const tenantBrand = await resolveTenantBrandContext();
 
+  // Membro = qualquer pessoa com sessão ativa (cadastro gratuito). Ela vê os dados marcados como reservados.
+  let isMember = false;
+  try {
+    const { data: authData } = await supabase.auth.getUser();
+    isMember = Boolean(authData?.user);
+  } catch {}
+  const returnPath = `/guia/lojas/${slug}`;
+  const loginHref = `/login?redirect=${encodeURIComponent(returnPath)}`;
+  const registerHref = `/register?redirect=${encodeURIComponent(returnPath)}`;
+
   let lodge: any = null;
   try {
     const { data: rpcLodge } = await (supabase as any).rpc('public_lodge_detail', {
@@ -99,19 +102,19 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
         slug: rawOrg.slug || rawOrg.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         name: rawOrg.name,
         code_number: rawOrg.code_number,
-        potency: rawOrg.potency,
-        potency_name: rawOrg.potency,
+        potency: canonicalPotencyCode(rawOrg.potency),
+        potency_name: canonicalPotencyCode(rawOrg.potency),
         rite: rawOrg.rite,
         foundation_date: rawOrg.foundation_date,
         city: rawOrg.city,
         state: rawOrg.state,
         cep: rawOrg.cep,
-        address: rawOrg.show_address ? rawOrg.address : null,
+        address: rawOrg.show_address || isMember ? rawOrg.address : null,
         latitude: rawOrg.latitude,
         longitude: rawOrg.longitude,
         logo_url: rawOrg.logo_url,
         cover_url: rawOrg.cover_url,
-        worshipful_master_name: rawOrg.show_worshipful_master ? rawOrg.worshipful_master_name : null,
+        worshipful_master_name: rawOrg.show_worshipful_master || isMember ? rawOrg.worshipful_master_name : null,
         show_worshipful_master: rawOrg.show_worshipful_master,
         show_address: rawOrg.show_address,
         contacts: rawContacts || [],
@@ -170,13 +173,12 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
           </nav>
 
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-            <div className="w-24 h-24 rounded-2xl bg-white p-2 shadow-xl shrink-0 overflow-hidden flex items-center justify-center border-2 border-amber-300">
-              {lodge.logo_url ? (
-                <img src={lodge.logo_url} alt={lodge.name} className="w-full h-full object-contain rounded-xl" />
-              ) : (
-                <Landmark className="w-12 h-12 text-[#3b0b14]" />
-              )}
-            </div>
+            <LodgeLogoZoom
+              logoUrl={lodge.logo_url}
+              lodgeName={lodge.name}
+              className="w-24 h-24 rounded-2xl bg-white p-2 shadow-xl border-2 border-amber-300"
+              fallbackIconClassName="w-12 h-12 text-[#3b0b14]"
+            />
 
             <div className="space-y-2 flex-1">
               <div className="flex items-center gap-2 flex-wrap text-xs font-bold text-amber-300">
@@ -219,9 +221,9 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
                     {lodge.meetings.map((m: any) => (
                       <div key={m.id} className="p-3 bg-amber-50/60 border border-amber-200/70 rounded-xl text-xs">
                         <p className="font-bold text-stone-900">
-                          {DAY_LABELS[m.day.toLowerCase()] || m.day} {m.time ? `às ${m.time}` : ''}
+                          {formatMeetingDay(m.day, m.label)} {m.time ? `às ${formatMeetingTime(m.time)}` : ''}
                         </p>
-                        {m.label && <p className="text-stone-600 text-[11px] mt-0.5">{m.label}</p>}
+                        {m.label && !/do mês$/i.test(m.label) && <p className="text-stone-600 text-[11px] mt-0.5">{m.label}</p>}
                       </div>
                     ))}
                   </div>
@@ -238,8 +240,20 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
                     <p className="text-stone-500 font-medium">Venerável Mestre</p>
                     <p className="font-bold text-stone-900 text-sm">{lodge.worshipful_master_name}</p>
                   </div>
+                ) : lodge.show_worshipful_master === false && !isMember ? (
+                  <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-stone-700 space-y-2">
+                    <p>A administração desta loja é visível apenas para membros cadastrados.</p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-bold">
+                      <Link href={loginHref} className="text-amber-900 hover:underline">Entrar</Link>
+                      <Link href={registerHref} className="text-amber-900 hover:underline">Cadastre-se grátis</Link>
+                    </div>
+                  </div>
                 ) : (
-                  <p className="text-xs text-stone-500">Administração restrita a membros autorizados.</p>
+                  <p className="text-xs text-stone-500">
+                    {isMember && lodge.show_worshipful_master === false
+                      ? 'O Venerável Mestre desta loja ainda não foi informado.'
+                      : 'Administração não informada.'}
+                  </p>
                 )}
               </div>
             </div>
@@ -254,6 +268,12 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
 
             {lodge.address ? (
               <p className="text-sm font-semibold text-stone-800">{lodge.address} — {lodge.city}, {lodge.state}</p>
+            ) : lodge.show_address === false && !isMember ? (
+              <p className="text-xs text-stone-600">
+                O endereço completo é visível apenas para membros cadastrados.{' '}
+                <Link href={loginHref} className="font-bold text-amber-900 hover:underline">Entrar</Link>{' · '}
+                <Link href={registerHref} className="font-bold text-amber-900 hover:underline">Cadastre-se grátis</Link>
+              </p>
             ) : (
               <p className="text-xs text-stone-500">Endereço no Oriente de {lodge.city} - {lodge.state}.</p>
             )}

@@ -15,6 +15,10 @@ export type LodgeFilterState = {
 type LodgeFiltersProps = {
   filters: LodgeFilterState;
   availableCities?: string[];
+  /** UFs que têm lojas cadastradas (ex.: ['BA', 'SP']). */
+  availableStates?: string[];
+  /** Cidades de cada UF, para a lista de cidades acompanhar o estado escolhido. */
+  citiesByState?: Record<string, string[]>;
   potencies?: { id: string; slug: string; name: string; abbreviation: string }[];
   rites?: { id: string; slug: string; name: string }[];
   onChange: (newFilters: LodgeFilterState) => void;
@@ -22,6 +26,14 @@ type LodgeFiltersProps = {
   onApply?: () => void;
   isMobileDrawer?: boolean;
   onCloseMobile?: () => void;
+};
+
+export const STATE_NAMES: Record<string, string> = {
+  AC: 'Acre', AL: 'Alagoas', AP: 'Amapá', AM: 'Amazonas', BA: 'Bahia', CE: 'Ceará', DF: 'Distrito Federal',
+  ES: 'Espírito Santo', GO: 'Goiás', MA: 'Maranhão', MT: 'Mato Grosso', MS: 'Mato Grosso do Sul',
+  MG: 'Minas Gerais', PA: 'Pará', PB: 'Paraíba', PR: 'Paraná', PE: 'Pernambuco', PI: 'Piauí',
+  RJ: 'Rio de Janeiro', RN: 'Rio Grande do Norte', RS: 'Rio Grande do Sul', RO: 'Rondônia', RR: 'Roraima',
+  SC: 'Santa Catarina', SP: 'São Paulo', SE: 'Sergipe', TO: 'Tocantins',
 };
 
 const DAYS_OF_WEEK = [
@@ -37,6 +49,8 @@ const DAYS_OF_WEEK = [
 export function LodgeFilters({
   filters,
   availableCities = [],
+  availableStates = [],
+  citiesByState = {},
   potencies = [],
   rites = [],
   onChange,
@@ -67,6 +81,35 @@ export function LodgeFilters({
         </button>
       </div>
 
+      {/* Estado */}
+      {availableStates.length > 0 && (
+        <div className="space-y-2">
+          <label htmlFor="lodge-filter-state" className="text-xs font-bold text-stone-800 uppercase tracking-wider flex items-center gap-1.5">
+            <MapPin className="w-3.5 h-3.5 text-amber-900" />
+            <span>Estado</span>
+          </label>
+          <select
+            id="lodge-filter-state"
+            value={filters.state || ''}
+            onChange={(e) => {
+              const state = e.target.value || undefined;
+              // Se a cidade escolhida não pertence ao novo estado, ela é limpa.
+              const stateCities = state ? citiesByState[state] || [] : [];
+              const keepCity = !state || (filters.city ? stateCities.includes(filters.city) : true);
+              onChange({ ...filters, state, city: keepCity ? filters.city : undefined });
+            }}
+            className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-900 font-medium"
+          >
+            <option value="">Todos os Estados</option>
+            {availableStates.map((uf) => (
+              <option key={uf} value={uf}>
+                {uf} — {STATE_NAMES[uf] || uf}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Cidade */}
       <div className="space-y-2">
         <label className="text-xs font-bold text-stone-800 uppercase tracking-wider flex items-center gap-1.5">
@@ -79,7 +122,7 @@ export function LodgeFilters({
           className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-900 font-medium"
         >
           <option value="">Todas as Cidades</option>
-          {availableCities.map((c) => (
+          {(filters.state && citiesByState[filters.state] ? citiesByState[filters.state]! : availableCities).map((c) => (
             <option key={c} value={c}>
               {c}
             </option>
@@ -101,7 +144,7 @@ export function LodgeFilters({
           <option value="">Todas as Potências</option>
           {potencies.map((p) => (
             <option key={p.id} value={p.slug}>
-              {p.abbreviation} - {p.name}
+              {p.name && p.name !== p.abbreviation ? `${p.name} - ${p.abbreviation}` : p.abbreviation}
             </option>
           ))}
         </select>

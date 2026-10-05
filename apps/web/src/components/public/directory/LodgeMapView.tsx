@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Landmark, MapPin, Navigation, Calendar, ChevronRight } from 'lucide-react';
 import type { LodgeCardData } from './LodgeCard';
+import { formatMeetingDay, formatMeetingTime } from '@/lib/lodges/format';
+import { canonicalPotencyCode } from '@/lib/lodges/potency';
 
 type LodgeMapViewProps = {
   items: LodgeCardData[];
@@ -50,7 +52,7 @@ export function LodgeMapView({ items }: LodgeMapViewProps) {
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1 text-[10px] font-bold text-amber-900">
-                  {lodge.potency && <span>{lodge.potency}</span>}
+                  {lodge.potency && <span>{canonicalPotencyCode(lodge.potency)}</span>}
                   {lodge.rite && <span>• {lodge.rite}</span>}
                 </div>
                 <h5 className="font-serif font-bold text-gray-900 text-xs truncate">{lodge.name}</h5>
@@ -95,7 +97,7 @@ export function LodgeMapView({ items }: LodgeMapViewProps) {
             {/* Popup Info Card */}
             <div className="mt-3 bg-white/95 backdrop-blur-md border border-stone-200 rounded-2xl p-4 shadow-xl max-w-sm mx-auto text-left space-y-2">
               <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-900">
-                {selectedLodge.potency && <span className="bg-amber-50 px-2 py-0.5 rounded border border-amber-200">{selectedLodge.potency}</span>}
+                {selectedLodge.potency && <span className="bg-amber-50 px-2 py-0.5 rounded border border-amber-200">{canonicalPotencyCode(selectedLodge.potency)}</span>}
                 {selectedLodge.rite && <span className="bg-stone-100 px-2 py-0.5 rounded text-stone-700">{selectedLodge.rite}</span>}
               </div>
 
@@ -108,7 +110,7 @@ export function LodgeMapView({ items }: LodgeMapViewProps) {
               {selectedLodge.primary_meeting?.day && (
                 <p className="text-xs text-stone-700 font-medium flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5 text-amber-800" />
-                  <span>Reuniões: {selectedLodge.primary_meeting.day} {selectedLodge.primary_meeting.time ? `• ${selectedLodge.primary_meeting.time}` : ''}</span>
+                  <span>Reuniões: {formatMeetingDay(selectedLodge.primary_meeting.day, selectedLodge.primary_meeting.label)} {selectedLodge.primary_meeting.time ? `• ${formatMeetingTime(selectedLodge.primary_meeting.time)}` : ''}</span>
                 </p>
               )}
 

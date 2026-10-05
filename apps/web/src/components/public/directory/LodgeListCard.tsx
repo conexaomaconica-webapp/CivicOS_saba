@@ -2,26 +2,19 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Landmark, MapPin, Calendar, User, Navigation, ChevronRight, ShieldCheck } from 'lucide-react';
+import { MapPin, Calendar, User, Navigation, ChevronRight, ShieldCheck } from 'lucide-react';
 import type { LodgeCardData } from './LodgeCard';
+import { formatMeetingDay, formatMeetingTime } from '@/lib/lodges/format';
+import { canonicalPotencyCode } from '@/lib/lodges/potency';
+import { LodgeLogoZoom } from './LodgeLogoZoom';
 
 type LodgeListCardProps = {
   data: LodgeCardData;
 };
 
-const DAY_LABELS: Record<string, string> = {
-  segunda: 'Segunda-feira',
-  terca: 'Terça-feira',
-  quarta: 'Quarta-feira',
-  quinta: 'Quinta-feira',
-  sexta: 'Sexta-feira',
-  sabado: 'Sábado',
-  domingo: 'Domingo',
-};
-
 export function LodgeListCard({ data }: LodgeListCardProps) {
-  const meetingDay = data.primary_meeting?.day ? DAY_LABELS[data.primary_meeting.day.toLowerCase()] || data.primary_meeting.day : null;
-  const meetingTime = data.primary_meeting?.time || null;
+  const meetingDay = formatMeetingDay(data.primary_meeting?.day, data.primary_meeting?.label);
+  const meetingTime = formatMeetingTime(data.primary_meeting?.time);
 
   const mapsUrl = data.latitude && data.longitude
     ? `https://www.google.com/maps/search/?api=1&query=${data.latitude},${data.longitude}`
@@ -33,20 +26,18 @@ export function LodgeListCard({ data }: LodgeListCardProps) {
     <article className="group bg-white border border-stone-200 rounded-2xl p-4 sm:p-5 shadow-2xs hover:shadow-md hover:border-amber-300 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       {/* Esquerda: Avatar / Brasão + Informações Principais */}
       <div className="flex items-start gap-4 flex-1">
-        <div className={`w-16 h-16 rounded-xl border border-stone-200 shadow-2xs flex items-center justify-center shrink-0 overflow-hidden p-1 ${data.logo_url ? 'bg-white' : 'bg-gradient-to-br from-amber-50 to-stone-100'}`}>
-          {data.logo_url ? (
-            <img src={data.logo_url} alt={data.name} className="max-w-full max-h-full object-contain object-center" />
-          ) : (
-            <Landmark className="w-8 h-8 text-[#3b0b14]" />
-          )}
-        </div>
+        <LodgeLogoZoom
+          logoUrl={data.logo_url}
+          lodgeName={data.name}
+          className={`w-16 h-16 rounded-xl border border-stone-200 shadow-2xs p-1 ${data.logo_url ? 'bg-white' : 'bg-gradient-to-br from-amber-50 to-stone-100'}`}
+        />
 
         <div className="space-y-1.5 flex-1">
           {/* Tags Potência + Rito + Destaque */}
           <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-semibold text-amber-900">
             {data.potency && (
               <span className="bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                {data.potency}
+                {canonicalPotencyCode(data.potency)}
               </span>
             )}
             {data.rite && (

@@ -3,36 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  Plus,
-  Eye,
-  Send,
-  CheckCircle2,
-  AlertTriangle,
-  Edit3,
-  Trash2,
-  Copy,
-  Smartphone,
-  Monitor,
-  X,
-  Loader2,
-  Layers,
-  CircleDot,
-  CheckSquare,
-  ListFilter,
-  ToggleLeft,
-  Star,
-  FileText,
-  AlignLeft,
-  Calendar,
-  MousePointer,
-  PenTool,
-  Settings,
-  Image as ImageIcon,
-  ArrowUp,
-  ArrowDown,
-  FolderInput,
-} from 'lucide-react';
+import { Plus, Eye, Send, CheckCircle2, AlertTriangle, Edit3, Trash2, Copy, Smartphone, Monitor, X, Loader2, Layers, CircleDot, CheckSquare, ListFilter, ToggleLeft, Star, FileText, AlignLeft, Calendar, MousePointer, PenTool, Settings, Image as ImageIcon, ArrowUp, ArrowDown, FolderInput, GitBranch } from 'lucide-react';
 import type { Survey, SurveyQuestion } from '@/types/surveys';
 import {
   toggleQuestionActiveAction,
@@ -47,6 +18,7 @@ import {
   uploadSurveyBrandAssetAction,
 } from '@/app/actions/surveys';
 import { optimizeImageForUpload } from '@/lib/media/optimize-image';
+import { getQuestionChoices } from '@/lib/surveys/conditional';
 import { systemConfirm } from '@/components/system/SystemFeedback';
 
 function cleanBlockTitle(title: string): string {
@@ -164,6 +136,7 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
       is_required: q.is_required,
       is_active: true,
       allow_other: q.allow_other,
+      conditional_rules: q.conditional_rules || null,
       options: q.options?.map((opt) => ({ label: opt.label, value: opt.value })),
     });
     setSaving(false);
@@ -219,6 +192,15 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
   const handleSaveQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingQuestion || !editingQuestion.question_text?.trim() || !selectedBlockId) return;
+
+    const rule = editingQuestion.conditional_rules;
+    if (rule && (!rule.depends_on_question_id || (rule.expected_values || []).length === 0)) {
+      setMessage({
+        type: 'error',
+        text: 'Lógica condicional incompleta: escolha a pergunta-gatilho e marque ao menos uma opção, ou desative a regra.',
+      });
+      return;
+    }
 
     setSaving(true);
     setMessage(null);
@@ -519,6 +501,46 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
 
   const currentType = editingQuestion?.question_type || 'short_text';
 
+  // Perguntas que podem servir de gatilho para a pergunta em edição: de escolha, com opções,
+  // e que venham ANTES dela (blocos anteriores ou posição anterior no mesmo bloco).
+  const eligibleTriggers: SurveyQuestion[] = (() => {
+    if (!editingQuestion) return [];
+    const orderedBlocks = [...(survey.blocks || [])].sort((a, b) => a.order_index - b.order_index);
+    const flat: SurveyQuestion[] = [];
+    let cutoff = -1;
+    for (const block of orderedBlocks) {
+      const qs = [...(block.questions || [])].sort(
+        (a, b) => a.order_index - b.order_index || (a.created_at || '').localeCompare(b.created_at || '')
+      );
+      for (const q of qs) {
+        if (editingQuestion.id && q.id === editingQuestion.id) cutoff = flat.length;
+        else flat.push(q);
+      }
+      // Pergunta nova: gatilhos podem ser qualquer pergunta até o fim do bloco selecionado.
+      if (!editingQuestion.id && block.id === selectedBlockId) cutoff = flat.length;
+    }
+    const before = cutoff >= 0 ? flat.slice(0, cutoff) : flat;
+    return before.filter(
+      (q) =>
+        ['single_choice', 'multiple_choice', 'dropdown', 'boolean'].includes(q.question_type) &&
+        getQuestionChoices(q).length > 0
+    );
+  })();
+  const conditionalRule = editingQuestion?.conditional_rules || null;
+  const selectedTrigger = conditionalRule
+    ? (survey.blocks || []).flatMap((b) => b.questions || []).find((q) => q.id === conditionalRule.depends_on_question_id)
+    : undefined;
+
+  const toggleExpectedValue = (value: string) => {
+    if (!editingQuestion || !conditionalRule) return;
+    const current = conditionalRule.expected_values || [];
+    const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
+    setEditingQuestion({
+      ...editingQuestion,
+      conditional_rules: { ...conditionalRule, expected_values: next },
+    });
+  };
+
   return (
     <div className="se-container">
       {/* Top Header */}
@@ -716,6 +738,21 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
                               <span className="se-q-text">{q.question_text}</span>
                               {q.is_required && <span className="se-badge-req">Obrigatória</span>}
                               {!q.is_active && <span className="se-badge-hidden">Ocultada</span>}
+                              {q.conditional_rules?.depends_on_question_id && (() => {
+                                const rule = q.conditional_rules!;
+                                const trigger = (survey.blocks || []).flatMap((b) => b.questions || []).find((t) => t.id === rule.depends_on_question_id);
+                                const labels = trigger
+                                  ? getQuestionChoices(trigger).filter((c) => (rule.expected_values || []).includes(c.value)).map((c) => c.label)
+                                  : [];
+                                return (
+                                  <span
+                                    className="se-cond-badge"
+                                    title={trigger ? `Aparece se “${trigger.question_text}” = ${labels.join(', ') || '(nenhuma opção marcada)'}` : 'Pergunta-gatilho não encontrada'}
+                                  >
+                                    <GitBranch size={11} /> Condicional{trigger ? ` · ${trigger.question_text.slice(0, 28)}${trigger.question_text.length > 28 ? '…' : ''} = ${labels.join(', ') || '?'}` : ' · gatilho removido'}
+                                  </span>
+                                );
+                              })()}
                             </div>
                             {q.help_text && <p className="se-q-help">{q.help_text}</p>}
                             <div className="se-q-meta">
@@ -856,6 +893,87 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
                   onChange={(e) => setEditingQuestion({ ...editingQuestion, help_text: e.target.value })}
                   placeholder="Ex: Marque a opção correspondente ao seu grau regular"
                 />
+              </div>
+
+              {/* Lógica condicional: quando esta pergunta aparece */}
+              <div className="se-cond-box" id="se-conditional-logic">
+                <div className="se-cond-title">
+                  <GitBranch size={15} />
+                  <span>Lógica condicional — quando esta pergunta deve aparecer?</span>
+                </div>
+                <label className="se-checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={!!conditionalRule}
+                    disabled={eligibleTriggers.length === 0 && !conditionalRule}
+                    onChange={(e) =>
+                      setEditingQuestion({
+                        ...editingQuestion,
+                        conditional_rules: e.target.checked
+                          ? { depends_on_question_id: eligibleTriggers[0]?.id || '', expected_values: [] }
+                          : null,
+                      })
+                    }
+                  />
+                  <span>Mostrar apenas se uma pergunta anterior for respondida de certa forma</span>
+                </label>
+
+                {!conditionalRule && (
+                  <p className="se-cond-hint">
+                    {eligibleTriggers.length === 0
+                      ? 'Indisponível por enquanto: antes desta pergunta precisa existir uma pergunta de escolha (opção única, múltipla, lista ou Sim/Não) já salva com suas alternativas. Salve a pergunta-gatilho primeiro e volte aqui.'
+                      : 'Sem regra: a pergunta aparece sempre para todos os participantes.'}
+                  </p>
+                )}
+
+                {conditionalRule && (
+                  <div className="se-cond-fields">
+                    <label className="se-label">Se a pergunta</label>
+                    <select
+                      className="se-select"
+                      value={conditionalRule.depends_on_question_id}
+                      onChange={(e) =>
+                        setEditingQuestion({
+                          ...editingQuestion,
+                          conditional_rules: { depends_on_question_id: e.target.value, expected_values: [] },
+                        })
+                      }
+                    >
+                      {!eligibleTriggers.some((q) => q.id === conditionalRule.depends_on_question_id) && (
+                        <option value={conditionalRule.depends_on_question_id}>
+                          {selectedTrigger ? selectedTrigger.question_text : 'Selecione a pergunta…'}
+                        </option>
+                      )}
+                      {eligibleTriggers.map((q) => (
+                        <option key={q.id} value={q.id}>
+                          {q.question_text}
+                        </option>
+                      ))}
+                    </select>
+
+                    <label className="se-label">for respondida com (qualquer uma das marcadas)</label>
+                    <div className="se-cond-options">
+                      {(selectedTrigger ? getQuestionChoices(selectedTrigger) : []).map((opt) => (
+                        <label key={opt.value} className="se-checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={(conditionalRule.expected_values || []).includes(opt.value)}
+                            onChange={() => toggleExpectedValue(opt.value)}
+                          />
+                          <span>{opt.label}</span>
+                        </label>
+                      ))}
+                      {!selectedTrigger && (
+                        <p className="se-cond-hint">Selecione uma pergunta-gatilho válida.</p>
+                      )}
+                    </div>
+                    {selectedTrigger && (conditionalRule.expected_values || []).length === 0 && (
+                      <p className="se-cond-hint se-cond-hint--warn">
+                        Marque ao menos uma opção; sem isso a regra é ignorada e a pergunta aparece sempre.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* SELETOR PRINCIPAL: CLICAR VS PREENCHER */}
@@ -1690,6 +1808,13 @@ export function SurveyEditorClient({ initialSurvey }: Props) {
         .se-live-opts { display: flex; flex-direction: column; gap: 0.375rem; margin-top: 0.25rem; }
         .se-live-opt-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: #374151; cursor: not-allowed; }
 
+        .se-cond-box { display: flex; flex-direction: column; gap: 0.625rem; padding: 0.875rem; background: #FAF8F5; border: 1px solid #E5E0D8; border-radius: 10px; }
+        .se-cond-title { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; font-weight: 800; color: #3B0B14; }
+        .se-cond-badge { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.6875rem; font-weight: 700; color: #7C4A03; background: #FEF3C7; border: 1px solid #FCD34D; padding: 0.125rem 0.5rem; border-radius: 20px; }
+        .se-cond-fields { display: flex; flex-direction: column; gap: 0.5rem; }
+        .se-cond-options { display: flex; flex-direction: column; gap: 0.375rem; padding: 0.5rem 0.625rem; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; max-height: 180px; overflow-y: auto; }
+        .se-cond-hint { margin: 0; font-size: 0.75rem; color: #6B7280; }
+        .se-cond-hint--warn { color: #B45309; }
         .se-config-row { display: flex; gap: 1.5rem; padding-top: 0.5rem; border-top: 1px solid #E5E7EB; }
         .se-checkbox-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; font-weight: 600; color: #374151; cursor: pointer; }
 

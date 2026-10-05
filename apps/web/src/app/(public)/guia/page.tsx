@@ -15,7 +15,8 @@ import { DirectoryCategories, type DirectoryCategoryItem } from '@/components/pu
 import { DirectorySponsored, type DirectorySponsoredItem } from '@/components/public/directory/DirectorySponsored';
 import { DirectoryAllBusinesses, type PublicSearchResultItem } from '@/components/public/directory/DirectoryAllBusinesses';
 import { DirectoryMapExplore } from '@/components/public/directory/DirectoryMapExplore';
-import { DirectoryLodgesGuide, type PublicMasonicLodgeItem } from '@/components/public/directory/DirectoryLodgesGuide';
+import { DirectoryLodgesGuide } from '@/components/public/directory/DirectoryLodgesGuide';
+import { fetchLodgeFacets } from '@/lib/lodges/facets';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
 import { DirectoryFavoritesModal } from '@/components/public/directory/DirectoryFavoritesModal';
@@ -61,7 +62,7 @@ function pickHeadquarters(
 
 function SectionDivider() {
   return (
-    <div className="dh-container py-10 sm:py-16 my-2">
+    <div className="dh-container py-5 sm:py-8 my-2">
       <div className="w-full h-px bg-gradient-to-r from-transparent via-amber-900/20 to-transparent" />
     </div>
   );
@@ -76,8 +77,6 @@ export default async function GuiaPage({ searchParams }: Props) {
   const benefits = params.benefits === 'true';
   const sort = params.sort || 'relevance';
   const page = parseInt(params.page || '1', 10) || 1;
-  const potency = params.potency || '';
-  const rite = params.rite || '';
 
   const headersList = await headers();
   const host = headersList.get('host') ?? 'localhost:3000';
@@ -102,7 +101,7 @@ export default async function GuiaPage({ searchParams }: Props) {
   const configuredPageSize = Math.min(100, Math.max(1, Number(directPublicSettings?.default_page_size) || 12));
 
   // Parallel RPC execution
-  const [homeDataRes, searchRes, lodgesRes] = await Promise.all([
+  const [homeDataRes, searchRes, lodgeFacets] = await Promise.all([
     (supabase as any).rpc('public_directory_home_data', {
       p_host: host,
       p_city: city || null,
@@ -118,14 +117,8 @@ export default async function GuiaPage({ searchParams }: Props) {
       p_page: page,
       p_page_size: configuredPageSize,
     }),
-    (supabase as any).rpc('public_organizations_search', {
-      p_host: host,
-      p_city: city || null,
-      p_potency: potency || null,
-      p_rite: rite || null,
-      p_page: 1,
-      p_page_size: 12,
-    }),
+    // Opções reais dos filtros da seção "Guia de Lojas" (a lista de lojas só carrega depois de filtrar).
+    fetchLodgeFacets(supabase),
   ]);
 
   const homeData: any = homeDataRes.data || {
@@ -250,15 +243,6 @@ export default async function GuiaPage({ searchParams }: Props) {
     };
   }
 
-  const lodgesData: any = lodgesRes.data || {
-    items: [],
-    total: 0,
-    page: 1,
-    page_size: 12,
-    total_pages: 1,
-    has_next_page: false,
-    has_previous_page: false,
-  };
 
   const settings = {
     ...(homeData.settings || {}),
@@ -324,23 +308,38 @@ export default async function GuiaPage({ searchParams }: Props) {
       )
     : [];
 
-  // Fallback para Banners se a RPC falhar ou retornar vazio
-  if (!banners || banners.length === 0) {
+  // Banner sem imagem utilizável (a RPC devolve null quando a URL é rejeitada) quebraria o carrossel.
+  // Imagens de protótipo (/visual-lab/...) não existem em produção e também não servem.
+  const isUsableBannerImage = (url: unknown): url is string =>
+    typeof url === 'string' && url.trim().length > 0 && !url.startsWith('/visual-lab/');
+  banners = (banners || []).filter((banner) => isUsableBannerImage(banner?.image_desktop_url));
+
+  // Fallback para Banners se a RPC falhar, retornar vazio ou só trouxer banners sem imagem válida
+  if (banners.length === 0) {
     try {
       const { data: dbBanners } = await (supabase as any)
         .from('directory_banners')
-        .select('id, title, subtitle, cta_text, cta_url, image_desktop_url')
+        .select('id, title, subtitle, cta_text, cta_url, image_desktop_url, image_mobile_url, start_at, end_at')
         .eq('is_active', true)
         .order('display_order');
 
-      if (dbBanners && dbBanners.length > 0) {
-        banners = dbBanners.map((b: any) => ({
+      const now = Date.now();
+      const scheduled = (dbBanners || []).filter(
+        (b: any) =>
+          isUsableBannerImage(b.image_desktop_url) &&
+          (!b.start_at || new Date(b.start_at).getTime() <= now) &&
+          (!b.end_at || new Date(b.end_at).getTime() >= now),
+      );
+
+      if (scheduled.length > 0) {
+        banners = scheduled.map((b: any) => ({
           id: b.id,
           title: b.title,
           subtitle: b.subtitle,
           cta_text: b.cta_text,
           cta_url: b.cta_url,
           image_desktop_url: b.image_desktop_url,
+          image_mobile_url: b.image_mobile_url || null,
         }));
       }
     } catch (_banErr) {}
@@ -427,8 +426,44 @@ export default async function GuiaPage({ searchParams }: Props) {
 
   console.log('[GuiaPage Server Log] availableCities immediately before render:', availableCities);
 
-  const businessItems = (searchData.items as PublicSearchResultItem[]) || [];
-  const lodgeItems = (lodgesData.items as PublicMasonicLodgeItem[]) || [];
+  let businessItems = (searchData.items as PublicSearchResultItem[]) || [];
+
+  // O mapa precisa do endereço da sede de cada empresa. A busca só devolve cidade/UF/coordenadas
+  // (e empresas novas costumam não ter coordenadas), então completamos com business_locations.
+  if (businessItems.length > 0) {
+    try {
+      const { data: locRows } = await (supabase as any)
+        .from('business_locations')
+        .select('business_id, street, number, neighborhood, city, state, postal_code, latitude, longitude, is_headquarters, created_at')
+        .in('business_id', businessItems.map((b) => b.id))
+        .order('is_headquarters', { ascending: false })
+        .order('created_at', { ascending: true });
+
+      const headquartersByBusiness = new Map<string, any>();
+      for (const row of locRows || []) {
+        if (!headquartersByBusiness.has(row.business_id)) headquartersByBusiness.set(row.business_id, row);
+      }
+
+      businessItems = businessItems.map((item) => {
+        const loc = headquartersByBusiness.get(item.id);
+        if (!loc) return item;
+        const street = [loc.street, loc.number].filter(Boolean).join(', ');
+        const cityState = [loc.city, loc.state].filter(Boolean).join(' - ');
+        const addressLine = [street, loc.neighborhood, cityState, loc.postal_code, 'Brasil']
+          .filter(Boolean)
+          .join(', ');
+        return {
+          ...item,
+          city: item.city ?? loc.city ?? null,
+          state: item.state ?? loc.state ?? null,
+          latitude: item.latitude ?? loc.latitude ?? null,
+          longitude: item.longitude ?? loc.longitude ?? null,
+          address_line: loc.street ? addressLine : null,
+        };
+      });
+    } catch (_locErr) {}
+  }
+
 
   return (
     <FavoritesProvider>
@@ -505,7 +540,7 @@ export default async function GuiaPage({ searchParams }: Props) {
         <SectionDivider />
 
         {/* Guia de Lojas Maçônicas */}
-        <DirectoryLodgesGuide lodges={lodgeItems} availableCities={availableCities} />
+        <DirectoryLodgesGuide facets={lodgeFacets} />
 
         {/* Footer */}
         <DirectoryFooter />

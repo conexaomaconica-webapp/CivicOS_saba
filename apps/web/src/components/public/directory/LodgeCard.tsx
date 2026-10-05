@@ -2,7 +2,10 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Landmark, MapPin, Calendar, User, Navigation, ChevronRight, ShieldCheck } from 'lucide-react';
+import { MapPin, Calendar, User, Navigation, ChevronRight, ShieldCheck } from 'lucide-react';
+import { formatMeetingDay, formatMeetingTime } from '@/lib/lodges/format';
+import { canonicalPotencyCode } from '@/lib/lodges/potency';
+import { LodgeLogoZoom } from './LodgeLogoZoom';
 
 export type LodgeMeetingData = {
   day?: string | null;
@@ -36,19 +39,9 @@ type LodgeCardProps = {
   variant?: 'featured' | 'compact';
 };
 
-const DAY_LABELS: Record<string, string> = {
-  segunda: 'Segunda-feira',
-  terca: 'Terça-feira',
-  quarta: 'Quarta-feira',
-  quinta: 'Quinta-feira',
-  sexta: 'Sexta-feira',
-  sabado: 'Sábado',
-  domingo: 'Domingo',
-};
-
 export function LodgeCard({ data, variant: _variant = 'compact' }: LodgeCardProps) {
-  const meetingDay = data.primary_meeting?.day ? DAY_LABELS[data.primary_meeting.day.toLowerCase()] || data.primary_meeting.day : null;
-  const meetingTime = data.primary_meeting?.time || null;
+  const meetingDay = formatMeetingDay(data.primary_meeting?.day, data.primary_meeting?.label);
+  const meetingTime = formatMeetingTime(data.primary_meeting?.time);
 
   const mapsUrl = data.latitude && data.longitude
     ? `https://www.google.com/maps/search/?api=1&query=${data.latitude},${data.longitude}`
@@ -59,39 +52,43 @@ export function LodgeCard({ data, variant: _variant = 'compact' }: LodgeCardProp
   return (
     <article className="group bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-2xs hover:shadow-md hover:border-amber-300 transition-all flex flex-col justify-between h-full relative">
       {/* Imagem de Capa ou Banner Institucional */}
-      <div className="relative h-28 w-full bg-gradient-to-r from-[#3b0b14] via-[#5d1523] to-[#2b060d] overflow-hidden">
-        {data.cover_url ? (
-          <img src={data.cover_url} alt={data.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-80" />
-        ) : (
-          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fef3c7_1px,transparent_1px)] [background-size:12px_12px]" />
-        )}
+      {/* O recorte (overflow-hidden) fica só na capa; o brasão é irmão dela para não ser cortado ao "vazar" para o conteúdo. */}
+      <div className="relative">
+        <div className="relative h-28 w-full bg-gradient-to-r from-[#3b0b14] via-[#5d1523] to-[#2b060d] overflow-hidden">
+          {data.cover_url ? (
+            <img src={data.cover_url} alt={data.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-80" />
+          ) : (
+            <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fef3c7_1px,transparent_1px)] [background-size:12px_12px]" />
+          )}
 
-        {/* Badge de Destaque */}
-        {data.is_featured && (
-          <div className="absolute top-2.5 right-2.5 bg-amber-400/95 backdrop-blur-xs text-amber-950 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 shadow-sm">
-            <ShieldCheck className="w-3 h-3" />
-            <span>Loja em Destaque</span>
-          </div>
-        )}
+          {/* Badge de Destaque */}
+          {data.is_featured && (
+            <div className="absolute top-2.5 right-2.5 bg-amber-400/95 backdrop-blur-xs text-amber-950 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 shadow-sm">
+              <ShieldCheck className="w-3 h-3" />
+              <span>Loja em Destaque</span>
+            </div>
+          )}
+        </div>
 
         {/* Avatar / Brasão da Loja */}
-        <div className="absolute -bottom-5 left-4 w-14 h-14 rounded-xl bg-white border-2 border-stone-100 shadow-md flex items-center justify-center overflow-hidden p-1">
-          {data.logo_url ? (
-            <img src={data.logo_url} alt={data.name} className="max-w-full max-h-full object-contain object-center" />
-          ) : (
-            <Landmark className="w-7 h-7 text-[#3b0b14]" />
-          )}
+        <div className="absolute -bottom-7 left-4 z-10">
+          <LodgeLogoZoom
+            logoUrl={data.logo_url}
+            lodgeName={data.name}
+            className="w-16 h-16 rounded-xl bg-white border-2 border-stone-100 shadow-md p-1.5"
+            fallbackIconClassName="w-8 h-8 text-[#3b0b14]"
+          />
         </div>
       </div>
 
       {/* Conteúdo do Card */}
-      <div className="p-4 pt-7 flex-1 flex flex-col justify-between space-y-3">
+      <div className="p-4 pt-10 flex-1 flex flex-col justify-between space-y-3">
         <div>
           {/* Tag Potência + Rito */}
           <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-semibold text-amber-900 mb-1">
             {data.potency && (
               <span className="bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                {data.potency}
+                {canonicalPotencyCode(data.potency)}
               </span>
             )}
             {data.rite && (

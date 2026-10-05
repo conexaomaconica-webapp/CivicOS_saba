@@ -119,7 +119,8 @@ export function appendSignatureImageToContractText(
   renderedText: string,
   signatureImageData: string,
   fantasyName: string,
-  contractorLegalName?: string | null
+  contractorLegalName?: string | null,
+  representativeName?: string | null
 ): string {
   const text = String(renderedText || '').trim();
   const signature = String(signatureImageData || '').trim();
@@ -129,8 +130,10 @@ export function appendSignatureImageToContractText(
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-  const tradeName = escapeHtml(String(fantasyName || '').trim());
+  // Abaixo da assinatura vão a razão social e o nome completo do responsável (nome fantasia só como reserva
+  // quando a razão social não estiver cadastrada).
   const legalName = escapeHtml(String(contractorLegalName || fantasyName || '').trim());
+  const representative = escapeHtml(String(representativeName || '').trim());
 
   if (!text) {
     throw new Error('Texto contratual renderizado e obrigatorio para anexar assinatura.');
@@ -147,8 +150,8 @@ export function appendSignatureImageToContractText(
 <section data-contract-signature="representante-legal" style="margin-top:40px;text-align:center;page-break-inside:avoid">
   <img src="${signature}" alt="Assinatura eletronica do representante legal" style="display:block;max-width:320px;max-height:130px;margin:0 auto 6px;object-fit:contain" />
   <div style="width:360px;max-width:100%;margin:0 auto;border-top:1px solid #333;padding-top:6px;font-size:12px;font-weight:bold">
-    <div>NOME FANTASIA: ${tradeName || 'NAO INFORMADO'}</div>
-    <div>CONTRATANTE / RAZAO SOCIAL: ${legalName || 'CONTRATANTE'}</div>
+    <div>CONTRATANTE / RAZÃO SOCIAL: ${legalName || 'CONTRATANTE'}</div>${representative ? `
+    <div>REPRESENTANTE LEGAL: ${representative}</div>` : ''}
   </div>
 </section>`;
 }

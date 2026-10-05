@@ -7,6 +7,7 @@ import { AsaasPaymentProvider } from './asaas-payment-provider';
 import { getAsaasDynamicConfig } from './asaas-config-service';
 import type { CreditCardPayload } from './payment-provider.interface';
 import { buildOnboardingPaymentReference } from './payment-idempotency';
+import { MIN_PUBLIC_LINK_TOKEN_LENGTH } from '@/lib/security/public-link-token';
 import {
   COMMERCIAL_STATUS,
   assertCommercialStatusTransition,
@@ -65,7 +66,7 @@ export async function createCommercialOnboardingChargeAction(
 ): Promise<CreateCommercialOnboardingChargeResult> {
   try {
     const cleanToken = payload?.token?.trim();
-    if (!cleanToken || cleanToken.length < 20) {
+    if (!cleanToken || cleanToken.length < MIN_PUBLIC_LINK_TOKEN_LENGTH) {
       return { success: false, error: 'Token de sessão inválido ou não informado.' };
     }
 

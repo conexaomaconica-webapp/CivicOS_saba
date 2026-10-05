@@ -1,8 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Landmark, MapPin, Calendar, Navigation, Info, Filter } from 'lucide-react';
+import React, { useState, useTransition } from 'react';
+import Link from 'next/link';
+import { Search, Loader2, ArrowRight, Landmark } from 'lucide-react';
+import { searchHomeLodgesAction, type HomeLodgeSearchResult } from '@/app/actions/home-lodges';
+import { LodgeCard } from './LodgeCard';
+import { STATE_NAMES } from './LodgeFilters';
+import type { LodgeGuideFacets } from '@/lib/lodges/facets';
+import { EMPTY_LODGE_FACETS } from '@/lib/lodges/facets';
 
 export type PublicMasonicLodgeItem = {
   id: string;
@@ -21,174 +26,190 @@ export type PublicMasonicLodgeItem = {
 };
 
 type DirectoryLodgesGuideProps = {
-  lodges?: PublicMasonicLodgeItem[];
-  availableCities?: string[];
-  onFilterChange?: (filters: { city?: string; potency?: string; rite?: string }) => void;
+  /** Opções reais dos filtros, vindas de todas as lojas publicadas (não só das exibidas). */
+  facets?: LodgeGuideFacets;
 };
 
-export function DirectoryLodgesGuide({
-  lodges = [],
-  availableCities = [],
-  onFilterChange,
-}: DirectoryLodgesGuideProps) {
-  const router = useRouter();
+const DAYS_OF_WEEK = [
+  { value: 'segunda', label: 'Segunda-feira' },
+  { value: 'terca', label: 'Terça-feira' },
+  { value: 'quarta', label: 'Quarta-feira' },
+  { value: 'quinta', label: 'Quinta-feira' },
+  { value: 'sexta', label: 'Sexta-feira' },
+  { value: 'sabado', label: 'Sábado' },
+  { value: 'domingo', label: 'Domingo' },
+];
+
+export function DirectoryLodgesGuide({ facets = EMPTY_LODGE_FACETS }: DirectoryLodgesGuideProps) {
+  const [state, setState] = useState('');
   const [city, setCity] = useState('');
   const [potency, setPotency] = useState('');
   const [rite, setRite] = useState('');
+  const [day, setDay] = useState('');
+  const [result, setResult] = useState<HomeLodgeSearchResult | null>(null);
+  const [searchedParams, setSearchedParams] = useState('');
+  const [isPending, startTransition] = useTransition();
 
-  const handleApply = (e: React.FormEvent) => {
+  const hasFilter = Boolean(state || city || potency || rite || day);
+  const cityOptions = state ? facets.citiesByState[state] || [] : facets.cities;
+
+  const handleStateChange = (value: string) => {
+    setState(value);
+    // Cidade que não pertence ao novo estado é limpa.
+    if (value && city && !(facets.citiesByState[value] || []).includes(city)) setCity('');
+  };
+
+  const handleClear = () => {
+    setState('');
+    setCity('');
+    setPotency('');
+    setRite('');
+    setDay('');
+    setResult(null);
+    setSearchedParams('');
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (onFilterChange) {
-      onFilterChange({ city, potency, rite });
-      return;
-    }
+    if (!hasFilter) return;
     const params = new URLSearchParams();
+    if (state) params.set('state', state);
     if (city) params.set('city', city);
     if (potency) params.set('potency', potency);
     if (rite) params.set('rite', rite);
-    router.push(`/guia/lojas${params.size ? `?${params.toString()}` : ''}`);
+    if (day) params.set('day', day);
+    setSearchedParams(params.toString());
+    startTransition(async () => {
+      setResult(await searchHomeLodgesAction({ state, city, potency, rite, day }));
+    });
   };
 
-  const lodgeCities = Array.from(new Set([
-    ...availableCities,
-    ...lodges.map((lodge) => lodge.city).filter((value): value is string => Boolean(value)),
-  ])).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  const lodgePotencies = Array.from(new Set(
-    lodges.map((lodge) => lodge.potency).filter((value): value is string => Boolean(value))
-  )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  const lodgeRites = Array.from(new Set(
-    lodges.map((lodge) => lodge.rite).filter((value): value is string => Boolean(value))
-  )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const selectClass = 'dh-filter-select';
 
   return (
     <section className="dh-container py-4" id="lojas">
       <div>
         <h2 className="dh-section-title">Guia de Lojas Maçônicas</h2>
         <p className="text-xs text-gray-500 mt-1">
-          Encontre lojas, orientes e informações para sua visita institucional.
+          Encontre lojas, orientes e informações para sua visita institucional
+          {facets.total > 0 ? ` — ${facets.total} ${facets.total === 1 ? 'loja cadastrada' : 'lojas cadastradas'}.` : '.'}
         </p>
       </div>
 
-      {/* Filter Bar */}
-      <form onSubmit={handleApply} className="dh-filter-bar my-6">
+      {/* Barra de filtros com dados reais */}
+      <form onSubmit={handleSearch} className="dh-filter-bar my-6">
         <div className="flex flex-wrap items-center gap-3 flex-1">
-          <select
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            className="dh-filter-select"
-          >
+          <select value={state} onChange={(e) => handleStateChange(e.target.value)} className={selectClass} aria-label="Estado">
+            <option value="">Todos os Estados</option>
+            {facets.states.map((uf) => (
+              <option key={uf} value={uf}>
+                {uf} — {STATE_NAMES[uf] || uf}
+              </option>
+            ))}
+          </select>
+
+          <select value={city} onChange={(e) => setCity(e.target.value)} className={selectClass} aria-label="Cidade">
             <option value="">Todas as Cidades</option>
-            {lodgeCities.map((c) => (
+            {cityOptions.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
             ))}
           </select>
 
-          <select
-            value={potency}
-            onChange={(e) => setPotency(e.target.value)}
-            className="dh-filter-select"
-          >
+          <select value={potency} onChange={(e) => setPotency(e.target.value)} className={selectClass} aria-label="Potência">
             <option value="">Todas as Potências</option>
-            {lodgePotencies.map((item) => (
-              <option key={item} value={item}>{item}</option>
+            {facets.potencies.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
             ))}
           </select>
 
-          <select
-            value={rite}
-            onChange={(e) => setRite(e.target.value)}
-            className="dh-filter-select"
-          >
+          <select value={rite} onChange={(e) => setRite(e.target.value)} className={selectClass} aria-label="Rito">
             <option value="">Todos os Ritos</option>
-            {lodgeRites.map((item) => (
-              <option key={item} value={item}>{item}</option>
+            {facets.rites.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+
+          <select value={day} onChange={(e) => setDay(e.target.value)} className={selectClass} aria-label="Dia da reunião">
+            <option value="">Qualquer dia de reunião</option>
+            {DAYS_OF_WEEK.map((d) => (
+              <option key={d.value} value={d.value}>
+                {d.label}
+              </option>
             ))}
           </select>
         </div>
 
-        <button
-          type="submit"
-          className="bg-amber-900 text-white font-bold text-xs px-4 py-2 rounded-md hover:bg-amber-800 transition-colors flex items-center gap-1.5"
-        >
-          <Filter className="w-3.5 h-3.5" /> Aplicar filtros
-        </button>
+        <div className="flex items-center gap-2">
+          {hasFilter && (
+            <button type="button" onClick={handleClear} className="text-xs font-semibold text-stone-500 hover:text-amber-900 px-2 py-2">
+              Limpar
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={!hasFilter || isPending}
+            className="bg-amber-900 text-white font-bold text-xs px-4 py-2 rounded-md hover:bg-amber-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+          >
+            {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+            Buscar lojas
+          </button>
+        </div>
       </form>
 
-      {/* Cards Grid */}
-      {lodges.length === 0 ? (
+      {/* Resultado: só aparece depois de filtrar */}
+      {!result && !isPending && (
+        <div className="bg-white border border-dashed border-stone-300 rounded-xl p-8 text-center text-xs text-stone-500 flex flex-col items-center gap-2">
+          <Landmark className="w-6 h-6 text-amber-900/60" />
+          <span>Escolha estado, cidade, potência, rito ou dia de reunião e clique em <strong>Buscar lojas</strong>.</span>
+          <Link href="/guia/lojas" className="font-bold text-amber-900 hover:underline">
+            Ou veja o diretório completo de lojas →
+          </Link>
+        </div>
+      )}
+
+      {isPending && (
+        <div className="bg-white border rounded-xl p-8 text-center text-xs text-stone-500 flex items-center justify-center gap-2" role="status">
+          <Loader2 className="w-4 h-4 animate-spin text-amber-900" /> Buscando lojas…
+        </div>
+      )}
+
+      {result && !isPending && !result.success && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center text-xs text-red-700" role="alert">
+          {result.error}
+        </div>
+      )}
+
+      {result && !isPending && result.success && result.items.length === 0 && (
         <div className="bg-white border rounded-xl p-8 text-center text-xs text-gray-500">
           Nenhuma Loja Maçônica encontrada com os filtros selecionados.
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {lodges.map((lodge) => {
-            const mapHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-              lodge.latitude != null && lodge.longitude != null
-                ? `${lodge.latitude},${lodge.longitude}`
-                : `${lodge.name}, ${lodge.address || lodge.city || 'Brasil'}`
-            )}`;
+      )}
 
-            return (
-              <div key={lodge.id} className="dh-lodge-card">
-                <div>
-                  <div className="w-12 h-12 bg-amber-50 text-amber-900 rounded-xl flex items-center justify-center mb-4 border border-amber-200">
-                    <Landmark className="w-6 h-6" />
-                  </div>
-
-                  <h3 className="font-bold text-gray-900 text-base">
-                    {lodge.name} {lodge.code_number ? `nº ${lodge.code_number}` : ''}
-                  </h3>
-                  
-                  {lodge.potency && (
-                    <span className="inline-block mt-1 text-[11px] font-bold text-amber-900 bg-amber-100/60 px-2 py-0.5 rounded">
-                      {lodge.potency}
-                    </span>
-                  )}
-
-                  <div className="space-y-1.5 mt-4 text-xs text-gray-600">
-                    {lodge.city && (
-                      <div className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        <span>{lodge.city}{lodge.state ? `, ${lodge.state}` : ''}</span>
-                      </div>
-                    )}
-                    {lodge.meeting_schedule && (
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        <span>{lodge.meeting_schedule}</span>
-                      </div>
-                    )}
-                    {lodge.rite && (
-                      <div className="flex items-center gap-1.5 text-gray-500">
-                        <span>Rito: <strong>{lodge.rite}</strong></span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 mt-6 pt-4 border-t border-gray-100">
-                  <button
-                    onClick={() => alert(`Informações da loja: ${lodge.name}\nPotência: ${lodge.potency || 'N/A'}\nReuniões: ${lodge.meeting_schedule || 'N/A'}`)}
-                    className="flex items-center justify-center gap-1 text-xs font-bold text-gray-700 bg-gray-50 border border-gray-200 py-2 rounded-md hover:bg-gray-100 transition-colors"
-                  >
-                    <Info className="w-3.5 h-3.5" /> Ver informações
-                  </button>
-                  
-                  <a
-                    href={mapHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1 text-xs font-bold text-amber-900 bg-amber-50 border border-amber-200 py-2 rounded-md hover:bg-amber-100 transition-colors"
-                  >
-                    <Navigation className="w-3.5 h-3.5 text-amber-800" /> Traçar rota
-                  </a>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      {result && !isPending && result.success && result.items.length > 0 && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {result.items.map((lodge) => (
+              <LodgeCard key={lodge.id} data={lodge} />
+            ))}
+          </div>
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-600">
+            <span>
+              Mostrando {result.items.length} de {result.total} {result.total === 1 ? 'loja' : 'lojas'}.
+            </span>
+            <Link
+              href={`/guia/lojas${searchedParams ? `?${searchedParams}` : ''}`}
+              className="inline-flex items-center gap-1 font-bold text-amber-900 hover:underline"
+            >
+              Ver {result.total > result.items.length ? `todas as ${result.total} lojas` : 'no diretório'} <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </>
       )}
     </section>
   );

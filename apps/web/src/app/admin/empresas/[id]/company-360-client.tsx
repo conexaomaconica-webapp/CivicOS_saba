@@ -533,7 +533,7 @@ export default function Company360Client({ initialData }: Props) {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
-    const safeFantasyName = data.business.name
+    const safeRepresentativeName = (data.owner?.full_name || '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
@@ -548,8 +548,8 @@ export default function Company360Client({ initialData }: Props) {
           <p style="font-family:Georgia,serif;font-weight:bold;color:#3B0B14">ASSINATURA ELETRÔNICA DO REPRESENTANTE LEGAL</p>
           <img src="${data.contract.signature_image_data}" alt="Assinatura do representante legal" style="display:block;max-width:320px;max-height:130px;margin:12px auto 4px;object-fit:contain" />
           <div style="width:360px;max-width:100%;margin:0 auto;border-top:1px solid #333;padding-top:6px;font-size:11px;font-weight:bold">
-            <div>NOME FANTASIA: ${safeFantasyName}</div>
-            <div>CONTRATANTE / RAZÃO SOCIAL: ${safeLegalName}</div>
+            <div>CONTRATANTE / RAZÃO SOCIAL: ${safeLegalName}</div>${safeRepresentativeName ? `
+            <div>REPRESENTANTE LEGAL: ${safeRepresentativeName}</div>` : ''}
           </div>
         </div>`
       : '';

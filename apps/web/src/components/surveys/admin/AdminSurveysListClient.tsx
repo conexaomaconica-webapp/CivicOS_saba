@@ -22,6 +22,7 @@ import {
   FileText,
   Upload,
   MessageSquareText,
+  BarChart3,
 } from 'lucide-react';
 import type { Survey } from '@/types/surveys';
 import {
@@ -365,6 +366,13 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
                   </Link>
 
                   <div className="asl-footer-btns">
+                    <Link
+                      href={`/admin/pesquisas/${survey.id}/resultados`}
+                      className="asl-btn-public"
+                      title="Ver resultados e gráficos"
+                    >
+                      <BarChart3 size={14} />
+                    </Link>
                     <button
                       type="button"
                       onClick={() => handleToggleStatus(survey)}

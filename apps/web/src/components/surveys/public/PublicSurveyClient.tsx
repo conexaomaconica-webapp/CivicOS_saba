@@ -9,13 +9,110 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react';
-import type { Survey, SurveyBlock } from '@/types/surveys';
+import type { Survey, SurveyBlock, SurveyQuestion } from '@/types/surveys';
+import { isQuestionVisible, BOOLEAN_OPTIONS } from '@/lib/surveys/conditional';
 import { submitSurveyResponseAction } from '@/app/actions/surveys';
 
 export function cleanBlockTitle(title: string): string {
   if (!title) return '';
   return title.replace(/^bloco\s+[a-z0-9]+\s*[-—–:]\s*/i, '').trim() || title;
 }
+
+const PS_STYLES = `
+        .ps-container {
+          max-width: 680px; margin: 0 auto; padding: 1.5rem 1rem 5rem; font-family: var(--font-sans, sans-serif);
+        }
+        .ps-progress-bar-wrap {
+          position: sticky; top: 0.5rem; z-index: 50; background: rgba(59, 11, 20, 0.95);
+          backdrop-filter: blur(8px); border: 1px solid rgba(201, 162, 39, 0.3); border-radius: 14px;
+          padding: 0.75rem 1rem; margin-bottom: 1.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        .ps-progress-info { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; font-weight: 700; color: #FFFFFF; margin-bottom: 0.5rem; }
+        .ps-brand-wrap { display: flex; align-items: center; gap: 0.5rem; }
+        .ps-brand-icon { width: 18px; height: 18px; object-fit: contain; }
+        .ps-brand { color: #C9A227; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.6875rem; }
+        .ps-progress-track { height: 6px; background: rgba(255,255,255,0.15); border-radius: 4px; overflow: hidden; }
+        .ps-progress-fill { height: 100%; background: linear-gradient(90deg, #C9A227 0%, #E6C659 100%); transition: width 0.3s ease; }
+
+        .ps-card { background: #FFFFFF; border: 1px solid #E5E0D8; border-radius: 20px; padding: 0 1.5rem 2rem; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.04); }
+        .ps-banner-wrap { margin: 0 -1.5rem; overflow: hidden; }
+        .ps-banner-img { display: block; width: 100%; aspect-ratio: 3 / 1; object-fit: cover; }
+        .ps-header { text-align: center; margin: 0 -1.5rem 1.5rem; padding: 1.75rem 1.5rem; }
+        .ps-logo-row { display: flex; margin-bottom: 1rem; }
+        .ps-logo-row--left { justify-content: flex-start; }
+        .ps-logo-row--center { justify-content: center; }
+        .ps-logo-row--right { justify-content: flex-end; }
+        .ps-logo-container { display: flex; justify-content: center; align-items: center; max-width: 100%; }
+        .ps-logo-container--small { width: 180px; }
+        .ps-logo-container--medium { width: 320px; }
+        .ps-logo-container--large { width: 480px; }
+        .ps-logo-container--full { width: 100%; }
+        .ps-logo-img { max-height: 300px; max-width: 100%; width: 100%; height: auto; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.12)); }
+        .ps-logo-container--small .ps-logo-img { max-height: 80px; }
+        .ps-logo-container--medium .ps-logo-img { max-height: 130px; }
+        .ps-logo-container--large .ps-logo-img { max-height: 210px; }
+        .ps-badge { display: inline-block; background: #3B0B14; color: #C9A227; font-size: 0.6875rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; padding: 0.25rem 0.625rem; border-radius: 6px; margin-bottom: 0.5rem; }
+        .ps-title { font-size: 1.5rem; font-weight: 800; color: #FFFFFF; margin: 0 0 0.5rem; }
+        .ps-subtitle { font-size: 0.875rem; color: rgba(255,255,255,0.82); margin: 0; line-height: 1.5; }
+
+        .ps-alert-error { display: flex; align-items: center; gap: 0.5rem; background: #FEF2F2; color: #991B1B; border: 1px solid #FCA5A5; padding: 0.75rem 1rem; border-radius: 10px; font-size: 0.875rem; font-weight: 600; margin-bottom: 1.5rem; }
+
+        .ps-block-title-box { margin-bottom: 1.5rem; border-left: 4px solid #3B0B14; padding-left: 0.875rem; }
+        .ps-block-title-box h2 { margin: 0; font-size: 1.25rem; font-weight: 800; color: #3B0B14; }
+        .ps-block-title-box p { margin: 0.25rem 0 0; font-size: 0.8125rem; color: #6B5E62; }
+
+        .ps-questions { display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 2rem; }
+        .ps-question-card { background: #FAF8F5; border: 1px solid #E5E0D8; border-radius: 14px; padding: 1.25rem; }
+        .ps-q-label { font-size: 0.9375rem; font-weight: 700; color: #1C0D10; display: block; margin-bottom: 0.375rem; line-height: 1.4; }
+        .ps-q-num { color: #C9A227; font-weight: 800; margin-right: 0.25rem; }
+        .ps-req-star { color: #DC2626; margin-left: 0.25rem; }
+        .ps-q-help { font-size: 0.8125rem; color: #6B5E62; margin: 0 0 0.75rem; }
+
+        .ps-input, .ps-textarea { width: 100%; padding: 0.75rem; border: 1.5px solid #D1D5DB; border-radius: 10px; background: #FFFFFF; font-size: 0.9375rem; color: #111827; transition: border-color 0.15s; }
+        .ps-input:focus, .ps-textarea:focus { outline: none; border-color: #3B0B14; box-shadow: 0 0 0 3px rgba(59,11,20,0.1); }
+
+        .ps-options-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+        .ps-option-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; background: #FFFFFF; border: 1.5px solid #E5E0D8; border-radius: 10px; cursor: pointer; transition: all 0.15s; font-size: 0.875rem; font-weight: 600; color: #374151; }
+        .ps-option-item:hover { border-color: #3B0B14; background: #FFFDF9; }
+        .ps-option-item.selected { border-color: #3B0B14; background: #3B0B14; color: #C9A227; }
+        .ps-option-item input { accent-color: #C9A227; width: 18px; height: 18px; }
+
+        .ps-rating-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin-top: 0.5rem; }
+        .ps-rating-btn { padding: 0.75rem 0; background: #FFFFFF; border: 1.5px solid #E5E0D8; border-radius: 8px; font-weight: 800; font-size: 0.9375rem; color: #1C0D10; cursor: pointer; transition: all 0.15s; text-align: center; }
+        .ps-rating-btn:hover { border-color: #3B0B14; background: #FAF8F5; }
+        .ps-rating-btn.selected { background: #3B0B14; color: #C9A227; border-color: #3B0B14; }
+
+        .ps-nav { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #F0ECE6; }
+        .ps-btn-back { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.25rem; background: #FAF8F5; color: #374151; border: 1px solid #D1D5DB; border-radius: 10px; font-weight: 700; font-size: 0.875rem; cursor: pointer; }
+        .ps-btn-next { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; background: #3B0B14; color: #C9A227; border: 1px solid rgba(201,162,39,0.4); border-radius: 10px; font-weight: 700; font-size: 0.9375rem; cursor: pointer; margin-left: auto; }
+        .ps-btn-next:hover { background: #2A080E; }
+        .ps-btn-submit { display: flex; align-items: center; gap: 0.5rem; padding: 0.875rem 1.75rem; background: #3B0B14; color: #C9A227; border: 1px solid rgba(201,162,39,0.5); border-radius: 12px; font-weight: 800; font-size: 1rem; cursor: pointer; margin-left: auto; }
+
+        .ps-consent-card { background: #FAF8F5; border: 1px solid #E5E0D8; border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .ps-gold-icon { color: #C9A227; }
+        .ps-consent-card h3 { font-size: 1.0625rem; font-weight: 800; color: #3B0B14; margin: 0.5rem 0 1rem; }
+        .ps-checkbox-group { display: flex; flex-direction: column; gap: 1rem; }
+        .ps-checkbox-item { display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; }
+        .ps-checkbox-item input { accent-color: #3B0B14; width: 20px; height: 20px; margin-top: 0.125rem; flex-shrink: 0; }
+        .ps-checkbox-item strong { font-size: 0.875rem; font-weight: 700; color: #111827; display: block; }
+        .ps-checkbox-item p { font-size: 0.8125rem; color: #6B5E62; margin: 0.25rem 0 0; line-height: 1.4; }
+
+        .ps-thankyou-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding-top: 1.5rem; padding-bottom: 1.5rem; }
+        .ps-thankyou-card { background: #FFFFFF; border: 1px solid #E5E0D8; border-radius: 24px; padding: 0 2rem 2.5rem; text-align: center; width: 100%; max-width: 540px; overflow: hidden; box-shadow: 0 20px 30px rgba(0,0,0,0.06); }
+        .ps-thankyou-brand { display: flex; justify-content: center; align-items: center; margin: 0 -2rem 2rem; padding: 1.75rem 1.5rem; }
+        .ps-thankyou-logo { width: 100%; max-width: 280px; max-height: 120px; height: auto; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.12)); }
+        .ps-thankyou-icon { width: 80px; height: 80px; background: #FAF8F5; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; border: 2px solid #E5E0D8; }
+        .ps-tag { font-size: 0.6875rem; font-weight: 800; color: #C9A227; text-transform: uppercase; letter-spacing: 0.1em; background: #3B0B14; padding: 0.25rem 0.75rem; border-radius: 20px; display: inline-block; margin-bottom: 0.75rem; }
+        .ps-thankyou-title { font-size: 1.75rem; font-weight: 800; color: #1C0D10; margin: 0 0 0.75rem; }
+        .ps-thankyou-desc { font-size: 0.9375rem; color: #6B5E62; margin: 0 0 1.5rem; line-height: 1.6; }
+        .ps-thankyou-box { display: flex; align-items: flex-start; gap: 0.75rem; background: #FAF8F5; border: 1px solid #E5E0D8; border-radius: 12px; padding: 1rem; text-align: left; margin-bottom: 1.5rem; }
+        .ps-box-icon { color: #3B0B14; flex-shrink: 0; margin-top: 0.125rem; }
+        .ps-thankyou-box strong { font-size: 0.8125rem; color: #111827; }
+        .ps-thankyou-box p { font-size: 0.75rem; color: #6B5E62; margin: 0.125rem 0 0; }
+        .ps-btn-home { display: inline-block; padding: 0.875rem 2rem; background: #3B0B14; color: #C9A227; border-radius: 12px; font-weight: 800; font-size: 0.9375rem; text-decoration: none; }
+        .ps-spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+`;
 
 interface Props {
   survey: Survey;
@@ -49,9 +146,20 @@ export function PublicSurveyClient({ survey }: Props) {
     return !!triggerAnswer;
   };
 
+  // Regras condicionais por pergunta (conditional_rules)
+  const questionsById = new Map<string, SurveyQuestion>(
+    activeBlocks.flatMap((b) => (b.questions || []).map((q) => [q.id, q] as [string, SurveyQuestion]))
+  );
+  const getVisibleQuestions = (block: SurveyBlock): SurveyQuestion[] =>
+    (block.questions || []).filter((q) => q.is_active && isQuestionVisible(q, questionsById, answers));
+
   // Compute visible blocks array dynamically based on conditional rules
   const getVisibleBlocks = (): SurveyBlock[] => {
     return activeBlocks.filter((block) => {
+      // Bloco cujas perguntas estão todas ocultas por regra não deve ser exibido.
+      const hasQuestions = (block.questions || []).some((q) => q.is_active);
+      if (hasQuestions && getVisibleQuestions(block).length === 0) return false;
+
       const lower = block.title.toLowerCase();
       // If block title contains "negócio" or "bloco b", check if hasBusiness is true
       if (lower.includes('negócio') || lower.includes('bloco b')) {
@@ -93,7 +201,7 @@ export function PublicSurveyClient({ survey }: Props) {
     if (isFinalStep) return consentResearch;
     if (!currentBlock) return true;
 
-    const requiredQuestions = (currentBlock.questions || []).filter((q) => q.is_active && q.is_required);
+    const requiredQuestions = getVisibleQuestions(currentBlock).filter((q) => q.is_required);
     for (const q of requiredQuestions) {
       const ans = answers[q.id];
       if (!ans) return false;
@@ -138,7 +246,13 @@ export function PublicSurveyClient({ survey }: Props) {
     setSubmitting(true);
     setErrorMessage('');
 
-    const formattedAnswers = Object.entries(answers).map(([qId, ans]) => ({
+    // Descarta respostas de perguntas que ficaram ocultas (usuário mudou a resposta-gatilho depois).
+    const formattedAnswers = Object.entries(answers)
+      .filter(([qId]) => {
+        const q = questionsById.get(qId);
+        return !q || isQuestionVisible(q, questionsById, answers);
+      })
+      .map(([qId, ans]) => ({
       question_id: qId,
       answer_value: ans.answer_value || undefined,
       selected_options: ans.selected_options || undefined,
@@ -169,6 +283,14 @@ export function PublicSurveyClient({ survey }: Props) {
     return (
       <div className="ps-container ps-thankyou-wrap">
         <div className="ps-thankyou-card">
+          <div className="ps-thankyou-brand" style={{ backgroundColor: survey.header_color || '#4B161B' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={survey.logo_url || '/logoconexao_red.png'}
+              alt="Conexão Maçônica"
+              className="ps-thankyou-logo"
+            />
+          </div>
           <div className="ps-thankyou-icon">
             <CheckCircle2 size={56} className="ps-gold-icon" />
           </div>
@@ -192,6 +314,7 @@ export function PublicSurveyClient({ survey }: Props) {
             </a>
           </div>
         </div>
+        <style>{PS_STYLES}</style>
       </div>
     );
   }
@@ -259,8 +382,7 @@ export function PublicSurveyClient({ survey }: Props) {
             </div>
 
             <div className="ps-questions">
-              {currentBlock.questions
-                ?.filter((q) => q.is_active)
+              {getVisibleQuestions(currentBlock)
                 .map((q, qIdx) => (
                   <div key={q.id} className="ps-question-card">
                     <label className="ps-q-label">
@@ -335,6 +457,35 @@ export function PublicSurveyClient({ survey }: Props) {
                           );
                         })}
                       </div>
+                    )}
+
+                    {q.question_type === 'boolean' && (
+                      <div className="ps-options-list">
+                        {BOOLEAN_OPTIONS.map((opt) => {
+                          const isSelected = answers[q.id]?.answer_value === opt.value;
+                          return (
+                            <label key={opt.value} className={`ps-option-item ${isSelected ? 'selected' : ''}`}>
+                              <input
+                                type="radio"
+                                name={q.id}
+                                value={opt.value}
+                                checked={isSelected}
+                                onChange={() => handleAnswerChange(q.id, opt.value, 'boolean')}
+                              />
+                              <span>{opt.label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {q.question_type === 'date' && (
+                      <input
+                        type="date"
+                        className="ps-input"
+                        value={answers[q.id]?.answer_value || ''}
+                        onChange={(e) => handleAnswerChange(q.id, e.target.value, 'date')}
+                      />
                     )}
 
                     {q.question_type === 'rating' && (
@@ -439,99 +590,7 @@ export function PublicSurveyClient({ survey }: Props) {
         )}
       </div>
 
-      <style>{`
-        .ps-container {
-          max-width: 680px; margin: 0 auto; padding: 1.5rem 1rem 5rem; font-family: var(--font-sans, sans-serif);
-        }
-        .ps-progress-bar-wrap {
-          position: sticky; top: 0.5rem; z-index: 50; background: rgba(59, 11, 20, 0.95);
-          backdrop-filter: blur(8px); border: 1px solid rgba(201, 162, 39, 0.3); border-radius: 14px;
-          padding: 0.75rem 1rem; margin-bottom: 1.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-        }
-        .ps-progress-info { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; font-weight: 700; color: #FFFFFF; margin-bottom: 0.5rem; }
-        .ps-brand-wrap { display: flex; align-items: center; gap: 0.5rem; }
-        .ps-brand-icon { width: 18px; height: 18px; object-fit: contain; }
-        .ps-brand { color: #C9A227; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.6875rem; }
-        .ps-progress-track { height: 6px; background: rgba(255,255,255,0.15); border-radius: 4px; overflow: hidden; }
-        .ps-progress-fill { height: 100%; background: linear-gradient(90deg, #C9A227 0%, #E6C659 100%); transition: width 0.3s ease; }
-
-        .ps-card { background: #FFFFFF; border: 1px solid #E5E0D8; border-radius: 20px; padding: 0 1.5rem 2rem; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.04); }
-        .ps-banner-wrap { margin: 0 -1.5rem; overflow: hidden; }
-        .ps-banner-img { display: block; width: 100%; aspect-ratio: 3 / 1; object-fit: cover; }
-        .ps-header { text-align: center; margin: 0 -1.5rem 1.5rem; padding: 1.75rem 1.5rem; }
-        .ps-logo-row { display: flex; margin-bottom: 1rem; }
-        .ps-logo-row--left { justify-content: flex-start; }
-        .ps-logo-row--center { justify-content: center; }
-        .ps-logo-row--right { justify-content: flex-end; }
-        .ps-logo-container { display: flex; justify-content: center; align-items: center; max-width: 100%; }
-        .ps-logo-container--small { width: 180px; }
-        .ps-logo-container--medium { width: 320px; }
-        .ps-logo-container--large { width: 480px; }
-        .ps-logo-container--full { width: 100%; }
-        .ps-logo-img { max-height: 300px; max-width: 100%; width: 100%; height: auto; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.12)); }
-        .ps-logo-container--small .ps-logo-img { max-height: 80px; }
-        .ps-logo-container--medium .ps-logo-img { max-height: 130px; }
-        .ps-logo-container--large .ps-logo-img { max-height: 210px; }
-        .ps-badge { display: inline-block; background: #3B0B14; color: #C9A227; font-size: 0.6875rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; padding: 0.25rem 0.625rem; border-radius: 6px; margin-bottom: 0.5rem; }
-        .ps-title { font-size: 1.5rem; font-weight: 800; color: #FFFFFF; margin: 0 0 0.5rem; }
-        .ps-subtitle { font-size: 0.875rem; color: rgba(255,255,255,0.82); margin: 0; line-height: 1.5; }
-
-        .ps-alert-error { display: flex; align-items: center; gap: 0.5rem; background: #FEF2F2; color: #991B1B; border: 1px solid #FCA5A5; padding: 0.75rem 1rem; border-radius: 10px; font-size: 0.875rem; font-weight: 600; margin-bottom: 1.5rem; }
-
-        .ps-block-title-box { margin-bottom: 1.5rem; border-left: 4px solid #3B0B14; padding-left: 0.875rem; }
-        .ps-block-title-box h2 { margin: 0; font-size: 1.25rem; font-weight: 800; color: #3B0B14; }
-        .ps-block-title-box p { margin: 0.25rem 0 0; font-size: 0.8125rem; color: #6B5E62; }
-
-        .ps-questions { display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 2rem; }
-        .ps-question-card { background: #FAF8F5; border: 1px solid #E5E0D8; border-radius: 14px; padding: 1.25rem; }
-        .ps-q-label { font-size: 0.9375rem; font-weight: 700; color: #1C0D10; display: block; margin-bottom: 0.375rem; line-height: 1.4; }
-        .ps-q-num { color: #C9A227; font-weight: 800; margin-right: 0.25rem; }
-        .ps-req-star { color: #DC2626; margin-left: 0.25rem; }
-        .ps-q-help { font-size: 0.8125rem; color: #6B5E62; margin: 0 0 0.75rem; }
-
-        .ps-input, .ps-textarea { width: 100%; padding: 0.75rem; border: 1.5px solid #D1D5DB; border-radius: 10px; background: #FFFFFF; font-size: 0.9375rem; color: #111827; transition: border-color 0.15s; }
-        .ps-input:focus, .ps-textarea:focus { outline: none; border-color: #3B0B14; box-shadow: 0 0 0 3px rgba(59,11,20,0.1); }
-
-        .ps-options-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
-        .ps-option-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; background: #FFFFFF; border: 1.5px solid #E5E0D8; border-radius: 10px; cursor: pointer; transition: all 0.15s; font-size: 0.875rem; font-weight: 600; color: #374151; }
-        .ps-option-item:hover { border-color: #3B0B14; background: #FFFDF9; }
-        .ps-option-item.selected { border-color: #3B0B14; background: #3B0B14; color: #C9A227; }
-        .ps-option-item input { accent-color: #C9A227; width: 18px; height: 18px; }
-
-        .ps-rating-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin-top: 0.5rem; }
-        .ps-rating-btn { padding: 0.75rem 0; background: #FFFFFF; border: 1.5px solid #E5E0D8; border-radius: 8px; font-weight: 800; font-size: 0.9375rem; color: #1C0D10; cursor: pointer; transition: all 0.15s; text-align: center; }
-        .ps-rating-btn:hover { border-color: #3B0B14; background: #FAF8F5; }
-        .ps-rating-btn.selected { background: #3B0B14; color: #C9A227; border-color: #3B0B14; }
-
-        .ps-nav { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #F0ECE6; }
-        .ps-btn-back { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.25rem; background: #FAF8F5; color: #374151; border: 1px solid #D1D5DB; border-radius: 10px; font-weight: 700; font-size: 0.875rem; cursor: pointer; }
-        .ps-btn-next { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; background: #3B0B14; color: #C9A227; border: 1px solid rgba(201,162,39,0.4); border-radius: 10px; font-weight: 700; font-size: 0.9375rem; cursor: pointer; margin-left: auto; }
-        .ps-btn-next:hover { background: #2A080E; }
-        .ps-btn-submit { display: flex; align-items: center; gap: 0.5rem; padding: 0.875rem 1.75rem; background: #3B0B14; color: #C9A227; border: 1px solid rgba(201,162,39,0.5); border-radius: 12px; font-weight: 800; font-size: 1rem; cursor: pointer; margin-left: auto; }
-
-        .ps-consent-card { background: #FAF8F5; border: 1px solid #E5E0D8; border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; }
-        .ps-gold-icon { color: #C9A227; }
-        .ps-consent-card h3 { font-size: 1.0625rem; font-weight: 800; color: #3B0B14; margin: 0.5rem 0 1rem; }
-        .ps-checkbox-group { display: flex; flex-direction: column; gap: 1rem; }
-        .ps-checkbox-item { display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; }
-        .ps-checkbox-item input { accent-color: #3B0B14; width: 20px; height: 20px; margin-top: 0.125rem; flex-shrink: 0; }
-        .ps-checkbox-item strong { font-size: 0.875rem; font-weight: 700; color: #111827; display: block; }
-        .ps-checkbox-item p { font-size: 0.8125rem; color: #6B5E62; margin: 0.25rem 0 0; line-height: 1.4; }
-
-        .ps-thankyou-wrap { display: flex; align-items: center; justify-content: center; min-height: 70vh; }
-        .ps-thankyou-card { background: #FFFFFF; border: 1px solid #E5E0D8; border-radius: 24px; padding: 3rem 2rem; text-align: center; max-width: 540px; box-shadow: 0 20px 30px rgba(0,0,0,0.06); }
-        .ps-thankyou-icon { width: 80px; height: 80px; background: #FAF8F5; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; border: 2px solid #E5E0D8; }
-        .ps-tag { font-size: 0.6875rem; font-weight: 800; color: #C9A227; text-transform: uppercase; letter-spacing: 0.1em; background: #3B0B14; padding: 0.25rem 0.75rem; border-radius: 20px; display: inline-block; margin-bottom: 0.75rem; }
-        .ps-thankyou-title { font-size: 1.75rem; font-weight: 800; color: #1C0D10; margin: 0 0 0.75rem; }
-        .ps-thankyou-desc { font-size: 0.9375rem; color: #6B5E62; margin: 0 0 1.5rem; line-height: 1.6; }
-        .ps-thankyou-box { display: flex; align-items: flex-start; gap: 0.75rem; background: #FAF8F5; border: 1px solid #E5E0D8; border-radius: 12px; padding: 1rem; text-align: left; margin-bottom: 1.5rem; }
-        .ps-box-icon { color: #3B0B14; flex-shrink: 0; margin-top: 0.125rem; }
-        .ps-thankyou-box strong { font-size: 0.8125rem; color: #111827; }
-        .ps-thankyou-box p { font-size: 0.75rem; color: #6B5E62; margin: 0.125rem 0 0; }
-        .ps-btn-home { display: inline-block; padding: 0.875rem 2rem; background: #3B0B14; color: #C9A227; border-radius: 12px; font-weight: 800; font-size: 0.9375rem; text-decoration: none; }
-        .ps-spin { animation: spin 1s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
+      <style>{PS_STYLES}</style>
     </div>
   );
 }

@@ -27,6 +27,7 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
   const { identity, recognition, authority, location, contacts, owner, media } = profile;
   const isFavorited = isFavorite(identity.slug);
 
+  const hasCover = Boolean(media.cover?.url);
   const coverUrl = media.cover?.url || '/capafallback.png';
 
   const handleShare = () => {
@@ -48,17 +49,32 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
       
       {/* 1. HERO HEADER INTERATIVO DO PLANO OURO (Altura equivalente ao Plano Prata) */}
       <section className="relative w-full bg-[#4B161B] text-white overflow-hidden shadow-xl border-b-2 border-[#C9A227] min-h-[380px] sm:min-h-[420px] lg:min-h-[440px] flex flex-col justify-center">
-        {/* Imagem de Capa com Gradient Overlay Premium */}
+        {/* Imagem de Capa: nítida, com escurecimento só onde há texto (legibilidade) */}
         <div className="absolute inset-0 z-0">
           <img
             src={coverUrl}
             alt={identity.name}
-            style={{ objectPosition: getObjectPosition(media.cover) }}
-            className="w-full h-full object-cover opacity-35 filter brightness-90 contrast-105"
+            // Sem ponto focal definido, enquadra um pouco acima do centro (rostos, fachadas e letreiros costumam ficar ali).
+            style={{ objectPosition: getObjectPosition(media.cover) ?? '50% 35%' }}
+            className={`h-full w-full object-cover ${hasCover ? '' : 'opacity-35 brightness-90'}`}
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#3B0B14] via-[#4B161B]/95 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#3B0B14] via-transparent to-[#3B0B14]/60" />
-          <div className="absolute inset-y-0 left-0 w-full lg:w-1/2 bg-[#4B161B]/95 pointer-events-none" />
+          {hasCover ? (
+            <>
+              {/* Celular: texto centralizado sobre a foto, então escurecimento uniforme e suave */}
+              <div className="absolute inset-0 bg-[#3B0B14]/65 md:hidden" />
+              {/* Tablet/desktop: sólido atrás do texto (esquerda) e desfazendo até deixar a foto limpa à direita */}
+              <div className="absolute inset-0 hidden bg-gradient-to-r from-[#3B0B14] from-0% via-[#3B0B14]/80 via-45% to-[#3B0B14]/10 md:block" />
+              {/* Base e topo: assentam o rodapé do hero e os botões flutuantes */}
+              <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#3B0B14]/75 to-transparent" />
+              <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/35 to-transparent" />
+            </>
+          ) : (
+            <>
+              <div className="absolute inset-0 bg-gradient-to-r from-[#3B0B14] via-[#4B161B]/95 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#3B0B14] via-transparent to-[#3B0B14]/60" />
+              <div className="pointer-events-none absolute inset-y-0 left-0 w-full bg-[#4B161B]/95 lg:w-1/2" />
+            </>
+          )}
         </div>
 
         {/* Linhas Douradas Geométricas Ornamentais no Fundo do Hero (Vetor Maçônico/Geométrico) */}

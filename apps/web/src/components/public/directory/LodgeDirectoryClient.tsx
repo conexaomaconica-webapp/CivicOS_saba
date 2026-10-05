@@ -20,6 +20,8 @@ type LodgeDirectoryClientProps = {
   totalPages: number;
   lodgeItems: LodgeCardData[];
   availableCities: string[];
+  availableStates?: string[];
+  citiesByState?: Record<string, string[]>;
   potencies: { id: string; slug: string; name: string; abbreviation: string }[];
   rites: { id: string; slug: string; name: string }[];
   queryParam: string;
@@ -35,6 +37,8 @@ export function LodgeDirectoryClient({
   totalPages,
   lodgeItems,
   availableCities,
+  availableStates,
+  citiesByState,
   potencies,
   rites,
   queryParam,
@@ -141,6 +145,8 @@ export function LodgeDirectoryClient({
           <LodgeFilters
             filters={filters}
             availableCities={availableCities}
+            availableStates={availableStates}
+            citiesByState={citiesByState}
             potencies={potencies}
             rites={rites}
             onChange={handleFilterChange}
@@ -213,6 +219,8 @@ export function LodgeDirectoryClient({
             <LodgeFilters
               filters={filters}
               availableCities={availableCities}
+              availableStates={availableStates}
+              citiesByState={citiesByState}
               potencies={potencies}
               rites={rites}
               onChange={setFilters}

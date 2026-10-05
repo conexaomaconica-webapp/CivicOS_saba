@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { Heart, MapPin, User, Menu, X, PlusCircle } from 'lucide-react';
+import { Heart, MapPin, User, Menu, X, PlusCircle, LogOut, UserPlus } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import { useFavorites } from '@/lib/directory/favorites-context';
 
 type DirectoryHeaderProps = {
@@ -27,6 +28,53 @@ export function DirectoryHeader({
   const pathname = usePathname();
   const { favoritesCount, setIsModalOpen } = useFavorites();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Sessão: undefined = ainda verificando, null = visitante, objeto = pessoa logada.
+  const [viewer, setViewer] = useState<{ name: string; href: string } | null | undefined>(undefined);
+
+  useEffect(() => {
+    const supabase = createClient();
+    let active = true;
+
+    const resolveViewer = async (user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> } | null) => {
+      if (!active) return;
+      if (!user) {
+        setViewer(null);
+        return;
+      }
+      const meta = user.user_metadata || {};
+      const metaName = [meta.full_name, meta.name].find((v): v is string => typeof v === 'string' && v.trim().length > 0);
+      let name = metaName || (user.email ? user.email.split('@')[0]! : 'Minha conta');
+      let href = '/minha-conta';
+      try {
+        const { data: profile } = await (supabase as any).from('profiles').select('name, role').eq('id', user.id).maybeSingle();
+        if (profile?.name) name = profile.name;
+        // Membros vão para a própria conta; demais perfis (anunciante, admin) para a Central de Acessos.
+        if (profile?.role && profile.role !== 'member') href = '/login';
+      } catch {}
+      if (active) setViewer({ name: String(name).trim().split(/\s+/)[0] || 'Minha conta', href });
+    };
+
+    supabase.auth.getUser().then(({ data }) => void resolveViewer(data.user as any)).catch(() => active && setViewer(null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => void resolveViewer((session?.user as any) ?? null));
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    await createClient().auth.signOut();
+    setViewer(null);
+    setMobileMenuOpen(false);
+    router.refresh();
+  };
+
+  // Depois de entrar (ou criar a conta), a pessoa volta para esta mesma página.
+  const currentSearch = searchParams ? searchParams.toString() : '';
+  const returnTo = `${pathname || '/guia'}${currentSearch ? `?${currentSearch}` : ''}`;
+  const loginHref = `/login?redirect=${encodeURIComponent(returnTo)}`;
+  const registerHref = `/register?redirect=${encodeURIComponent(returnTo)}`;
 
   const currentParamCity = searchParams ? (searchParams.get('city') || searchParams.get('cidade') || '') : '';
   const activeCity = selectedCity !== undefined && selectedCity !== null ? selectedCity : currentParamCity;
@@ -143,14 +191,43 @@ export function DirectoryHeader({
             <span>Anunciar</span>
           </Link>
 
-          {/* Botão Login / Entrar */}
-          <Link
-            href="/login"
-            className="flex items-center gap-2 bg-[#C9A227] hover:bg-[#b89320] text-[#2b060d] text-xs font-bold px-4 py-1.5 rounded-full shadow-md hover:shadow-lg transition-all border border-[#ffd866]/30"
-          >
-            <User className="w-4 h-4 text-[#2b060d]" />
-            <span>Entrar</span>
-          </Link>
+          {/* Sessão: Entrar / Cadastrar (visitante) ou Minha conta + Sair (logado) */}
+          {viewer === undefined ? (
+            <span className="h-8 w-24" aria-hidden="true" />
+          ) : viewer ? (
+            <div className="flex items-center gap-2">
+              <Link
+                href={viewer.href}
+                className="flex items-center gap-2 bg-[#C9A227] hover:bg-[#b89320] text-[#2b060d] text-xs font-bold px-4 py-1.5 rounded-full shadow-md hover:shadow-lg transition-all border border-[#ffd866]/30"
+                title="Ir para minha conta"
+              >
+                <User className="w-4 h-4 text-[#2b060d]" />
+                <span className="max-w-[64px] truncate lg:max-w-[110px]">Olá, {viewer.name}</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => void handleLogout()}
+                className="dh-header__icon-btn"
+                title="Sair"
+                aria-label="Sair da conta"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <Link href={registerHref} className="hidden xl:inline text-xs font-semibold text-[#f3cf68] hover:text-white transition-colors">
+                Cadastre-se grátis
+              </Link>
+              <Link
+                href={loginHref}
+                className="flex items-center gap-2 bg-[#C9A227] hover:bg-[#b89320] text-[#2b060d] text-xs font-bold px-4 py-1.5 rounded-full shadow-md hover:shadow-lg transition-all border border-[#ffd866]/30"
+              >
+                <User className="w-4 h-4 text-[#2b060d]" />
+                <span>Entrar</span>
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile Hamburger Toggle Button */}
@@ -229,14 +306,45 @@ export function DirectoryHeader({
               <span>Anunciar Empresa</span>
             </Link>
 
-            <Link
-              href="/login"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center justify-center gap-2 bg-[#C9A227] hover:bg-[#b89320] text-[#2b060d] text-xs font-bold py-2.5 rounded-xl shadow-md w-full transition-all border border-[#ffd866]/30"
-            >
-              <User className="w-4 h-4 text-[#2b060d]" />
-              <span>Entrar no Portal</span>
-            </Link>
+            {viewer ? (
+              <>
+                <Link
+                  href={viewer.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-center gap-2 bg-[#C9A227] hover:bg-[#b89320] text-[#2b060d] text-xs font-bold py-2.5 rounded-xl shadow-md w-full transition-all border border-[#ffd866]/30"
+                >
+                  <User className="w-4 h-4 text-[#2b060d]" />
+                  <span>Olá, {viewer.name} — minha conta</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => void handleLogout()}
+                  className="flex items-center justify-center gap-2 text-white/80 hover:text-white text-xs font-semibold py-2 w-full"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sair</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href={loginHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-center gap-2 bg-[#C9A227] hover:bg-[#b89320] text-[#2b060d] text-xs font-bold py-2.5 rounded-xl shadow-md w-full transition-all border border-[#ffd866]/30"
+                >
+                  <User className="w-4 h-4 text-[#2b060d]" />
+                  <span>Entrar no Portal</span>
+                </Link>
+                <Link
+                  href={registerHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-center gap-2 text-[#f3cf68] hover:text-white text-xs font-semibold py-2 w-full"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Cadastre-se grátis como membro</span>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

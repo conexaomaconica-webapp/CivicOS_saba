@@ -122,13 +122,27 @@ vi.mock('@/lib/supabase/server', () => {
                 single: vi.fn().mockResolvedValue({ data: { id: 'resp-uuid-1' }, error: null }),
               }),
             }),
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue({
-                  data: [{ id: 'resp-uuid-1', version_number: 1 }],
-                  error: null,
-                }),
-              }),
+            // select(...).eq().order().limit() [.eq(version)] — encadeável e "await-ável".
+            select: vi.fn().mockImplementation(() => {
+              const result = {
+                data: [
+                  {
+                    id: 'resp-uuid-1',
+                    version_number: 1,
+                    completed_at: '2026-10-05T15:00:00.000Z',
+                    consent_research: true,
+                    consent_commercial: false,
+                  },
+                ],
+                error: null,
+              };
+              const chain: any = {
+                eq: vi.fn().mockImplementation(() => chain),
+                order: vi.fn().mockImplementation(() => chain),
+                limit: vi.fn().mockImplementation(() => chain),
+                then: (resolve: (v: typeof result) => unknown) => Promise.resolve(result).then(resolve),
+              };
+              return chain;
             }),
           };
         }
@@ -137,12 +151,14 @@ vi.mock('@/lib/supabase/server', () => {
           return {
             insert: vi.fn().mockResolvedValue({ error: null }),
             select: vi.fn().mockReturnValue({
-              in: vi.fn().mockResolvedValue({
-                data: [
-                  { id: 'ans1', response_id: 'resp-uuid-1', question_id: 'q1', answer_value: 'Ir. João Silva' },
-                  { id: 'ans2', response_id: 'resp-uuid-1', question_id: 'q2', answer_value: 'sim_propria' },
-                ],
-                error: null,
+              in: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue({
+                  data: [
+                    { response_id: 'resp-uuid-1', question_id: 'q1', answer_value: 'Ir. João Silva' },
+                    { response_id: 'resp-uuid-1', question_id: 'q2', answer_value: 'sim_propria' },
+                  ],
+                  error: null,
+                }),
               }),
             }),
           };

@@ -105,6 +105,14 @@ export interface SurveyAnalyticsSummary {
   survey_id: string;
   total_responses: number;
   version_number: number;
+  /** Respostas por dia (YYYY-MM-DD, fuso America/Sao_Paulo), em ordem crescente. */
+  responses_by_day?: Array<{ date: string; count: number }>;
+  consent_research_count?: number;
+  consent_commercial_count?: number;
+  first_response_at?: string | null;
+  last_response_at?: string | null;
+  /** Respostas por versão da pesquisa. */
+  responses_by_version?: Array<{ version_number: number; count: number }>;
   block_summaries: Array<{
     block_id: string;
     title: string;
@@ -113,6 +121,8 @@ export interface SurveyAnalyticsSummary {
       question_text: string;
       question_type: QuestionType;
       total_answers: number;
+      /** Rótulos legíveis das opções (value -> label). */
+      option_labels?: Record<string, string>;
       option_counts?: Record<string, number>;
       text_samples?: string[];
       average_rating?: number;

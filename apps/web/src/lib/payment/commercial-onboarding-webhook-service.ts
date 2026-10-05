@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database.types';
 import { getAsaasConfig } from './asaas-config';
+import { MIN_PUBLIC_LINK_TOKEN_LENGTH } from '@/lib/security/public-link-token';
 import {
   COMMERCIAL_STATUS,
   assertCommercialStatusTransition,
@@ -334,7 +335,7 @@ export async function checkCommercialPaymentStatusAction(token: string): Promise
 }> {
   try {
     const cleanToken = token?.trim();
-    if (!cleanToken || cleanToken.length < 20) {
+    if (!cleanToken || cleanToken.length < MIN_PUBLIC_LINK_TOKEN_LENGTH) {
       return { success: false, error: 'Token inválido.' };
     }
 

@@ -22,6 +22,7 @@ import {
   formatDataInicioVigencia,
   appendSignatureImageToContractText,
 } from './contract-template-renderer';
+import { generatePublicLinkToken, MIN_PUBLIC_LINK_TOKEN_LENGTH } from '@/lib/security/public-link-token';
 import {
   CANONICAL_ADVERTISER_CONTRACT_CODE,
   CANONICAL_ADVERTISER_CONTRACT_VERSION,
@@ -1243,7 +1244,7 @@ export async function renewAdminContractPaymentLinkAction(
       .eq('token_type', 'onboarding_payment')
       .eq('is_revoked', false);
 
-    const token = crypto.randomBytes(48).toString('hex');
+    const token = generatePublicLinkToken();
     const tokenHash = crypto.createHash('sha256').update(token, 'utf8').digest('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const { error: tokenError } = await (dbClient as any).from('business_onboarding_tokens').insert({
@@ -1290,7 +1291,7 @@ export async function renewAdminContractPaymentLinkAction(
  * - Confirma que os dados atuais não divergem do snapshot congelado (SHA-256).
  * - Idempotência: se já houver token ativo não expirado em awaiting_signature, retorna o mesmo link.
  * - Revoga tokens anteriores ainda abertos para esta empresa.
- * - Gera token de alta entropia com crypto.randomBytes(48).toString('hex').
+ * - Gera token curto de alta entropia (16 caracteres, ~93 bits) com generatePublicLinkToken().
  * - Grava expires_at para 7 dias.
  * - Transiciona contracts.status para 'awaiting_signature'.
  * - Transiciona businesses.commercial_status para 'contrato_enviado'.
@@ -1403,7 +1404,7 @@ export async function sendAdminContractForSignatureAction(
               .eq('id', existingToken.id);
           }
 
-          const rawToken = crypto.randomBytes(48).toString('hex');
+          const rawToken = generatePublicLinkToken();
           const tokenHash = crypto.createHash('sha256').update(rawToken, 'utf8').digest('hex');
           const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -1507,7 +1508,7 @@ export async function sendAdminContractForSignatureAction(
 
     // 9. Geração de token criptograficamente seguro (48 bytes hex = 96 chars)
     // HARDENING: Armazena apenas o hash SHA-256 no banco e vincula explicitamente a contract_id e snapshot_id
-    const token = crypto.randomBytes(48).toString('hex');
+    const token = generatePublicLinkToken();
     const tokenHash = crypto.createHash('sha256').update(token, 'utf8').digest('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 dias
 
@@ -1755,7 +1756,7 @@ export async function getPublicContractByTokenAction(
 ): Promise<PublicContractDetailsResult> {
   try {
     const cleanToken = token?.trim();
-    if (!cleanToken || cleanToken.length < 20) {
+    if (!cleanToken || cleanToken.length < MIN_PUBLIC_LINK_TOKEN_LENGTH) {
       return { success: false, error: 'Token de acesso inválido ou malformado.' };
     }
 
@@ -1930,7 +1931,7 @@ export async function getPublicContractByTokenAction(
       if (payTok && payTok.token) {
         activePaymentToken = payTok.token;
       } else {
-        const rawPayTok = crypto.randomBytes(48).toString('hex');
+        const rawPayTok = generatePublicLinkToken();
         const payHash = crypto.createHash('sha256').update(rawPayTok, 'utf8').digest('hex');
         const payExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -2061,7 +2062,7 @@ export async function signPublicContractAction(
 ): Promise<SignPublicContractResult> {
   try {
     const cleanToken = payload?.token?.trim();
-    if (!cleanToken || cleanToken.length < 20) {
+    if (!cleanToken || cleanToken.length < MIN_PUBLIC_LINK_TOKEN_LENGTH) {
       return { success: false, error: 'Token de assinatura inválido ou não informado.' };
     }
 
@@ -2212,11 +2213,31 @@ export async function signPublicContractAction(
     }
 
     // 5. Captura evidências técnicas com anonimização de IP para conformidade LGPD
+    // Nome completo do representante legal (mesma origem usada ao exibir o contrato).
+    let representativeName = '';
+    try {
+      const { data: respRow } = await (dbClient as any)
+        .from('business_responsibles')
+        .select('name')
+        .eq('business_id', biz.id)
+        .maybeSingle();
+      representativeName = respRow?.name || '';
+      if (!representativeName && biz.owner_id) {
+        const { data: ownerProfile } = await (dbClient as any)
+          .from('profiles')
+          .select('name')
+          .eq('id', biz.owner_id)
+          .maybeSingle();
+        representativeName = ownerProfile?.name || '';
+      }
+    } catch (_respErr) {}
+
     const signedRenderedText = appendSignatureImageToContractText(
       snapshot.rendered_text,
       sigData,
       biz.name,
-      biz.legal_name
+      biz.legal_name,
+      representativeName
     );
     const signedSha256Hash = crypto
       .createHash('sha256')
@@ -2386,7 +2407,7 @@ export async function signPublicContractAction(
     });
 
     // 13. Emissão de payment_token isolado para autorizar pagamento (Microetapa 6.2)
-    const rawPaymentToken = crypto.randomBytes(48).toString('hex');
+    const rawPaymentToken = generatePublicLinkToken();
     const paymentTokenHash = crypto.createHash('sha256').update(rawPaymentToken, 'utf8').digest('hex');
     const paymentExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 

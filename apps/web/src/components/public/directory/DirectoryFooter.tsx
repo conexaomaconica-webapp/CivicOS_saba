@@ -44,14 +44,17 @@ export function DirectoryFooter() {
             <Link href="/guia" className="text-gray-300 hover:text-amber-400 transition-colors">
               Início
             </Link>
-            <Link href="/guia#empresas" className="text-gray-300 hover:text-amber-400 transition-colors">
+            <Link href="/guia/empresas" className="text-gray-300 hover:text-amber-400 transition-colors">
               Empresas
             </Link>
-            <Link href="/guia#beneficios" className="text-gray-300 hover:text-amber-400 transition-colors">
+            <Link href="/guia/beneficios" className="text-gray-300 hover:text-amber-400 transition-colors">
               Benefícios
             </Link>
-            <Link href="/guia#lojas" className="text-gray-300 hover:text-amber-400 transition-colors">
+            <Link href="/guia/lojas" className="text-gray-300 hover:text-amber-400 transition-colors">
               Lojas Maçônicas
+            </Link>
+            <Link href="/guia/eventos" className="text-gray-300 hover:text-amber-400 transition-colors">
+              Eventos
             </Link>
             <Link href="/termos" className="text-gray-300 hover:text-amber-400 transition-colors">
               Termos de Uso

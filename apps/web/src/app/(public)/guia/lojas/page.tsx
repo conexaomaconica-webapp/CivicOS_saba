@@ -14,6 +14,8 @@ import type { LodgeFilterState } from '@/components/public/directory/LodgeFilter
 import type { ViewMode } from '@/components/public/directory/BusinessResultsToolbar';
 import type { LodgeCardData } from '@/components/public/directory/LodgeCard';
 import { StructuredData } from '@/components/seo/StructuredData';
+import { canonicalPotencyCode, KNOWN_POTENCY_NAMES } from '@/lib/lodges/potency';
+import { interpretLodgeQueryByRules, describeInterpretation } from '@/lib/lodges/smart-search';
 import '@/styles/directory-home.css';
 
 function appUrl(path: string) {
@@ -87,13 +89,15 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
   let availableCities: string[] = homeData?.available_cities || [];
   let potencies = (potenciesData as any[]) || [];
   let rites = (ritesData as any[]) || [];
+  let availableStates: string[] = [];
+  const citiesByState: Record<string, string[]> = {};
 
   // Os catálogos podem estar protegidos por RLS, mas as opções públicas também
   // podem ser derivadas com segurança das próprias Lojas ativas e publicadas.
   try {
     const { data: publicLodgeFacets } = await (supabase as any)
       .from('organizations')
-      .select('city, potency, rite')
+      .select('city, state, potency, rite')
       .eq('is_active', true)
       .eq('is_published', true);
 
@@ -103,14 +107,36 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
       ...facetRows.map((row: any) => row.city).filter(Boolean),
     ])).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
-    if (potencies.length === 0) {
-      const potencyValues: string[] = facetRows
-        .map((row: any) => row.potency)
-        .filter((value: unknown): value is string => typeof value === 'string' && value.length > 0);
-      potencies = Array.from(new Set<string>(potencyValues))
-        .sort((a: string, b: string) => a.localeCompare(b, 'pt-BR'))
-        .map((value: string) => ({ id: value, slug: value, name: value, abbreviation: value }));
+    // Estados que têm lojas e, para cada um, suas cidades (a lista de cidades acompanha o estado escolhido).
+    const statesSet = new Set<string>();
+    for (const row of facetRows as Array<{ city?: string | null; state?: string | null }>) {
+      const uf = (row.state || '').trim().toUpperCase();
+      if (!uf) continue;
+      statesSet.add(uf);
+      if (row.city) {
+        const list = (citiesByState[uf] ||= []);
+        if (!list.includes(row.city)) list.push(row.city);
+      }
     }
+    availableStates = [...statesSet].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    for (const uf of Object.keys(citiesByState)) citiesByState[uf]!.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+    // Potências: catálogo + as que existem nas lojas, unificadas (CMSB/BA e CMSB/RJ viram CMSB).
+    const catalogByCode = new Map<string, { name?: string }>(
+      potencies.map((p: any) => [canonicalPotencyCode(p.abbreviation || p.slug || p.name), { name: p.name }]),
+    );
+    const potencyCodes = new Set<string>(catalogByCode.keys());
+    for (const row of facetRows as Array<{ potency?: string | null }>) {
+      const code = canonicalPotencyCode(row.potency);
+      if (code) potencyCodes.add(code);
+    }
+    potencies = [...potencyCodes]
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+      .map((code) => {
+        const name = catalogByCode.get(code)?.name || KNOWN_POTENCY_NAMES[code] || code;
+        return { id: code, slug: code, name, abbreviation: code };
+      });
     if (rites.length === 0) {
       const riteValues: string[] = facetRows
         .map((row: any) => row.rite)
@@ -119,9 +145,19 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
         .sort((a: string, b: string) => a.localeCompare(b, 'pt-BR'))
         .map((value: string) => ({ id: value, slug: value, name: value }));
     }
-  } catch (_facetError) {}
+  } catch (_facetError) { }
 
-  // Execute search RPC with graceful fallback
+  // Busca inteligente: a frase inteira vai para o banco (public_lodges_search), que divide em termos e
+  // exige todos eles em nome, número, cidade, UF, potência, rito, venerável, endereço ou dia de reunião.
+  // Ex.: "feira de santana sexta". Os filtros da barra lateral continuam valendo em conjunto.
+  const interpreted = q.trim()
+    ? interpretLodgeQueryByRules(q, {
+      cities: availableCities,
+      potencies: potencies.map((p: any) => ({ abbreviation: p.abbreviation, name: p.name, slug: p.slug })),
+      rites: rites.map((r: any) => ({ name: r.name, slug: r.slug })),
+    })
+    : null;
+
   let searchRes: any = null;
   try {
     const rpcResult = await (supabase as any).rpc('public_lodges_search', {
@@ -136,9 +172,7 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
       p_page: page,
       p_page_size: pageSize,
     });
-    if (rpcResult.data) {
-      searchRes = rpcResult.data;
-    }
+    if (rpcResult.data && rpcResult.data.items) searchRes = rpcResult.data;
   } catch (err) {
     console.error('RPC public_lodges_search fallback:', err);
   }
@@ -153,6 +187,30 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
       has_next_page: false,
       has_previous_page: false,
     };
+  }
+
+  // A função de busca do banco não devolve o dia/horário da reunião; completamos aqui.
+  if (Array.isArray(searchRes.items) && searchRes.items.length > 0) {
+    try {
+      const { data: meetingRows } = await (supabase as any)
+        .from('organization_meetings')
+        .select('organization_id, meeting_day, meeting_time, label, sort_order, created_at')
+        .in('organization_id', searchRes.items.map((item: any) => item.id))
+        .eq('is_public', true)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      const firstMeeting = new Map<string, { day: string; time: string; label: string | null }>();
+      for (const row of meetingRows || []) {
+        if (!firstMeeting.has(row.organization_id)) {
+          firstMeeting.set(row.organization_id, { day: row.meeting_day, time: row.meeting_time, label: row.label ?? null });
+        }
+      }
+      searchRes.items = searchRes.items.map((item: any) => ({
+        ...item,
+        primary_meeting: item.primary_meeting ?? firstMeeting.get(item.id) ?? null,
+      }));
+    } catch (_meetingErr) { }
   }
 
   const searchData = searchRes;
@@ -200,24 +258,24 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
 
             <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider mb-1">
               <Landmark className="w-4 h-4" />
-              <span>Diretório Institucional</span>
+              <span>DIRETÓRIO NACIONAL</span>
             </div>
 
             <h1 className="font-serif font-bold text-2xl md:text-3xl text-white">
-              Lojas Maçônicas
+              Lojas Maçônicas do Brasil
             </h1>
             <p className="text-xs md:text-sm text-amber-100/80 max-w-2xl mt-1.5">
-              Encontre oficinas, potências, ritos, dias de reunião e informações para sua visita fraternal na rede Conexão Maçônica.
+              Pesquise por cidade, estado, potência, rito e dia de reunião para planejar sua visita
             </p>
 
             {/* Barra de Busca Principal */}
-            <form action="/guia/lojas" method="GET" className="dh-search-box mt-6 max-w-3xl">
+            <form action="/guia/lojas" method="GET" className="dh-search-box mt-8 max-w-3xl">
               <Sparkles className="w-5 h-5 text-amber-500 ml-3 shrink-0" />
               <input
                 type="text"
                 name="q"
                 defaultValue={q}
-                placeholder="Busque por nome da Loja, número, cidade ou potência..."
+                placeholder="Busca inteligente: ex. feira de santana sexta · GOB quarta · loja 1842"
                 className="dh-search-box__input text-gray-900"
               />
               {city && <input type="hidden" name="city" value={city} />}
@@ -227,6 +285,20 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
                 <span>Buscar</span>
               </button>
             </form>
+
+            {interpreted && q.trim() && describeInterpretation(interpreted).length > 0 && (
+              <div className="mt-3 max-w-3xl flex flex-wrap items-center gap-1.5 text-[11px]" aria-live="polite">
+                <span className="text-amber-200/90 font-semibold inline-flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Filtrando por:
+                </span>
+                {describeInterpretation(interpreted).map((chip) => (
+                  <span key={chip} className="bg-white/10 border border-amber-300/30 text-amber-50 px-2 py-0.5 rounded-full">
+                    {chip}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
@@ -244,6 +316,8 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
             availableCities={availableCities}
             potencies={potencies}
             rites={rites}
+            availableStates={availableStates}
+            citiesByState={citiesByState}
             queryParam={q}
           />
         </main>
