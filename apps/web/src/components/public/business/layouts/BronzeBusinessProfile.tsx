@@ -59,10 +59,6 @@ export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
                 <CompanyLogoWithZoom logo={identity.logo} businessName={identity.name} />
 
                 <div className="space-y-1.5 flex-1 min-w-0">
-                  <InstitutionalBadges recognition={recognition} catalog={recognition.catalog} commercialPlan={profile.plan.commercialPlan} variant="compact" />
-
-
-
                   <h1 className="mt-1 break-words font-serif text-2xl font-bold leading-tight tracking-tight text-[#4B161B] sm:text-3xl">
                     {identity.name}
                   </h1>
@@ -77,6 +73,9 @@ export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
                       {[location.city, location.state].filter(Boolean).join(' • ')}
                     </p>
                   )}
+
+                  {/* Selo do plano e selos institucionais: abaixo da categoria e da localização */}
+                  <InstitutionalBadges recognition={recognition} catalog={recognition.catalog} commercialPlan={profile.plan.commercialPlan} variant="compact" />
 
                   {/* Nome do Responsável + Loja Maçônica no Subtítulo */}
                   {owner && (

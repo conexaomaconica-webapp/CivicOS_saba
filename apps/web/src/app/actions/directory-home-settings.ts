@@ -1,8 +1,8 @@
 'use server';
 
 import { revalidatePath, revalidateTag } from 'next/cache';
-import { headers } from 'next/headers';
 import { createServerSideClient } from '@/lib/supabase/server';
+import { resolveCanonicalAdminTenant } from '@/lib/admin/admin-tenant-context';
 
 export type DirectoryHomeSettingsInput = {
   hero_title: string;
@@ -15,19 +15,11 @@ export type DirectoryHomeSettingsInput = {
   sponsored_logo_style?: 'standard' | 'clean';
 };
 
-async function resolvePublicDirectoryTenantId(supabase: any, userId: string): Promise<string | null> {
-  const requestHeaders = await headers();
-  const requestHost = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '').toLowerCase();
-  const [{ data: hostTenantId }, { data: profile }] = await Promise.all([
-    requestHost
-      ? supabase.rpc('_resolve_public_tenant_id', { p_host: requestHost })
-      : Promise.resolve({ data: null }),
-    supabase.from('profiles').select('tenant_id').eq('id', userId).maybeSingle(),
-  ]);
-
-  // Configurações do Guia pertencem ao tenant resolvido para o host público.
-  // O tenant do perfil é apenas fallback para instalações sem domínio configurado.
-  return hostTenantId || profile?.tenant_id || null;
+// Configurações do Guia pertencem ao tenant do domínio administrado.
+// O perfil do usuário não define o destino da gravação.
+async function resolvePublicDirectoryTenantId(): Promise<string> {
+  const { tenantId } = await resolveCanonicalAdminTenant();
+  return tenantId;
 }
 
 export async function saveDirectoryHomeSettingsAction(input: DirectoryHomeSettingsInput) {
@@ -40,7 +32,7 @@ export async function saveDirectoryHomeSettingsAction(input: DirectoryHomeSettin
       return { success: false, error: 'Usuário não autenticado.' };
     }
 
-    const tenantId = await resolvePublicDirectoryTenantId(supabase as any, authData.user.id);
+    const tenantId = await resolvePublicDirectoryTenantId();
     if (!tenantId) {
       return { success: false, error: 'Tenant do administrador não identificado. Nenhuma configuração foi alterada.' };
     }
@@ -154,7 +146,7 @@ export async function updateSponsoredSettingsAction(input: UpdateSponsoredSettin
       return { success: false, error: 'Usuário não autenticado.' };
     }
 
-    const tenantId = await resolvePublicDirectoryTenantId(supabase as any, authData.user.id);
+    const tenantId = await resolvePublicDirectoryTenantId();
     if (!tenantId) {
       return { success: false, error: 'Tenant do administrador não identificado. Nenhuma configuração foi alterada.' };
     }

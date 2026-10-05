@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { updateSponsoredSettingsAction } from '@/app/actions/directory-home-settings';
+import { getCanonicalAdminTenantAction } from '@/app/actions/admin-tenant-context';
 import { Plus, Trash2, Edit2, Loader2, CheckCircle2, X, Award, Gauge, Sparkles, LayoutGrid, Check } from 'lucide-react';
 
 type SponsoredBusiness = {
@@ -52,15 +53,9 @@ export default function AdminGuiaDestaquesPage() {
       const supabase = createClient();
       const { data: authData } = await supabase.auth.getUser();
       if (!authData.user) throw new Error('Usuário não autenticado.');
-      const { data: profileData } = await (supabase as any)
-        .from('profiles')
-        .select('tenant_id')
-        .eq('id', authData.user.id)
-        .maybeSingle();
-      const requestHost = window.location.host.toLowerCase();
-      const { data: hostTenantId } = await (supabase as any)
-        .rpc('_resolve_public_tenant_id', { p_host: requestHost });
-      const tid = hostTenantId || profileData?.tenant_id;
+      const tenantResult = await getCanonicalAdminTenantAction();
+      const tid = tenantResult.tenantId;
+      if (!tenantResult.success) throw new Error(tenantResult.error);
       if (!tid) throw new Error('Tenant do administrador não identificado.');
       setTenantId(tid);
 
@@ -440,7 +435,8 @@ export default function AdminGuiaDestaquesPage() {
             Nenhum override manual cadastrado. As empresas Acácia/Compasso estão sendo exibidas pela regra comercial padrão.
           </div>
         ) : (
-          <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="bg-gray-50 text-gray-700 border-b font-semibold">
               <tr>
                 <th className="p-3">Prioridade</th>
@@ -478,6 +474,7 @@ export default function AdminGuiaDestaquesPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

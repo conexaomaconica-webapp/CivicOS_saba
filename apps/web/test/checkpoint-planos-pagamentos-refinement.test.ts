@@ -72,10 +72,10 @@ vi.mock('../src/lib/supabase/server', () => ({
             select: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
             maybeSingle: vi.fn().mockResolvedValue({
-              data: { id: 'b-1', name: 'Comandos Terceirização', plan_tier: 'ouro' },
+              data: { id: 'b-1', tenant_id: '00000000-0000-0000-0000-000000000000', name: 'Comandos Terceirização', plan_tier: 'ouro' },
               error: null,
             }),
-            then: (r: any) => r({ data: [{ id: 'b-1', name: 'Comandos Terceirização', plan_tier: 'ouro' }], error: null }),
+            then: (r: any) => r({ data: [{ id: 'b-1', tenant_id: '00000000-0000-0000-0000-000000000000', name: 'Comandos Terceirização', plan_tier: 'ouro' }], error: null }),
           };
         }
         if (table === 'invoices') {
@@ -120,7 +120,7 @@ vi.mock('../src/lib/supabase/server', () => ({
             maybeSingle: () => Promise.resolve({
               data: {
                 id: 'pay-003',
-                tenant_id: '00000000-0000-0000-0000-000000000010',
+                tenant_id: '00000000-0000-0000-0000-000000000000',
                 provider: 'asaas',
                 provider_event_id: 'evt_asaas_123',
                 canonical_event: 'payment_confirmed',

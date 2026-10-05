@@ -878,7 +878,7 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
 
         .asl-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+          grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
           gap: 1.5rem;
         }
         .asl-card {
@@ -1270,6 +1270,16 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+
+        /* Mobile: cartões e cabeçalhos quebram linha; grades de 3 colunas viram 1 */
+        @media (max-width: 640px) {
+          .asl-card { padding: 1.125rem; }
+          .asl-card-header { flex-wrap: wrap; gap: 0.5rem; }
+          .asl-card-footer { flex-wrap: wrap; gap: 0.5rem; }
+          .asl-header { flex-wrap: wrap; gap: 0.75rem; }
+          .asl-logo-mode-grid { grid-template-columns: 1fr !important; }
+          .asl-grid { gap: 1rem; }
         }
       `}</style>
     </div>

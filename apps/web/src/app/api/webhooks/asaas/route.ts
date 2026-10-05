@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { AsaasBillingAdapter } from '@/lib/billing/billing-adapters';
-import { reconcileCommercialPaymentWebhook } from '@/lib/payment/commercial-onboarding-webhook-service';
+import {
+  reconcileCommercialPaymentWebhook,
+  validateAsaasWebhookToken,
+} from '@/lib/payment/commercial-onboarding-webhook-service';
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -12,11 +15,25 @@ function getAdminSupabase() {
 export async function POST(req: Request) {
   try {
     const accessTokenHeader = req.headers.get('asaas-access-token');
-    if (!AsaasBillingAdapter.validateSignature(accessTokenHeader)) {
+    if (!(await validateAsaasWebhookToken(accessTokenHeader))) {
       return NextResponse.json({ error: 'UNAUTHORIZED: Header token do Asaas inválido.' }, { status: 401 });
     }
 
-    const payload = await req.json();
+    const requestBody = await req.text();
+    if (!requestBody.trim() || requestBody.trim() === 'null') {
+      return NextResponse.json({ received: true, validation_request: true });
+    }
+
+    let payload: Record<string, any>;
+    try {
+      payload = JSON.parse(requestBody);
+    } catch (_parseError) {
+      return NextResponse.json({ error: 'INVALID_PAYLOAD: JSON inválido.' }, { status: 400 });
+    }
+
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return NextResponse.json({ error: 'INVALID_PAYLOAD: Evento do Asaas inválido.' }, { status: 400 });
+    }
 
     // 1. Tenta reconciliar como Onboarding Comercial (Microetapa 6.3)
     // Localiza internamente pelo Asaas payment ID sem confiar em metadados externos
@@ -63,7 +80,8 @@ export async function POST(req: Request) {
     }
 
     const { data: rpcRes, error } = await supabase.rpc('process_canonical_billing_event', {
-      p_tenant_id: '00000000-0000-0000-0000-000000000001',
+      // Tenant não é informado pelo gateway: o RPC deriva o tenant canônico da empresa no banco.
+      p_tenant_id: null,
       p_provider: canonicalEvent.provider,
       p_provider_event_id: canonicalEvent.providerEventId,
       p_canonical_event: canonicalEvent.canonicalEvent,

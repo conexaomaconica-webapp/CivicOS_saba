@@ -1,6 +1,7 @@
 'use server';
 
 import { createServerSideClient } from '@/lib/supabase/server';
+import { resolveRequestOperationalTenantId } from '@/lib/tenant/tenant-policy';
 import { AsaasPaymentProvider } from './asaas-payment-provider';
 import { CreditCardPayload, PixChargeResult, CreditCardChargeResult } from './payment-provider.interface';
 
@@ -527,7 +528,7 @@ export async function updatePlanPaymentRulesAdminAction(payload: {
 
   const entityUuid = beforeState?.id || '00000000-0000-0000-0000-000000000001';
   await (supabase as any).from('admin_audit_logs').insert({
-    tenant_id: '00000000-0000-0000-0000-000000000001',
+    tenant_id: await resolveRequestOperationalTenantId(supabase),
     actor_id: user.id,
     action: 'UPDATE_PLAN_PAYMENT_RULES',
     entity_type: 'plan_payment_rules',

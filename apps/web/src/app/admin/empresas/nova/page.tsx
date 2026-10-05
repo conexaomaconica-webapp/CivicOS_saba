@@ -1,17 +1,16 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { assertPlatformAdminAccess } from '@/lib/admin/admin-auth-helper';
+import { resolveCanonicalAdminTenant } from '@/lib/admin/admin-tenant-context';
 import { getPedraFundamentalQuotaAction } from '@/app/actions/institutional-recognitions';
 import AdvertiserCreateForm from './advertiser-create-form';
 
 export const metadata: Metadata = { title: 'Cadastrar anunciante', robots: { index: false, follow: false } };
 
 export default async function NewAdminAdvertiserPage() {
-  const { supabase, user } = await assertPlatformAdminAccess();
+  const { supabase, tenantId: currentTenantId } = await resolveCanonicalAdminTenant();
 
-  const [{ data: profile }, { data: categories }, { data: planRows }, { count: pedraCount }, quotaRes] = await Promise.all([
-    (supabase as any).from('profiles').select('tenant_id').eq('id', user.id).maybeSingle(),
+  const [{ data: categories }, { data: planRows }, { count: pedraCount }, quotaRes] = await Promise.all([
     (supabase as any).from('categories').select('id, name').eq('is_active', true).order('display_order'),
     (supabase as any).from('plan_payment_rules').select('plan_code, title, amount_cents').order('amount_cents'),
     (supabase as any)
@@ -21,8 +20,6 @@ export default async function NewAdminAdvertiserPage() {
       .eq('is_active', true),
     getPedraFundamentalQuotaAction(),
   ]);
-
-  const currentTenantId = profile?.tenant_id || '00000000-0000-0000-0000-000000000000';
 
   // Lista canônica oficial dos 3 planos vigentes no Conexão Maçônica
   const CANONICAL_PLANS = [

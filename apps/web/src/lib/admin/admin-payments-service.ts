@@ -2,6 +2,7 @@
 
 import { assertPlatformAdminAccess } from './admin-auth-helper';
 import { revalidatePath } from 'next/cache';
+import { assertOperationalTenantId, resolveBusinessTenantIdFromDb } from '@/lib/tenant/tenant-policy';
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database.types';
 import { deriveCanonicalBillingStatus } from '@/lib/payment/canonical-billing-status';
@@ -334,7 +335,7 @@ export async function reprocessPaymentWebhookAction(recordId: string) {
       eventRecord.business_id ||
       payment.externalReference ||
       payload.externalReference ||
-      '00000000-0000-0000-0000-000000000001';
+      null;
     const planCode = eventRecord.plan_code || payment.planCode || 'ouro';
     const amountCents =
       eventRecord.amount_cents ||
@@ -344,7 +345,7 @@ export async function reprocessPaymentWebhookAction(recordId: string) {
       const commercialRes = await reconcileCommercialPaymentWebhook(payload, providerEventId);
       if (commercialRes.success && commercialRes.reconciled) {
         await (supabase as any).from('admin_audit_logs').insert({
-          tenant_id: eventRecord.tenant_id || '00000000-0000-0000-0000-000000000001',
+          tenant_id: await resolveBusinessTenantIdFromDb(supabase, commercialRes.data?.business_id),
           actor_id: user.id,
           action: 'REPROCESS_ASAAS_COMMERCIAL_PAYMENT_WEBHOOK',
           entity_type: 'payment_provider_event',
@@ -364,7 +365,7 @@ export async function reprocessPaymentWebhookAction(recordId: string) {
     }
 
     const { data: rpcRes, error: rpcErr } = await (supabase as any).rpc('process_canonical_billing_event', {
-      p_tenant_id: eventRecord.tenant_id || '00000000-0000-0000-0000-000000000001',
+      p_tenant_id: null,
       p_provider: provider,
       p_provider_event_id: providerEventId,
       p_canonical_event: canonicalEvent,
@@ -381,7 +382,7 @@ export async function reprocessPaymentWebhookAction(recordId: string) {
 
     // 3. Grava log de auditoria do Admin (somente se a operação for concluída com sucesso)
     await (supabase as any).from('admin_audit_logs').insert({
-      tenant_id: eventRecord.tenant_id || '00000000-0000-0000-0000-000000000001',
+      tenant_id: await resolveBusinessTenantIdFromDb(supabase, businessId),
       actor_id: user.id,
       action: 'REPROCESS_PAYMENT_WEBHOOK',
       entity_type: 'payment_provider_event',
@@ -497,7 +498,7 @@ export async function confirmPaymentManuallyAction(invoiceId: string) {
     }
 
     await (adminClient as any).from('admin_audit_logs').insert({
-      tenant_id: invoice.tenant_id || business.tenant_id || '00000000-0000-0000-0000-000000000001',
+      tenant_id: assertOperationalTenantId(invoice.tenant_id || business.tenant_id, `Fatura ${invoiceId}`),
       actor_id: user.id,
       action: 'CONFIRM_PAYMENT_MANUALLY',
       entity_type: 'invoice',

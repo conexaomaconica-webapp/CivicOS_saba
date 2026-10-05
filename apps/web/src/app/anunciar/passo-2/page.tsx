@@ -20,7 +20,7 @@ export default async function OnboardingStep2Page() {
   }
 
   const [tenantId, categories] = await Promise.all([
-    resolveRequestTenantId(supabase, user.id),
+    resolveRequestTenantId(supabase),
     listBusinessCategories(supabase),
   ]);
 

@@ -1,6 +1,6 @@
 'use server';
 
-import { createServerSideClient } from '@/lib/supabase/server';
+import { createServerSideClient, resolveTenantIdServer } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
 export interface OnboardingStateDTO {
@@ -151,11 +151,12 @@ export async function saveStepDataAction(payload: {
     const supabase = await getSupabaseForAction();
     const { data: userRes } = await supabase.auth.getUser();
 
-    const userId = userRes?.user?.id || '00000000-0000-0000-0000-000000000001';
-    const tenantId = '00000000-0000-0000-0000-000000000001';
+    const userId: string | null = userRes?.user?.id ?? null;
 
     // PASSO 2: SALVAR OU ATUALIZAR DADOS ESSENCIAIS DA EMPRESA (UPDATE IDEMPOTENTE)
     if (payload.step === 2) {
+      if (!userId) return { success: false, message: 'Sessão expirada. Faça login para continuar.' };
+      const tenantId = await resolveTenantIdServer();
       const { tradingName, legalName, cnpj, categoryId, phone, city } = payload.data;
 
       let targetBizId = payload.businessId;
@@ -204,38 +205,41 @@ export async function saveStepDataAction(payload: {
         .replace(/^-|-$/g, '');
 
       const uniqueSlug = `${rawSlug}-${Date.now().toString().slice(-4)}`;
-      let newBizId = '00000000-0000-0000-0000-000000000001';
 
-      try {
-        const { data: newBiz } = await (supabase as any)
-          .from('businesses')
-          .insert({
-            tenant_id: tenantId,
-            owner_id: userId,
-            name: tradingName || legalName,
-            legal_name: legalName,
-            cnpj: cnpj ? cnpj.replace(/\D/g, '') : null,
-            slug: uniqueSlug,
-            category: categoryId || 'servicos',
-            phone,
-            city: city || 'São Paulo',
-            state: 'SP',
-            publication_status: 'draft',
-            is_active: false,
-          })
-          .select('id')
-          .single();
+      const { data: newBiz, error: insertError } = await (supabase as any)
+        .from('businesses')
+        .insert({
+          tenant_id: tenantId,
+          owner_id: userId,
+          name: tradingName || legalName,
+          legal_name: legalName,
+          cnpj: cnpj ? cnpj.replace(/\D/g, '') : null,
+          slug: uniqueSlug,
+          category: categoryId || 'servicos',
+          phone,
+          city: city || null,
+          state: null,
+          publication_status: 'draft',
+          is_active: false,
+        })
+        .select('id')
+        .single();
 
-        if (newBiz?.id) newBizId = newBiz.id;
-      } catch {}
+      if (insertError || !newBiz?.id) {
+        return { success: false, message: 'Não foi possível salvar a empresa. Tente novamente.' };
+      }
 
       try { revalidatePath('/anunciar/passo-2'); } catch {}
-      return { success: true, message: 'Empresa salva em rascunho.', businessId: newBizId, nextStep: 3 };
+      return { success: true, message: 'Empresa salva em rascunho.', businessId: newBiz.id, nextStep: 3 };
     }
 
     // PASSO 3: SALVAR VÍNCULO MAÇÔNICO & COMERCIAL
     if (payload.step === 3) {
-      const bizId = payload.businessId || '00000000-0000-0000-0000-000000000001';
+      if (!userId || !payload.businessId) {
+        return { success: false, message: 'Empresa não identificada para salvar o vínculo.' };
+      }
+      const tenantId = await resolveTenantIdServer();
+      const bizId = payload.businessId;
       const { masonicStatus, companyRelationship, cimbCode, lodgeName } = payload.data;
 
       try {
@@ -261,7 +265,10 @@ export async function saveStepDataAction(payload: {
 
     // PASSO 4: SELECIONAR PLANO
     if (payload.step === 4) {
-      const bizId = payload.businessId || '00000000-0000-0000-0000-000000000001';
+      if (!payload.businessId) {
+        return { success: false, message: 'Empresa não identificada para selecionar o plano.' };
+      }
+      const bizId = payload.businessId;
       const { planCode } = payload.data;
 
       try {

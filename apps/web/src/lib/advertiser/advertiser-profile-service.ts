@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { resolveBusinessMedia, resolveLogoUrl, resolveCoverUrl } from '@/lib/business/business-media-helpers';
 import { getCanonicalDefaultLimit } from '@/lib/billing/plans-service';
+import { assertOperationalTenantId, resolveBusinessTenantIdFromDb } from '@/lib/tenant/tenant-policy';
 
 function safeRevalidatePath(path: string, type?: 'page' | 'layout') {
   try {
@@ -562,7 +563,7 @@ export async function updateAdvertiserMediaAction(
 
       const res = await (supabase as any).from('business_media').insert({
         business_id: businessId,
-        tenant_id: '00000000-0000-0000-0000-000000000001',
+        tenant_id: await resolveBusinessTenantIdFromDb(supabase, businessId),
         media_type: 'image',
         url: payload.url,
         title: 'Imagem de Capa',
@@ -586,11 +587,12 @@ export async function updateAdvertiserMediaAction(
         .eq('id', businessId)
         .maybeSingle();
 
+      const tenantId = assertOperationalTenantId(b?.tenant_id, `Empresa ${businessId}`);
       const planCode = b?.plan_code || b?.plan_tier || 'bronze';
       const { data: entRow } = await (supabase as any)
         .from('plan_entitlements')
         .select('max_limit')
-        .eq('tenant_id', b?.tenant_id || '00000000-0000-0000-0000-000000000001')
+        .eq('tenant_id', tenantId)
         .eq('plan_code', planCode)
         .eq('feature_code', 'gallery_photos_limit')
         .maybeSingle();
@@ -611,7 +613,7 @@ export async function updateAdvertiserMediaAction(
 
       const res = await (supabase as any).from('business_media').insert({
         business_id: businessId,
-        tenant_id: '00000000-0000-0000-0000-000000000001',
+        tenant_id: tenantId,
         media_type: 'image',
         url: payload.url,
         title: payload.title || 'Foto da Galeria',

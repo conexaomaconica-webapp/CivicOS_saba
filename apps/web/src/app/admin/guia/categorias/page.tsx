@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { getCanonicalAdminTenantAction } from '@/app/actions/admin-tenant-context';
 import { Plus, Trash2, Edit2, Loader2, CheckCircle2, X, Star } from 'lucide-react';
 import { CATEGORY_ICON_OPTIONS, isCategoryIcon, normalizeCategoryIcon, resolveCategoryIcon } from '@/lib/directory/category-icons';
 import { deleteAdminGuideCategoryAction, listAdminGuideCategoriesAction, setAdminGuideCategoryStatusAction, updateAdminGuideCategoryAction } from '@/app/actions/admin-guide-categories';
@@ -93,16 +94,9 @@ export default function AdminGuiaCategoriasPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Sessão expirada. Entre novamente.');
-      const requestHost = window.location.host.toLowerCase();
-      const [{ data: profileData, error: profileError }, { data: hostTenantId, error: hostTenantError }, { data: enabledTenant, error: tenantError }] = await Promise.all([
-        (supabase as any).from('profiles').select('tenant_id').eq('id', user.id).maybeSingle(),
-        (supabase as any).rpc('_resolve_public_tenant_id', { p_host: requestHost }),
-        (supabase as any).from('tenants').select('id').eq('public_access_status', 'enabled').order('created_at').limit(1).maybeSingle(),
-      ]);
-      if (profileError) throw profileError;
-      if (hostTenantError) throw hostTenantError;
-      if (tenantError) throw tenantError;
-      const tid = hostTenantId || profileData?.tenant_id || enabledTenant?.id;
+      const tenantResult = await getCanonicalAdminTenantAction();
+      const tid = tenantResult.tenantId;
+      if (!tenantResult.success) throw new Error(tenantResult.error);
       if (!tid) throw new Error('Não foi possível resolver o tenant canônico da Conexão Maçônica.');
       setTenantId(tid);
 
@@ -523,7 +517,8 @@ export default function AdminGuiaCategoriasPage() {
         {featured.length === 0 ? (
           <div className="p-8 text-center text-gray-500 text-sm">Nenhuma categoria em destaque cadastrada.</div>
         ) : (
-          <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto">
+          <table className="min-w-[640px] w-full text-left text-sm">
             <thead className="bg-gray-50 text-gray-700 border-b font-semibold">
               <tr>
                 <th className="p-3">Ordem</th>
@@ -561,6 +556,7 @@ export default function AdminGuiaCategoriasPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

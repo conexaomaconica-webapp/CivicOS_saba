@@ -2,6 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { assertPlatformAdminAccess } from './admin-auth-helper';
+import { resolveCanonicalAdminTenant } from './admin-tenant-context';
 import { revalidatePath } from 'next/cache';
 import { LODGE_GALLERY_MAX_PHOTOS } from '@/lib/media/lodge-media-policy';
 
@@ -712,8 +713,9 @@ export async function geocodeAdminLodgeAddressAction(input: {
 }
 
 async function resolvePlatformAdminTenantId(supabase: any): Promise<string> {
-  const { data: profile } = await supabase.from('profiles').select('tenant_id').maybeSingle();
-  return profile?.tenant_id || '00000000-0000-0000-0000-000000000010';
+  void supabase;
+  const { tenantId } = await resolveCanonicalAdminTenant();
+  return tenantId;
 }
 
 export async function createAdminLodgeAction(payload: AdminLodgeFormPayload): Promise<{ success: boolean; data?: any; error?: string }> {
@@ -829,7 +831,10 @@ export async function updateAdminLodgeAction(lodgeId: string, payload: AdminLodg
       .eq('id', lodgeId)
       .maybeSingle();
 
-    const tenantId = existingLodge?.tenant_id || (await resolvePlatformAdminTenantId(supabase));
+    const tenantId = await resolvePlatformAdminTenantId(supabase);
+    if (existingLodge?.tenant_id && existingLodge.tenant_id !== tenantId) {
+      return { success: false, error: 'A Loja pertence a outro tenant. Faça a conciliação antes de editar.' };
+    }
     const oldSlug = existingLodge?.slug;
 
     const slug = normalizeLodgeSlug(payload.slug || oldSlug || payload.name);

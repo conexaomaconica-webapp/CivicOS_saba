@@ -1,33 +1,13 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
-import { headers } from 'next/headers';
 import { getPlanPaymentRulesAction } from '@/lib/payment/payment-service';
+import { resolveTenantIdServer } from '@/lib/supabase/server';
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 'sb_secret_key';
   return createClient(url, key);
-}
-
-async function resolveTenantIdServer(): Promise<string> {
-  let cleanHost = 'localhost';
-  try {
-    const reqHeaders = await headers();
-    const host = reqHeaders?.get('host');
-    const firstPart = host ? host.split(':')[0] : null;
-    if (firstPart) cleanHost = firstPart.toLowerCase();
-  } catch (_e) {
-    // Test fallback
-  }
-
-  try {
-    const supabase = getAdminSupabase();
-    const { data } = await supabase.rpc('_resolve_public_tenant_id', { p_host: cleanHost });
-    return data || '00000000-0000-0000-0000-000000000001';
-  } catch (_e) {
-    return '00000000-0000-0000-0000-000000000001';
-  }
 }
 
 // ----------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Save, ArrowUp, ArrowDown, Eye, EyeOff, Loader2, CheckCircle2, Gauge, Sparkles } from 'lucide-react';
 import { saveDirectoryHomeSettingsAction } from '@/app/actions/directory-home-settings';
+import { getCanonicalAdminTenantAction } from '@/app/actions/admin-tenant-context';
 
 type SectionConfig = {
   id: string;
@@ -52,12 +53,9 @@ export default function AdminGuiaGeralPage() {
         const { data: authData } = await supabase.auth.getUser();
         if (!authData.user) throw new Error('Usuário não autenticado.');
 
-        const requestHost = window.location.host.toLowerCase();
-        const [{ data: profileData }, { data: hostTenantId }] = await Promise.all([
-          (supabase as any).from('profiles').select('tenant_id').eq('id', authData.user.id).maybeSingle(),
-          (supabase as any).rpc('_resolve_public_tenant_id', { p_host: requestHost }),
-        ]);
-        const tid = hostTenantId || profileData?.tenant_id;
+        const tenantResult = await getCanonicalAdminTenantAction();
+        const tid = tenantResult.tenantId;
+        if (!tenantResult.success) throw new Error(tenantResult.error);
         if (!tid) throw new Error('Tenant do administrador não identificado.');
 
         const { data } = await (supabase as any)

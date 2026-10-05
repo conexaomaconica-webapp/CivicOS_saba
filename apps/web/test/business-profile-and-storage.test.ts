@@ -67,6 +67,7 @@ vi.mock('@supabase/supabase-js', () => ({
 
 vi.mock('../src/lib/supabase/server', () => ({
   createServerSideClient: vi.fn().mockImplementation(() => Promise.resolve(createMockSupabaseClient())),
+  resolveTenantIdServer: vi.fn().mockResolvedValue('00000000-0000-0000-0000-000000000000'),
 }));
 
 vi.mock('next/cache', () => ({

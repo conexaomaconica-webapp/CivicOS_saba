@@ -32,7 +32,7 @@ export function DirectorySponsored({
     const isCleanMode = logoStyle === 'clean';
 
     return (
-      <section className="dh-container py-6" id="patrocinadas">
+      <section className="dh-container dh-mobile-visible-section py-6" id="patrocinadas">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="dh-section-title text-stone-900">Empresas Patrocinadas</h2>
@@ -135,7 +135,7 @@ export function DirectorySponsored({
   }
 
   return (
-    <section className="dh-container py-4" id="patrocinadas">
+    <section className="dh-container dh-mobile-visible-section py-4" id="patrocinadas">
       <div>
         <h2 className="dh-section-title">Empresas Patrocinadas</h2>
         <p className="text-xs text-gray-500 mt-1">Destaques comerciais e empresas pilares da nossa rede.</p>

@@ -28,8 +28,11 @@ export function DirectoryMapExplore({ businesses = [], selectedCity }: Directory
     businesses[0] ||
     null;
 
+  const hasCoordinates = selectedBiz?.latitude != null && selectedBiz?.longitude != null;
   const mapQuery = selectedBiz
-    ? `${selectedBiz.name}, ${selectedBiz.city || selectedCity || 'Brasil'}`
+    ? hasCoordinates
+      ? `${selectedBiz.latitude},${selectedBiz.longitude}`
+      : `${selectedBiz.name}, ${selectedBiz.city || selectedCity || 'Brasil'}`
     : selectedCity
     ? `Empresas em ${selectedCity}`
     : 'Brasil';
@@ -37,7 +40,9 @@ export function DirectoryMapExplore({ businesses = [], selectedCity }: Directory
   const embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
 
   const handleTravarRota = (b: PublicSearchResultItem) => {
-    const query = `${b.name}, ${b.city || ''} ${b.state || ''}`;
+    const query = b.latitude != null && b.longitude != null
+      ? `${b.latitude},${b.longitude}`
+      : `${b.name}, ${b.city || ''} ${b.state || ''}`;
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query)}`, '_blank');
   };
 

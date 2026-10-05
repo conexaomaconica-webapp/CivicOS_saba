@@ -2,8 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
-import { headers } from 'next/headers';
-import { assertPlatformAdminAccess } from './admin-auth-helper';
+import { resolveCanonicalAdminTenant } from './admin-tenant-context';
 import { validateEmail, validateName, validatePassword } from '@/lib/auth/validation';
 import { sanitizeCnpj, validatePhone } from '@/lib/onboarding/onboarding-validation';
 import type { Database } from '@/types/database.types';
@@ -46,30 +45,11 @@ export async function createAdminAdvertiserAction(
   input: CreateAdminAdvertiserInput,
 ): Promise<CreateAdminAdvertiserResult> {
   try {
-    const { supabase, user: admin } = await assertPlatformAdminAccess();
+    const { supabase, user: admin, tenantId } = await resolveCanonicalAdminTenant();
 
     // 1. Resolve primeiro o tenant público canônico do domínio. O perfil de um
     // administrador de plataforma pode pertencer ao tenant global e não deve
     // deslocar novos anunciantes para fora do diretório público.
-    const requestHeaders = await headers();
-    const requestHost = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '').toLowerCase();
-    const { data: adminProfile } = await (supabase as any)
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', admin.id)
-      .maybeSingle();
-    const { data: publicTenantId } = requestHost
-      ? await (supabase as any).rpc('_resolve_public_tenant_id', { p_host: requestHost })
-      : { data: null };
-
-    const tenantId = (
-      publicTenantId ||
-      input.tenantId ||
-      adminProfile?.tenant_id ||
-      (admin as any)?.user_metadata?.tenant_id ||
-      '00000000-0000-0000-0000-000000000000'
-    ).trim();
-
     const responsibleName = input.responsibleName.trim();
     const responsibleEmail = input.responsibleEmail.trim().toLowerCase();
     const temporaryPassword = input.temporaryPassword;

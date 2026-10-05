@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     // Trata payload de gateway (Asaas ou Stripe)
     const eventId = body.id || body.eventId || `evt_${Date.now()}`;
     const eventType = body.event || body.type || 'PAYMENT_RECEIVED';
-    const businessId = body.payment?.externalReference || body.metadata?.businessId || '00000000-0000-0000-0000-000000000001';
+    const businessId = body.payment?.externalReference || body.metadata?.businessId || null;
     const userId = body.customer?.externalReference || body.metadata?.userId || null;
     const planCode = body.payment?.planCode || body.metadata?.planCode || 'ouro';
     const amountCents = Math.round((body.payment?.value || body.amount_total || 199.0) * 100);
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 
     // Invoca RPC idempotente process_billing_webhook
     const { data: rpcRes, error } = await supabase.rpc('process_billing_webhook', {
-      p_tenant_id: '00000000-0000-0000-0000-000000000001',
+      p_tenant_id: null,
       p_gateway_event_id: eventId,
       p_gateway_name: gatewayName,
       p_event_type: eventType,

@@ -1,6 +1,7 @@
 import { type CookieOptions, createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { AppDatabase } from '@/types/database-extensions';
+import { getRequestHost, resolveStrictDomainTenantId } from '@/lib/tenant/tenant-policy';
 
 function getSupabaseUrl(): string {
   return process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -32,23 +33,13 @@ export async function createServerSideClient() {
   });
 }
 
+/**
+ * Tenant operacional do domínio da requisição. Não há fallback: domínio sem
+ * tenant verificado gera erro explícito, nunca o tenant global ou o primeiro tenant.
+ */
 export async function resolveTenantIdServer(): Promise<string> {
-  if (process.env.NEXT_PUBLIC_TENANT_ID) {
-    return process.env.NEXT_PUBLIC_TENANT_ID;
-  }
-  
-  try {
-    const supabase = await createServerSideClient();
-    const { data } = await supabase.from('tenants').select('id').limit(1).single();
-    if (data && data.id) {
-      return data.id;
-    }
-  } catch (e) {
-    console.error('[TenantResolver] Erro ao buscar tenant no banco:', e);
-  }
-  
-  // UUID válido de fallback (embora vá falhar restrição de chave estrangeira se não existir)
-  return '00000000-0000-0000-0000-000000000000';
+  const supabase = await createServerSideClient();
+  return resolveStrictDomainTenantId(supabase, await getRequestHost());
 }
 
 export { createServerSideClient as createClient };

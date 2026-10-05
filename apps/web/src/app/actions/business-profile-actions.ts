@@ -1,8 +1,8 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
-import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { resolveTenantIdServer } from '@/lib/supabase/server';
 
 // Cliente Supabase com Service Role para execução segura no servidor
 // Timeout removido: o antigo AbortSignal.timeout(1500) causava 'fetch failed' em operações normais
@@ -15,27 +15,6 @@ function getAdminSupabase() {
 function safeRevalidate(...paths: string[]) {
   for (const p of paths) {
     try { revalidatePath(p); } catch { /* Vitest */ }
-  }
-}
-
-// Auxiliar: Resolve o tenant pelo Host do cabeçalho da requisição
-async function resolveTenantIdServer(): Promise<string> {
-  let cleanHost = 'localhost';
-  try {
-    const reqHeaders = await headers();
-    const host = reqHeaders?.get('host');
-    const firstPart = host ? host.split(':')[0] : null;
-    if (firstPart) cleanHost = firstPart.toLowerCase();
-  } catch (_e) {
-    // Fallback para ambiente de teste/fora de requisição HTTP
-  }
-
-  try {
-    const supabase = getAdminSupabase();
-    const { data } = await supabase.rpc('_resolve_public_tenant_id', { p_host: cleanHost });
-    return data || '00000000-0000-0000-0000-000000000001';
-  } catch (_e) {
-    return '00000000-0000-0000-0000-000000000001';
   }
 }
 

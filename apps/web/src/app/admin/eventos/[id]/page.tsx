@@ -90,6 +90,7 @@ function SourceTable({ data }: { data: Record<string, number> }) {
   if (entries.length === 0) return <p className="ev-chart-empty">Sem dados de origem.</p>;
   const total = entries.reduce((s, [, v]) => s + v, 0);
   return (
+    <div className="overflow-x-auto">
     <table className="ev-src-table">
       <tbody>
         {entries.sort((a, b) => b[1] - a[1]).map(([src, count]) => (
@@ -101,6 +102,7 @@ function SourceTable({ data }: { data: Record<string, number> }) {
         ))}
       </tbody>
     </table>
+    </div>
   );
 }
 

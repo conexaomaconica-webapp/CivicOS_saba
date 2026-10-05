@@ -17,7 +17,7 @@ export default function AdminGuiaLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between border-b border-gray-200 pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 pb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <LayoutGrid className="w-6 h-6 text-amber-700" /> Gestão da Home do Guia
@@ -29,7 +29,7 @@ export default function AdminGuiaLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* Navigation Tabs */}
-      <nav className="flex space-x-1 border-b border-gray-200 bg-white p-1 rounded-lg border shadow-sm">
+      <nav className="flex flex-wrap gap-1 border-b border-gray-200 bg-white p-1 rounded-lg border shadow-sm">
         {TABS.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || (href === '/admin/guia/geral' && pathname === '/admin/guia');
           return (

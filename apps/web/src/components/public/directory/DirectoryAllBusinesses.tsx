@@ -27,6 +27,8 @@ export type PublicSearchResultItem = {
   category_name?: string | null;
   city?: string | null;
   state?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   is_verified?: boolean;
   is_founder?: boolean;
   effective_plan_code?: string | null;

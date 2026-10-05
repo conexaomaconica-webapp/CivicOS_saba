@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { getOperationalTenantAction } from '@/app/actions/tenant-context';
 import type { User } from '@supabase/supabase-js';
 import type { Database } from '@/types/database.types';
 
@@ -94,18 +95,14 @@ export default function NewListingWizardPage() {
       }
       setUser(user);
 
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('tenant_id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (error || !profile?.tenant_id) {
+      // Tenant do domínio atual (o perfil do usuário não define onde o cadastro é gravado).
+      const tenantResult = await getOperationalTenantAction();
+      if (!tenantResult.success || !tenantResult.tenantId) {
         setErrorMsg('Não foi possível resolver o tenant autorizado para este cadastro.');
         return;
       }
 
-      setTenantId(profile.tenant_id);
+      setTenantId(tenantResult.tenantId);
     };
     fetchUserAndTenant().catch(console.error);
   }, [supabase, router]);

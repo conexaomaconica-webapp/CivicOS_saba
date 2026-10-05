@@ -239,7 +239,8 @@ describe('Suíte de Testes Funcionais: Módulo de Pesquisas (Conexão Maçônica
     });
 
     expect(res.success).toBe(true);
-    expect(res.responseId).toBe('resp-uuid-1');
+    // O id é gerado no servidor (sem RETURNING, que a RLS bloquearia para anônimo).
+    expect(res.responseId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
   });
 
   it('8. Deve consolidar analytics e estatísticas por versão de pesquisa', async () => {

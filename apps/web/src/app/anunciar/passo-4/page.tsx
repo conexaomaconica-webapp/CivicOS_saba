@@ -19,7 +19,7 @@ export default async function OnboardingStep4Page() {
     redirect('/login?redirect=%2Fanunciar%2Fpasso-4');
   }
 
-  const tenantId = (await resolveRequestTenantId(supabase, user.id)) || '00000000-0000-0000-0000-000000000001';
+  const tenantId = await resolveRequestTenantId(supabase);
 
   // Buscar rascunho de empresa vinculada
   const { data: draftBiz } = await (supabase as any)

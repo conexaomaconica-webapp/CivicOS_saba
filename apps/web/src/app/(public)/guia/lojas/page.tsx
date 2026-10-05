@@ -84,9 +84,42 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
     console.error('Error fetching initial lodges page data:', err);
   }
 
-  const availableCities: string[] = homeData?.available_cities || [];
-  const potencies = (potenciesData as any[]) || [];
-  const rites = (ritesData as any[]) || [];
+  let availableCities: string[] = homeData?.available_cities || [];
+  let potencies = (potenciesData as any[]) || [];
+  let rites = (ritesData as any[]) || [];
+
+  // Os catálogos podem estar protegidos por RLS, mas as opções públicas também
+  // podem ser derivadas com segurança das próprias Lojas ativas e publicadas.
+  try {
+    const { data: publicLodgeFacets } = await (supabase as any)
+      .from('organizations')
+      .select('city, potency, rite')
+      .eq('is_active', true)
+      .eq('is_published', true);
+
+    const facetRows = publicLodgeFacets || [];
+    availableCities = Array.from(new Set([
+      ...availableCities,
+      ...facetRows.map((row: any) => row.city).filter(Boolean),
+    ])).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+    if (potencies.length === 0) {
+      const potencyValues: string[] = facetRows
+        .map((row: any) => row.potency)
+        .filter((value: unknown): value is string => typeof value === 'string' && value.length > 0);
+      potencies = Array.from(new Set<string>(potencyValues))
+        .sort((a: string, b: string) => a.localeCompare(b, 'pt-BR'))
+        .map((value: string) => ({ id: value, slug: value, name: value, abbreviation: value }));
+    }
+    if (rites.length === 0) {
+      const riteValues: string[] = facetRows
+        .map((row: any) => row.rite)
+        .filter((value: unknown): value is string => typeof value === 'string' && value.length > 0);
+      rites = Array.from(new Set<string>(riteValues))
+        .sort((a: string, b: string) => a.localeCompare(b, 'pt-BR'))
+        .map((value: string) => ({ id: value, slug: value, name: value }));
+    }
+  } catch (_facetError) {}
 
   // Execute search RPC with graceful fallback
   let searchRes: any = null;

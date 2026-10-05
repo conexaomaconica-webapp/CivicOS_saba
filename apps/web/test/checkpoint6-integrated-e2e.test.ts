@@ -89,7 +89,13 @@ vi.mock('../src/lib/supabase/server', () => ({
       }
       return Promise.resolve({ data: null, error: null });
     },
-    from: () => createChainableMock(),
+    from: (table: string) => {
+      const chain: any = createChainableMock();
+      if (table === 'businesses') {
+        chain.maybeSingle = () => Promise.resolve({ data: { tenant_id: '00000000-0000-0000-0000-000000000000' }, error: null });
+      }
+      return chain;
+    },
   })),
 }));
 

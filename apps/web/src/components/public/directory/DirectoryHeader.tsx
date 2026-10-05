@@ -50,7 +50,9 @@ export function DirectoryHeader({
     }
   };
 
-  const citiesToDisplay = availableCities || [];
+  const citiesToDisplay = Array.from(new Set(
+    (availableCities || []).filter((city): city is string => typeof city === 'string' && city.trim().length > 0)
+  )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
   const navLinks = [
     { href: '/guia', label: 'Início', exact: true },
@@ -108,9 +110,9 @@ export function DirectoryHeader({
               onChange={(e) => handleCityChange(e.target.value)}
               className="bg-transparent text-white border-none outline-none font-semibold cursor-pointer text-xs pr-1"
             >
-              <option value="" className="bg-[#2b060d] text-white">Todas as Cidades</option>
+              <option value="" className="bg-white text-stone-900">Todas as Cidades</option>
               {citiesToDisplay.map((c) => (
-                <option key={c} value={c} className="bg-[#2b060d] text-white">
+                <option key={c} value={c} className="bg-white text-stone-900">
                   {c}
                 </option>
               ))}
@@ -186,9 +188,9 @@ export function DirectoryHeader({
             aria-label="Filtrar empresas por cidade"
             className="min-w-0 flex-1 cursor-pointer truncate border-none bg-transparent text-xs font-semibold text-white outline-none"
           >
-            <option value="" className="bg-[#2b060d] text-white">Todas as cidades</option>
+            <option value="" className="bg-white text-stone-900">Todas as cidades</option>
             {citiesToDisplay.map((c) => (
-              <option key={c} value={c} className="bg-[#2b060d] text-white">{c}</option>
+              <option key={c} value={c} className="bg-white text-stone-900">{c}</option>
             ))}
           </select>
         </div>

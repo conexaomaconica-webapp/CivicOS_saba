@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
+import { assertOperationalTenantId, resolveBusinessTenantIdFromDb } from '@/lib/tenant/tenant-policy';
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -16,21 +17,16 @@ export interface AdminActionResult<T = unknown> {
   error?: string;
 }
 
-const DEFAULT_TENANT_UUID = '00000000-0000-0000-0000-000000000010';
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const KNOWN_FIXTURE_IDS = new Set(['tenant-demo', 'tenant-test', 'demo', 'default']);
 
 function validateAndResolveTenantUuid(id?: string): string {
-  if (!id) {
-    return DEFAULT_TENANT_UUID;
-  }
-
-  if (KNOWN_FIXTURE_IDS.has(id)) {
-    return DEFAULT_TENANT_UUID;
+  if (!id || KNOWN_FIXTURE_IDS.has(id)) {
+    throw new Error('TENANT_NOT_RESOLVED: Tenant obrigatório para registrar esta operação.');
   }
 
   if (UUID_REGEX.test(id)) {
-    return id;
+    return assertOperationalTenantId(id, 'Operação administrativa');
   }
 
   throw new Error(`INVALID_TENANT_UUID: O identificador de tenant "${id}" é inválido e malformado.`);
@@ -116,12 +112,23 @@ export async function moderatePublicationStatusAction(input: {
 }
 
 export async function allocateFounderStatusAction(input: {
-  tenantId: string;
+  tenantId?: string;
   businessId: string;
   isFounder: boolean;
   reason?: string;
 }): Promise<AdminActionResult> {
-  const validTenantId = validateAndResolveTenantUuid(input.tenantId);
+  // O tenant da empresa é lido do banco antes de qualquer gravação. Um tenantId
+  // informado precisa coincidir com ele. Falha aqui interrompe a ação (sem fallback).
+  let validTenantId: string;
+  try {
+    const businessTenantId = await resolveBusinessTenantIdFromDb(await createServerSideClient(), input.businessId);
+    if (input.tenantId && validateAndResolveTenantUuid(input.tenantId) !== businessTenantId) {
+      return { success: false, error: 'Tenant informado diverge do tenant da empresa.' };
+    }
+    validTenantId = businessTenantId;
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Tenant da empresa não identificado.' };
+  }
 
   try {
     const supabase = await createServerSideClient();

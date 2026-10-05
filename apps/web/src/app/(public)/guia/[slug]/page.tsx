@@ -314,16 +314,9 @@ const getPublicBusiness = cache(async (slug: string) => {
       is_coluna_honra: isColunaHonra,
       lodge_name: lodgeNameFromLink,
       contacts: (contactsRows || []) as any,
-      locations: [
-        {
-          street: bObj.street || 'Rua das Palmeiras',
-          number: bObj.number || '500',
-          neighborhood: bObj.neighborhood || 'Bela Vista',
-          city: bObj.city || 'São Paulo',
-          state: bObj.state || 'SP',
-          is_headquarters: true,
-        },
-      ] as any,
+      // Localização real vem de business_locations (ver bloco de localização abaixo).
+      // Não há endereço padrão: sem localização cadastrada, nada é exibido.
+      locations: [] as any,
       media: (mediaRows || []) as any,
       services: (servicesRows || []).map((s: any) => ({
         id: s.id,

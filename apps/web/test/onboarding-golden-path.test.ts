@@ -95,6 +95,7 @@ vi.mock('@supabase/supabase-js', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createServerSideClient: vi.fn().mockImplementation(() => Promise.resolve(createMockSupabaseClient())),
+  resolveTenantIdServer: vi.fn().mockResolvedValue('00000000-0000-0000-0000-000000000000'),
 }));
 
 import {
@@ -146,6 +147,7 @@ describe('BLOCO 5 — SUÍTE INTEGRADA DO GOLDEN PATH DO ONBOARDING DO ANUNCIANT
   it('4. Validação de Vínculo Maçônico (Passo 3): Formulário grava dados', async () => {
     const res = await saveStepDataAction({
       step: 3,
+      businessId: 'biz-golden-1',
       data: {
         masonicRelation: 'brother',
         lodgeName: 'Lodge Fraternidade',
@@ -160,6 +162,7 @@ describe('BLOCO 5 — SUÍTE INTEGRADA DO GOLDEN PATH DO ONBOARDING DO ANUNCIANT
   it('5. Seleção de Plano (Passo 4): Exibe Bronze, Prata e Ouro', async () => {
     const res = await saveStepDataAction({
       step: 4,
+      businessId: 'biz-golden-1',
       data: { planCode: 'ouro' },
     });
     expect(res.success).toBe(true);
@@ -168,6 +171,7 @@ describe('BLOCO 5 — SUÍTE INTEGRADA DO GOLDEN PATH DO ONBOARDING DO ANUNCIANT
   it('6. Troca de plano atualiza valor do resumo', async () => {
     const res = await saveStepDataAction({
       step: 4,
+      businessId: 'biz-golden-1',
       data: { planCode: 'prata' },
     });
     expect(res.success).toBe(true);

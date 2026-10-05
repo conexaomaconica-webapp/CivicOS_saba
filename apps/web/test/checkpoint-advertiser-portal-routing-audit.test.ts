@@ -9,6 +9,7 @@ vi.mock('next/headers', () => ({
 
 const mockBiz = {
   id: 'biz_001',
+  tenant_id: '00000000-0000-0000-0000-000000000000',
   name: 'Comandos - Terceirização e Segurança Eletrônica',
   slug: 'comandos-terceirizacao-e-seguranca-eletronica',
   cnpj: '12.345.678/0001-90',

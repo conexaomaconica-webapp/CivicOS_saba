@@ -55,7 +55,7 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
 
   return (
     <section
-      className="dh-container py-4"
+      className="dh-container dh-mobile-visible-section py-4"
       aria-roledescription="carrossel"
       aria-label="Destaques"
       onMouseEnter={() => setPaused(true)}

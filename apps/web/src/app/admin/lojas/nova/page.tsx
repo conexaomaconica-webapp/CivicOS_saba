@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { getCanonicalAdminTenantAction } from '@/app/actions/admin-tenant-context';
 import { createAdminLodgeAction, updateAdminLodgeAction } from '@/lib/admin/admin-lodges-service';
 import { BrazilianLocationFields } from '@/components/admin/BrazilianLocationFields';
 import { Landmark, ArrowLeft, Save, Loader2, Upload, Image as ImageIcon } from 'lucide-react';
@@ -146,8 +147,9 @@ export default function AdminNovaLojaPage() {
 
       const orgId = res.data.id;
       const supabase = createClient();
-      const { data: profileData } = await (supabase as any).from('profiles').select('tenant_id').maybeSingle();
-      const tenantId = profileData?.tenant_id || '00000000-0000-0000-0000-000000000010';
+      const tenantResult = await getCanonicalAdminTenantAction();
+      if (!tenantResult.success || !tenantResult.tenantId) throw new Error(tenantResult.error || 'Tenant canônico não identificado.');
+      const tenantId = tenantResult.tenantId;
 
       let uploadedLogoUrl: string | null = null;
       let uploadedCoverUrl: string | null = null;

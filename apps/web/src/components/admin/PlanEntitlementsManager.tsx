@@ -253,7 +253,7 @@ export function PlanEntitlementsManager({ initialData }: PlanEntitlementsManager
       </div>
 
       {/* BANNER 2: PROTEÇÃO DE HISTÓRICO CONTRATUAL */}
-      <div className="p-3 bg-amber-950/20 border border-amber-800/40 rounded-xl text-xs text-amber-900 flex items-center justify-between gap-3">
+      <div className="p-3 bg-amber-950/20 border border-amber-800/40 rounded-xl text-xs text-amber-900 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0" />
           <span>

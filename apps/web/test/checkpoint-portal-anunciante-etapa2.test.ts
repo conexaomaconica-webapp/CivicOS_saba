@@ -18,6 +18,7 @@ vi.mock('../src/lib/supabase/server', () => ({
             maybeSingle: vi.fn().mockResolvedValue({
               data: {
                 id: 'biz_001',
+                tenant_id: '00000000-0000-0000-0000-000000000000',
                 name: 'Comandos - Terceirização e Segurança Eletrônica',
                 slug: 'comandos-terceirizacao-e-seguranca-eletronica',
                 phone: '(11) 3456-7890',

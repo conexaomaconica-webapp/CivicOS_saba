@@ -2,6 +2,7 @@ import React from 'react';
 import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import Image from 'next/image';
+import { assertOperationalTenantId } from '@/lib/tenant/tenant-policy';
 
 interface BusinessDashboardPageProps {
   params: Promise<{ id: string }>;
@@ -22,7 +23,7 @@ export default async function BusinessDashboardPage({ params }: BusinessDashboar
     .eq('id', businessId)
     .maybeSingle();
 
-  const tenantId = business?.tenant_id || '00000000-0000-0000-0000-000000000001';
+  const tenantId = assertOperationalTenantId(business?.tenant_id, 'Empresa');
 
   // Busca plano vigente
   const { data: planCode } = await supabase.rpc('_effective_business_plan', {

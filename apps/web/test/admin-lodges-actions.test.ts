@@ -13,6 +13,15 @@ vi.mock('@/lib/admin/admin-auth-helper', () => ({
   assertPlatformAdminAccess: vi.fn(),
 }));
 
+vi.mock('@/lib/admin/admin-tenant-context', () => ({
+  resolveCanonicalAdminTenant: vi.fn().mockResolvedValue({
+    supabase: {},
+    user: { id: 'admin-123' },
+    tenantId: '00000000-0000-0000-0000-000000000000',
+    host: 'conexaomaconica.com.br',
+  }),
+}));
+
 import { assertPlatformAdminAccess } from '@/lib/admin/admin-auth-helper';
 import { createAdminLodgeAction, updateAdminLodgeAction } from '@/lib/admin/admin-lodges-service';
 
@@ -65,7 +74,7 @@ describe('SUÍTE DE TESTES — SERVER ACTIONS DE LOJAS MAÇÔNICAS (ADMIN)', () 
     const mockSupabase = {
       from: vi.fn((table: string) => {
         if (table === 'profiles') {
-          return { select: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: { tenant_id: '00000000-0000-0000-0000-000000000010' } }) }) };
+          return { select: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: { tenant_id: '00000000-0000-0000-0000-000000000000' } }) }) };
         }
         if (table === 'organizations') {
           return { insert: mockInsert };
@@ -102,7 +111,7 @@ describe('SUÍTE DE TESTES — SERVER ACTIONS DE LOJAS MAÇÔNICAS (ADMIN)', () 
     // Verificar se o insert no servidor usou tenant_id canônico e gravou is_featured
     expect(mockInsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        tenant_id: '00000000-0000-0000-0000-000000000010',
+        tenant_id: '00000000-0000-0000-0000-000000000000',
         name: 'Loja Luz do Oriente',
         code_number: 100,
         logo_url: 'https://storage.local/logo.png',
@@ -127,7 +136,7 @@ describe('SUÍTE DE TESTES — SERVER ACTIONS DE LOJAS MAÇÔNICAS (ADMIN)', () 
     const mockSupabase = {
       from: vi.fn((table: string) => {
         if (table === 'profiles') {
-          return { select: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: { tenant_id: '00000000-0000-0000-0000-000000000010' } }) }) };
+          return { select: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: { tenant_id: '00000000-0000-0000-0000-000000000000' } }) }) };
         }
         return { insert: mockInsert };
       }),
@@ -168,7 +177,7 @@ describe('SUÍTE DE TESTES — SERVER ACTIONS DE LOJAS MAÇÔNICAS (ADMIN)', () 
     const mockSelectExisting = vi.fn().mockReturnValue({
       eq: vi.fn().mockReturnValue({
         maybeSingle: vi.fn().mockResolvedValue({
-          data: { slug: 'loja-antiga-50', tenant_id: '00000000-0000-0000-0000-000000000010' },
+          data: { slug: 'loja-antiga-50', tenant_id: '00000000-0000-0000-0000-000000000000' },
         }),
       }),
     });
@@ -176,7 +185,7 @@ describe('SUÍTE DE TESTES — SERVER ACTIONS DE LOJAS MAÇÔNICAS (ADMIN)', () 
     const mockSupabase = {
       from: vi.fn((table: string) => {
         if (table === 'profiles') {
-          return { select: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: { tenant_id: '00000000-0000-0000-0000-000000000010' } }) }) };
+          return { select: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: { tenant_id: '00000000-0000-0000-0000-000000000000' } }) }) };
         }
         if (table === 'organizations') {
           return {
@@ -230,7 +239,7 @@ describe('SUÍTE DE TESTES — SERVER ACTIONS DE LOJAS MAÇÔNICAS (ADMIN)', () 
     const mockSupabase = {
       from: vi.fn((table: string) => {
         if (table === 'profiles') {
-          return { select: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: { tenant_id: '00000000-0000-0000-0000-000000000010' } }) }) };
+          return { select: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: { tenant_id: '00000000-0000-0000-0000-000000000000' } }) }) };
         }
         if (table === 'organizations') return { insert: mockInsert };
         return { insert: vi.fn().mockResolvedValue({}) };
@@ -268,7 +277,7 @@ describe('SUÍTE DE TESTES — SERVER ACTIONS DE LOJAS MAÇÔNICAS (ADMIN)', () 
     });
 
     const mockMaybeSingleProfile = vi.fn().mockResolvedValue({
-      data: { tenant_id: '00000000-0000-0000-0000-000000000010' },
+      data: { tenant_id: '00000000-0000-0000-0000-000000000000' },
     });
 
     const mockSupabase = {
@@ -295,7 +304,7 @@ describe('SUÍTE DE TESTES — SERVER ACTIONS DE LOJAS MAÇÔNICAS (ADMIN)', () 
     expect(res.success).toBe(true);
     expect(mockInsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        tenant_id: '00000000-0000-0000-0000-000000000010',
+        tenant_id: '00000000-0000-0000-0000-000000000000',
       })
     );
   });

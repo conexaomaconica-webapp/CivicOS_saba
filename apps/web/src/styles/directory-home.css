@@ -515,6 +515,48 @@
   .dh-filter-select { width: 100%; min-width: 0; }
   .dh-carousel-card {
     grid-template-columns: 1fr;
+    min-height: 0;
+    margin-block: 16px;
+  }
+  .dh-mobile-visible-section {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100%;
+  }
+  .dh-carousel-card__content {
+    padding: 24px 20px;
+  }
+  .dh-carousel-card__title {
+    font-size: 25px;
+  }
+  .dh-carousel-card__media {
+    width: 100%;
+    height: 210px;
+    min-height: 210px;
+  }
+  .dh-carousel-card > picture,
+  .dh-carousel-card > a > picture {
+    min-height: 210px;
+  }
+  .dh-categories-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .dh-category-card {
+    width: 100%;
+    min-width: 0;
+    padding: 16px 10px;
+  }
+  .dh-section-title {
+    font-size: 23px;
+    line-height: 1.2;
+  }
+  .dh-logo-marquee-track {
+    display: flex !important;
+    visibility: visible !important;
   }
   .dh-map-box {
     grid-template-columns: 1fr;

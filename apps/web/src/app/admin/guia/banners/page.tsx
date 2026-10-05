@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Plus, Trash2, Edit2, Loader2, CheckCircle2, X } from 'lucide-react';
+import { getCanonicalAdminTenantAction } from '@/app/actions/admin-tenant-context';
 
 type Banner = {
   id: string;
@@ -36,7 +37,7 @@ export default function AdminGuiaBannersPage() {
   const [subtitle, setSubtitle] = useState('DESTAQUE DA SEMANA');
   const [ctaText, setCtaText] = useState('Conhecer empresas');
   const [ctaUrl, setCtaUrl] = useState('/guia');
-  const [imageDesktopUrl, setImageDesktopUrl] = useState('/visual-lab/assets/banner-reference');
+  const [imageDesktopUrl, setImageDesktopUrl] = useState('');
   const [imageMobileUrl, setImageMobileUrl] = useState('');
   const [city, setCity] = useState('');
   const [displayOrder, setDisplayOrder] = useState(1);
@@ -48,12 +49,9 @@ export default function AdminGuiaBannersPage() {
       const supabase = createClient();
       const { data: authData } = await supabase.auth.getUser();
       if (!authData.user) throw new Error('Usuário não autenticado.');
-      const { data: profileData } = await (supabase as any)
-        .from('profiles')
-        .select('tenant_id')
-        .eq('id', authData.user.id)
-        .maybeSingle();
-      const tid = profileData?.tenant_id;
+      const tenantResult = await getCanonicalAdminTenantAction();
+      const tid = tenantResult.tenantId;
+      if (!tenantResult.success) throw new Error(tenantResult.error);
       if (!tid) throw new Error('Tenant do administrador não identificado.');
       setTenantId(tid);
 
@@ -94,7 +92,7 @@ export default function AdminGuiaBannersPage() {
       setSubtitle('DESTAQUE DA SEMANA');
       setCtaText('Conhecer empresas');
       setCtaUrl('/guia');
-      setImageDesktopUrl('/visual-lab/assets/banner-reference');
+      setImageDesktopUrl('');
       setImageMobileUrl('');
       setCity('');
       setDisplayOrder(banners.length + 1);
@@ -191,7 +189,8 @@ export default function AdminGuiaBannersPage() {
         {banners.length === 0 ? (
           <div className="p-8 text-center text-gray-500 text-sm">Nenhum banner cadastrado. Clique no botão acima para adicionar o primeiro.</div>
         ) : (
-          <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="bg-gray-50 text-gray-700 border-b font-semibold">
               <tr>
                 <th className="p-3">Ordem</th>
@@ -227,6 +226,7 @@ export default function AdminGuiaBannersPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

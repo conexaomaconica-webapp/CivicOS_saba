@@ -125,7 +125,22 @@ export class AsaasPaymentProvider implements IPaymentProvider {
       if (searchRes.ok) {
         const searchJson = await searchRes.json();
         if (searchJson?.data && searchJson.data.length > 0) {
-          return { customerId: searchJson.data[0].id };
+          const existingCustomerId: string = searchJson.data[0].id;
+          // Clientes criados antes do ajuste podem ainda enviar notificações do Asaas.
+          // Desativa no cadastro existente; falha aqui não impede a cobrança.
+          try {
+            await fetch(`${this.baseUrl}/customers/${existingCustomerId}`, {
+              method: 'PUT',
+              headers: {
+                access_token: this.apiKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ notificationDisabled: true }),
+            });
+          } catch {
+            // Ignorado de propósito: a notificação do Asaas é secundária à cobrança.
+          }
+          return { customerId: existingCustomerId };
         }
       }
 

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { Scroll, ArrowLeft, Plus, Edit, Trash2, Loader2, Save } from 'lucide-react';
+import { getCanonicalAdminTenantAction } from '@/app/actions/admin-tenant-context';
 
 type PotencyItem = {
   id: string;
@@ -28,8 +29,9 @@ export default function AdminPotenciasPage() {
   const fetchPotencies = async () => {
     try {
       const supabase = createClient();
-      const { data: profileData } = await (supabase as any).from('profiles').select('tenant_id').maybeSingle();
-      const tid = profileData?.tenant_id || '00000000-0000-0000-0000-000000000010';
+      const tenantResult = await getCanonicalAdminTenantAction();
+      if (!tenantResult.success || !tenantResult.tenantId) throw new Error(tenantResult.error || 'Tenant canônico não identificado.');
+      const tid = tenantResult.tenantId;
       setTenantId(tid);
 
       const { data } = await (supabase as any).from('masonic_potencies').select('*').eq('tenant_id', tid).order('name', { ascending: true });
@@ -143,7 +145,8 @@ export default function AdminPotenciasPage() {
       </div>
 
       <div className="bg-white border rounded-2xl overflow-hidden shadow-2xs">
-        <table className="w-full text-left border-collapse text-xs">
+          <div className="overflow-x-auto">
+        <table className="min-w-[640px] w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-stone-50 border-b text-stone-700 font-bold uppercase">
               <th className="p-4">Sigla</th>
@@ -178,6 +181,7 @@ export default function AdminPotenciasPage() {
             ))}
           </tbody>
         </table>
+          </div>
       </div>
 
       {/* Modal CRUD */}

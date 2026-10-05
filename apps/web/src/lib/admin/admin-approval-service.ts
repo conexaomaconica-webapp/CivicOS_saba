@@ -7,6 +7,7 @@ import { getCommercialPlanName } from '@/lib/admin/approval-display';
 import { evaluateBusinessProfileReadiness } from '@/lib/admin/admin-commercial-dossier-readiness';
 import { resolveCanonicalApprovalFlags } from '@/lib/admin/approval-canonical-status';
 import { resolveSignedBusinessContract } from '@/lib/contracts/contract-signature-status';
+import { assertOperationalTenantId } from '@/lib/tenant/tenant-policy';
 
 export interface ApprovalRequirement {
   id: string;
@@ -156,6 +157,11 @@ export interface ApprovalDossier360 {
     after_state?: any;
     created_at: string;
   }>;
+}
+
+async function resolveBusinessTenantId(supabase: any, businessId: string): Promise<string> {
+  const { data } = await supabase.from('businesses').select('tenant_id').eq('id', businessId).maybeSingle();
+  return assertOperationalTenantId(data?.tenant_id, `Empresa ${businessId}`);
 }
 
 export async function getApprovalDirectoryListAction(statusFilter: string = 'todos') {
@@ -625,7 +631,7 @@ export async function updateBusinessDataBeforeApprovalAction(
       .eq('id', businessId);
 
     await (supabase as any).from('admin_audit_logs').insert({
-      tenant_id: '00000000-0000-0000-0000-000000000010',
+      tenant_id: await resolveBusinessTenantId(supabase, businessId),
       admin_user_id: 'admin-user',
       action_type: 'UPDATE_COMPANY_DATA_BEFORE_APPROVAL',
       entity_type: 'business',
@@ -666,7 +672,7 @@ export async function updateBusinessMediaBeforeApprovalAction(
       .eq('id', businessId);
 
     await (supabase as any).from('admin_audit_logs').insert({
-      tenant_id: '00000000-0000-0000-0000-000000000010',
+      tenant_id: await resolveBusinessTenantId(supabase, businessId),
       admin_user_id: 'admin-user',
       action_type: 'UPDATE_COMPANY_MEDIA_BEFORE_APPROVAL',
       entity_type: 'business',
@@ -690,7 +696,7 @@ export async function validateMasonicLinkAction(businessId: string, status: 'ver
     const supabase = await createServerSideClient();
 
     await (supabase as any).from('admin_audit_logs').insert({
-      tenant_id: '00000000-0000-0000-0000-000000000010',
+      tenant_id: await resolveBusinessTenantId(supabase, businessId),
       admin_user_id: 'admin-user',
       action_type: 'VALIDATE_MASONIC_LINK',
       entity_type: 'business',
@@ -721,7 +727,7 @@ export async function requestBusinessCorrectionAction(businessId: string, observ
       .eq('id', businessId);
 
     await (supabase as any).from('admin_audit_logs').insert({
-      tenant_id: '00000000-0000-0000-0000-000000000010',
+      tenant_id: await resolveBusinessTenantId(supabase, businessId),
       admin_user_id: 'admin-user',
       action_type: 'REQUEST_BUSINESS_CORRECTION',
       entity_type: 'business',
@@ -766,7 +772,7 @@ export async function approveEligibilityAndGenerateLinkAction(businessId: string
       .eq('id', businessId)
       .maybeSingle();
 
-    const tenantId = bizData?.tenant_id || '00000000-0000-0000-0000-000000000010';
+    const tenantId = assertOperationalTenantId(bizData?.tenant_id, `Empresa ${businessId}`);
 
     const { data: existingLink } = await (supabase as any)
       .from('business_masonic_links')
@@ -883,7 +889,7 @@ export async function finalizeApprovalDecisionAction(
         .eq('id', businessId);
 
       await (supabase as any).from('admin_audit_logs').insert({
-        tenant_id: '00000000-0000-0000-0000-000000000010', // Or derive from current tenant context
+        tenant_id: await resolveBusinessTenantId(supabase, businessId),
         admin_user_id: 'admin-user', // Should be auth.uid() in real env
         action_type: `DECISION_${decision.toUpperCase()}`,
         entity_type: 'business',

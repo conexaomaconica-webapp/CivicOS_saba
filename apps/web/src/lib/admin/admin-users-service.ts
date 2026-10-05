@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
+import { resolveRequestOperationalTenantId } from '@/lib/tenant/tenant-policy';
 import { revalidatePath } from 'next/cache';
 import { validateEmail, validateName, validatePassword } from '@/lib/auth/validation';
 import type { Database } from '@/types/database.types';
@@ -147,14 +148,8 @@ export async function createAdminUserAction(
     const validationError = validateName(name) ?? validateEmail(email) ?? validatePassword(password);
     if (validationError) return { success: false, error: validationError };
 
-    // Resolve tenant do admin atual
-    const { data: currentProfile } = await adminClient
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', currentAdmin.id)
-      .maybeSingle();
-
-    const tenantId = currentProfile?.tenant_id || '00000000-0000-0000-0000-000000000010';
+    // Tenant administrado pelo domínio atual; o perfil do admin não define o destino.
+    const tenantId = await resolveRequestOperationalTenantId(adminClient);
 
     // Cria o usuário no Supabase Auth
     const { data: createdAuth, error: authError } = await adminClient.auth.admin.createUser({

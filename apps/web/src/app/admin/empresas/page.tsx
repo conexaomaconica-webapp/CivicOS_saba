@@ -29,6 +29,8 @@ import {
   Check,
   EyeOff,
   Plus,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 
 
@@ -130,6 +132,7 @@ export default function AdminBusinessesDirectoryPage() {
   const [visibleColumns, setVisibleColumns] = useState<Record<ColumnKey, boolean>>(DEFAULT_VISIBLE_COLUMNS);
   const [colWidths, setColWidths] = useState<Record<ColumnKey, number>>(DEFAULT_COL_WIDTHS);
   const [showColumnMenu, setShowColumnMenu] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const columnMenuRef = useRef<HTMLDivElement>(null);
 
   // REDIMENSIONAMENTO DRAG-AND-DROP DE COLUNAS
@@ -569,6 +572,32 @@ export default function AdminBusinessesDirectoryPage() {
       </div>
 
 
+      {/* 1.1. ALTERNÂNCIA ENTRE TABELA E CARDS */}
+      <div className="flex justify-end gap-1 mb-2">
+        <button
+          type="button"
+          onClick={() => setViewMode('table')}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+            viewMode === 'table'
+              ? 'bg-[#3B0B14] text-white border-[#3B0B14]'
+              : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+          }`}
+        >
+          <List className="w-4 h-4" /> Tabela
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode('cards')}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+            viewMode === 'cards'
+              ? 'bg-[#3B0B14] text-white border-[#3B0B14]'
+              : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+          }`}
+        >
+          <LayoutGrid className="w-4 h-4" /> Cards
+        </button>
+      </div>
+
       {/* 2. TABELA DE EMPRESAS COM DUAL HORIZONTAL SCROLLBAR E COLUNAS REDIMENSIONÁVEIS */}
       <div className="bg-white border border-stone-300 rounded-2xl shadow-xs overflow-hidden">
         {loading ? (
@@ -581,6 +610,46 @@ export default function AdminBusinessesDirectoryPage() {
             <p className="text-sm font-bold text-stone-800">
               Nenhuma empresa encontrada com estes filtros.
             </p>
+          </div>
+        ) : viewMode === 'cards' ? (
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {items.map((item) => (
+              <Link
+                key={item.id}
+                href={`/admin/empresas/${item.id}`}
+                className="block rounded-2xl border border-stone-200 bg-white p-4 hover:border-[#C9A227] hover:shadow-md transition-all min-w-0"
+              >
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-stone-100 border border-stone-200 flex items-center justify-center text-[#3B0B14] font-serif font-bold shrink-0">
+                    {item.name.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-serif font-bold text-stone-900 truncate">{item.name}</div>
+                    <div className="text-[11px] text-stone-500 font-semibold truncate">
+                      {item.category} • {item.city}{item.state ? `, ${item.state}` : ''}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 space-y-0.5 text-xs text-stone-700 min-w-0">
+                  <div className="truncate">
+                    <span className="text-stone-400">Responsável:</span>{' '}
+                    <span className="font-bold text-stone-900">{item.owner_name}</span>
+                  </div>
+                  <div className="text-[11px] text-stone-500 font-mono truncate">{item.owner_email}</div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
+                  <span className="px-2 py-0.5 rounded-full bg-stone-100 border border-stone-200 font-bold uppercase">{item.plan_code}</span>
+                  <span className="px-2 py-0.5 rounded-full bg-stone-100 border border-stone-200 font-bold">{item.publication_status}</span>
+                  <span className="px-2 py-0.5 rounded-full bg-stone-100 border border-stone-200 font-bold">Completude {item.completeness_percent}%</span>
+                  {item.is_verified && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold">Verificada</span>
+                  )}
+                  {item.is_pedra_fundamental && (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-300 text-amber-900 font-bold">Pedra Fundamental</span>
+                  )}
+                </div>
+              </Link>
+            ))}
           </div>
         ) : (
           <div>

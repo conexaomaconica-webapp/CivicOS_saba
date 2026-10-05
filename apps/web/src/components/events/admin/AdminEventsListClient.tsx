@@ -362,8 +362,13 @@ export function AdminEventsListClient({ initialEvents }: Props) {
         .ev-stat-label { font-size: 0.6875rem; color: #6B5E62; font-weight: 600; }
         
         .ev-card-actions {
-          display: flex; align-items: center; justify-content: flex-end; gap: 0.625rem;
+          display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.625rem;
           padding: 0.75rem 1.5rem; background: #FAF8F5; border-top: 1px solid #F0ECE6;
+        }
+        /* Mobile: os botões quebram linha e dividem a largura, sem sair da tela */
+        @media (max-width: 640px) {
+          .ev-card-actions { justify-content: stretch; padding: 0.75rem 1rem; }
+          .ev-card-actions > * { flex: 1 1 auto; justify-content: center; }
         }
         .ev-action-btn {
           display: flex; align-items: center; gap: 0.375rem; padding: 0.4375rem 0.875rem;

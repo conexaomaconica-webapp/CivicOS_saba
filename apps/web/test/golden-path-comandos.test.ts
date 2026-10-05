@@ -101,7 +101,7 @@ vi.mock('../src/lib/supabase/server', () => ({
         insert: () => chain,
         update: () => chain,
         eq: () => chain,
-        maybeSingle: () => Promise.resolve({ data: { id: '00000000-0000-0000-0000-000000000001', plan_code: 'prata' }, error: null }),
+        maybeSingle: () => Promise.resolve({ data: { id: '00000000-0000-0000-0000-000000000001', tenant_id: '00000000-0000-0000-0000-000000000000', plan_code: 'prata' }, error: null }),
         single: () => Promise.resolve({ data: { id: '00000000-0000-0000-0000-000000000001', plan_code: 'prata' }, error: null }),
         then: (resolve: any) => resolve({ data: [{ id: '00000000-0000-0000-0000-000000000001' }], count: 1, error: null }),
       };

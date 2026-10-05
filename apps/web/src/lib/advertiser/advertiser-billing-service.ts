@@ -2,6 +2,7 @@
 
 import { createServerSideClient } from '@/lib/supabase/server';
 import { getSignedContractSnapshotAction } from '@/app/actions/contract-actions';
+import { assertOperationalTenantId } from '@/lib/tenant/tenant-policy';
 
 export interface AdvertiserInvoiceItem {
   id: string;
@@ -129,7 +130,7 @@ export async function getAdvertiserPlanBillingDTOAction(targetBusinessId?: strin
     }
 
     const businessId = activeBiz.id;
-    const tenantId = activeBiz.tenant_id || '00000000-0000-0000-0000-000000000001';
+    const tenantId = assertOperationalTenantId(activeBiz.tenant_id, `Empresa ${businessId}`);
 
     // 2. Consulta Canônica de Assinatura & Versão do Plano
     const { data: subData } = await (supabase as any)

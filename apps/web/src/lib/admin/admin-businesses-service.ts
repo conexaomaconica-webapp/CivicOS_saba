@@ -1,6 +1,7 @@
 'use server';
 
 import { assertPlatformAdminAccess } from './admin-auth-helper';
+import { resolveCanonicalAdminTenant } from './admin-tenant-context';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { resolveLogoUrl } from '@/lib/business/business-media-helpers';
@@ -58,6 +59,62 @@ function normalizeBusinessSlug(value: string): string {
     .replace(/-+$/g, '');
 }
 
+/**
+ * Remove de um texto de endereço os trechos de cidade, UF e CEP que já vivem em
+ * colunas próprias (business_locations). Evita duplicar esses dados a cada salvamento.
+ */
+function stripLocationTail(address: string, city: string, state: string): string {
+  const cityKey = city.trim().toLowerCase();
+  const segments = address
+    .split(',')
+    .map((segment) => segment.trim())
+    .filter((segment) => {
+      if (!segment) return false;
+      if (/^CEP\b/i.test(segment)) return false;
+      if (/^\d{5}-?\d{3}$/.test(segment)) return false;
+      if (/\s-\s[A-Za-z]{2}$/.test(segment)) return false;
+      if (cityKey && segment.toLowerCase() === cityKey) return false;
+      if (state.trim() && segment.toLowerCase() === state.trim().toLowerCase()) return false;
+      return true;
+    });
+  return segments.join(', ');
+}
+
+async function geocodeBusinessAddress(input: {
+  address: string;
+  city: string;
+  state: string;
+}): Promise<{ latitude: number; longitude: number } | null> {
+  const query = [input.address, input.city, input.state, 'Brasil']
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(', ');
+
+  if (!input.address || !input.city || !input.state) return null;
+
+  try {
+    const params = new URLSearchParams({ q: query, format: 'jsonv2', limit: '1', countrycodes: 'br' });
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'ConexaoMaconica/1.0 (geocodificacao administrativa)',
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return null;
+
+    const results = (await response.json()) as Array<{ lat: string; lon: string }>;
+    const latitude = Number(results[0]?.lat);
+    const longitude = Number(results[0]?.lon);
+    return Number.isFinite(latitude) && Number.isFinite(longitude)
+      ? { latitude, longitude }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function listAdminBusinessCategoriesAction(tenantId: string): Promise<{
   success: boolean;
   categories: Array<{ id: string; name: string }>;
@@ -88,15 +145,14 @@ export async function createAdminBusinessCategoryAction(tenantId: string, rawNam
   error?: string;
 }> {
   try {
-    const { user } = await assertPlatformAdminAccess();
+    const { user, tenantId: canonicalTenantId } = await resolveCanonicalAdminTenant();
+    if (tenantId !== canonicalTenantId) return { success: false, error: 'Tenant informado diverge do tenant administrado.' };
     const name = rawName.trim().replace(/\s+/g, ' ');
     if (name.length < 3 || name.length > 80) return { success: false, error: 'A categoria deve ter entre 3 e 80 caracteres.' };
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !serviceRoleKey) return { success: false, error: 'Configuração segura do Supabase indisponível.' };
     const adminClient = createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
-    const { data: tenant } = await adminClient.from('tenants').select('id').eq('id', tenantId).maybeSingle();
-    if (!tenant) return { success: false, error: 'Tenant inválido.' };
     const { data: existing } = await adminClient
       .from('categories')
       .select('id, name')
@@ -768,6 +824,20 @@ export async function getAdminBusinessesListAction(params?: {
       } catch (_e) { }
     }
 
+    // Nome do responsável cadastrado para cada empresa (mesma fonte da tela 360).
+    const responsibleNameMap: Record<string, string> = {};
+    if (bizIds.length > 0) {
+      try {
+        const { data: responsibles } = await (supabase as any)
+          .from('business_responsibles')
+          .select('business_id, name')
+          .in('business_id', bizIds);
+        for (const r of responsibles || []) {
+          if (r.name && !responsibleNameMap[r.business_id]) responsibleNameMap[r.business_id] = r.name;
+        }
+      } catch (_e) { }
+    }
+
     let items: AdminBusinessListItem[] = (data || []).map((b: any) => {
       const effectivePlan = normalizeCanonicalPlanCode(allPlanMap[b.id] || b.plan_tier || b.plan_code);
       const recs = allRecMap[b.id] || [];
@@ -785,14 +855,14 @@ export async function getAdminBusinessesListAction(params?: {
       });
       return {
         id: b.id,
-        tenant_id: b.tenant_id || '00000000-0000-0000-0000-000000000001',
+        tenant_id: b.tenant_id,
         name: b.name || 'Empresa Anunciante',
         legal_name: b.legal_name || b.name,
         cnpj_cpf: b.cnpj_cpf || b.cnpj || 'Não informado',
         category: categoryMap[b.id]?.name || b.category || 'Geral',
         city: locationMap[b.id]?.city || b.city || 'Não informado',
         state: locationMap[b.id]?.state || b.state || '',
-        owner_name: 'Anunciante Titular',
+        owner_name: responsibleNameMap[b.id] || 'Responsável não informado',
         owner_email: b.email || 'contato@anunciante.com',
         publication_status: (b.publication_status || 'published') as any,
         payment_status: b.publication_status === 'published' ? 'paid' : 'pending',
@@ -946,11 +1016,13 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       complement?: string;
       neighborhood?: string;
       postal_code?: string;
+      latitude?: number;
+      longitude?: number;
     } = {};
     try {
       const { data: locs } = await (supabase as any)
         .from('business_locations')
-        .select('city, state, street, number, complement, neighborhood, postal_code, is_headquarters')
+        .select('city, state, street, number, complement, neighborhood, postal_code, latitude, longitude, is_headquarters')
         .eq('business_id', businessId);
       if (locs && locs.length > 0) {
         const primary = locs.find((l: any) => l.is_headquarters === true) || locs[0];
@@ -958,7 +1030,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
           primary.street ? `${primary.street}${primary.number ? ', ' + primary.number : ''}` : '',
           primary.complement,
           primary.neighborhood,
-          primary.city ? `${primary.city} - ${primary.state || 'SP'}` : '',
+          primary.city ? [primary.city, primary.state].filter(Boolean).join(' - ') : '',
           primary.postal_code ? `CEP ${primary.postal_code}` : '',
         ].filter(Boolean);
 
@@ -971,6 +1043,8 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
           complement: primary.complement || undefined,
           neighborhood: primary.neighborhood || undefined,
           postal_code: primary.postal_code || undefined,
+          latitude: primary.latitude == null ? undefined : Number(primary.latitude),
+          longitude: primary.longitude == null ? undefined : Number(primary.longitude),
         };
       }
     } catch (_e) { }
@@ -1433,14 +1507,16 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
         category_id: primaryCategory?.id,
         category: primaryCategory?.name || b.category || 'Geral',
         description: b.description || undefined,
-        city: locationData.city || b.city || 'São Paulo',
-        state: locationData.state || b.state || 'SP',
+        city: locationData.city || b.city || '',
+        state: locationData.state || b.state || '',
         address: locationData.address || (b.street ? `${b.street}, ${b.number || ''}` : (b.address || undefined)),
         street: locationData.street || b.street || undefined,
         number: locationData.number || b.number || undefined,
         complement: locationData.complement || b.complement || undefined,
         neighborhood: locationData.neighborhood || b.neighborhood || undefined,
         postal_code: locationData.postal_code || b.postal_code || undefined,
+        latitude: locationData.latitude,
+        longitude: locationData.longitude,
         phone: contactsMap['phone'] || b.phone || undefined,
         whatsapp: contactsMap['whatsapp'] || b.whatsapp || b.phone || undefined,
         email: contactsMap['email'] || b.email || undefined,
@@ -2123,7 +2199,12 @@ export async function updateAdminBusinessDetailsAction(
         .eq('business_id', businessId);
 
       const primaryLoc = (locs || []).find((l: any) => l.is_headquarters === true) || (locs || [])[0];
-      const canonicalAddress = payload.address?.trim() || 'Endereço não informado';
+      const canonicalAddress =
+        stripLocationTail(payload.address?.trim() || '', canonicalCity.name, stateVal) || 'Endereço não informado';
+
+      const coordinates = payload.address?.trim()
+        ? await geocodeBusinessAddress({ address: payload.address.trim(), city: canonicalCity.name, state: stateVal })
+        : null;
 
       if (primaryLoc) {
         const { error: locationUpdateError } = await (supabase as any)
@@ -2134,6 +2215,7 @@ export async function updateAdminBusinessDetailsAction(
             state: stateVal,
             street: canonicalAddress,
             number: null,
+            ...(coordinates || {}),
             updated_at: new Date().toISOString(),
           })
           .eq('id', primaryLoc.id);
@@ -2153,6 +2235,8 @@ export async function updateAdminBusinessDetailsAction(
             state: stateVal,
             postal_code: '00000-000',
             street: canonicalAddress,
+            latitude: coordinates?.latitude ?? null,
+            longitude: coordinates?.longitude ?? null,
             is_headquarters: true,
           });
 
@@ -2984,19 +3068,22 @@ export async function confirmAdminCommercialTermsAction(
     let fullAddressToSync: string | undefined = undefined;
     if (input.address && (input.address.street?.trim() || input.address.city?.trim())) {
       const street = input.address.street?.trim() || '';
-      const city = input.address.city?.trim() || 'São Paulo';
-      const state = input.address.state?.trim() || 'SP';
+      const city = input.address.city?.trim() || '';
+      const state = input.address.state?.trim() || '';
+      if (!city || !state) {
+        return { success: false, error: 'Informe cidade e UF do endereço. Não há cidade padrão.' };
+      }
       const number = input.address.number?.trim() || null;
       const complement = input.address.complement?.trim() || null;
       const neighborhood = input.address.neighborhood?.trim() || null;
       const postal_code = input.address.postal_code?.trim() || null;
 
+      // businesses.address guarda somente a linha de logradouro. Cidade, UF e CEP
+      // vivem em business_locations e são exibidos a partir dessas colunas.
       const parts = [
         street ? `${street}${number ? ', ' + number : ''}` : '',
         complement,
         neighborhood,
-        city ? `${city} - ${state}` : '',
-        postal_code ? `CEP ${postal_code}` : '',
       ].filter(Boolean);
       fullAddressToSync = parts.join(', ');
 
@@ -3748,36 +3835,38 @@ export async function manageAdminMediaAction(
 
 export async function updateAdminBusinessPlanAction(
   businessId: string,
-  newPlanCode: 'bronze' | 'prata' | 'ouro',
+  requestedPlanCode: string,
   justification: string
 ): Promise<{
   success: boolean;
-  data?: { plan_code: 'bronze' | 'prata' | 'ouro'; plan_name: string; entitlements: Record<string, number> };
+  data?: { plan_code: 'esquadro' | 'compasso' | 'acacia'; plan_name: string; entitlements: Record<string, number> };
   error?: string;
 }> {
   try {
     const { supabase, user } = await assertPlatformAdminAccess();
 
+    // A coluna canônica é businesses.plan_tier, com os códigos comerciais
+    // (esquadro, compasso, acacia). Códigos legados da tela são normalizados.
+    const newPlanCode = normalizeCanonicalPlanCode(requestedPlanCode);
+
     const { data: bData, error: findErr } = await (supabase as any)
       .from('businesses')
-      .select('id, tenant_id, slug, plan_code, plan_tier')
+      .select('id, tenant_id, slug, plan_tier')
       .eq('id', businessId)
-      .single();
+      .maybeSingle();
 
     if (findErr || !bData) {
       return { success: false, error: 'Empresa não localizada.' };
     }
 
-    const oldPlan = bData.plan_tier || bData.plan_code || 'bronze';
+    const oldPlan = bData.plan_tier || 'esquadro';
 
-    const { error: updateErr } = await (supabase as any)
-      .from('businesses')
-      .update({
-        plan_code: newPlanCode,
-        plan_tier: newPlanCode,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', businessId);
+    // Escrita server-side autorizada: a RPC valida admin de plataforma e acesso ao tenant.
+    const { error: updateErr } = await (supabase as any).rpc('admin_set_business_plan_tier', {
+      p_business_id: businessId,
+      p_plan_code: newPlanCode,
+      p_justification: justification,
+    });
 
     if (updateErr) {
       return { success: false, error: `Erro ao atualizar plano: ${updateErr.message}` };
@@ -3806,6 +3895,7 @@ export async function updateAdminBusinessPlanAction(
       .select('feature_code, max_limit')
       .eq('tenant_id', bData.tenant_id)
       .eq('plan_code', newPlanCode);
+    // Cotas do plano: as linhas de plan_entitlements usam o mesmo código canônico.
     const entitlements = Object.fromEntries(
       (entitlementRows || []).map((row: any) => [row.feature_code, Number(row.max_limit) || 0]),
     );
@@ -3818,7 +3908,7 @@ export async function updateAdminBusinessPlanAction(
       success: true,
       data: {
         plan_code: newPlanCode,
-        plan_name: newPlanCode === 'ouro' ? 'Plano Acácia' : newPlanCode === 'prata' ? 'Plano Compasso' : 'Plano Esquadro',
+        plan_name: newPlanCode === 'acacia' ? 'Plano Acácia' : newPlanCode === 'compasso' ? 'Plano Compasso' : 'Plano Esquadro',
         entitlements,
       },
     };

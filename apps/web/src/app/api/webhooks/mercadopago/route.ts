@@ -20,7 +20,8 @@ export async function POST(req: Request) {
 
     const supabase = getAdminSupabase();
     const { data: rpcRes, error } = await supabase.rpc('process_canonical_billing_event', {
-      p_tenant_id: '00000000-0000-0000-0000-000000000001',
+      // Tenant não é informado pelo gateway: o RPC deriva o tenant canônico da empresa no banco.
+      p_tenant_id: null,
       p_provider: canonicalEvent.provider,
       p_provider_event_id: canonicalEvent.providerEventId,
       p_canonical_event: canonicalEvent.canonicalEvent,

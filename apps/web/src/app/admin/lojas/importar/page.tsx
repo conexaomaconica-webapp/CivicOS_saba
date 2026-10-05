@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { getCanonicalAdminTenantAction } from '@/app/actions/admin-tenant-context';
 import { Upload, ArrowLeft, CheckCircle2, FileSpreadsheet, Loader2, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { extractLodgesFromUrlAction } from '@/app/actions/lodge-url-import';
@@ -298,8 +299,9 @@ export default function AdminImportarLojasPage() {
     setImporting(true);
     try {
       const supabase = createClient();
-      const { data: profileData } = await (supabase as any).from('profiles').select('tenant_id').maybeSingle();
-      const tid = profileData?.tenant_id || '00000000-0000-0000-0000-000000000010';
+      const tenantResult = await getCanonicalAdminTenantAction();
+      if (!tenantResult.success || !tenantResult.tenantId) throw new Error(tenantResult.error || 'Tenant canônico não identificado.');
+      const tid = tenantResult.tenantId;
 
       for (const row of validRows) {
         const slug = `${row.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${row.code_number || Math.floor(Math.random() * 1000)}`;
@@ -561,7 +563,8 @@ export default function AdminImportarLojasPage() {
               </div>
             </div>
 
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="overflow-x-auto">
+            <table className="min-w-[640px] w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-stone-100 border-b text-stone-700 font-bold uppercase">
                   <th className="p-3">Status</th>
@@ -598,6 +601,7 @@ export default function AdminImportarLojasPage() {
                 ))}
               </tbody>
             </table>
+          </div>
           </div>
         </div>
       )}

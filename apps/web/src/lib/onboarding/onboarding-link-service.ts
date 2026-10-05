@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { headers } from 'next/headers';
 import crypto from 'crypto';
 import { getCanonicalPlanByCode, normalizeCanonicalPlanCode } from '@/lib/billing/plans-service';
+import { assertOperationalTenantId } from '@/lib/tenant/tenant-policy';
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.E2E_SUPABASE_URL || 'https://rwvztwsjcjljphqttiws.supabase.co';
@@ -63,7 +64,7 @@ export async function generateOnboardingLinkAction(businessId: string, customExp
   // 1. Busca dados da empresa
   const { data: biz, error: bizError } = await supabase
     .from('businesses')
-    .select('id, name, slug, plan_tier, publication_status')
+    .select('id, tenant_id, name, slug, plan_tier, publication_status')
     .eq('id', businessId)
     .single();
 
@@ -122,7 +123,7 @@ export async function generateOnboardingLinkAction(businessId: string, customExp
   // Registra trilha de auditoria no Admin
   try {
     await (supabase as any).from('admin_audit_logs').insert({
-      tenant_id: '00000000-0000-0000-0000-000000000010',
+      tenant_id: assertOperationalTenantId(biz.tenant_id, `Empresa ${businessId}`),
       admin_user_id: 'admin-user',
       action_type: 'GENERATE_ONBOARDING_LINK',
       entity_type: 'business',

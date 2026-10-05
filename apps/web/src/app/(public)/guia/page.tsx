@@ -51,6 +51,14 @@ export const metadata: Metadata = {
   },
 };
 
+// Localização de exibição: a sede (is_headquarters) tem prioridade sobre as demais.
+function pickHeadquarters(
+  locations: Array<{ city?: string | null; state?: string | null; latitude?: number | null; longitude?: number | null; is_headquarters?: boolean | null }> | null | undefined,
+) {
+  if (!Array.isArray(locations) || locations.length === 0) return null;
+  return locations.find((location) => location.is_headquarters === true) ?? locations[0] ?? null;
+}
+
 function SectionDivider() {
   return (
     <div className="dh-container py-10 sm:py-16 my-2">
@@ -148,7 +156,7 @@ export default async function GuiaPage({ searchParams }: Props) {
     try {
       let directQuery = (supabase as any)
         .from('businesses')
-        .select('id, slug, name, description, logo_url, plan_tier, publication_status, is_active, category, business_locations(city, state)')
+        .select('id, slug, name, description, logo_url, plan_tier, publication_status, is_active, category, business_locations(city, state, latitude, longitude, is_headquarters)')
         .eq('publication_status', 'published')
         .eq('is_active', true);
 
@@ -210,8 +218,10 @@ export default async function GuiaPage({ searchParams }: Props) {
             cover_url: null,
             category_slug: b.category,
             category_name: b.category,
-            city: Array.isArray(b.business_locations) && b.business_locations[0] ? b.business_locations[0].city : null,
-            state: Array.isArray(b.business_locations) && b.business_locations[0] ? b.business_locations[0].state : null,
+            city: pickHeadquarters(b.business_locations)?.city ?? null,
+            state: pickHeadquarters(b.business_locations)?.state ?? null,
+            latitude: pickHeadquarters(b.business_locations)?.latitude ?? null,
+            longitude: pickHeadquarters(b.business_locations)?.longitude ?? null,
             is_verified: true,
             is_founder: false,
             is_pedra_fundamental: Boolean(b.is_pedra_fundamental),
@@ -362,7 +372,7 @@ export default async function GuiaPage({ searchParams }: Props) {
     try {
       const { data: dbSponsored } = await (supabase as any)
         .from('businesses')
-        .select('id, slug, name, description, logo_url, plan_tier, category, business_locations(city, state), business_media(url, media_type, display_order)')
+        .select('id, slug, name, description, logo_url, plan_tier, category, business_locations(city, state, is_headquarters, created_at), business_media(url, media_type, display_order)')
         .eq('publication_status', 'published')
         .eq('is_active', true)
         .order('created_at', { ascending: false })
@@ -370,7 +380,7 @@ export default async function GuiaPage({ searchParams }: Props) {
 
       if (dbSponsored && dbSponsored.length > 0) {
         sponsored = dbSponsored.map((b: any) => {
-          const locs = Array.isArray(b.business_locations) && b.business_locations[0] ? b.business_locations[0] : {};
+          const locs = pickHeadquarters(b.business_locations) ?? { city: null, state: null };
           const medias = Array.isArray(b.business_media) ? b.business_media : [];
           const coverMedia = medias.find((m: any) => m.media_type === 'image') || medias[0];
           return {

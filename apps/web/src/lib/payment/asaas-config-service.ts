@@ -2,6 +2,7 @@
 
 import crypto from 'node:crypto';
 import { assertPlatformAdminAccess } from '@/lib/admin/admin-auth-helper';
+import { resolveRequestOperationalTenantId } from '@/lib/tenant/tenant-policy';
 import { getAsaasConfig, type AsaasConfig, type AsaasEnvironment } from './asaas-config';
 import { revalidatePath } from 'next/cache';
 import {
@@ -49,16 +50,10 @@ export async function getAdminAsaasIntegrationOverviewAction(): Promise<{
   error?: string;
 }> {
   try {
-    const { supabase, user } = await assertPlatformAdminAccess();
+    const { supabase } = await assertPlatformAdminAccess();
 
     // 1. Obtém o tenant padrão do administrador
-    const { data: profile } = await (supabase as any)
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single();
-
-    const tenantId = profile?.tenant_id || '00000000-0000-0000-0000-000000000001';
+    const tenantId = await resolveRequestOperationalTenantId(supabase);
 
     // 2. Busca registros em payment_provider_settings
     const { data: settingsList, error: settingsErr } = await (supabase as any)
@@ -207,13 +202,7 @@ export async function saveAdminAsaasCredentialsAction(payload: {
       return { success: false, error: 'Ambiente inválido. Deve ser "sandbox" ou "production".' };
     }
 
-    const { data: profile } = await (supabase as any)
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single();
-
-    const tenantId = profile?.tenant_id || '00000000-0000-0000-0000-000000000001';
+    const tenantId = await resolveRequestOperationalTenantId(supabase);
 
     // 1. Busca registro atual para preservar campos existentes
     const { data: existing } = await (supabase as any)
@@ -328,13 +317,7 @@ export async function switchAdminAsaasEnvironmentAction(payload: {
       }
     }
 
-    const { data: profile } = await (supabase as any)
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single();
-
-    const tenantId = profile?.tenant_id || '00000000-0000-0000-0000-000000000001';
+    const tenantId = await resolveRequestOperationalTenantId(supabase);
 
     // Garante que ambos os registros existam
     for (const env of ['sandbox', 'production'] as AsaasEnvironment[]) {
@@ -415,15 +398,9 @@ export async function testAdminAsaasConnectionAction(
   };
 }> {
   try {
-    const { supabase, user } = await assertPlatformAdminAccess();
+    const { supabase } = await assertPlatformAdminAccess();
 
-    const { data: profile } = await (supabase as any)
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single();
-
-    const tenantId = profile?.tenant_id || '00000000-0000-0000-0000-000000000001';
+    const tenantId = await resolveRequestOperationalTenantId(supabase);
 
     // 1. Obtém a API Key descriptografada do banco ou fallback de env
     const { data: setting } = await (supabase as any)
@@ -559,15 +536,9 @@ export async function configureAdminAsaasWebhookAction(
   error?: string;
 }> {
   try {
-    const { supabase, user } = await assertPlatformAdminAccess();
+    const { supabase } = await assertPlatformAdminAccess();
 
-    const { data: profile } = await (supabase as any)
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single();
-
-    const tenantId = profile?.tenant_id || '00000000-0000-0000-0000-000000000001';
+    const tenantId = await resolveRequestOperationalTenantId(supabase);
 
     const { data: setting } = await (supabase as any)
       .from('payment_provider_settings')

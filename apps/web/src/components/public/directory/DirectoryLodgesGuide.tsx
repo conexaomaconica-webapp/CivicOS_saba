@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Landmark, MapPin, Calendar, Navigation, Info, Filter } from 'lucide-react';
 
 export type PublicMasonicLodgeItem = {
@@ -30,6 +31,7 @@ export function DirectoryLodgesGuide({
   availableCities = [],
   onFilterChange,
 }: DirectoryLodgesGuideProps) {
+  const router = useRouter();
   const [city, setCity] = useState('');
   const [potency, setPotency] = useState('');
   const [rite, setRite] = useState('');
@@ -38,8 +40,25 @@ export function DirectoryLodgesGuide({
     e.preventDefault();
     if (onFilterChange) {
       onFilterChange({ city, potency, rite });
+      return;
     }
+    const params = new URLSearchParams();
+    if (city) params.set('city', city);
+    if (potency) params.set('potency', potency);
+    if (rite) params.set('rite', rite);
+    router.push(`/guia/lojas${params.size ? `?${params.toString()}` : ''}`);
   };
+
+  const lodgeCities = Array.from(new Set([
+    ...availableCities,
+    ...lodges.map((lodge) => lodge.city).filter((value): value is string => Boolean(value)),
+  ])).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const lodgePotencies = Array.from(new Set(
+    lodges.map((lodge) => lodge.potency).filter((value): value is string => Boolean(value))
+  )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const lodgeRites = Array.from(new Set(
+    lodges.map((lodge) => lodge.rite).filter((value): value is string => Boolean(value))
+  )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
   return (
     <section className="dh-container py-4" id="lojas">
@@ -59,7 +78,7 @@ export function DirectoryLodgesGuide({
             className="dh-filter-select"
           >
             <option value="">Todas as Cidades</option>
-            {availableCities.map((c) => (
+            {lodgeCities.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
@@ -72,10 +91,9 @@ export function DirectoryLodgesGuide({
             className="dh-filter-select"
           >
             <option value="">Todas as Potências</option>
-            <option value="GLEB">GLEB</option>
-            <option value="GOB">GOB</option>
-            <option value="GLMMG">GLMMG</option>
-            <option value="COMAB">COMAB</option>
+            {lodgePotencies.map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
           </select>
 
           <select
@@ -84,10 +102,9 @@ export function DirectoryLodgesGuide({
             className="dh-filter-select"
           >
             <option value="">Todos os Ritos</option>
-            <option value="Rito Escocês Antigo e Aceito">Rito Escocês Antigo e Aceito</option>
-            <option value="Rito Moderno">Rito Moderno</option>
-            <option value="Rito Brasileiro">Rito Brasileiro</option>
-            <option value="Rito York">Rito York</option>
+            {lodgeRites.map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
           </select>
         </div>
 

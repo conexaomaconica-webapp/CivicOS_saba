@@ -1,6 +1,11 @@
 'use server';
 
 import { createServerSideClient } from '@/lib/supabase/server';
+import { resolveRequestOperationalTenantId } from '@/lib/tenant/tenant-policy';
+import { dispatchNotificationAction } from '@/lib/notifications/notification-service';
+
+// Destinatário dos avisos de nova resposta de pesquisa (equipe administrativa da Conexão).
+const SURVEY_ADMIN_NOTIFICATION_EMAIL = 'conexaomaconica@gmail.com';
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import type {
@@ -332,9 +337,13 @@ export async function submitSurveyResponseAction(payload: SurveyResponseSubmissi
   try {
     const supabase = await createServerSideClient();
 
-    const { data: resp, error: rErr } = await (supabase as any)
+    // O id é gerado aqui e a inserção não pede retorno (sem .select): visitante anônimo
+    // não consegue ler a própria resposta de volta, então o RETURNING seria bloqueado pela RLS.
+    const responseId = crypto.randomUUID();
+    const { error: rErr } = await (supabase as any)
       .from('survey_responses')
       .insert({
+        id: responseId,
         survey_id: payload.survey_id,
         version_number: payload.version_number,
         user_id: payload.user_id || null,
@@ -344,14 +353,12 @@ export async function submitSurveyResponseAction(payload: SurveyResponseSubmissi
         consent_research: payload.consent_research ?? true,
         consent_commercial: payload.consent_commercial ?? false,
         completed_at: new Date().toISOString(),
-      })
-      .select('id')
-      .single();
+      });
 
-    if (rErr || !resp) throw new Error('Erro ao registrar resposta principal.');
+    if (rErr) throw new Error('Erro ao registrar resposta principal.');
 
     const answersToInsert = payload.answers.map((ans) => ({
-      response_id: resp.id,
+      response_id: responseId,
       question_id: ans.question_id,
       answer_value: ans.answer_value || null,
       selected_options: ans.selected_options || [],
@@ -363,7 +370,21 @@ export async function submitSurveyResponseAction(payload: SurveyResponseSubmissi
       if (aErr) throw aErr;
     }
 
-    return { success: true, responseId: resp.id };
+    // Aviso à equipe. É best-effort: a resposta já foi gravada, então falha de envio não a desfaz.
+    try {
+      await dispatchNotificationAction({
+        recipientEmail: SURVEY_ADMIN_NOTIFICATION_EMAIL,
+        eventType: 'survey_response_received',
+        title: 'Nova resposta de pesquisa',
+        body: 'Uma nova resposta foi registrada em uma pesquisa publicada. Acesse o painel administrativo para visualizá-la.',
+        actionUrl: '/admin/pesquisas',
+        channel: 'email',
+      });
+    } catch {
+      // Ignorado de propósito: o aviso não pode impedir o registro da resposta.
+    }
+
+    return { success: true, responseId };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao enviar respostas.' };
   }
@@ -716,13 +737,7 @@ export async function createSurveyAction(payload: {
       return { success: false, error: 'Acesso não autenticado.' };
     }
 
-    const { data: profile } = await (supabase as any)
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    const tenantId = profile?.tenant_id || '00000000-0000-0000-0000-000000000010';
+    const tenantId = await resolveRequestOperationalTenantId(supabase);
 
     const rawSlug = payload.slug || payload.title;
     const cleanSlug = rawSlug
@@ -872,12 +887,11 @@ export async function uploadSurveyBrandAssetAction(fileDataUrl: string) {
     const supabase = await createServerSideClient();
     const auth = await supabase.auth.getUser();
     if (!auth.data.user) return { success: false, error: 'Acesso não autenticado.' };
-    const { data: profile } = await (supabase as any).from('profiles').select('tenant_id').eq('id', auth.data.user.id).maybeSingle();
-    if (!profile?.tenant_id) return { success: false, error: 'Tenant não identificado.' };
+    const tenantId = await resolveRequestOperationalTenantId(supabase);
 
     const mimeType = match[1]!;
     const extension = mimeType === 'image/jpeg' ? 'jpg' : mimeType.split('/')[1];
-    const path = `${profile.tenant_id}/${crypto.randomUUID()}.${extension}`;
+    const path = `${tenantId}/${crypto.randomUUID()}.${extension}`;
     const { error } = await supabase.storage.from('survey-assets').upload(path, buffer, { contentType: mimeType });
     if (error) return { success: false, error: error.message };
     const { data } = supabase.storage.from('survey-assets').getPublicUrl(path);

@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
+import { assertOperationalTenantId, resolveRequestOperationalTenantId } from '@/lib/tenant/tenant-policy';
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -20,7 +21,8 @@ export type NotificationEventType =
   | 'correction_requested'
   | 'masonic_link_verified'
   | 'subscription_expiring'
-  | 'quota_reached';
+  | 'quota_reached'
+  | 'survey_response_received';
 
 export interface OperationalNotificationItem {
   id: string;
@@ -66,7 +68,9 @@ export async function dispatchNotificationAction(payload: {
 
   try {
     const { data } = await supabase.rpc('trigger_operational_notification', {
-      p_tenant_id: payload.tenantId || '00000000-0000-0000-0000-000000000010',
+      p_tenant_id: payload.tenantId
+        ? assertOperationalTenantId(payload.tenantId, 'Notificação operacional')
+        : await resolveRequestOperationalTenantId(supabase),
       p_recipient_id: payload.recipientId || null,
       p_recipient_email: payload.recipientEmail,
       p_event_type: payload.eventType,
