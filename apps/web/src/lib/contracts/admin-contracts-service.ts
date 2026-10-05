@@ -1039,7 +1039,6 @@ export async function invalidateAdminContractSnapshotAction(
       .update({
         commercial_status: 'dados_comerciais_conferidos',
         publication_status: 'draft',
-        is_published: false,
         updated_at: supersededAt,
       })
       .eq('id', businessId);
@@ -2134,7 +2133,7 @@ export async function signPublicContractAction(
     // 2. Busca empresa
     const { data: biz, error: bizErr } = await (dbClient as any)
       .from('businesses')
-      .select('id, tenant_id, name, commercial_status, owner_id')
+      .select('id, tenant_id, name, legal_name, commercial_status, owner_id')
       .eq('id', tokenRow.business_id)
       .single();
 
@@ -2216,7 +2215,8 @@ export async function signPublicContractAction(
     const signedRenderedText = appendSignatureImageToContractText(
       snapshot.rendered_text,
       sigData,
-      biz.name
+      biz.name,
+      biz.legal_name
     );
     const signedSha256Hash = crypto
       .createHash('sha256')

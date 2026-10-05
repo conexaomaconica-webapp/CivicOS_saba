@@ -118,11 +118,19 @@ export function renderContractTemplate(
 export function appendSignatureImageToContractText(
   renderedText: string,
   signatureImageData: string,
-  contractorName: string
+  fantasyName: string,
+  contractorLegalName?: string | null
 ): string {
   const text = String(renderedText || '').trim();
   const signature = String(signatureImageData || '').trim();
-  const name = String(contractorName || '').trim();
+  const escapeHtml = (value: string) => value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+  const tradeName = escapeHtml(String(fantasyName || '').trim());
+  const legalName = escapeHtml(String(contractorLegalName || fantasyName || '').trim());
 
   if (!text) {
     throw new Error('Texto contratual renderizado e obrigatorio para anexar assinatura.');
@@ -138,8 +146,23 @@ export function appendSignatureImageToContractText(
 
 <section data-contract-signature="representante-legal" style="margin-top:40px;text-align:center;page-break-inside:avoid">
   <img src="${signature}" alt="Assinatura eletronica do representante legal" style="display:block;max-width:320px;max-height:130px;margin:0 auto 6px;object-fit:contain" />
-  <div style="width:360px;max-width:100%;margin:0 auto;border-top:1px solid #333;padding-top:6px;font-size:12px;font-weight:bold">CONTRATANTE: ${name || 'CONTRATANTE'}</div>
+  <div style="width:360px;max-width:100%;margin:0 auto;border-top:1px solid #333;padding-top:6px;font-size:12px;font-weight:bold">
+    <div>NOME FANTASIA: ${tradeName || 'NAO INFORMADO'}</div>
+    <div>CONTRATANTE / RAZAO SOCIAL: ${legalName || 'CONTRATANTE'}</div>
+  </div>
 </section>`;
+}
+
+/**
+ * Remove apenas o bloco técnico de assinatura anexado ao snapshot para que
+ * visualizadores de texto puro não exibam HTML nem o data URL da imagem.
+ * O snapshot armazenado permanece imutável e a assinatura continua sendo
+ * apresentada pelo campo signature_image_data.
+ */
+export function contractTextForPlainDisplay(renderedText: string | null | undefined): string {
+  return String(renderedText || '')
+    .replace(/\n*<section data-contract-signature[\s\S]*?<\/section>/g, '')
+    .trimEnd();
 }
 
 export function formatCurrencyBRL(cents: number): string {

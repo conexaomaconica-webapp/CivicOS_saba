@@ -76,6 +76,23 @@ export default async function GuiaPage({ searchParams }: Props) {
   const supabase = await createServerSideClient();
   const brand = await resolveTenantBrandContext();
 
+  // Resolve primeiro as preferências do tenant público para que Hero, busca e
+  // paginação não dependam do sucesso da RPC agregadora da Home.
+  let directPublicSettings: any = null;
+  try {
+    const { data: publicTenantId } = await (supabase as any)
+      .rpc('_resolve_public_tenant_id', { p_host: host });
+    if (publicTenantId) {
+      const { data } = await (supabase as any)
+        .from('directory_home_settings')
+        .select('hero_title, hero_subtitle, hero_search_placeholder, default_page_size, sections_config, sponsored_display_mode, sponsored_marquee_speed, sponsored_logo_style')
+        .eq('tenant_id', publicTenantId)
+        .maybeSingle();
+      directPublicSettings = data;
+    }
+  } catch (_settingsErr) {}
+  const configuredPageSize = Math.min(100, Math.max(1, Number(directPublicSettings?.default_page_size) || 12));
+
   // Parallel RPC execution
   const [homeDataRes, searchRes, lodgesRes] = await Promise.all([
     (supabase as any).rpc('public_directory_home_data', {
@@ -91,7 +108,7 @@ export default async function GuiaPage({ searchParams }: Props) {
       p_has_benefits: benefits || null,
       p_sort: sort,
       p_page: page,
-      p_page_size: 12,
+      p_page_size: configuredPageSize,
     }),
     (supabase as any).rpc('public_organizations_search', {
       p_host: host,
@@ -108,7 +125,7 @@ export default async function GuiaPage({ searchParams }: Props) {
       hero_title: 'Encontre empresas, serviços e conexões de confiança',
       hero_subtitle: 'Descubra oportunidades dentro de uma rede que valoriza relacionamento, credibilidade e propósito.',
       hero_search_placeholder: 'Pergunte à busca inteligente...',
-      default_page_size: 12,
+      default_page_size: configuredPageSize,
       sections_config: [
         { id: 'hero', enabled: true, order: 1 },
         { id: 'carousel', enabled: true, order: 2 },
@@ -178,10 +195,10 @@ export default async function GuiaPage({ searchParams }: Props) {
         });
 
         const totalItems = filteredBiz.length;
-        const totalPages = Math.max(1, Math.ceil(totalItems / 12));
+        const totalPages = Math.max(1, Math.ceil(totalItems / configuredPageSize));
         const safePage = Math.max(1, Math.min(page, totalPages));
-        const startIndex = (safePage - 1) * 12;
-        const paginatedBiz = filteredBiz.slice(startIndex, startIndex + 12);
+        const startIndex = (safePage - 1) * configuredPageSize;
+        const paginatedBiz = filteredBiz.slice(startIndex, startIndex + configuredPageSize);
 
         searchData = {
           items: paginatedBiz.map((b: any) => ({
@@ -202,7 +219,7 @@ export default async function GuiaPage({ searchParams }: Props) {
           })),
           total: totalItems,
           page: safePage,
-          page_size: 12,
+          page_size: configuredPageSize,
           total_pages: totalPages,
           has_next_page: safePage < totalPages,
           has_previous_page: safePage > 1,
@@ -216,7 +233,7 @@ export default async function GuiaPage({ searchParams }: Props) {
       items: [],
       total: 0,
       page: 1,
-      page_size: 12,
+      page_size: configuredPageSize,
       total_pages: 1,
       has_next_page: false,
       has_previous_page: false,
@@ -233,7 +250,10 @@ export default async function GuiaPage({ searchParams }: Props) {
     has_previous_page: false,
   };
 
-  const settings = homeData.settings || {};
+  const settings = {
+    ...(homeData.settings || {}),
+    ...(directPublicSettings || {}),
+  };
   let sponsoredDisplayMode: 'cards' | 'logos' = settings.sponsored_display_mode === 'logos' ? 'logos' : 'cards';
   let sponsoredSpeed = Number(settings.sponsored_marquee_speed) || 45;
   let sponsoredLogoStyle: 'standard' | 'clean' = settings.sponsored_logo_style === 'clean' ? 'clean' : 'standard';
@@ -242,13 +262,16 @@ export default async function GuiaPage({ searchParams }: Props) {
   if (Array.isArray(settings.sections_config)) {
     const sponsoredConfig = settings.sections_config.find((section: any) => section.id === 'sponsored');
     if (sponsoredConfig) {
-      if (!settings.sponsored_display_mode && ['cards', 'logos'].includes(sponsoredConfig.display_mode)) {
+      // O editor administrativo persiste a configuração atual também no bloco
+      // sponsored. Ele é a fonte mais recente quando colunas legadas/default
+      // ainda retornam "cards" pela RPC ou pelo cache de schema.
+      if (['cards', 'logos'].includes(sponsoredConfig.display_mode)) {
         sponsoredDisplayMode = sponsoredConfig.display_mode;
       }
-      if (!settings.sponsored_marquee_speed && Number(sponsoredConfig.speed) > 0) {
+      if (Number(sponsoredConfig.speed) > 0) {
         sponsoredSpeed = Number(sponsoredConfig.speed);
       }
-      if (!settings.sponsored_logo_style && ['standard', 'clean'].includes(sponsoredConfig.logo_style)) {
+      if (['standard', 'clean'].includes(sponsoredConfig.logo_style)) {
         sponsoredLogoStyle = sponsoredConfig.logo_style;
       }
     }

@@ -420,8 +420,48 @@ export async function createCommercialOnboardingChargeAction(
       } catch (_attErr) {}
     }
 
+    const normalizedChargeStatus = String(chargeStatus || '').trim().toUpperCase();
+    const isImmediatelyConfirmed = ['CONFIRMED', 'RECEIVED'].includes(normalizedChargeStatus);
+
+    // Cartão pode ser confirmado de forma síncrona pelo Asaas. Nesse caso, o
+    // estado interno deve ser consolidado agora; o webhook permanece idempotente
+    // como confirmação secundária e não pode ser a única fonte da transição.
+    if (isImmediatelyConfirmed) {
+      const confirmedAt = new Date().toISOString();
+      const { error: invoiceConfirmationError } = await (dbClient as any)
+        .from('invoices')
+        .update({
+          status: 'paid',
+          amount_paid: amountCents / 100,
+          paid_at: confirmedAt,
+          updated_at: confirmedAt,
+        })
+        .eq('id', invoiceId);
+
+      if (invoiceConfirmationError) {
+        return { success: false, error: `Pagamento aprovado, mas a fatura interna não foi conciliada: ${invoiceConfirmationError.message}` };
+      }
+
+      await (dbClient as any)
+        .from('payment_attempts')
+        .update({ status: 'success' })
+        .eq('provider_charge_id', paymentId);
+
+      const { error: businessConfirmationError } = await (dbClient as any)
+        .from('businesses')
+        .update({
+          commercial_status: 'pagamento_confirmado',
+          updated_at: confirmedAt,
+        })
+        .eq('id', biz.id);
+
+      if (businessConfirmationError) {
+        return { success: false, error: `Pagamento aprovado, mas o onboarding não foi atualizado: ${businessConfirmationError.message}` };
+      }
+    }
+
     // 10. Transição de status comercial: contrato_assinado -> aguardando_pagamento (Microetapa 6.4)
-    if (biz.commercial_status === 'contrato_assinado') {
+    if (!isImmediatelyConfirmed && biz.commercial_status === 'contrato_assinado') {
       assertCommercialStatusTransition(COMMERCIAL_STATUS.CONTRATO_ASSINADO, COMMERCIAL_STATUS.AGUARDANDO_PAGAMENTO);
 
       await (dbClient as any)

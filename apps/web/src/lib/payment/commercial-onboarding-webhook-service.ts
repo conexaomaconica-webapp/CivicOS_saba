@@ -198,7 +198,7 @@ export async function reconcileCommercialPaymentWebhook(
 
     // Se o evento é de confirmação de pagamento
     if (rawEvent === 'PAYMENT_CONFIRMED' || rawEvent === 'PAYMENT_RECEIVED') {
-      if (currentStatus === 'pagamento_confirmado') {
+      if (['pagamento_confirmado', 'prontuario_em_configuracao', 'pronto_para_publicar', 'publicado'].includes(currentStatus)) {
         return {
           success: true,
           reconciled: true,
@@ -375,11 +375,66 @@ export async function checkCommercialPaymentStatusAction(token: string): Promise
       return { success: false, error: 'Empresa não encontrada.' };
     }
 
-    const isConfirmed = biz.commercial_status === 'pagamento_confirmado';
+    const confirmedCommercialStatuses = [
+      'pagamento_confirmado',
+      'prontuario_em_configuracao',
+      'pronto_para_publicar',
+      'publicado',
+    ];
+    let effectiveCommercialStatus = biz.commercial_status;
+    let isConfirmed = confirmedCommercialStatuses.includes(effectiveCommercialStatus);
+
+    // Reconciliação de segurança para pagamentos aprovados antes do webhook.
+    // Recupera inclusive transações sandbox já concluídas que ficaram presas em
+    // aguardando_pagamento por dependerem exclusivamente do evento assíncrono.
+    if (!isConfirmed) {
+      const [{ data: paidInvoice }, { data: successfulAttempt }] = await Promise.all([
+        (dbClient as any)
+          .from('invoices')
+          .select('id')
+          .eq('business_id', tokenRow.business_id)
+          .eq('status', 'paid')
+          .limit(1)
+          .maybeSingle(),
+        (dbClient as any)
+          .from('payment_attempts')
+          .select('id, status, payload_received')
+          .eq('business_id', tokenRow.business_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      const gatewayStatus = String(successfulAttempt?.payload_received?.status || '').toUpperCase();
+      const hasConfirmedEvidence = Boolean(
+        paidInvoice
+        || successfulAttempt?.status === 'success'
+        || ['CONFIRMED', 'RECEIVED'].includes(gatewayStatus)
+      );
+
+      if (hasConfirmedEvidence && ['contrato_assinado', 'aguardando_pagamento'].includes(effectiveCommercialStatus)) {
+        const confirmedAt = new Date().toISOString();
+        const { error: reconciliationError } = await (dbClient as any)
+          .from('businesses')
+          .update({ commercial_status: 'pagamento_confirmado', updated_at: confirmedAt })
+          .eq('id', tokenRow.business_id);
+
+        if (!reconciliationError) {
+          effectiveCommercialStatus = 'pagamento_confirmado';
+          isConfirmed = true;
+          if (successfulAttempt?.id) {
+            await (dbClient as any)
+              .from('payment_attempts')
+              .update({ status: 'success' })
+              .eq('id', successfulAttempt.id);
+          }
+        }
+      }
+    }
 
     return {
       success: true,
-      commercial_status: biz.commercial_status,
+      commercial_status: effectiveCommercialStatus,
       is_confirmed: isConfirmed,
     };
   } catch (err: any) {

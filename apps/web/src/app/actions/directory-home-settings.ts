@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath, revalidateTag } from 'next/cache';
+import { headers } from 'next/headers';
 import { createServerSideClient } from '@/lib/supabase/server';
 
 export type DirectoryHomeSettingsInput = {
@@ -14,6 +15,21 @@ export type DirectoryHomeSettingsInput = {
   sponsored_logo_style?: 'standard' | 'clean';
 };
 
+async function resolvePublicDirectoryTenantId(supabase: any, userId: string): Promise<string | null> {
+  const requestHeaders = await headers();
+  const requestHost = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '').toLowerCase();
+  const [{ data: hostTenantId }, { data: profile }] = await Promise.all([
+    requestHost
+      ? supabase.rpc('_resolve_public_tenant_id', { p_host: requestHost })
+      : Promise.resolve({ data: null }),
+    supabase.from('profiles').select('tenant_id').eq('id', userId).maybeSingle(),
+  ]);
+
+  // Configurações do Guia pertencem ao tenant resolvido para o host público.
+  // O tenant do perfil é apenas fallback para instalações sem domínio configurado.
+  return hostTenantId || profile?.tenant_id || null;
+}
+
 export async function saveDirectoryHomeSettingsAction(input: DirectoryHomeSettingsInput) {
   try {
     const supabase = await createServerSideClient();
@@ -24,13 +40,7 @@ export async function saveDirectoryHomeSettingsAction(input: DirectoryHomeSettin
       return { success: false, error: 'Usuário não autenticado.' };
     }
 
-    const { data: profile } = await (supabase as any)
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', authData.user.id)
-      .maybeSingle();
-
-    const tenantId = profile?.tenant_id;
+    const tenantId = await resolvePublicDirectoryTenantId(supabase as any, authData.user.id);
     if (!tenantId) {
       return { success: false, error: 'Tenant do administrador não identificado. Nenhuma configuração foi alterada.' };
     }
@@ -87,7 +97,7 @@ export async function saveDirectoryHomeSettingsAction(input: DirectoryHomeSettin
 
     const { data: savedSettings, error: verificationError } = await (supabase as any)
       .from('directory_home_settings')
-      .select('hero_title, hero_subtitle, hero_search_placeholder, default_page_size')
+      .select('hero_title, hero_subtitle, hero_search_placeholder, default_page_size, sections_config, sponsored_display_mode')
       .eq('tenant_id', tenantId)
       .single();
 
@@ -102,8 +112,20 @@ export async function saveDirectoryHomeSettingsAction(input: DirectoryHomeSettin
       savedSettings.hero_title !== input.hero_title
       || savedSettings.hero_subtitle !== input.hero_subtitle
       || savedSettings.hero_search_placeholder !== input.hero_search_placeholder
+      || Number(savedSettings.default_page_size) !== Number(input.default_page_size)
     ) {
-      return { success: false, error: 'O banco não confirmou os novos textos da Hero.' };
+      return { success: false, error: 'O banco não confirmou as configurações da Hero e da paginação.' };
+    }
+
+    const savedSponsoredConfig = Array.isArray(savedSettings.sections_config)
+      ? savedSettings.sections_config.find((section: any) => section.id === 'sponsored')
+      : null;
+    if (
+      savedSettings.sponsored_display_mode !== input.sponsored_display_mode
+      || savedSponsoredConfig?.display_mode !== input.sponsored_display_mode
+      || savedSponsoredConfig?.logo_style !== input.sponsored_logo_style
+    ) {
+      return { success: false, error: 'O banco não confirmou o formato configurado para as empresas patrocinadas.' };
     }
 
     // INVALIDA O CACHE DO NEXT.JS DA PÁGINA PÚBLICA /guia PARA ATUALIZAR O HERO EM TEMPO REAL
@@ -132,13 +154,7 @@ export async function updateSponsoredSettingsAction(input: UpdateSponsoredSettin
       return { success: false, error: 'Usuário não autenticado.' };
     }
 
-    const { data: profile } = await (supabase as any)
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', authData.user.id)
-      .maybeSingle();
-
-    const tenantId = profile?.tenant_id;
+    const tenantId = await resolvePublicDirectoryTenantId(supabase as any, authData.user.id);
     if (!tenantId) {
       return { success: false, error: 'Tenant do administrador não identificado. Nenhuma configuração foi alterada.' };
     }

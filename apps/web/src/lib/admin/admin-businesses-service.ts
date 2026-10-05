@@ -1172,7 +1172,13 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
     // 6. Contrato digital: nunca inferir assinatura a partir da existência do contrato/snapshot.
     let contractDetail: AdminBusiness360DTO['contract'] = undefined;
     try {
-      const { data: contractRows, error: contractsError } = await (supabase as any)
+      const contractSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const contractServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!contractSupabaseUrl || !contractServiceRoleKey) throw new Error('Configuração administrativa do Supabase ausente.');
+      const contractReader = createSupabaseAdminClient<Database>(contractSupabaseUrl, contractServiceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const { data: contractRows, error: contractsError } = await (contractReader as any)
         .from('contracts')
         .select('id, status, version_id, created_at')
         .eq('business_id', businessId)
@@ -1186,7 +1192,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       const contractIds = contracts.map((contract: any) => contract.id);
       let acceptanceRow: any = null;
       if (contractIds.length > 0) {
-        const { data: acceptance } = await (supabase as any)
+        const { data: acceptance } = await (contractReader as any)
           .from('contract_acceptances')
           .select('id, contract_id, snapshot_id, accepted_at')
           .in('contract_id', contractIds)
@@ -1202,7 +1208,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
 
       let snapshotRow: any = null;
       if (contractRow) {
-        let snapshotQuery = (supabase as any)
+        let snapshotQuery = (contractReader as any)
           .from('contract_snapshots')
           .select('id, rendered_text, sha256_hash, created_at')
           .eq('contract_id', contractRow.id);
@@ -1212,7 +1218,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
         const { data: snap } = await snapshotQuery.maybeSingle();
         snapshotRow = snap;
         if (snapshotRow) {
-          const { data: evidence } = await (supabase as any)
+          const { data: evidence } = await (contractReader as any)
             .from('contract_snapshots')
             .select('signature_image_data, signer_cpf')
             .eq('id', snapshotRow.id)
@@ -1223,7 +1229,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
 
       if (snapshotRow && snapshotRow.rendered_text) {
         const [{ data: versionRow }] = await Promise.all([
-          (supabase as any)
+          (contractReader as any)
             .from('contract_versions')
             .select('version')
             .eq('id', contractRow.version_id)
@@ -1487,7 +1493,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
         contract_status: contractDetail?.status || null,
         snapshot_id: contractDetail?.snapshot_id || null,
         acceptance_id: contractDetail?.acceptance_id || null,
-        contract_signed: Boolean(contractDetail?.acceptance_id && contractDetail?.signed_at),
+        contract_signed: Boolean(contractDetail?.status === 'signed'),
         payment_confirmed: hasConfirmedCommercialPayment,
       },
       subscription: {

@@ -715,7 +715,6 @@ export async function requestBusinessCorrectionAction(businessId: string, observ
       .from('businesses')
       .update({
         publication_status: 'draft',
-        is_published: false,
         correction_notes: fullNotes,
         last_correction_requested_at: new Date().toISOString(),
       })
@@ -861,7 +860,7 @@ export async function finalizeApprovalDecisionAction(
       if (pendingCriteria.length > 0) {
         throw new Error(`REGRA_CENTRAL_BLOQUEIO: Publicação negada. Requisitos pendentes:\n- ${pendingCriteria.join('\n- ')}`);
       }
-      await (supabase as any).from('businesses').update({ publication_status: 'published', commercial_status: 'publicado', is_published: true, updated_at: new Date().toISOString() }).eq('id', businessId);
+      await (supabase as any).from('businesses').update({ publication_status: 'published', commercial_status: 'publicado', updated_at: new Date().toISOString() }).eq('id', businessId);
       
 
       await dispatchNotificationAction({
@@ -879,7 +878,6 @@ export async function finalizeApprovalDecisionAction(
         .from('businesses')
         .update({
           publication_status: newStatus,
-          is_published: false,
           updated_at: new Date().toISOString(),
         })
         .eq('id', businessId);

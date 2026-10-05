@@ -13,6 +13,7 @@ export async function resolveSignedBusinessContract(supabase: SupabaseLike, busi
     (contract: any) => !['voided', 'superseded'].includes(contract.status)
   );
   if (rows.length === 0) return { contract: null, acceptance: null, error: null };
+  const signedContract = rows.find((contract: any) => contract.status === 'signed') || null;
 
   const { data: acceptance, error: acceptanceError } = await supabase
     .from('contract_acceptances')
@@ -22,12 +23,17 @@ export async function resolveSignedBusinessContract(supabase: SupabaseLike, busi
     .limit(1)
     .maybeSingle();
 
-  if (acceptanceError) return { contract: null, acceptance: null, error: acceptanceError };
+  // O status `signed` é atualizado pela mesma operação transacional que cria o
+  // aceite. Se a leitura complementar do aceite for bloqueada por RLS ou por
+  // indisponibilidade momentânea, não descarte uma assinatura já consolidada.
+  if (acceptanceError) {
+    return signedContract
+      ? { contract: signedContract, acceptance: null, error: null }
+      : { contract: null, acceptance: null, error: acceptanceError };
+  }
   const acceptedContract = acceptance
     ? rows.find((contract: any) => contract.id === acceptance.contract_id) || null
     : null;
-  const signedContract = rows.find((contract: any) => contract.status === 'signed') || null;
-
   return {
     contract: acceptedContract || signedContract,
     acceptance: acceptance || null,

@@ -398,7 +398,6 @@ export async function advanceToReadyForPublicationAction(businessId: string): Pr
  * Quando aprovado:
  * commercial_status = 'publicado'
  * publication_status = 'published'
- * is_published = true
  * is_active = true
  */
 export async function publishAdminBusinessAction(businessId: string): Promise<{
@@ -451,8 +450,33 @@ export async function publishAdminBusinessAction(businessId: string): Promise<{
     );
 
     // 3. Consulta contrato assinado no banco
-    const signedContractResult = await resolveSignedBusinessContract(supabase, businessId);
+    const contractSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const contractServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!contractSupabaseUrl || !contractServiceRoleKey) {
+      return { success: false, error: 'Configuração administrativa do Supabase ausente para validar o contrato.' };
+    }
+    const contractReader = createSupabaseAdminClient<Database>(contractSupabaseUrl, contractServiceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const signedContractResult = await resolveSignedBusinessContract(contractReader, businessId);
     const hasSignedContract = Boolean(signedContractResult.contract);
+
+    // Localização canônica: o endereço operacional vive em business_locations.
+    // Mantém fallback para colunas legadas de businesses.
+    let publicationCity = biz.city;
+    let publicationState = biz.state;
+    const { data: publicationLocations, error: publicationLocationError } = await (supabase as any)
+      .from('business_locations')
+      .select('city, state, is_headquarters')
+      .eq('business_id', businessId);
+    if (publicationLocationError) {
+      return { success: false, error: `Falha ao consultar localização da empresa: ${publicationLocationError.message}` };
+    }
+    if (publicationLocations?.length) {
+      const headquarters = publicationLocations.find((location: any) => location.is_headquarters) || publicationLocations[0];
+      publicationCity = headquarters.city || publicationCity;
+      publicationState = headquarters.state || publicationState;
+    }
 
     // 4. Consulta status de pagamento no banco
     let hasConfirmedPayment = ['pronto_para_publicar', 'publicado'].includes(biz.commercial_status);
@@ -492,8 +516,8 @@ export async function publishAdminBusinessAction(businessId: string): Promise<{
         description: biz.description,
         category: biz.category,
         category_id: biz.category_id,
-        city: biz.city,
-        state: biz.state,
+        city: publicationCity,
+        state: publicationState,
         phone: biz.phone,
         whatsapp: biz.whatsapp,
         logo_url: biz.logo_url,
@@ -529,7 +553,6 @@ export async function publishAdminBusinessAction(businessId: string): Promise<{
       .update({
         commercial_status: COMMERCIAL_STATUS.PUBLICADO,
         publication_status: 'published',
-        is_published: true,
         is_active: true,
         updated_at: nowIso,
       })
@@ -553,7 +576,7 @@ export async function publishAdminBusinessAction(businessId: string): Promise<{
         before_value: {
           commercial_status: biz.commercial_status,
           publication_status: biz.publication_status,
-          is_published: biz.is_published,
+          is_published: biz.publication_status === 'published',
         },
         after_value: {
           commercial_status: COMMERCIAL_STATUS.PUBLICADO,
@@ -593,7 +616,6 @@ export async function publishAdminBusinessAction(businessId: string): Promise<{
  *
  * Altera:
  * publication_status = 'draft'
- * is_published = false
  *
  * PRESERVA INTEGRALMENTE:
  * commercial_status (mantém 'publicado', garantindo que o histórico
@@ -618,7 +640,7 @@ export async function unpublishAdminBusinessAction(
 
     const { data: biz, error: bizErr } = await (supabase as any)
       .from('businesses')
-      .select('id, tenant_id, slug, commercial_status, publication_status, is_published')
+      .select('id, tenant_id, slug, commercial_status, publication_status')
       .eq('id', businessId)
       .single();
 
@@ -631,7 +653,6 @@ export async function unpublishAdminBusinessAction(
       .from('businesses')
       .update({
         publication_status: 'draft',
-        is_published: false,
         updated_at: nowIso,
       })
       .eq('id', businessId);
@@ -652,7 +673,7 @@ export async function unpublishAdminBusinessAction(
         entity_id: businessId,
         before_value: {
           publication_status: biz.publication_status,
-          is_published: biz.is_published,
+          is_published: biz.publication_status === 'published',
           commercial_status: biz.commercial_status,
         },
         after_value: {

@@ -107,7 +107,9 @@ export function ContractSignatureClient({
 
   const effectivePaymentToken = signedState?.payment_token || contractData.payment_token || token;
   const [isPaymentConfirmed, setIsPaymentConfirmed] = useState(
-    contractData.commercial_status === 'pagamento_confirmado'
+    ['pagamento_confirmado', 'prontuario_em_configuracao', 'pronto_para_publicar', 'publicado'].includes(
+      contractData.commercial_status || ''
+    )
   );
 
   useEffect(() => {

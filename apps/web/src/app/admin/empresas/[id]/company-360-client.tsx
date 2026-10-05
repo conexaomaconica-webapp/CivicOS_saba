@@ -44,6 +44,7 @@ import {
   upsertBusinessPostAction,
   deleteBusinessPostAction,
 } from '@/app/actions/events-and-posts';
+import { contractTextForPlainDisplay } from '@/lib/contracts/contract-template-renderer';
 import {
   AdminBusiness360DTO,
   togglePublicationStatusAction,
@@ -513,7 +514,7 @@ export default function Company360Client({ initialData }: Props) {
 
   const handleCopyContractText = () => {
     if (!data.contract?.rendered_text) return;
-    navigator.clipboard.writeText(data.contract.rendered_text);
+    navigator.clipboard.writeText(contractTextForPlainDisplay(data.contract.rendered_text));
     setMessage({ type: 'success', text: 'Texto completo do contrato copiado para a área de transferência!' });
   };
 
@@ -532,7 +533,11 @@ export default function Company360Client({ initialData }: Props) {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
-    const safeSignerName = (data.contract?.signer_name || data.business.name)
+    const safeFantasyName = data.business.name
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    const safeLegalName = (data.business.legal_name || data.business.name)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
@@ -542,7 +547,10 @@ export default function Company360Client({ initialData }: Props) {
       ? `<div style="margin-top:28px;text-align:center;page-break-inside:avoid">
           <p style="font-family:Georgia,serif;font-weight:bold;color:#3B0B14">ASSINATURA ELETRÔNICA DO REPRESENTANTE LEGAL</p>
           <img src="${data.contract.signature_image_data}" alt="Assinatura do representante legal" style="display:block;max-width:320px;max-height:130px;margin:12px auto 4px;object-fit:contain" />
-          <div style="width:360px;max-width:100%;margin:0 auto;border-top:1px solid #333;padding-top:6px;font-size:11px;font-weight:bold">CONTRATANTE: ${safeSignerName}</div>
+          <div style="width:360px;max-width:100%;margin:0 auto;border-top:1px solid #333;padding-top:6px;font-size:11px;font-weight:bold">
+            <div>NOME FANTASIA: ${safeFantasyName}</div>
+            <div>CONTRATANTE / RAZÃO SOCIAL: ${safeLegalName}</div>
+          </div>
         </div>`
       : '';
 
@@ -3394,7 +3402,7 @@ export default function Company360Client({ initialData }: Props) {
 
               {/* Corpo do Texto Contratual */}
               <div className="font-serif text-xs text-stone-900 leading-relaxed whitespace-pre-wrap max-h-[450px] overflow-y-auto select-text pr-2 text-justify">
-                {data.contract?.rendered_text || 'Carregando termo contratual...'}
+                {contractTextForPlainDisplay(data.contract?.rendered_text) || 'Carregando termo contratual...'}
               </div>
 
               {data.contract.signature_image_data && (
@@ -4582,7 +4590,7 @@ export default function Company360Client({ initialData }: Props) {
             </div>
 
             <div className="p-6 bg-stone-50 border border-stone-300 rounded-2xl font-mono text-xs text-stone-900 leading-relaxed whitespace-pre-wrap max-h-[65vh] overflow-y-auto select-text">
-              {data.contract?.rendered_text || 'Sem texto de contrato disponível.'}
+              {contractTextForPlainDisplay(data.contract?.rendered_text) || 'Sem texto de contrato disponível.'}
             </div>
 
             <div className="flex justify-between items-center pt-3 border-t border-stone-200 flex-wrap gap-2">

@@ -139,12 +139,12 @@ export default async function ContratacaoPublicPage({ params }: ContratacaoPageP
           {/* Dados Resumidos das Partes */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 rounded-xl border border-white/15 bg-white/10 p-4 text-xs">
             <div>
-              <span className="text-white/65 font-medium block">Empresa / Razão Social:</span>
-              <strong className="text-white font-semibold">{business_legal_name}</strong>
-            </div>
-            <div>
               <span className="text-white/65 font-medium block">Nome Fantasia:</span>
               <strong className="text-white font-semibold">{business_name}</strong>
+            </div>
+            <div>
+              <span className="text-white/65 font-medium block">Contratante / Razão Social:</span>
+              <strong className="text-white font-semibold">{business_legal_name}</strong>
             </div>
             <div>
               <span className="text-white/65 font-medium block">CNPJ:</span>

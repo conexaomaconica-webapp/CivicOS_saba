@@ -57,7 +57,10 @@ export default function AdminGuiaDestaquesPage() {
         .select('tenant_id')
         .eq('id', authData.user.id)
         .maybeSingle();
-      const tid = profileData?.tenant_id;
+      const requestHost = window.location.host.toLowerCase();
+      const { data: hostTenantId } = await (supabase as any)
+        .rpc('_resolve_public_tenant_id', { p_host: requestHost });
+      const tid = hostTenantId || profileData?.tenant_id;
       if (!tid) throw new Error('Tenant do administrador não identificado.');
       setTenantId(tid);
 

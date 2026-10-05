@@ -7,6 +7,7 @@ import {
   formatSeloPedraFundamental,
   formatDataEmissao,
   appendSignatureImageToContractText,
+  contractTextForPlainDisplay,
   AdvertiserContractVariables,
 } from './contract-template-renderer';
 
@@ -135,17 +136,19 @@ Plano: {{plano_nome}} — {{plano_valor}} — {{vigencia}}`;
   });
 
   describe('appendSignatureImageToContractText', () => {
-    it('anexa a imagem da assinatura no fim acima do campo CONTRATANTE', () => {
+    it('anexa a assinatura acima do nome fantasia e da razao social do contratante', () => {
       const signature = `data:image/png;base64,${'A'.repeat(300)}`;
       const rendered = appendSignatureImageToContractText(
         'Contrato renderizado\n\n**Data de emissao:** 01/10/2026',
         signature,
+        'Empresa Teste',
         'Empresa Teste Ltda.'
       );
 
       expect(rendered).toContain('<img src="data:image/png;base64,');
-      expect(rendered).toContain('CONTRATANTE: Empresa Teste Ltda.');
-      expect(rendered.indexOf('<img')).toBeLessThan(rendered.indexOf('CONTRATANTE: Empresa Teste Ltda.'));
+      expect(rendered).toContain('NOME FANTASIA: Empresa Teste');
+      expect(rendered).toContain('CONTRATANTE / RAZAO SOCIAL: Empresa Teste Ltda.');
+      expect(rendered.indexOf('NOME FANTASIA:')).toBeLessThan(rendered.indexOf('CONTRATANTE / RAZAO SOCIAL:'));
     });
 
     it('substitui bloco de assinatura anterior sem duplicar imagem', () => {
@@ -154,6 +157,20 @@ Plano: {{plano_nome}} — {{plano_valor}} — {{vigencia}}`;
       const second = appendSignatureImageToContractText(first, signature, 'Empresa Teste Ltda.');
 
       expect((second.match(/data-contract-signature/g) || [])).toHaveLength(1);
+    });
+
+    it('remove o bloco HTML da assinatura na visualizacao em texto puro', () => {
+      const signature = `data:image/png;base64,${'C'.repeat(300)}`;
+      const signed = appendSignatureImageToContractText(
+        'Contrato renderizado',
+        signature,
+        'Empresa Teste',
+        'Empresa Teste Ltda.'
+      );
+
+      expect(contractTextForPlainDisplay(signed)).toBe('Contrato renderizado');
+      expect(contractTextForPlainDisplay(signed)).not.toContain('<section');
+      expect(contractTextForPlainDisplay(signed)).not.toContain('data:image');
     });
   });
 

@@ -72,7 +72,6 @@ export async function createDraftBusinessAction(payload: {
         state: payload.state || 'SP',
         whatsapp: payload.whatsapp || null,
         phone: payload.phone || null,
-        is_published: false,
         publication_status: 'draft',
       })
       .select('id, name, slug')

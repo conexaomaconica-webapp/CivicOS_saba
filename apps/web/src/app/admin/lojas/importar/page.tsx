@@ -33,6 +33,31 @@ type ParsedLodgeRow = {
   longitude?: number | null;
 };
 
+const PLATFORM_FIELDS = [
+  { key: 'name', label: 'Nome da Loja', aliases: ['nome', 'name', 'loja', 'nome_da_loja'] },
+  { key: 'code_number', label: 'Número da Loja', aliases: ['numero', 'número', 'code_number', 'numero_da_loja'] },
+  { key: 'potency', label: 'Potência', aliases: ['potencia', 'potência', 'potency'] },
+  { key: 'rite', label: 'Rito', aliases: ['rito', 'ritual', 'rite'] },
+  { key: 'city', label: 'Cidade', aliases: ['cidade', 'city', 'municipio', 'município'] },
+  { key: 'state', label: 'Estado / UF', aliases: ['estado', 'state', 'uf'] },
+  { key: 'cep', label: 'CEP', aliases: ['cep', 'postal_code'] },
+  { key: 'address', label: 'Endereço', aliases: ['endereco', 'endereço', 'address', 'logradouro'] },
+  { key: 'worshipful_master_name', label: 'Venerável Mestre', aliases: ['veneravel', 'venerável', 'worshipful_master_name'] },
+  { key: 'meeting_day', label: 'Dia da Reunião', aliases: ['dia_reuniao', 'dia_da_reuniao', 'meeting_day'] },
+  { key: 'meeting_time', label: 'Horário da Reunião', aliases: ['horario_reuniao', 'horário_reunião', 'meeting_time'] },
+  { key: 'phone', label: 'Telefone', aliases: ['telefone', 'phone'] },
+  { key: 'whatsapp', label: 'WhatsApp', aliases: ['whatsapp'] },
+  { key: 'email', label: 'E-mail', aliases: ['email', 'e-mail'] },
+  { key: 'website', label: 'Site', aliases: ['site', 'website', 'url'] },
+  { key: 'instagram', label: 'Instagram', aliases: ['instagram'] },
+] as const;
+
+type FieldMapping = Record<string, string>;
+
+function normalizedColumn(value: string) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
 export default function AdminImportarLojasPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -42,10 +67,16 @@ export default function AdminImportarLojasPage() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [sourceUrl, setSourceUrl] = useState('');
   const [sourcePotency, setSourcePotency] = useState('');
+  const [spreadsheetRows, setSpreadsheetRows] = useState<Record<string, unknown>[]>([]);
+  const [spreadsheetColumns, setSpreadsheetColumns] = useState<string[]>([]);
+  const [fieldMapping, setFieldMapping] = useState<FieldMapping>({});
 
   const handleLoadUrl = async () => {
     setLoading(true);
     setSuccessMsg(null);
+    setSpreadsheetRows([]);
+    setSpreadsheetColumns([]);
+    setFieldMapping({});
     try {
       const result = await extractLodgesFromUrlAction({ url: sourceUrl, potency: sourcePotency });
       if (!result.success || !result.data) {
@@ -159,6 +190,52 @@ export default function AdminImportarLojasPage() {
     XLSX.writeFile(workbook, 'modelo_importacao_lojas.xlsx');
   };
 
+  const analyzeSpreadsheetRows = async () => {
+    const selected = (key: string) => fieldMapping[key];
+    if (!selected('name')) {
+      alert('Associe pelo menos o campo obrigatório "Nome da Loja".');
+      return;
+    }
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const { data: existingLodges } = await (supabase as any).from('organizations').select('id, name, code_number, potency, city');
+      const existingList = existingLodges || [];
+      let newC = 0, updC = 0, dupC = 0, errC = 0;
+      const results: ParsedLodgeRow[] = [];
+      const cell = (row: Record<string, unknown>, key: string) => selected(key) ? String(row[selected(key)!] ?? '').trim() : '';
+
+      for (const rowData of spreadsheetRows) {
+        const name = cell(rowData, 'name');
+        const codeValue = cell(rowData, 'code_number');
+        const parsedCode = codeValue ? Number.parseInt(codeValue, 10) : NaN;
+        const code_number = Number.isFinite(parsedCode) ? parsedCode : null;
+        const potency = cell(rowData, 'potency') || 'NÃO INFORMADA';
+        const city = cell(rowData, 'city');
+        if (!name) {
+          errC++;
+          results.push({ raw: rowData, status: 'error', reason: 'Nome da loja é obrigatório', name: 'Sem nome', potency });
+          continue;
+        }
+        const matchByNumber = existingList.find((item: any) => code_number != null && Number(item.code_number) === code_number && item.potency?.toLowerCase() === potency.toLowerCase());
+        const matchByNameCity = existingList.find((item: any) => item.name?.trim().toLowerCase() === name.toLowerCase() && item.potency?.toLowerCase() === potency.toLowerCase() && (item.city || '').trim().toLowerCase() === city.toLowerCase());
+        const status: ParsedLodgeRow['status'] = matchByNumber ? 'update' : matchByNameCity ? 'duplicate' : 'new';
+        if (status === 'update') updC++; else if (status === 'duplicate') dupC++; else newC++;
+        results.push({
+          raw: rowData, status, name, code_number, potency,
+          reason: status === 'update' ? 'Potência e número já cadastrados' : status === 'duplicate' ? 'Nome e cidade já cadastrados' : 'Nova loja pronta para cadastro',
+          rite: cell(rowData, 'rite'), city, state: cell(rowData, 'state'), cep: cell(rowData, 'cep'), address: cell(rowData, 'address'),
+          worshipful_master_name: cell(rowData, 'worshipful_master_name'), meeting_day: cell(rowData, 'meeting_day'), meeting_time: cell(rowData, 'meeting_time'),
+          phone: cell(rowData, 'phone'), whatsapp: cell(rowData, 'whatsapp'), email: cell(rowData, 'email'), website: cell(rowData, 'website'), instagram: cell(rowData, 'instagram'),
+        });
+      }
+      setParsedRows(results);
+      setSummary({ newCount: newC, updateCount: updC, dupCount: dupC, errCount: errC });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Process Native Excel (.xlsx / .xls / .csv) File Upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -187,88 +264,18 @@ export default function AdminImportarLojasPage() {
           return;
         }
 
-        const supabase = createClient();
-        const { data: existingLodges } = await (supabase as any).from('organizations').select('id, name, code_number, potency, city');
-        const existingList = existingLodges || [];
-
-        let newC = 0, updC = 0, dupC = 0, errC = 0;
-        const results: ParsedLodgeRow[] = [];
-
-        for (const rowData of rawJson) {
-          const name = String(rowData.nome || rowData.name || rowData.Nome || '').trim();
-          const code_number = rowData.numero || rowData.code_number || rowData.Numero ? parseInt(String(rowData.numero || rowData.code_number || rowData.Numero), 10) : null;
-          const potency = String(rowData.potencia || rowData.potency || rowData.Potencia || 'GOB').trim();
-
-          if (!name) {
-            errC++;
-            results.push({
-              raw: rowData,
-              status: 'error',
-              reason: 'Registro inválido: Nome da loja é obrigatório',
-              name: 'Sem Nome (Inválido)',
-              potency,
-            });
-            continue;
-          }
-
-          // 1º Match por potência + número (Atualização Segura)
-          const matchByNumber = existingList.find(
-            (e: any) =>
-              code_number != null &&
-              e.code_number === code_number &&
-              e.potency?.toLowerCase() === potency.toLowerCase()
-          );
-
-          // 2º Match por potência + nome + cidade (Possível Duplicidade)
-          const matchByNameCity = existingList.find(
-            (e: any) =>
-              e.name.toLowerCase().trim() === name.toLowerCase().trim() &&
-              e.potency?.toLowerCase() === potency.toLowerCase() &&
-              (e.city || '').toLowerCase().trim() === String(rowData.cidade || rowData.city || '').toLowerCase().trim()
-          );
-
-          let status: 'new' | 'update' | 'duplicate' | 'error' = 'new';
-          let reason: string | undefined = undefined;
-
-          if (matchByNumber) {
-            status = 'update';
-            updC++;
-            reason = `Atualização segura: Loja já cadastrada por número (${code_number}) e potência (${potency})`;
-          } else if (matchByNameCity) {
-            status = 'duplicate';
-            dupC++;
-            reason = `Possível duplicidade: Nome e cidade já existentes na potência (${potency})`;
-          } else {
-            status = 'new';
-            newC++;
-            reason = 'Nova loja pronta para cadastro';
-          }
-
-          results.push({
-            raw: rowData,
-            status,
-            reason,
-            name,
-            code_number,
-            potency,
-            rite: String(rowData.rito || rowData.rite || ''),
-            city: String(rowData.cidade || rowData.city || ''),
-            state: String(rowData.estado || rowData.state || ''),
-            cep: String(rowData.cep || ''),
-            address: String(rowData.endereco || rowData.address || ''),
-            worshipful_master_name: String(rowData.veneravel || rowData.worshipful_master_name || ''),
-            meeting_day: String(rowData.dia_reuniao || rowData.meeting_day || ''),
-            meeting_time: String(rowData.horario_reuniao || rowData.meeting_time || ''),
-            phone: String(rowData.telefone || rowData.phone || ''),
-            whatsapp: String(rowData.whatsapp || ''),
-            email: String(rowData.email || ''),
-            website: String(rowData.site || rowData.website || ''),
-            instagram: String(rowData.instagram || ''),
-          });
+        const columns = Array.from(new Set(rawJson.flatMap((row) => Object.keys(row))));
+        const automaticMapping: FieldMapping = {};
+        for (const field of PLATFORM_FIELDS) {
+          const aliases = field.aliases.map(normalizedColumn);
+          const match = columns.find((column) => aliases.includes(normalizedColumn(column)));
+          if (match) automaticMapping[field.key] = match;
         }
-
-        setParsedRows(results);
-        setSummary({ newCount: newC, updateCount: updC, dupCount: dupC, errCount: errC });
+        setSpreadsheetRows(rawJson);
+        setSpreadsheetColumns(columns);
+        setFieldMapping(automaticMapping);
+        setParsedRows([]);
+        setSummary({ newCount: 0, updateCount: 0, dupCount: 0, errCount: 0 });
       } catch (err) {
         console.error(err);
         alert('Erro ao processar planilha Excel. Verifique o formato do arquivo.');
@@ -471,6 +478,32 @@ export default function AdminImportarLojasPage() {
       </div>
 
       {/* Prévia da Análise */}
+      {spreadsheetRows.length > 0 && (
+        <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-2xs space-y-5">
+          <div>
+            <h2 className="font-serif font-bold text-lg text-gray-900">Conciliação das colunas</h2>
+            <p className="text-xs text-stone-500 mt-1">Relacione os campos da plataforma com as colunas encontradas na planilha ({spreadsheetRows.length} registros). O nome da loja é obrigatório.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {PLATFORM_FIELDS.map((field) => (
+              <div key={field.key} className="grid grid-cols-[minmax(130px,1fr)_minmax(160px,1.4fr)] items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
+                <label htmlFor={`mapping-${field.key}`} className="text-xs font-bold text-stone-800">{field.label}{field.key === 'name' ? ' *' : ''}</label>
+                <select id={`mapping-${field.key}`} value={fieldMapping[field.key] || ''} onChange={(e) => setFieldMapping((current) => ({ ...current, [field.key]: e.target.value }))} className="w-full rounded-lg border border-stone-300 bg-white px-2.5 py-2 text-xs text-stone-900">
+                  <option value="">Não importar</option>
+                  {spreadsheetColumns.map((column) => <option key={column} value={column}>{column}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end">
+            <button type="button" onClick={() => void analyzeSpreadsheetRows()} disabled={loading || !fieldMapping.name} className="inline-flex items-center gap-2 rounded-xl bg-[#3b0b14] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#5d1523] disabled:opacity-50">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              Confirmar conciliação e analisar
+            </button>
+          </div>
+        </div>
+      )}
+
       {parsedRows.length > 0 && (
         <div className="space-y-6">
           {/* Card Resumo */}

@@ -16,8 +16,8 @@ Pelo presente instrumento eletrônico, de um lado:
 e, de outro lado:
 
 **CONTRATANTE / ANUNCIANTE:**
-- **Razão Social:** {{razao_social}}
 - **Nome Fantasia:** {{nome_fantasia}}
+- **Razão Social:** {{razao_social}}
 - **CNPJ:** {{cnpj}}
 - **Endereço:** {{endereco}}
 

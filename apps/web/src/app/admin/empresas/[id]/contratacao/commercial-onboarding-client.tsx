@@ -42,6 +42,7 @@ import {
 import { formatCentsToReais } from '@/lib/billing/plans-service';
 import { MASONIC_ELIGIBILITY_TYPE_LABELS } from '@/lib/masonic/masonic-links-service';
 import { COMMERCIAL_STATUS_LABELS } from '@/lib/commercial-onboarding-status';
+import { contractTextForPlainDisplay } from '@/lib/contracts/contract-template-renderer';
 import {
   getAdminContractDraftPreviewAction,
   getAdminSignedContractAction,
@@ -2746,7 +2747,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
                     <p className="break-all font-mono text-[11px] text-stone-700">{signedContractData.sha256_hash}</p>
                   </div>
                   <article className="whitespace-pre-wrap rounded-xl border border-stone-200 bg-white p-6 text-sm leading-relaxed text-stone-800 shadow-inner">
-                    {signedContractData.rendered_text}
+                    {contractTextForPlainDisplay(signedContractData.rendered_text)}
                   </article>
                   {signedContractData.signature_image_data && (
                     <div className="rounded-xl border border-stone-200 p-4">

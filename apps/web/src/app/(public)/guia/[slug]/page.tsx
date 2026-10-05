@@ -239,9 +239,9 @@ const getPublicBusiness = cache(async (slug: string) => {
 
     // TRIPLA CONDIÇÃO ESTRITA E POSITIVA FECHADA:
     // 1. business.is_active = true (ja filtrado na query)
-    // 2. publication_status = 'published' ou is_published = true
+    // 2. publication_status = 'published'
     // 3. subscription_status em ('active', 'trialing', 'trailing')
-    const isPublished = bObj.publication_status === 'published' || bObj.is_published === true;
+    const isPublished = bObj.publication_status === 'published';
     const isSubscriptionActive = ['active', 'trialing', 'trailing'].includes(subStatus);
 
     if (!isPublished || !isSubscriptionActive) {

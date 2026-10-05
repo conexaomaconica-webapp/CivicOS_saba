@@ -52,12 +52,12 @@ export default function AdminGuiaGeralPage() {
         const { data: authData } = await supabase.auth.getUser();
         if (!authData.user) throw new Error('Usuário não autenticado.');
 
-        const { data: profileData } = await (supabase as any)
-          .from('profiles')
-          .select('tenant_id')
-          .eq('id', authData.user.id)
-          .maybeSingle();
-        const tid = profileData?.tenant_id;
+        const requestHost = window.location.host.toLowerCase();
+        const [{ data: profileData }, { data: hostTenantId }] = await Promise.all([
+          (supabase as any).from('profiles').select('tenant_id').eq('id', authData.user.id).maybeSingle(),
+          (supabase as any).rpc('_resolve_public_tenant_id', { p_host: requestHost }),
+        ]);
+        const tid = hostTenantId || profileData?.tenant_id;
         if (!tid) throw new Error('Tenant do administrador não identificado.');
 
         const { data } = await (supabase as any)
@@ -84,10 +84,13 @@ export default function AdminGuiaGeralPage() {
             setSections(data.sections_config as SectionConfig[]);
             const spConfig = (data.sections_config as any[]).find((s) => s.id === 'sponsored');
             if (spConfig) {
-              if (spConfig.speed && !data.sponsored_marquee_speed) {
+              if (spConfig.display_mode === 'logos' || spConfig.display_mode === 'cards') {
+                setSponsoredDisplayMode(spConfig.display_mode);
+              }
+              if (Number(spConfig.speed) > 0) {
                 setSponsoredSpeed(Number(spConfig.speed));
               }
-              if (spConfig.logo_style && !data.sponsored_logo_style) {
+              if (spConfig.logo_style === 'clean' || spConfig.logo_style === 'standard') {
                 setSponsoredLogoStyle(spConfig.logo_style);
               }
             }
