@@ -170,7 +170,7 @@ export async function createCommercialOnboardingChargeAction(
     // 4. Carrega termos comerciais CONGELADOS no backend (FONTE CANÔNICA DE PREÇO)
     const { data: terms, error: termsErr } = await (dbClient as any)
       .from('business_commercial_terms')
-      .select('plan_code, plan_name, amount_cents, billing_cycle, payment_method, installments_count, is_pedra_fundamental')
+      .select('plan_code, plan_name, amount_cents, billing_cycle, payment_method, installments_count, is_pedra_fundamental, invoice_required, invoice_issued_at')
       .eq('business_id', biz.id)
       .maybeSingle();
 
@@ -178,6 +178,14 @@ export async function createCommercialOnboardingChargeAction(
       return {
         success: false,
         error: 'Termos comerciais congelados não encontrados ou valor inválido para cobrança.',
+      };
+    }
+
+    // Nota fiscal opcional: se foi solicitada e ainda não emitida, o pagamento fica em espera (checagem no servidor).
+    if (terms.invoice_required && !terms.invoice_issued_at) {
+      return {
+        success: false,
+        error: 'O pagamento será liberado assim que a nota fiscal for emitida pela equipe da Conexão Maçônica.',
       };
     }
 

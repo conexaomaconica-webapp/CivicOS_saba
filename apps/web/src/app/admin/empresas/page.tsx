@@ -39,6 +39,7 @@ import {
   AdminBusinessListItem,
 } from '@/lib/admin/admin-businesses-service';
 import { deleteBusinessAdminAction } from '@/app/actions/business-management';
+import { getPedraFundamentalQuotaAction } from '@/app/actions/institutional-recognitions';
 
 const PLAN_LABELS: Record<string, string> = {
   bronze: 'Esquadro',
@@ -117,6 +118,7 @@ export default function AdminBusinessesDirectoryPage() {
     ouro: 0,
     pedraFundamental: 0,
   });
+  const [pedraQuota, setPedraQuota] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedFilter, setSelectedFilter] = useState<string>('todas');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -161,6 +163,8 @@ export default function AdminBusinessesDirectoryPage() {
 
     if (filter === 'publicadas') statusParam = 'published';
     else if (filter === 'suspensas') statusParam = 'suspended';
+    else if (filter === 'inadimplentes') statusParam = 'overdue';
+    else if (filter === 'incompletas') statusParam = 'incomplete';
     else if (filter === 'bronze') planParam = 'bronze';
     else if (filter === 'prata') planParam = 'prata';
     else if (filter === 'ouro') planParam = 'ouro';
@@ -182,6 +186,11 @@ export default function AdminBusinessesDirectoryPage() {
     }
     setLoading(false);
   }, [searchQuery]);
+
+  // Cota máxima de Pedra Fundamental definida em Reconhecimentos (antes o "/10" era fixo na tela)
+  useEffect(() => {
+    getPedraFundamentalQuotaAction().then((res) => setPedraQuota(res.quota)).catch(() => setPedraQuota(null));
+  }, []);
 
   // Recarregar dados quando mudam filtros ou paginação
   useEffect(() => {
@@ -420,7 +429,7 @@ export default function AdminBusinessesDirectoryPage() {
             <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900">Pedra Fundamental</span>
             <Sparkles className="w-4 h-4 text-amber-500" />
           </div>
-          <p className="text-2xl font-serif font-bold text-amber-900 mt-1">{counts.pedraFundamental}/10</p>
+          <p className="text-2xl font-serif font-bold text-amber-900 mt-1">{counts.pedraFundamental}{pedraQuota != null ? `/${pedraQuota}` : ''}</p>
         </button>
       </section>
 
@@ -780,6 +789,10 @@ export default function AdminBusinessesDirectoryPage() {
                           {item.payment_status === 'paid' ? (
                             <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-[10px]">
                               ✓ Confirmado
+                            </span>
+                          ) : item.payment_status === 'overdue' ? (
+                            <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-900 border border-rose-300 font-bold text-[10px]">
+                              Em atraso
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10px]">

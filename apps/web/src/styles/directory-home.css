@@ -55,8 +55,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 0 auto; /* o menu mantém a largura dos links; quem cede espaço são as ações da direita */
   gap: 24px;
 }
 .dh-header__link {
@@ -77,8 +76,11 @@
 .dh-header__actions {
   display: flex;
   align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
   gap: 16px;
 }
+.dh-header__actions > * { white-space: nowrap; }
 .dh-header__icon-btn {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -499,6 +501,14 @@
   margin-bottom: 24px;
   font-size: 14px;
   font-weight: 600;
+}
+
+/* Notebooks (até ~1400px): logo, menu e ações dividem o espaço sem se encostar */
+@media (min-width: 1181px) and (max-width: 1440px) {
+  .dh-header__nav { gap: 18px; }
+  .dh-header__actions { gap: 10px; }
+  .dh-header__actions .dh-city-dropdown { max-width: 172px; }
+  .dh-header__actions .dh-city-dropdown select { max-width: 124px; text-overflow: ellipsis; }
 }
 
 /* Larguras médias (tablet / janela estreita): menu e ações mais compactos para caber sem apertar a logo */

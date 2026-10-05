@@ -28,6 +28,7 @@ import {
   CalendarDays,
   ClipboardList,
   KeyRound,
+  Handshake,
 } from 'lucide-react';
 import { getApprovalDirectoryListAction } from '@/lib/admin/admin-approval-service';
 
@@ -183,6 +184,12 @@ export const adminNavSections: NavSection[] = [
         label: 'Avaliações & Reputação',
         path: '/admin/reviews',
         icon: Star,
+      },
+      {
+        id: 'conexoes',
+        label: 'Mural de Conexões',
+        path: '/admin/conexoes',
+        icon: Handshake,
       },
     ],
   },

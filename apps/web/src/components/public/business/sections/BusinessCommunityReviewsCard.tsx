@@ -2,6 +2,8 @@ import React from 'react';
 import { Star, ThumbsUp, MessageSquareQuote, UserRound } from 'lucide-react';
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
 import { BusinessReviewForm } from './BusinessReviewForm';
+import { BusinessConnectionsCard } from './BusinessConnectionsCard';
+import { ReferralTracker } from './ReferralTracker';
 import { CollapsibleReviewComment } from './CollapsibleReviewComment';
 
 type BusinessCommunityReviewsCardProps = {
@@ -60,6 +62,11 @@ export function BusinessCommunityReviewsCard({
           )}
         </div>
       )}
+
+      <ReferralTracker businessSlug={businessSlug} />
+
+      {/* MURAL DE CONEXÕES ("Comprei na Conexão") */}
+      <BusinessConnectionsCard businessSlug={businessSlug} />
 
       {/* SEÇÃO AVALIAÇÕES E DEPOIMENTOS */}
       <div className="flex flex-col gap-4">

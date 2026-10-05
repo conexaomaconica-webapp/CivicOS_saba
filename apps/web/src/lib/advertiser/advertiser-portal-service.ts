@@ -2,6 +2,7 @@
 
 import { createServerSideClient } from '@/lib/supabase/server';
 import { resolveBusinessMedia, resolveLogoUrl, resolveCoverUrl } from '@/lib/business/business-media-helpers';
+import { findAdvertiserBusiness } from '@/lib/advertiser/advertiser-access';
 
 export interface AdvertiserDashboardDTO {
   business: {
@@ -56,12 +57,8 @@ export async function getAdvertiserDashboardDTOAction(_userId?: string): Promise
     let businessData: any = null;
 
     if (userRes?.user) {
-      const { data: biz } = await supabase
-        .from('businesses')
-        .select('*')
-        .eq('owner_id', userRes.user.id)
-        .maybeSingle();
-      businessData = biz;
+      // Dono da empresa ou membro da equipe (co-dono, gestor...).
+      businessData = await findAdvertiserBusiness(supabase, userRes.user.id);
     }
 
     if (!userRes?.user || !businessData) throw new Error('Empresa do anunciante não localizada.');

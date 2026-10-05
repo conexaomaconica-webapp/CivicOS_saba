@@ -1,9 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   getAdminLodgesListAction,
   getAdminLodge360DetailsAction,
   toggleLodgePublicationStatusAction,
 } from '../src/lib/admin/admin-lodges-service';
+
+vi.mock('../src/lib/admin/admin-auth-helper', () => ({ assertPlatformAdminAccess: async () => ({ supabase: {}, user: { id: 'test-admin' } }) }));
 
 describe('EPIC ADMIN — CHECKPOINT 5: GESTÃO 360º DE LOJAS MAÇÔNICAS & ORGANIZAÇÕES', () => {
   const TEST_LODGE_ID = '00000000-0000-0000-0000-000000000020';

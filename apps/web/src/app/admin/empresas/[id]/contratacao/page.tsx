@@ -2,6 +2,7 @@ import React from 'react';
 import { notFound } from 'next/navigation';
 import { getAdminBusiness360Action } from '@/lib/admin/admin-businesses-service';
 import CommercialOnboardingClient from './commercial-onboarding-client';
+import InvoiceControl from './invoice-control';
 
 type ContratacaoPageProps = {
   params: Promise<{
@@ -31,6 +32,7 @@ export default async function ContratacaoPage({ params }: ContratacaoPageProps) 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
       <CommercialOnboardingClient dto={dto} />
+      <InvoiceControl businessId={id} />
     </div>
   );
 }

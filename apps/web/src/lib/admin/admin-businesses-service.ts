@@ -659,6 +659,7 @@ export interface AdminBusiness360DTO {
 
 export async function getAdminBusinessesListAction(params?: {
   query?: string;
+  /** all | published | suspended | overdue (inadimplentes) | incomplete (<70%) | qualquer publication_status */
   status?: string;
   plan?: string;
   recognition?: string;
@@ -667,180 +668,91 @@ export async function getAdminBusinessesListAction(params?: {
 }) {
   const { supabase } = await assertPlatformAdminAccess();
 
-  const page = params?.page || 1;
-  const pageSize = params?.pageSize || 20;
-  const offset = (page - 1) * pageSize;
+  const page = Math.max(1, params?.page || 1);
+  const pageSize = Math.max(1, params?.pageSize || 20);
 
   try {
-    let query = (supabase as any).from('businesses').select('*', { count: 'exact' });
-
-    if (params?.query) {
-      const q = `%${params.query.toLowerCase()}%`;
-      query = query.or(`name.ilike.${q},category.ilike.${q}`);
-    }
-
-    if (params?.status && params.status !== 'all') {
-      if (params.status !== 'inadimplente') {
-        query = query.eq('publication_status', params.status);
-      }
-    }
-
-    // Filtro por plano: será aplicado após resolver plan_code via subscriptions
-    // Filtro por reconhecimento: será aplicado após consultar business_recognitions
-
-    const { data, count } = await query
-      .order('created_at', { ascending: false })
-      .range(offset, offset + pageSize - 1);
-
-    // Carregar todos os negócios para KPIs de contagem
-    const { data: allBizData } = await (supabase as any)
-      .from('businesses')
-      .select('id, publication_status, plan_code, plan_tier, created_at');
+    // Toda a carteira de uma vez: KPIs, filtros e paginação são calculados sobre o conjunto completo
+    // (antes, plano/Pedra Fundamental eram filtrados só dentro da página atual e "inadimplentes"/"incompletas" ficavam em 0).
+    const { data: allBizData } = await (supabase as any).from('businesses').select('*').order('created_at', { ascending: false });
     const allBiz = (allBizData || []) as any[];
 
-
-    // Resolver plano efetivo via subscriptions para TODAS as empresas (KPIs)
-    let allPlanMap: Record<string, string> = {};
-    try {
-      const { data: allSubs } = await (supabase as any)
-        .from('subscriptions')
-        .select('business_id, plan_versions!inner(plans!inner(code))')
-        .in('status', ['active', 'pending']);
-      if (allSubs && Array.isArray(allSubs)) {
-        for (const sub of allSubs) {
-          const code = sub.plan_versions?.plans?.code;
-          if (code && sub.business_id) {
-            allPlanMap[sub.business_id] = code;
-          }
-        }
+    const rowsOf = async (builder: any): Promise<any[]> => {
+      try {
+        const res = await builder;
+        return Array.isArray(res?.data) ? res.data : [];
+      } catch {
+        return [];
       }
-    } catch (_e) { }
-
-    // Resolver reconhecimentos ativos para TODAS as empresas (KPIs)
-    let allRecMap: Record<string, string[]> = {};
-    try {
-      const { data: allRecs } = await (supabase as any)
-        .from('business_recognitions')
-        .select('business_id, recognition_key')
-        .eq('is_active', true);
-      if (allRecs && Array.isArray(allRecs)) {
-        for (const r of allRecs) {
-          const bizId = r.business_id as string;
-          if (!allRecMap[bizId]) allRecMap[bizId] = [];
-          allRecMap[bizId]!.push(r.recognition_key);
-        }
-      }
-    } catch (_e) { }
-
-    const totalPortfolio = allBiz.length;
-    const publishedCount = allBiz.filter((b) => b.publication_status === 'published').length;
-    const suspendedCount = allBiz.filter((b) => b.publication_status === 'suspended').length;
-    const pendingCount = allBiz.filter((b) => b.publication_status === 'pending_review').length;
-    const pedraCount = Object.values(allRecMap).filter((keys) => keys.includes('pedra_fundamental')).length;
-
-    // Contagens de plano efetivo
-    const bronzeCount = allBiz.filter((b) => normalizeCanonicalPlanCode(allPlanMap[b.id] || b.plan_tier || b.plan_code) === 'esquadro').length;
-    const prataCount = allBiz.filter((b) => normalizeCanonicalPlanCode(allPlanMap[b.id] || b.plan_tier || b.plan_code) === 'compasso').length;
-    const ouroCount = allBiz.filter((b) => normalizeCanonicalPlanCode(allPlanMap[b.id] || b.plan_tier || b.plan_code) === 'acacia').length;
-
-    const kpis = {
-      total: totalPortfolio,
-      published: publishedCount,
-      suspended: suspendedCount,
-      pending: pendingCount,
-      overdue: 0,
-      incomplete: 0,
-      pedra_fundamental_count: pedraCount,
     };
 
-    const counts = {
-      todas: totalPortfolio,
-      publicadas: publishedCount,
-      inadimplentes: 0,
-      suspensas: suspendedCount,
-      incompletas: 0,
-      bronze: bronzeCount,
-      prata: prataCount,
-      ouro: ouroCount,
-      pedraFundamental: pedraCount,
-    };
+    const [subsRows, recRows, invoiceRows, locRows, contactRows, categoryRows, linkRows, responsibleRows] = await Promise.all([
+      rowsOf((supabase as any).from('subscriptions').select('business_id, status, created_at, plan_versions!inner(plans!inner(code))')),
+      rowsOf((supabase as any).from('business_recognitions').select('business_id, recognition_key').eq('is_active', true)),
+      rowsOf((supabase as any).from('invoices').select('business_id, status')),
+      rowsOf((supabase as any).from('business_locations').select('business_id, city, state, is_headquarters')),
+      rowsOf((supabase as any).from('business_contacts').select('business_id, type, value')),
+      rowsOf((supabase as any).from('business_categories').select('business_id, category_id, is_primary, categories(name)').order('is_primary', { ascending: false })),
+      rowsOf((supabase as any).from('business_masonic_links').select('business_id, status').eq('status', 'verified')),
+      rowsOf((supabase as any).from('business_responsibles').select('business_id, name')),
+    ]);
 
-    // Resolver localizações para os itens da página atual
-    const bizIds = (data || []).map((b: any) => b.id);
-    let locationMap: Record<string, { city: string; state: string }> = {};
-    let contactMap: Record<string, { phone?: string; whatsapp?: string }> = {};
-    let categoryMap: Record<string, { id?: string; name?: string }> = {};
-    if (bizIds.length > 0) {
-      try {
-        const locBuilder = (supabase as any).from('business_locations').select('business_id, city, state, is_headquarters');
-        if (typeof locBuilder?.in === 'function') {
-          const { data: locs } = await locBuilder.in('business_id', bizIds);
-          if (locs && Array.isArray(locs)) {
-            for (const loc of locs) {
-              if (!locationMap[loc.business_id] || loc.is_headquarters) {
-                locationMap[loc.business_id] = { city: loc.city, state: loc.state };
-              }
-            }
-          }
+    // Plano efetivo: assinatura ativa vale mais que pendente; entre iguais, a mais recente.
+    const planMap: Record<string, string> = {};
+    {
+      const rank: Record<string, number> = { active: 2, pending: 1 };
+      const best: Record<string, { rank: number; at: number }> = {};
+      for (const sub of subsRows) {
+        const code = sub.plan_versions?.plans?.code;
+        const r = rank[sub.status as string];
+        if (!code || !sub.business_id || !r) continue;
+        const at = sub.created_at ? new Date(sub.created_at).getTime() : 0;
+        const current = best[sub.business_id];
+        if (!current || r > current.rank || (r === current.rank && at >= current.at)) {
+          best[sub.business_id] = { rank: r, at };
+          planMap[sub.business_id] = code;
         }
-      } catch (_e) { }
-      try {
-        const { data: contacts } = await (supabase as any)
-          .from('business_contacts')
-          .select('business_id, type, value')
-          .in('business_id', bizIds)
-          .in('type', ['phone', 'whatsapp']);
-        for (const contact of contacts || []) {
-          contactMap[contact.business_id] ||= {};
-          contactMap[contact.business_id]![contact.type as 'phone' | 'whatsapp'] = contact.value;
-        }
-      } catch (_e) { }
-      try {
-        const { data: categories } = await (supabase as any)
-          .from('business_categories')
-          .select('business_id, category_id, is_primary, categories(name)')
-          .in('business_id', bizIds)
-          .order('is_primary', { ascending: false });
-        for (const row of categories || []) {
-          if (!categoryMap[row.business_id]) categoryMap[row.business_id] = { id: row.category_id, name: row.categories?.name };
-        }
-      } catch (_e) { }
+      }
     }
 
-    // Resolver verificação maçônica para itens da página
-    let verifiedMap: Record<string, boolean> = {};
-    if (bizIds.length > 0) {
-      try {
-        const { data: links } = await (supabase as any)
-          .from('business_masonic_links')
-          .select('business_id, status')
-          .in('business_id', bizIds)
-          .eq('status', 'verified');
-        if (links && Array.isArray(links)) {
-          for (const l of links) {
-            verifiedMap[l.business_id] = true;
-          }
-        }
-      } catch (_e) { }
+    const recMap: Record<string, string[]> = {};
+    for (const r of recRows) (recMap[r.business_id] ||= []).push(r.recognition_key);
+
+    // Situação financeira por empresa (mesma regra do dashboard): fatura paga vence; senão atrasada; senão aberta.
+    const paymentMap: Record<string, 'paid' | 'pending' | 'overdue'> = {};
+    for (const inv of invoiceRows) {
+      if (!inv.business_id) continue;
+      const current = paymentMap[inv.business_id];
+      if (inv.status === 'paid') paymentMap[inv.business_id] = 'paid';
+      else if (current === 'paid') continue;
+      else if (inv.status === 'overdue') paymentMap[inv.business_id] = 'overdue';
+      else if (!current && ['draft', 'open', 'pending'].includes(inv.status)) paymentMap[inv.business_id] = 'pending';
     }
 
-    // Nome do responsável cadastrado para cada empresa (mesma fonte da tela 360).
+    const locationMap: Record<string, { city: string; state: string }> = {};
+    for (const loc of locRows) {
+      if (!locationMap[loc.business_id] || loc.is_headquarters) locationMap[loc.business_id] = { city: loc.city, state: loc.state };
+    }
+    const contactMap: Record<string, { phone?: string; whatsapp?: string }> = {};
+    for (const contact of contactRows) {
+      if (contact.type !== 'phone' && contact.type !== 'whatsapp') continue;
+      (contactMap[contact.business_id] ||= {})[contact.type as 'phone' | 'whatsapp'] = contact.value;
+    }
+    const categoryMap: Record<string, { id?: string; name?: string }> = {};
+    for (const row of categoryRows) {
+      if (!categoryMap[row.business_id]) categoryMap[row.business_id] = { id: row.category_id, name: row.categories?.name };
+    }
+    const verifiedMap: Record<string, boolean> = {};
+    for (const link of linkRows) verifiedMap[link.business_id] = true;
     const responsibleNameMap: Record<string, string> = {};
-    if (bizIds.length > 0) {
-      try {
-        const { data: responsibles } = await (supabase as any)
-          .from('business_responsibles')
-          .select('business_id, name')
-          .in('business_id', bizIds);
-        for (const r of responsibles || []) {
-          if (r.name && !responsibleNameMap[r.business_id]) responsibleNameMap[r.business_id] = r.name;
-        }
-      } catch (_e) { }
+    for (const r of responsibleRows) {
+      if (r.name && !responsibleNameMap[r.business_id]) responsibleNameMap[r.business_id] = r.name;
     }
 
-    let items: AdminBusinessListItem[] = (data || []).map((b: any) => {
-      const effectivePlan = normalizeCanonicalPlanCode(allPlanMap[b.id] || b.plan_tier || b.plan_code);
-      const recs = allRecMap[b.id] || [];
+    // Itens completos de TODA a carteira (a página só recorta no final).
+    const allItems: AdminBusinessListItem[] = allBiz.map((b: any) => {
+      const effectivePlan = normalizeCanonicalPlanCode(planMap[b.id] || b.plan_tier || b.plan_code);
+      const recs = recMap[b.id] || [];
       const readiness = evaluateBusinessProfileReadiness({
         name: b.name,
         legal_name: b.legal_name,
@@ -853,6 +765,7 @@ export async function getAdminBusinessesListAction(params?: {
         whatsapp: contactMap[b.id]?.whatsapp || b.whatsapp,
         logo_url: b.logo_url,
       });
+      const publication = (b.publication_status || 'published') as AdminBusinessListItem['publication_status'];
       return {
         id: b.id,
         tenant_id: b.tenant_id,
@@ -864,8 +777,9 @@ export async function getAdminBusinessesListAction(params?: {
         state: locationMap[b.id]?.state || b.state || '',
         owner_name: responsibleNameMap[b.id] || 'Responsável não informado',
         owner_email: b.email || 'contato@anunciante.com',
-        publication_status: (b.publication_status || 'published') as any,
-        payment_status: b.publication_status === 'published' ? 'paid' : 'pending',
+        publication_status: publication,
+        // Com fatura, vale a situação real; sem fatura, publicada conta como regular.
+        payment_status: paymentMap[b.id] ?? (publication === 'published' ? 'paid' : 'pending'),
         plan_code: effectivePlan,
         completeness_percent: readiness.completion_percentage,
         completeness_missing: readiness.missing_labels,
@@ -879,24 +793,68 @@ export async function getAdminBusinessesListAction(params?: {
       };
     });
 
-    // Filtro por plano (pós-resolução efetiva)
+    const isOverdue = (item: AdminBusinessListItem) => paymentMap[item.id] === 'overdue';
+    const isIncomplete = (item: AdminBusinessListItem) => item.completeness_percent < 70;
+    const planOf = (item: AdminBusinessListItem) => normalizeCanonicalPlanCode(item.plan_code);
+
+    const counts = {
+      todas: allItems.length,
+      publicadas: allItems.filter((i) => i.publication_status === 'published').length,
+      inadimplentes: allItems.filter(isOverdue).length,
+      suspensas: allItems.filter((i) => i.publication_status === 'suspended').length,
+      incompletas: allItems.filter(isIncomplete).length,
+      bronze: allItems.filter((i) => planOf(i) === 'esquadro').length,
+      prata: allItems.filter((i) => planOf(i) === 'compasso').length,
+      ouro: allItems.filter((i) => planOf(i) === 'acacia').length,
+      pedraFundamental: allItems.filter((i) => i.is_pedra_fundamental).length,
+    };
+
+    const kpis = {
+      total: counts.todas,
+      published: counts.publicadas,
+      suspended: counts.suspensas,
+      pending: allItems.filter((i) => i.publication_status === 'pending_review').length,
+      overdue: counts.inadimplentes,
+      incomplete: counts.incompletas,
+      pedra_fundamental_count: counts.pedraFundamental,
+    };
+
+    // Filtros sobre a carteira inteira
+    let filtered = allItems;
+
+    const status = params?.status;
+    if (status && status !== 'all') {
+      if (status === 'overdue' || status === 'inadimplente') filtered = filtered.filter(isOverdue);
+      else if (status === 'incomplete') filtered = filtered.filter(isIncomplete);
+      else filtered = filtered.filter((i) => i.publication_status === status);
+    }
+
     if (params?.plan && params.plan !== 'all') {
-      items = items.filter(
-        (item) => normalizeCanonicalPlanCode(item.plan_code) === normalizeCanonicalPlanCode(params!.plan),
+      const wanted = normalizeCanonicalPlanCode(params.plan);
+      filtered = filtered.filter((i) => planOf(i) === wanted);
+    }
+
+    if (params?.recognition === 'pedra_fundamental') {
+      filtered = filtered.filter((i) => i.is_pedra_fundamental);
+    } else if (params?.recognition === 'founder' || params?.recognition === 'coluna_honra') {
+      filtered = filtered.filter((i) => i.is_coluna_honra);
+    }
+
+    const search = (params?.query || '').trim().toLowerCase();
+    if (search) {
+      const digits = search.replace(/\D/g, '');
+      filtered = filtered.filter((i) =>
+        [i.name, i.legal_name, i.category, i.city, i.owner_name, i.owner_email]
+          .some((value) => (value || '').toLowerCase().includes(search)) ||
+        (digits.length >= 3 && (i.cnpj_cpf || '').replace(/\D/g, '').includes(digits)),
       );
     }
 
-    // Filtro por reconhecimento (pós-resolução canônica)
-    if (params?.recognition === 'pedra_fundamental') {
-      items = items.filter((item) => item.is_pedra_fundamental);
-    } else if (params?.recognition === 'founder' || params?.recognition === 'coluna_honra') {
-      items = items.filter((item) => item.is_coluna_honra);
-    }
-
-    return { items, total: count || items.length, kpis, counts };
+    const offset = (page - 1) * pageSize;
+    return { items: filtered.slice(offset, offset + pageSize), total: filtered.length, kpis, counts };
   } catch (_err) {
     return {
-      items: [],
+      items: [] as AdminBusinessListItem[],
       total: 0,
       kpis: { total: 0, published: 0, suspended: 0, pending: 0, overdue: 0, incomplete: 0, pedra_fundamental_count: 0 },
       counts: { todas: 0, publicadas: 0, inadimplentes: 0, suspensas: 0, incompletas: 0, bronze: 0, prata: 0, ouro: 0, pedraFundamental: 0 },

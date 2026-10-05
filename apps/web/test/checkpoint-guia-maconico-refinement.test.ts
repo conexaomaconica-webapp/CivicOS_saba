@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { getAdminLodgesListAction, getAdminLodge360DetailsAction } from '../src/lib/admin/admin-lodges-service';
 
+vi.mock('../src/lib/admin/admin-auth-helper', () => ({ assertPlatformAdminAccess: async () => ({ supabase: {}, user: { id: 'test-admin' } }) }));
 vi.mock('../src/lib/supabase/server', () => ({
   createServerSideClient: vi.fn().mockImplementation(() => {
     return Promise.resolve({

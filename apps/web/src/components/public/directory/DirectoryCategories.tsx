@@ -41,7 +41,7 @@ export function DirectoryCategories({ categories = [], onCategorySelect }: Direc
     <section className="dh-container dh-mobile-visible-section py-4" id="categorias-destaque">
       {/* Botão 'Ver todas' alinhado à direita */}
       <div className="flex items-center justify-between gap-3 mb-4">
-        <h2 className="dh-section-title">Categorias em destaque</h2>
+        <h2 className="dh-section-title">Explore por Categoria</h2>
         <Link
           href="/guia/empresas"
           className="text-xs font-bold text-amber-900 flex items-center gap-1 hover:underline bg-white/60 px-3 py-1.5 rounded-full border border-amber-900/10 shadow-2xs"

@@ -117,7 +117,7 @@ export default function Home() {
             margin: '0 auto 16px',
           }}>
             <svg width="18" height="18" fill="none" stroke="#C9A227" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
-              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
             </svg>
             <div style={{ flex: 1 }}>
               <input
@@ -138,7 +138,7 @@ export default function Home() {
               background: '#F9FAFB', borderRadius: 8, padding: '6px 10px',
               fontSize: 12, color: '#374151', fontWeight: 500, flexShrink: 0,
             }}>
-              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
               Feira de Santana
               <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 0, fontSize: 14, lineHeight: 1 }}>×</button>
             </div>
@@ -160,7 +160,7 @@ export default function Home() {
                 whiteSpace: 'nowrap',
               }}
             >
-              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" /></svg>
               Buscar com IA
             </button>
           </div>
@@ -219,7 +219,7 @@ export default function Home() {
 
             {/* dots */}
             <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6 }}>
-              {[0,1,2,3,4].map(i => (
+              {[0, 1, 2, 3, 4].map(i => (
                 <button key={i} onClick={() => setSlide(i)} style={{
                   width: i === slide ? 20 : 8, height: 8, borderRadius: 4,
                   background: i === slide ? '#C9A227' : 'rgba(255,255,255,0.4)',
@@ -303,7 +303,7 @@ export default function Home() {
                     width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
                     cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
                   }}>
-                    <svg width="16" height="16" fill="none" stroke="#9CA3AF" strokeWidth="2" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                    <svg width="16" height="16" fill="none" stroke="#9CA3AF" strokeWidth="2" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
                   </button>
                   {/* Logo badge */}
                   <div style={{

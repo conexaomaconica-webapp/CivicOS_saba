@@ -1,343 +1,177 @@
 import React from 'react';
 import Link from 'next/link';
+import { Compass } from 'lucide-react';
 import {
-  Compass,
-  Search,
-  Filter,
-  Eye,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react';
-import { getAdminLodgesListAction } from '@/lib/admin/admin-lodges-service';
+  getAdminLodgeFacetsAction,
+  listAdminLodgesAction,
+  type LodgeListFilters,
+  type LodgeListSort,
+} from '@/lib/admin/admin-lodges-list-service';
+import { LodgesTableClient } from './lodges-table-client';
 
 export const metadata = {
   title: 'Diretório de Lojas Maçônicas · Admin CM',
+  robots: { index: false, follow: false },
 };
 
-type AdminLojasPageProps = {
-  searchParams: Promise<{
-    q?: string;
-    state?: string;
-    potency?: string;
-    status?: string;
-    missingCoords?: string;
-    missingEmblem?: string;
-    page?: string;
-  }>;
-};
+type SP = Record<string, string | string[] | undefined>;
+const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || '';
 
-export default async function AdminLojasPage({ searchParams }: AdminLojasPageProps) {
-  const resolvedParams = await searchParams;
-  const q = resolvedParams.q || '';
-  const state = resolvedParams.state || 'all';
-  const potency = resolvedParams.potency || 'all';
-  const status = resolvedParams.status || 'all';
-  const missingCoords = resolvedParams.missingCoords === 'true';
-  const missingEmblem = resolvedParams.missingEmblem === 'true';
-  const page = parseInt(resolvedParams.page || '1', 10);
+const PAGE_SIZES = [25, 50, 100, 200];
 
-  const { items, total, kpis } = await getAdminLodgesListAction({
-    query: q,
-    state: state !== 'all' ? state : undefined,
-    potency: potency !== 'all' ? potency : undefined,
-    status: status !== 'all' ? status : undefined,
-    missingCoords,
-    missingEmblem,
-    page,
-    pageSize: 10,
+/** Janela de páginas: 1 … 4 5 [6] 7 8 … 40 */
+function pageWindow(current: number, last: number): Array<number | '…'> {
+  const set = new Set<number>([1, last, current - 2, current - 1, current, current + 1, current + 2]);
+  const nums = [...set].filter((n) => n >= 1 && n <= last).sort((a, b) => a - b);
+  const out: Array<number | '…'> = [];
+  nums.forEach((n, i) => {
+    const prev = nums[i - 1];
+    if (i > 0 && prev !== undefined && n - prev > 1) out.push('…');
+    out.push(n);
   });
+  return out;
+}
 
-  const totalPages = Math.max(1, Math.ceil(total / 10));
+export default async function AdminLojasPage({ searchParams }: { searchParams: Promise<SP> }) {
+  const sp = await searchParams;
+  const filters: LodgeListFilters = {
+    q: one(sp.q),
+    state: one(sp.state),
+    city: one(sp.city),
+    potency: one(sp.potency),
+    rite: one(sp.rite),
+    status: one(sp.status) as LodgeListFilters['status'],
+    logo: one(sp.logo) as LodgeListFilters['logo'],
+    coords: one(sp.coords) as LodgeListFilters['coords'],
+  };
+  const sort = (one(sp.sort) || 'recent') as LodgeListSort;
+
+  const [result, facets] = await Promise.all([
+    listAdminLodgesAction({ filters, page: Number(one(sp.page)) || 1, pageSize: Number(one(sp.size)) || 50, sort }),
+    getAdminLodgeFacetsAction(),
+  ]);
+  const { items, total, page, pageSize, totalPages, kpis } = result;
+
+  const buildHref = (over: Record<string, string | number | undefined>) => {
+    const params = new URLSearchParams();
+    const base: Record<string, string | number | undefined> = {
+      q: filters.q, state: filters.state, city: filters.city, potency: filters.potency, rite: filters.rite,
+      status: filters.status, logo: filters.logo, coords: filters.coords,
+      sort: sort !== 'recent' ? sort : undefined, size: pageSize !== 50 ? pageSize : undefined,
+      page, ...over,
+    };
+    for (const [k, v] of Object.entries(base)) {
+      if (v === undefined || v === '' || v === 'all' || (k === 'page' && Number(v) <= 1)) continue;
+      params.set(k, String(v));
+    }
+    const qs = params.toString();
+    return qs ? `/admin/lojas?${qs}` : '/admin/lojas';
+  };
+
+  const kpiCards = [
+    { label: 'Total de lojas', value: kpis.total, href: buildHref({ q: '', state: '', city: '', potency: '', rite: '', status: '', logo: '', coords: '', page: 1 }) },
+    { label: 'Publicadas', value: kpis.published, href: buildHref({ status: 'published', page: 1 }) },
+    { label: 'Inativas', value: kpis.inactive, href: buildHref({ status: 'inactive', page: 1 }) },
+    { label: 'Sem brasão', value: kpis.missing_logo, href: buildHref({ logo: 'missing', page: 1 }) },
+    { label: 'Sem coordenadas', value: kpis.missing_coords, href: buildHref({ coords: 'missing', page: 1 }) },
+  ];
+
+  const input = 'rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-sm';
+  const first = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const last = Math.min(total, page * pageSize);
 
   return (
     <div className="space-y-6">
-      {/* Cabeçalho */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#C9A227]/30 pb-4">
-        <div>
-          <span className="bg-[#3B0B14] text-[#C9A227] font-bold text-xs px-2.5 py-0.5 rounded-full border border-[#C9A227]/40">
-            Organizações Maçônicas · Conexão Maçônica
-          </span>
-          <h1 className="text-2xl font-serif font-bold text-[#1f1914] mt-2 flex items-center gap-2">
-            <Compass className="w-6 h-6 text-[#4B161B]" /> Gestão 360º de Lojas Maçônicas & Potências
-          </h1>
-          <p className="text-xs text-stone-500 mt-1">
-            Central operacional de qualificação da base de Lojas: auditoria de endereço, reuniões, brasão e geolocalização.
-          </p>
-        </div>
+      <div className="border-b border-[#C9A227]/30 pb-4">
+        <span className="bg-[#3B0B14] text-[#C9A227] font-bold text-xs px-2.5 py-0.5 rounded-full border border-[#C9A227]/40">
+          Organizações Maçônicas · Conexão Maçônica
+        </span>
+        <h1 className="text-2xl font-serif font-bold text-[#1f1914] mt-2 flex items-center gap-2">
+          <Compass className="w-6 h-6 text-[#4B161B]" /> Gestão 360º de Lojas Maçônicas & Potências
+        </h1>
+        <p className="text-xs text-stone-500 mt-1">
+          Qualificação da base: brasão, coordenadas, reuniões e publicação. Selecione várias lojas para editar ou excluir em massa.
+        </p>
       </div>
 
-      {/* SUPERIOR KPI CARDS (DADOS REAIS DE QUALIDADE DA BASE) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-white border border-stone-300 rounded-2xl p-4 space-y-1 shadow-xs">
-          <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Total Lojas</span>
-          <p className="text-2xl font-serif font-bold text-[#1f1914]">{kpis.total}</p>
-          <span className="text-[10px] text-stone-400">Cadastradas</span>
-        </div>
+      {result.error && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{result.error}</div>}
 
-        <div className="bg-white border border-stone-300 rounded-2xl p-4 space-y-1 shadow-xs">
-          <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Publicadas</span>
-          <p className="text-2xl font-serif font-bold text-emerald-800">{kpis.published}</p>
-          <span className="text-[10px] text-emerald-600 font-semibold">Ativas no Guia</span>
-        </div>
-
-        <div className="bg-white border border-stone-300 rounded-2xl p-4 space-y-1 shadow-xs">
-          <span className="text-[10px] font-bold text-stone-600 uppercase tracking-wider">Inativas</span>
-          <p className="text-2xl font-serif font-bold text-stone-700">{kpis.inactive}</p>
-          <span className="text-[10px] text-stone-500">Desativadas</span>
-        </div>
-
-        <div className="bg-white border border-stone-300 rounded-2xl p-4 space-y-1 shadow-xs">
-          <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Sem Coordenadas</span>
-          <p className="text-2xl font-serif font-bold text-amber-900">{kpis.missing_coords}</p>
-          <span className="text-[10px] text-amber-700 font-semibold">Sem GPS</span>
-        </div>
-
-        <div className="bg-white border border-stone-300 rounded-2xl p-4 space-y-1 shadow-xs">
-          <span className="text-[10px] font-bold text-purple-800 uppercase tracking-wider">Sem Brasão</span>
-          <p className="text-2xl font-serif font-bold text-purple-900">{kpis.missing_emblem}</p>
-          <span className="text-[10px] text-purple-700">Logo ausente</span>
-        </div>
-
-        <div className="bg-[#3B0B14] text-white border border-[#C9A227]/40 rounded-2xl p-4 space-y-1 shadow-md">
-          <span className="text-[10px] font-bold text-[#C9A227] uppercase tracking-wider">Duplicidades</span>
-          <p className="text-2xl font-serif font-bold text-white">{kpis.possible_duplicates}</p>
-          <span className="text-[10px] text-amber-200/80">Para revisão</span>
-        </div>
-      </div>
-
-      {/* FILTROS E BUSCA DE QUALIDADE */}
-      <form className="bg-stone-900 text-white p-4 rounded-2xl border border-stone-800 space-y-3 shadow-md">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          {/* Busca por Nome/Número/Oriente */}
-          <div className="md:col-span-1 space-y-1">
-            <label className="text-[11px] font-bold text-stone-300">Buscar Nome, Número ou Cidade:</label>
-            <div className="relative">
-              <Search className="w-4 h-4 text-stone-400 absolute left-3 top-3" />
-              <input
-                type="text"
-                name="q"
-                defaultValue={q}
-                placeholder="Ex: 13 de Maio, 450, São Paulo..."
-                className="w-full pl-9 pr-3 py-2 bg-stone-950 border border-stone-700 rounded-xl text-xs text-white placeholder-stone-500 outline-none focus:border-[#C9A227]"
-              />
-            </div>
-          </div>
-
-          {/* Filtro Potência */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-bold text-stone-300">Potência Maçônica:</label>
-            <select
-              name="potency"
-              defaultValue={potency}
-              className="w-full px-3 py-2 bg-stone-950 border border-stone-700 rounded-xl text-xs text-white outline-none focus:border-[#C9A227]"
-            >
-              <option value="all">Todas as Potências</option>
-              <option value="GLESP">GLESP</option>
-              <option value="GOB">GOB</option>
-              <option value="GOSP">GOSP</option>
-              <option value="COMAB">COMAB</option>
-            </select>
-          </div>
-
-          {/* Filtro Status */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-bold text-stone-300">Status de Publicação:</label>
-            <select
-              name="status"
-              defaultValue={status}
-              className="w-full px-3 py-2 bg-stone-950 border border-stone-700 rounded-xl text-xs text-white outline-none focus:border-[#C9A227]"
-            >
-              <option value="all">Todos os Status</option>
-              <option value="published">Publicada</option>
-              <option value="inactive">Inativa</option>
-            </select>
-          </div>
-
-          {/* Qualidade da Base (Coordenadas / Brasão) */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-bold text-stone-300">Auditoria de Qualidade:</label>
-            <div className="flex items-center gap-3 pt-1">
-              <label className="flex items-center gap-1.5 text-xs text-stone-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="missingCoords"
-                  value="true"
-                  defaultChecked={missingCoords}
-                  className="accent-[#C9A227]"
-                />
-                <span>Sem Coordenadas</span>
-              </label>
-
-              <label className="flex items-center gap-1.5 text-xs text-stone-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="missingEmblem"
-                  value="true"
-                  defaultChecked={missingEmblem}
-                  className="accent-[#C9A227]"
-                />
-                <span>Sem Brasão</span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 pt-2 border-t border-stone-800">
-          <Link
-            href="/admin/lojas"
-            className="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-bold rounded-xl transition-colors"
-          >
-            Limpar Filtros
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {kpiCards.map((k) => (
+          <Link key={k.label} href={k.href} className="rounded-xl border border-stone-200 bg-white p-3 hover:border-[#C9A227]">
+            <div className="text-2xl font-bold text-[#4B161B]">{k.value.toLocaleString('pt-BR')}</div>
+            <div className="text-xs text-stone-500">{k.label}</div>
           </Link>
-          <button
-            type="submit"
-            className="px-4 py-1.5 bg-[#C9A227] hover:bg-amber-400 text-[#3B0B14] font-extrabold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
-          >
-            <Filter className="w-3.5 h-3.5" />
-            <span>Filtrar Lojas</span>
-          </button>
+        ))}
+      </div>
+
+      <form method="get" action="/admin/lojas" className="grid grid-cols-2 gap-2 rounded-xl border border-stone-200 bg-white p-3 md:grid-cols-4 lg:grid-cols-6">
+        <input name="q" defaultValue={filters.q} placeholder="Buscar nome, cidade, nº, venerável…" className={`${input} col-span-2`} />
+        <select name="state" defaultValue={filters.state || ''} className={input} aria-label="Estado">
+          <option value="">Todos os estados</option>
+          {facets.states.map((s) => <option key={s.value} value={s.value}>{s.value} ({s.count.toLocaleString('pt-BR')})</option>)}
+        </select>
+        <input name="city" defaultValue={filters.city} placeholder="Cidade (exata)" className={input} />
+        <select name="potency" defaultValue={filters.potency || ''} className={input} aria-label="Potência">
+          <option value="">Todas as potências</option>
+          {facets.potencies.map((p) => <option key={p.value} value={p.value}>{p.label} ({p.count.toLocaleString('pt-BR')})</option>)}
+        </select>
+        <input name="rite" defaultValue={filters.rite} placeholder="Rito" className={input} />
+        <select name="status" defaultValue={filters.status || 'all'} className={input} aria-label="Status">
+          <option value="all">Qualquer status</option>
+          <option value="published">Publicadas</option>
+          <option value="inactive">Inativas</option>
+        </select>
+        <select name="logo" defaultValue={filters.logo || 'all'} className={input} aria-label="Brasão">
+          <option value="all">Brasão: todos</option>
+          <option value="missing">Sem brasão</option>
+          <option value="has">Com brasão</option>
+        </select>
+        <select name="coords" defaultValue={filters.coords || 'all'} className={input} aria-label="Coordenadas">
+          <option value="all">Coordenadas: todas</option>
+          <option value="missing">Sem coordenadas</option>
+        </select>
+        <select name="sort" defaultValue={sort} className={input} aria-label="Ordenação">
+          <option value="recent">Mais recentes</option>
+          <option value="name">Nome (A–Z)</option>
+          <option value="number">Número</option>
+        </select>
+        <select name="size" defaultValue={String(pageSize)} className={input} aria-label="Por página">
+          {PAGE_SIZES.map((n) => <option key={n} value={n}>{n} por página</option>)}
+        </select>
+        <div className="flex gap-2">
+          <button type="submit" className="rounded-lg bg-[#4B161B] px-4 py-1.5 text-sm font-bold text-white hover:bg-[#3B0B14]">Filtrar</button>
+          <Link href="/admin/lojas" className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm">Limpar</Link>
         </div>
       </form>
 
-      {/* TABELA DE LOJAS */}
-      <div className="bg-white border border-stone-300 rounded-2xl shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[700px]">
-            <thead>
-              <tr className="bg-stone-100 border-b border-stone-300 text-[11px] font-bold text-stone-600 uppercase tracking-wider">
-                <th className="py-3 px-4">Loja / Número</th>
-                <th className="py-3 px-4">Oriente / UF</th>
-                <th className="py-3 px-4">Potência & Rito</th>
-                <th className="py-3 px-4">Reunião</th>
-                <th className="py-3 px-4">Completude %</th>
-                <th className="py-3 px-4">Origem</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Prontuário 360º</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-200 text-xs">
-              {items.map((lodge) => (
-                <tr key={lodge.id} className="hover:bg-stone-50/80 transition-colors">
-                  {/* Loja & Número */}
-                  <td className="py-3.5 px-4">
-                    <div className="space-y-0.5">
-                      <p className="font-serif font-bold text-stone-900 text-sm">{lodge.name}</p>
-                      <p className="text-[11px] text-stone-500 font-mono">Nº {lodge.code_number || 'S/N'}</p>
-                    </div>
-                  </td>
+      <p className="text-sm text-stone-600">
+        Mostrando <strong>{first.toLocaleString('pt-BR')}–{last.toLocaleString('pt-BR')}</strong> de <strong>{total.toLocaleString('pt-BR')}</strong> loja(s)
+        {total !== kpis.total && <> (filtro aplicado; base total {kpis.total.toLocaleString('pt-BR')})</>}.
+      </p>
 
-                  {/* Cidade & Estado */}
-                  <td className="py-3.5 px-4">
-                    <p className="font-semibold text-stone-800">
-                      {lodge.city} - {lodge.state}
-                    </p>
-                  </td>
+      <LodgesTableClient items={items} total={total} filters={filters} />
 
-                  {/* Potência & Rito */}
-                  <td className="py-3.5 px-4">
-                    <div className="space-y-0.5">
-                      <span className="font-bold text-[#4B161B] text-[11px]">{lodge.potency}</span>
-                      <p className="text-[10px] text-stone-500">{lodge.rite || 'R.E.A.A.'}</p>
-                    </div>
-                  </td>
-
-                  {/* Reunião */}
-                  <td className="py-3.5 px-4">
-                    <p className="text-stone-700 font-medium">{lodge.meeting_schedule || 'Não informada'}</p>
-                  </td>
-
-                  {/* Indicador de Completude % */}
-                  <td className="py-3.5 px-4">
-                    <div className="space-y-1">
-                      <span
-                        className={`font-mono font-bold text-xs ${
-                          lodge.completeness_percent >= 80
-                            ? 'text-emerald-700'
-                            : lodge.completeness_percent >= 50
-                            ? 'text-amber-700'
-                            : 'text-red-700'
-                        }`}
-                      >
-                        {lodge.completeness_percent}%
-                      </span>
-                      <div className="w-16 h-1.5 bg-stone-200 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${
-                            lodge.completeness_percent >= 80
-                              ? 'bg-emerald-600'
-                              : lodge.completeness_percent >= 50
-                              ? 'bg-amber-500'
-                              : 'bg-red-500'
-                          }`}
-                          style={{ width: `${lodge.completeness_percent}%` }}
-                        />
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Origem dos Dados (Excel / Manual) */}
-                  <td className="py-3.5 px-4">
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-300">
-                      {lodge.provenance}
-                    </span>
-                  </td>
-
-                  {/* Status */}
-                  <td className="py-3.5 px-4">
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                        lodge.is_active
-                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                          : 'bg-stone-100 text-stone-600 border border-stone-300'
-                      }`}
-                    >
-                      {lodge.is_active ? 'Publicada' : 'Inativa'}
-                    </span>
-                  </td>
-
-                  {/* Prontuário 360º */}
-                  <td className="py-3.5 px-4 text-right">
-                    <Link
-                      href={`/admin/lojas/${lodge.id}`}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs transition-all cursor-pointer shadow-xs"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Visão 360º</span>
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Paginação */}
-        <div className="p-4 bg-stone-50 border-t border-stone-200 flex items-center justify-between text-xs text-stone-600">
-          <span>
-            Página <strong className="text-stone-900">{page}</strong> de{' '}
-            <strong className="text-stone-900">{totalPages}</strong> ({total} lojas no total)
-          </span>
-
-          <div className="flex items-center gap-1">
-            {page > 1 && (
+      {totalPages > 1 && (
+        <nav aria-label="Paginação" className="flex flex-wrap items-center justify-center gap-1.5">
+          {page > 1 && <Link href={buildHref({ page: page - 1 })} className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-50">‹ Anterior</Link>}
+          {pageWindow(page, totalPages).map((n, i) =>
+            n === '…' ? (
+              <span key={`gap-${i}`} className="px-1 text-stone-400">…</span>
+            ) : (
               <Link
-                href={`/admin/lojas?page=${page - 1}&q=${q}&state=${state}&potency=${potency}&status=${status}`}
-                className="p-1.5 rounded-lg border border-stone-300 hover:bg-stone-200 transition-colors"
+                key={n}
+                href={buildHref({ page: n })}
+                aria-current={n === page ? 'page' : undefined}
+                className={`rounded-lg border px-3 py-1.5 text-sm ${n === page ? 'border-[#4B161B] bg-[#4B161B] font-bold text-white' : 'border-stone-300 hover:bg-stone-50'}`}
               >
-                <ChevronLeft className="w-4 h-4" />
+                {n}
               </Link>
-            )}
-            {page < totalPages && (
-              <Link
-                href={`/admin/lojas?page=${page + 1}&q=${q}&state=${state}&potency=${potency}&status=${status}`}
-                className="p-1.5 rounded-lg border border-stone-300 hover:bg-stone-200 transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Link>
-            )}
-          </div>
-        </div>
-      </div>
+            ),
+          )}
+          {page < totalPages && <Link href={buildHref({ page: page + 1 })} className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-50">Próxima ›</Link>}
+        </nav>
+      )}
     </div>
   );
 }

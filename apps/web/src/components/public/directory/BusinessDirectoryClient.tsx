@@ -10,6 +10,7 @@ import { BusinessCard, type BusinessCardData } from './BusinessCard';
 import { BusinessListCard } from './BusinessListCard';
 import { BusinessMapView } from './BusinessMapView';
 import { DirectoryPagination } from './DirectoryPagination';
+import { GEO_COOKIE, parseGeoCookie } from '@/lib/directory/business-filters';
 
 type BusinessDirectoryClientProps = {
   initialFilters: FilterState;
@@ -25,6 +26,50 @@ type BusinessDirectoryClientProps = {
   activeCategoryName?: string;
   queryParam: string;
 };
+
+const GEO_MAX_AGE_SECONDS = 60 * 60; // 1 hora
+
+function readGeoCookie(): { lat: number; lng: number } | null {
+  if (typeof document === 'undefined') return null;
+  const row = document.cookie.split('; ').find((item) => item.startsWith(`${GEO_COOKIE}=`));
+  return parseGeoCookie(row ? row.slice(GEO_COOKIE.length + 1) : null);
+}
+
+function clearGeoCookie() {
+  document.cookie = `${GEO_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax`;
+}
+
+type LocationResult = { ok: true } | { ok: false; message: string };
+
+/** Pede a localização ao navegador e guarda (aproximada, ~100 m) num cookie de 1 hora, lido pelo servidor. */
+function requestBrowserLocation(): Promise<LocationResult> {
+  return new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      resolve({ ok: false, message: 'Seu navegador não permite obter a localização.' });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude.toFixed(3);
+        const lng = position.coords.longitude.toFixed(3);
+        document.cookie = `${GEO_COOKIE}=${lat},${lng}; Max-Age=${GEO_MAX_AGE_SECONDS}; Path=/; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
+        resolve({ ok: true });
+      },
+      (error) => {
+        resolve({
+          ok: false,
+          message:
+            error.code === error.PERMISSION_DENIED
+              ? 'Permita o acesso à sua localização no navegador para filtrar por distância.'
+              : error.code === error.TIMEOUT
+              ? 'Não conseguimos obter sua localização a tempo. Tente novamente.'
+              : 'Não foi possível obter sua localização agora.',
+        });
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 5 * 60 * 1000 },
+    );
+  });
+}
 
 export function BusinessDirectoryClient({
   initialFilters,
@@ -48,6 +93,8 @@ export function BusinessDirectoryClient({
   const [sortBy, setSortBy] = useState<string>(initialSort);
   const [pageSize, setPageSize] = useState<number>(initialPageSize);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [locationBusy, setLocationBusy] = useState(false);
+  const [locationError, setLocationError] = useState('');
 
   // Sincroniza filtros locais quando props/URL forem atualizadas
   React.useEffect(() => {
@@ -102,10 +149,46 @@ export function BusinessDirectoryClient({
     router.push(`/guia/empresas?${params.toString()}`);
   };
 
-  const handleFilterChange = (newFilters: FilterState) => {
-    setFilters(newFilters);
-    updateUrl(newFilters, sortBy, viewMode, 1, pageSize);
+  // Garante a localização do visitante antes de aplicar distância máxima ou ordenação por proximidade.
+  const ensureLocation = async (): Promise<boolean> => {
+    if (readGeoCookie()) {
+      setLocationError('');
+      return true;
+    }
+    setLocationBusy(true);
+    setLocationError('');
+    const result = await requestBrowserLocation();
+    setLocationBusy(false);
+    if (!result.ok) setLocationError(result.message);
+    return result.ok;
   };
+
+  const handleFilterChange = async (newFilters: FilterState) => {
+    let next = newFilters;
+    if (next.maxDistanceKm) {
+      if (!(await ensureLocation())) next = { ...next, maxDistanceKm: undefined };
+    } else {
+      setLocationError('');
+      if (sortBy !== 'distance') clearGeoCookie();
+    }
+    setFilters(next);
+    updateUrl(next, sortBy, viewMode, 1, pageSize);
+  };
+
+  // Link compartilhado com distância (ou recarga da página): o cookie de localização pode não existir neste navegador.
+  React.useEffect(() => {
+    if ((initialFilters.maxDistanceKm || initialSort === 'distance') && !readGeoCookie()) {
+      void ensureLocation().then((ok) => {
+        if (ok) router.refresh();
+        else if (initialFilters.maxDistanceKm) {
+          const cleared = { ...initialFilters, maxDistanceKm: undefined };
+          setFilters(cleared);
+          updateUrl(cleared, initialSort === 'distance' ? 'relevance' : initialSort, initialViewMode, 1, initialPageSize);
+        }
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleClearAllFilters = () => {
     const emptyFilters: FilterState = {
@@ -144,14 +227,22 @@ export function BusinessDirectoryClient({
     updateUrl(filters, sortBy, mode, initialPage, pageSize);
   };
 
-  const handleSortChange = (sort: string) => {
-    setSortBy(sort);
-    updateUrl(filters, sort, viewMode, 1, pageSize);
+  const handleSortChange = async (sort: string) => {
+    let nextSort = sort;
+    if (sort === 'distance' && !(await ensureLocation())) nextSort = 'relevance';
+    setSortBy(nextSort);
+    updateUrl(filters, nextSort, viewMode, 1, pageSize);
   };
 
   const handlePageChange = (newPage: number) => {
     updateUrl(filters, sortBy, viewMode, newPage, pageSize);
   };
+
+  const locationNote = locationError
+    ? { tone: 'error' as const, text: locationError }
+    : filters.maxDistanceKm
+    ? { tone: 'info' as const, text: 'Usando a sua localização atual (aproximada). Empresas sem localização no mapa não entram neste filtro.' }
+    : null;
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
@@ -187,6 +278,8 @@ export function BusinessDirectoryClient({
             filters={filters}
             availableCities={availableCities}
             categories={categories}
+            locationNote={locationNote}
+            locationBusy={locationBusy}
             onChange={handleFilterChange}
             onClear={handleClearAllFilters}
           />
@@ -258,6 +351,8 @@ export function BusinessDirectoryClient({
               filters={filters}
               availableCities={availableCities}
               categories={categories}
+              locationNote={locationNote}
+              locationBusy={locationBusy}
               onChange={setFilters}
               onClear={handleClearAllFilters}
               isMobileDrawer

@@ -17,6 +17,10 @@ import { DirectoryAllBusinesses, type PublicSearchResultItem } from '@/component
 import { DirectoryMapExplore } from '@/components/public/directory/DirectoryMapExplore';
 import { DirectoryLodgesGuide } from '@/components/public/directory/DirectoryLodgesGuide';
 import { fetchLodgeFacets } from '@/lib/lodges/facets';
+import { fetchFilterCategories } from '@/lib/directory/filter-categories';
+import { getConfirmedConnectionsCountAction, getConnectionsFeedAction } from '@/app/actions/connections';
+import { DirectoryConnectionsMural } from '@/components/public/directory/DirectoryConnectionsMural';
+import { DirectoryConnectionsCta } from '@/components/public/directory/DirectoryConnectionsCta';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
 import { DirectoryFavoritesModal } from '@/components/public/directory/DirectoryFavoritesModal';
@@ -101,7 +105,7 @@ export default async function GuiaPage({ searchParams }: Props) {
   const configuredPageSize = Math.min(100, Math.max(1, Number(directPublicSettings?.default_page_size) || 12));
 
   // Parallel RPC execution
-  const [homeDataRes, searchRes, lodgeFacets] = await Promise.all([
+  const [homeDataRes, searchRes, lodgeFacets, confirmedConnections, connectionsFeed] = await Promise.all([
     (supabase as any).rpc('public_directory_home_data', {
       p_host: host,
       p_city: city || null,
@@ -119,6 +123,9 @@ export default async function GuiaPage({ searchParams }: Props) {
     }),
     // Opções reais dos filtros da seção "Guia de Lojas" (a lista de lojas só carrega depois de filtrar).
     fetchLodgeFacets(supabase),
+    // Mural de Conexões: total de negócios confirmados pelas empresas (aparece no hero quando maior que zero).
+    getConfirmedConnectionsCountAction(),
+    getConnectionsFeedAction(5),
   ]);
 
   const homeData: any = homeDataRes.data || {
@@ -465,6 +472,9 @@ export default async function GuiaPage({ searchParams }: Props) {
   }
 
 
+  // Opções do filtro "Todas as Categorias": todas as que têm empresas publicadas.
+  const filterCategories = await fetchFilterCategories(supabase, host, categories);
+
   return (
     <FavoritesProvider>
       <div className="min-h-screen bg-[#faf7f2] text-[#1f1914] font-sans antialiased relative">
@@ -491,10 +501,14 @@ export default async function GuiaPage({ searchParams }: Props) {
           subtitle={settings.hero_subtitle}
           searchPlaceholder={settings.hero_search_placeholder}
           selectedCity={city}
+          confirmedConnections={confirmedConnections}
         />
 
         {/* Carrossel Destaque da Semana */}
         <DirectoryCarousel banners={banners} />
+
+        {/* Convite em destaque: registrar visita ou negócio com foto e comentário */}
+        <DirectoryConnectionsCta />
 
         <SectionDivider />
 
@@ -513,6 +527,11 @@ export default async function GuiaPage({ searchParams }: Props) {
 
         <SectionDivider />
 
+        {/* Mural de Conexões: prova social e convite para registrar uma conexão (fotos opcionais) */}
+        <DirectoryConnectionsMural items={connectionsFeed} confirmedTotal={confirmedConnections} />
+
+        <SectionDivider />
+
         {/* Diretório Completo "Todas as Empresas" */}
         <DirectoryAllBusinesses
           items={businessItems}
@@ -523,7 +542,7 @@ export default async function GuiaPage({ searchParams }: Props) {
           hasNextPage={searchData.has_next_page}
           hasPreviousPage={searchData.has_previous_page}
           availableCities={availableCities}
-          categories={categories}
+          categories={filterCategories}
           searchQuery={q}
           selectedCity={city}
           selectedCategory={cat}

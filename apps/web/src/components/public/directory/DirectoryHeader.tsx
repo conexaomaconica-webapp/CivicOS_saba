@@ -216,7 +216,7 @@ export function DirectoryHeader({
             </div>
           ) : (
             <>
-              <Link href={registerHref} className="hidden xl:inline text-xs font-semibold text-[#f3cf68] hover:text-white transition-colors">
+              <Link href={registerHref} className="hidden 2xl:inline whitespace-nowrap text-xs font-semibold text-[#f3cf68] hover:text-white transition-colors">
                 Cadastre-se grátis
               </Link>
               <Link

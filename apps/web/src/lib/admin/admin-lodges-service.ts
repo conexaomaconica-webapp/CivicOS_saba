@@ -131,6 +131,7 @@ export async function getAdminLodgesListAction(params?: {
     possible_duplicates: number;
   };
 }> {
+  await assertPlatformAdminAccess();
   const supabase = getAdminSupabase();
   const page = params?.page || 1;
   const pageSize = params?.pageSize || 10;
@@ -310,22 +311,37 @@ export async function getAdminLodge360DetailsAction(lodgeId: string): Promise<Ad
       const score = [hasName, hasPot, hasMeet, hasCity, hasCoords, hasEmb, hasContact].filter(Boolean).length;
       const completenessPercent = Math.round((score / 7) * 100);
 
-      // Checa possíveis duplicidades no banco por potência + número ou potência + nome
-      const { data: dups } = await supabase
-        .from('organizations')
-        .select('id, name, potency, code_number, city')
-        .neq('id', lodgeId)
-        .eq('potency', o.potency)
-        .or(`code_number.eq.${o.code_number || 0},city.eq.${o.city}`);
-
-      const mappedDups = (dups || []).map((d) => ({
-        id: d.id,
-        name: d.name,
-        potency: d.potency,
-        code_number: d.code_number,
-        city: d.city,
-        reason: d.code_number === o.code_number ? 'Mesma Potência e Número de Loja' : 'Mesma Potência e Oriente/Cidade',
-      }));
+      // Duplicidade = mesmo NOME de loja (ignorando acentos, caixa e espaços) no mesmo tenant.
+      // Mesma potência, número ou cidade sozinhos não indicam duplicidade: é comum haver várias lojas assim.
+      const normName = (value: unknown) =>
+        String(value || '')
+          .normalize('NFD')
+          .replace(/[̀-ͯ]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, ' ')
+          .trim();
+      const ownName = normName(o.name);
+      let mappedDups: Array<{ id: string; name: string; potency: string; code_number?: number; city: string; reason: string }> = [];
+      if (ownName) {
+        let dupQuery = supabase
+          .from('organizations')
+          .select('id, name, potency, code_number, city')
+          .neq('id', lodgeId)
+          .ilike('name', `%${String(o.name).replace(/[%_,()\\]/g, ' ').trim()}%`)
+          .limit(50);
+        if (o.tenant_id) dupQuery = dupQuery.eq('tenant_id', o.tenant_id);
+        const { data: dups } = await dupQuery;
+        mappedDups = (dups || [])
+          .filter((d) => normName(d.name) === ownName)
+          .map((d) => ({
+            id: d.id,
+            name: d.name,
+            potency: d.potency,
+            code_number: d.code_number ?? undefined,
+            city: d.city,
+            reason: 'Mesmo nome de loja',
+          }));
+      }
 
       // Contagem de empresas vinculadas
       const { count: bizCount } = await supabase

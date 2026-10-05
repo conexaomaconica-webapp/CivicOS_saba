@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Gift, Heart, Home, LogOut, Menu, UserRound, X } from 'lucide-react';
+import { Gift, Handshake, Heart, Home, LogOut, Menu, UserRound, Users, X } from 'lucide-react';
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
@@ -10,6 +10,8 @@ const links = [
   { href: '/minha-conta', label: 'Visão geral', icon: Home },
   { href: '/minha-conta/perfil', label: 'Meu perfil', icon: UserRound },
   { href: '/minha-conta/beneficios', label: 'Meus benefícios', icon: Gift },
+  { href: '/minha-conta/conexoes', label: 'Minhas conexões', icon: Handshake },
+  { href: '/minha-conta/indicacoes', label: 'Minhas indicações', icon: Users },
   { href: '/minha-conta/favoritos', label: 'Favoritos', icon: Heart, disabled: true },
 ];
 

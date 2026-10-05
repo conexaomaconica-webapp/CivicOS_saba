@@ -91,8 +91,7 @@ export function DirectoryLodgesGuide({ facets = EMPTY_LODGE_FACETS }: DirectoryL
       <div>
         <h2 className="dh-section-title">Guia de Lojas Maçônicas</h2>
         <p className="text-xs text-gray-500 mt-1">
-          Encontre lojas, orientes e informações para sua visita institucional
-          {facets.total > 0 ? ` — ${facets.total} ${facets.total === 1 ? 'loja cadastrada' : 'lojas cadastradas'}.` : '.'}
+          Encontre lojas maçônicas em todo o Brasil e consulte informações para sua visita fraternal.
         </p>
       </div>
 

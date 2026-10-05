@@ -145,44 +145,105 @@ export default function AdminImportarLojasPage() {
     setLoading(true);
     try {
       const supabase = createClient();
-      const { data: existingLodges } = await (supabase as any).from('organizations').select('id, name, code_number, potency, city');
-      const existingList = existingLodges || [];
+      // Carrega TODAS as lojas existentes (o limite padrão de 1000 linhas esconderia parte da base).
+      const existingList: any[] = [];
+      for (let from = 0; from < 50000; from += 1000) {
+        const { data: page } = await (supabase as any)
+          .from('organizations')
+          .select('id, name, code_number, potency, city, state')
+          .order('id', { ascending: true })
+          .range(from, from + 999);
+        existingList.push(...(page || []));
+        if (!page || page.length < 1000) break;
+      }
       let newC = 0, updC = 0, dupC = 0, errC = 0;
       const results: ParsedLodgeRow[] = [];
-      const seenInFile = new Set<string>();
+      const norm = (value: unknown) => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+      // Regra: duplicidade = mesmo NOME e mesma CIDADE, ambos preenchidos. Campo vazio nunca marca duplicidade
+      // (a loja é importada normalmente e o campo fica vazio). Potência ou número iguais não bastam.
+      const nameSeenInFile = new Map<string, number>(); // nome|cidade normalizados -> linha
+      const numberKeyInFile = new Map<string, { line: number; name: string }>(); // potência#número -> loja
 
-      for (const rowData of spreadsheetRows) {
+      for (const [rowIndex, rowData] of spreadsheetRows.entries()) {
+        const line = rowIndex + 2; // linha da planilha (1 = cabeçalho)
         const input: LodgeImportInput = {};
         for (const field of LODGE_IMPORT_FIELDS) {
           const column = selected(field.key);
           if (column) input[field.key] = rowData[column];
         }
-        const { values, errors, warnings } = normalizeLodgeImportRow(input);
-        const { name, code_number, potency, city } = values;
+        const { values: parsed, errors, warnings } = normalizeLodgeImportRow(input);
+        let values = parsed;
 
         if (errors.length > 0) {
           errC++;
-          results.push({ raw: rowData, status: 'error', reason: errors.join('; '), warnings, ...values, name: name || 'Sem nome' });
+          results.push({ raw: rowData, status: 'error', reason: errors.join('; '), warnings, ...values, name: values.name || 'Sem nome' });
           continue;
         }
 
-        // Mesma loja repetida dentro da própria planilha.
-        const fileKey = code_number != null ? `${potency.toLowerCase()}#${code_number}` : `${potency.toLowerCase()}|${name.toLowerCase()}|${city.toLowerCase()}`;
-        if (seenInFile.has(fileKey)) {
+        const nameKey = values.name && values.city ? `${norm(values.name)}|${norm(values.city)}` : '';
+
+        // 1. Mesmo nome repetido na planilha
+        const firstLine = nameKey ? nameSeenInFile.get(nameKey) : undefined;
+        if (firstLine != null) {
           dupC++;
-          results.push({ raw: rowData, status: 'duplicate', reason: 'Repetida na própria planilha', warnings, ...values });
+          results.push({ raw: rowData, status: 'duplicate', warnings, ...values, reason: `Mesmo nome e cidade da linha ${firstLine} da planilha` });
           continue;
         }
-        seenInFile.add(fileKey);
 
-        const matchByNumber = existingList.find((item: any) => code_number != null && Number(item.code_number) === code_number && item.potency?.toLowerCase() === potency.toLowerCase());
-        const matchByNameCity = existingList.find((item: any) => item.name?.trim().toLowerCase() === name.toLowerCase() && item.potency?.toLowerCase() === potency.toLowerCase() && (item.city || '').trim().toLowerCase() === city.toLowerCase());
-        const status: ParsedLodgeRow['status'] = matchByNumber ? 'update' : matchByNameCity ? 'duplicate' : 'new';
-        if (status === 'update') updC++; else if (status === 'duplicate') dupC++; else newC++;
-        results.push({
-          raw: rowData, status, warnings, ...values,
-          reason: status === 'update' ? (emptyCellsMode === 'clear' ? 'Potência e número já cadastrados: células vazias APAGARÃO o dado atual' : 'Potência e número já cadastrados: só os campos preenchidos serão atualizados') : status === 'duplicate' ? 'Nome e cidade já cadastrados: revisar duplicidade' : 'Nova loja pronta para cadastro',
-        });
+        // 2. Mesmo nome já cadastrado na base
+        const sameNameInDb = nameKey ? existingList.find((item: any) => item.name && item.city && `${norm(item.name)}|${norm(item.city)}` === nameKey) : undefined;
+        let status: ParsedLodgeRow['status'] = 'new';
+        let reason = 'Nova loja pronta para cadastro';
+        const extraWarnings = [...warnings];
+
+        if (sameNameInDb) {
+          const samePotencyNumber =
+            values.code_number != null &&
+            Number(sameNameInDb.code_number) === values.code_number &&
+            String(sameNameInDb.potency || '').toLowerCase() === values.potency.toLowerCase();
+          if (samePotencyNumber) {
+            status = 'update';
+            reason = emptyCellsMode === 'clear'
+              ? 'Mesma loja já cadastrada: células vazias APAGARÃO o dado atual'
+              : 'Mesma loja já cadastrada: só os campos preenchidos serão atualizados';
+          } else {
+            dupC++;
+            nameSeenInFile.set(nameKey, line);
+            results.push({ raw: rowData, status: 'duplicate', warnings, ...values, reason: 'Já existe uma loja com este nome e cidade na base: revisar' });
+            continue;
+          }
+        } else if (values.code_number != null) {
+          // 3. Nome novo, mas a base só aceita uma loja por potência + número. Em conflito, a UF entra na potência
+          //    (ex.: "CMSB/SP"), que a busca e os filtros já tratam como a mesma potência.
+          const keyOf = (potency: string) => `${potency.toLowerCase()}#${values.code_number}`;
+          const takenBy = (potency: string) =>
+            numberKeyInFile.get(keyOf(potency)) ||
+            (existingList.find((item: any) => Number(item.code_number) === values.code_number && String(item.potency || '').toLowerCase() === potency.toLowerCase())
+              ? { line: 0, name: '' }
+              : undefined);
+          let conflict = takenBy(values.potency);
+          if (conflict && values.state) {
+            const qualified = `${values.potency}/${values.state.toUpperCase()}`;
+            extraWarnings.push(
+              `Outra loja já usa o nº ${values.code_number} em ${values.potency}${conflict.line ? ` (linha ${conflict.line})` : ''}: potência gravada como ${qualified}`,
+            );
+            values = { ...values, potency: qualified };
+            conflict = takenBy(values.potency);
+          }
+          if (conflict) {
+            errC++;
+            results.push({
+              raw: rowData, status: 'error', warnings, ...values,
+              reason: `O nº ${values.code_number} em ${values.potency} já é de outra loja${conflict.name ? ` (${conflict.name})` : ''} e a linha não tem UF para diferenciar`,
+            });
+            continue;
+          }
+          numberKeyInFile.set(keyOf(values.potency), { line, name: values.name });
+        }
+
+        if (nameKey) nameSeenInFile.set(nameKey, line);
+        if (status === 'update') updC++; else newC++;
+        results.push({ raw: rowData, status, warnings: extraWarnings, ...values, reason });
       }
       setParsedRows(results);
       setSummary({ newCount: newC, updateCount: updC, dupCount: dupC, errCount: errC });

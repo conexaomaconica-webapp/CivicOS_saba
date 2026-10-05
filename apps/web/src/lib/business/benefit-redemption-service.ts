@@ -1,6 +1,7 @@
 'use server';
 
 import { createServerSideClient } from '@/lib/supabase/server';
+import { markBenefitReferral } from '@/lib/referrals/attribution';
 
 export interface BenefitRedemptionResult {
   success: boolean;
@@ -43,6 +44,9 @@ export async function redeemBenefitAction(
     if (error) {
       return { success: false, error: error.message };
     }
+
+    // Funil de indicações: a pessoa indicada resgatou um benefício desta empresa.
+    await markBenefitReferral(supabase, (data as any)?.business_id);
 
     return {
       success: true,

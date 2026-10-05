@@ -3,6 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { headers } from 'next/headers';
+import { readVisitorKey } from '@/lib/referrals/attribution';
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -107,6 +108,20 @@ export async function trackDirectoryEventAction(payload: {
       },
     });
     if (error) return { ok: false, error: error.message };
+
+    // Funil de indicações: contato (WhatsApp, telefone, site, rota ou rede social) de quem chegou por um link de indicação.
+    if (['whatsapp_click', 'phone_click', 'website_click', 'directions_click', 'social_click'].includes(payload.eventType)) {
+      try {
+        const visitorKey = await readVisitorKey();
+        if (visitorKey) {
+          await (supabase as any).rpc('referral_record_contact', {
+            p_business_id: payload.businessId,
+            p_visitor_key: visitorKey,
+            p_channel: payload.eventType.replace('_click', ''),
+          });
+        }
+      } catch {}
+    }
 
     return { ok: true };
   } catch (err) {

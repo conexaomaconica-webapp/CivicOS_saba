@@ -2,6 +2,7 @@ import React from 'react';
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { getAdvertiserDashboardDTOAction } from '@/lib/advertiser/advertiser-portal-service';
+import { resolveNoBusinessRedirectPath } from '@/lib/advertiser/advertiser-access';
 import AdvertiserHomeClient from './advertiser-home-client';
 
 export const metadata = {
@@ -26,6 +27,7 @@ export default async function AdvertiserDashboardPage() {
   }
 
   const dto = await getAdvertiserDashboardDTOAction(userId);
+  if (!dto.business.id) redirect(await resolveNoBusinessRedirectPath());
 
   return <AdvertiserHomeClient data={dto} />;
 }

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, MapPin, ShieldCheck, UserCheck, Loader2, ChevronRight, Building2 } from 'lucide-react';
+import { Search, MapPin, ShieldCheck, UserCheck, Loader2, ChevronRight, Building2, Handshake } from 'lucide-react';
 import { normalizeSearchTerm } from '@/lib/directory/normalize-search';
 import { createClient } from '@/lib/supabase/client';
 
@@ -24,6 +24,8 @@ type DirectoryHeroProps = {
   searchPlaceholder?: string;
   selectedCity?: string | null;
   initialQuery?: string;
+  /** Negócios confirmados pelas empresas no Mural de Conexões (exibido só quando maior que zero). */
+  confirmedConnections?: number;
 };
 
 export function DirectoryHero({
@@ -32,6 +34,7 @@ export function DirectoryHero({
   searchPlaceholder = 'Digite o nome da empresa ou serviço...',
   selectedCity,
   initialQuery = '',
+  confirmedConnections = 0,
 }: DirectoryHeroProps) {
   const router = useRouter();
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -213,6 +216,12 @@ export function DirectoryHero({
           <span className="flex items-center gap-1.5">
             <UserCheck className="w-4 h-4 text-amber-400" /> Resultados instantâneos
           </span>
+          {confirmedConnections > 0 && (
+            <span className="flex items-center gap-1.5">
+              <Handshake className="w-4 h-4 text-amber-400" />
+              {confirmedConnections} {confirmedConnections === 1 ? 'negócio confirmado' : 'negócios confirmados'} pela Conexão
+            </span>
+          )}
         </div>
       </div>
     </section>

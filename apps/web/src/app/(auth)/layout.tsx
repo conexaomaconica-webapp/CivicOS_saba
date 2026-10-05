@@ -22,21 +22,20 @@ export default function AuthLayout({
       <div className="w-full max-w-md bg-[#2b060d]/90 border border-[#C9A227]/30 rounded-3xl shadow-2xl p-6 sm:p-8 relative z-10 backdrop-blur-md flex flex-col gap-6 text-white">
         {/* Cabeçalho de Identidade da Marca Conexão Maçônica */}
         <div className="flex flex-col items-center text-center gap-2">
-          <div className="w-16 h-16 rounded-2xl bg-[#3B0B14] border border-[#C9A227]/50 flex items-center justify-center p-2 shadow-lg mb-1">
-            <Image
-              src="/logoconexao_red_vert.png"
-              alt="Conexão Maçônica Logo"
-              width={48}
-              height={48}
-              className="object-contain"
-              priority
-            />
-          </div>
+          {/* Logomarca livre (sem caixa) e ampla: ocupa a largura útil do cartão, mantendo a proporção (971×208). */}
+          <Image
+            src="/logoconexao_red_vert.png"
+            alt="Conexão Maçônica"
+            width={971}
+            height={208}
+            className="mb-2 h-auto w-full max-w-[340px] object-contain drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] sm:max-w-[360px]"
+            priority
+          />
           <h1 className="font-serif font-bold text-2xl tracking-tight text-[#FAF7F2]">
             Conexão Maçônica
           </h1>
           <p className="text-xs text-amber-200/80 font-medium">
-            Portal de Negócios & Governança da Plataforma
+            Plataforma de Negócios da família Maçônica
           </p>
         </div>
 

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { Landmark, MapPin, Calendar, Phone, Mail, Globe, Navigation, ChevronRight, Image as ImageIcon, AtSign } from 'lucide-react';
+import { MapPin, Calendar, Phone, Mail, Globe, Navigation, ChevronRight, Image as ImageIcon, AtSign } from 'lucide-react';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
@@ -11,6 +11,7 @@ import { StructuredData } from '@/components/seo/StructuredData';
 import { formatMeetingDay, formatMeetingTime } from '@/lib/lodges/format';
 import { canonicalPotencyCode } from '@/lib/lodges/potency';
 import { LodgeLogoZoom } from '@/components/public/directory/LodgeLogoZoom';
+import { LodgeGallery } from '@/components/public/directory/LodgeGallery';
 import '@/styles/directory-home.css';
 
 function appUrl(path: string) {
@@ -128,11 +129,25 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
     notFound();
   }
 
-  const mapsUrl = lodge.latitude && lodge.longitude
-    ? `https://www.google.com/maps/search/?api=1&query=${lodge.latitude},${lodge.longitude}`
-    : lodge.address && lodge.city
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lodge.name}, ${lodge.address}, ${lodge.city} - ${lodge.state || ''}`)}`
+  // Localização exata (coordenadas/endereço) só quando o endereço é público ou a pessoa é membro logado.
+  // Caso contrário o mapa mostra apenas a cidade e não há botão de rota.
+  const canShowExactLocation = Boolean(lodge.address) || isMember;
+  const cityQuery = [lodge.city, lodge.state, 'Brasil'].filter(Boolean).join(', ');
+  const exactQuery =
+    lodge.latitude != null && lodge.longitude != null
+      ? `${lodge.latitude},${lodge.longitude}`
+      : lodge.address
+      ? [lodge.name, lodge.address, lodge.city, lodge.state].filter(Boolean).join(', ')
+      : null;
+  const mapQuery = canShowExactLocation && exactQuery ? exactQuery : cityQuery;
+  const hasMap = Boolean(mapQuery.replace(/[,\s]|Brasil/g, ''));
+  const mapEmbedUrl = hasMap
+    ? `https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&t=&z=${canShowExactLocation && exactQuery ? 16 : 12}&ie=UTF8&iwloc=&output=embed`
     : null;
+  const mapsUrl =
+    canShowExactLocation && exactQuery
+      ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(exactQuery)}`
+      : null;
 
   return (
     <div className="min-h-screen bg-[#faf7f2] text-[#1f1914] font-sans antialiased relative">
@@ -212,18 +227,18 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
               <span>Sessões e Administração</span>
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
               {/* Reuniões */}
-              <div>
+              <div className="flex flex-col">
                 <h4 className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Dias de Reunião</h4>
                 {lodge.meetings && lodge.meetings.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="flex flex-1 flex-col gap-2">
                     {lodge.meetings.map((m: any) => (
-                      <div key={m.id} className="p-3 bg-amber-50/60 border border-amber-200/70 rounded-xl text-xs">
-                        <p className="font-bold text-stone-900">
+                      <div key={m.id} className="flex flex-1 flex-col justify-center gap-1 p-4 bg-amber-50/60 border border-amber-200/70 rounded-xl text-xs">
+                        <p className="font-bold text-stone-900 text-sm">
                           {formatMeetingDay(m.day, m.label)} {m.time ? `às ${formatMeetingTime(m.time)}` : ''}
                         </p>
-                        {m.label && !/do mês$/i.test(m.label) && <p className="text-stone-600 text-[11px] mt-0.5">{m.label}</p>}
+                        {m.label && !/do mês$/i.test(m.label) && <p className="text-stone-600 text-xs">{m.label}</p>}
                       </div>
                     ))}
                   </div>
@@ -233,15 +248,15 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
               </div>
 
               {/* Venerável Mestre */}
-              <div>
+              <div className="flex flex-col">
                 <h4 className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Administração</h4>
                 {lodge.worshipful_master_name ? (
-                  <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-xl text-xs space-y-1">
-                    <p className="text-stone-500 font-medium">Venerável Mestre</p>
+                  <div className="flex flex-1 flex-col justify-center gap-1 p-4 bg-stone-50 border border-stone-200 rounded-xl text-xs">
                     <p className="font-bold text-stone-900 text-sm">{lodge.worshipful_master_name}</p>
+                    <p className="text-stone-600 text-xs">Venerável Mestre</p>
                   </div>
                 ) : lodge.show_worshipful_master === false && !isMember ? (
-                  <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-stone-700 space-y-2">
+                  <div className="flex flex-1 flex-col justify-center gap-2 p-4 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-stone-700">
                     <p>A administração desta loja é visível apenas para membros cadastrados.</p>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-bold">
                       <Link href={loginHref} className="text-amber-900 hover:underline">Entrar</Link>
@@ -278,26 +293,33 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
               <p className="text-xs text-stone-500">Endereço no Oriente de {lodge.city} - {lodge.state}.</p>
             )}
 
-            {mapsUrl && (
+            {mapEmbedUrl && (
               <div className="space-y-3">
-                <div className="h-64 bg-stone-200 rounded-xl overflow-hidden relative flex items-center justify-center border border-stone-300">
-                  <div className="absolute inset-0 bg-cover bg-center opacity-70 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]" />
-                  <div className="relative z-10 text-center bg-white/95 p-4 rounded-xl shadow-lg max-w-xs border">
-                    <Landmark className="w-8 h-8 text-[#3b0b14] mx-auto mb-1" />
-                    <h5 className="font-bold text-xs text-gray-900">{lodge.name}</h5>
-                    <p className="text-[11px] text-stone-500 mt-0.5">{lodge.city}, {lodge.state}</p>
-                  </div>
+                <div className="h-64 overflow-hidden rounded-xl border border-stone-300 bg-stone-100">
+                  <iframe
+                    title={`Mapa de localização — ${lodge.name}`}
+                    src={mapEmbedUrl}
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    allowFullScreen
+                    referrerPolicy="no-referrer-when-downgrade"
+                    className="h-full w-full"
+                  />
                 </div>
 
-                <a
-                  href={mapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 bg-amber-900 text-white font-bold text-xs py-3 px-5 rounded-xl hover:bg-amber-800 transition-colors w-full sm:w-auto shadow-xs"
-                >
-                  <Navigation className="w-4 h-4" />
-                  <span>Como chegar (Abrir no GPS / Google Maps)</span>
-                </a>
+                {mapsUrl && (
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 bg-amber-900 text-white font-bold text-xs py-3 px-5 rounded-xl hover:bg-amber-800 transition-colors w-full sm:w-auto shadow-xs"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    <span>Traçar rota no Google Maps</span>
+                  </a>
+                )}
               </div>
             )}
           </div>
@@ -310,13 +332,7 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
                 <span>Galeria de Fotos da Loja</span>
               </h2>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {lodge.gallery.map((img: any) => (
-                  <div key={img.id} className="h-40 rounded-xl overflow-hidden border border-stone-200 shadow-2xs group relative">
-                    <img src={img.url} alt={img.alt || lodge.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                  </div>
-                ))}
-              </div>
+              <LodgeGallery images={lodge.gallery} lodgeName={lodge.name} />
             </div>
           )}
         </div>

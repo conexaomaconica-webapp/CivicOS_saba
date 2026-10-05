@@ -510,6 +510,14 @@ export function ContractSignatureClient({
               <strong>Próxima etapa:</strong> A equipe do Conexão Maçônica liberará o <strong>Prontuário 360</strong> para que você preencha a ficha cadastral completa, fotos, canais de contato e regras de benefícios aos irmãos.
             </div>
           </div>
+        ) : contractData.invoice_status === 'pending' && !contractData.active_charge ? (
+          <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/70 p-6 sm:p-8 space-y-3 text-center">
+            <h3 className="font-serif text-xl font-bold text-stone-900">Aguardando a emissão da nota fiscal</h3>
+            <p className="mx-auto max-w-md text-sm text-stone-700 leading-relaxed">
+              Seu contrato foi assinado. Como você solicitou nota fiscal, o pagamento será liberado assim que ela for emitida
+              pela equipe da Conexão Maçônica. Guarde este link: quando for liberado, é só voltar a esta mesma página para pagar.
+            </p>
+          </div>
         ) : (
         /* 6.2: Jornada Real de Pagamento da Contratação */
         <div className="rounded-2xl border-2 border-stone-300 bg-stone-50/70 p-6 sm:p-8 space-y-6">

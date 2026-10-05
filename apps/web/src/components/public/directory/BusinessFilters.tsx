@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Filter, RotateCcw, MapPin, Building2, Crown, ShieldCheck, Award, Users, Navigation } from 'lucide-react';
+import { Filter, RotateCcw, MapPin, Building2, Crown, ShieldCheck, Award, Users, Navigation, Loader2 } from 'lucide-react';
+import { RELATIONSHIP_OPTIONS } from '@/lib/directory/business-filters';
 
 export type FilterState = {
   state?: string;
@@ -18,6 +19,9 @@ type BusinessFiltersProps = {
   filters: FilterState;
   availableCities?: string[];
   categories?: { id: string; slug: string; name: string }[];
+  /** Mensagem sobre a localização (pedindo permissão, negada, em uso...). */
+  locationNote?: { tone: 'info' | 'error'; text: string } | null;
+  locationBusy?: boolean;
   onChange: (newFilters: FilterState) => void;
   onClear: () => void;
   onApply?: () => void;
@@ -29,6 +33,8 @@ export function BusinessFilters({
   filters,
   availableCities = [],
   categories = [],
+  locationNote = null,
+  locationBusy = false,
   onChange,
   onClear,
   onApply,
@@ -96,6 +102,16 @@ export function BusinessFilters({
           <option value="25">Até 25 km</option>
           <option value="50">Até 50 km</option>
         </select>
+        {locationBusy && (
+          <p className="flex items-center gap-1.5 text-[11px] text-stone-600">
+            <Loader2 className="w-3 h-3 animate-spin" /> Obtendo sua localização…
+          </p>
+        )}
+        {locationNote && (
+          <p className={`text-[11px] leading-snug ${locationNote.tone === 'error' ? 'text-rose-700' : 'text-stone-500'}`} role={locationNote.tone === 'error' ? 'alert' : undefined}>
+            {locationNote.text}
+          </p>
+        )}
       </div>
 
       {/* 2. Categoria */}
@@ -123,12 +139,7 @@ export function BusinessFilters({
           <Users className="w-3.5 h-3.5 text-amber-900" /> Vínculo Maçônico
         </label>
 
-        {[
-          { id: 'brother', label: 'Irmão' },
-          { id: 'wife', label: 'Cunhada' },
-          { id: 'child', label: 'Sobrinho(a)' },
-          { id: 'representative', label: 'Representante' },
-        ].map((rel) => (
+        {RELATIONSHIP_OPTIONS.map((rel) => (
           <label key={rel.id} className="flex items-center gap-2 text-xs text-stone-700 cursor-pointer hover:text-amber-900">
             <input
               type="checkbox"

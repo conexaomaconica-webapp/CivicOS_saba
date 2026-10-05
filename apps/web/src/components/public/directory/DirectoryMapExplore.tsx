@@ -39,8 +39,8 @@ export function DirectoryMapExplore({ businesses = [], selectedCity }: Directory
   const mapQuery = selectedBiz
     ? locationQuery(selectedBiz)
     : selectedCity
-    ? `Empresas em ${selectedCity}`
-    : 'Brasil';
+      ? `Empresas em ${selectedCity}`
+      : 'Brasil';
   // Com coordenadas ou endereço o mapa aproxima mais (pino exato); sem eles, só a região.
   const mapZoom = selectedBiz && (hasCoordinates || selectedBiz.address_line) ? 16 : 14;
 
@@ -65,7 +65,7 @@ export function DirectoryMapExplore({ businesses = [], selectedCity }: Directory
             <span>Explore no Mapa</span>
           </h2>
           <p className="text-xs text-gray-500 mt-1">
-            Localização geográfica e raio de atuação das empresas cadastradas na nossa rede.
+            Encontre empresas da Conexão Maçônica por localização e descubra quem está mais perto de você.
           </p>
         </div>
         {selectedCity && (
@@ -175,25 +175,22 @@ export function DirectoryMapExplore({ businesses = [], selectedCity }: Directory
             <div className="flex gap-1 my-3 bg-gray-100 p-1 rounded-xl">
               <button
                 onClick={() => setActiveTab('empresas')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                  activeTab === 'empresas' ? 'bg-amber-900 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
-                }`}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${activeTab === 'empresas' ? 'bg-amber-900 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                  }`}
               >
                 Todas
               </button>
               <button
                 onClick={() => setActiveTab('beneficios')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                  activeTab === 'beneficios' ? 'bg-amber-900 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
-                }`}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${activeTab === 'beneficios' ? 'bg-amber-900 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                  }`}
               >
                 Com Benefícios
               </button>
               <button
                 onClick={() => setActiveTab('eventos')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                  activeTab === 'eventos' ? 'bg-amber-900 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
-                }`}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${activeTab === 'eventos' ? 'bg-amber-900 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                  }`}
               >
                 Eventos
               </button>
@@ -212,11 +209,10 @@ export function DirectoryMapExplore({ businesses = [], selectedCity }: Directory
                     <div
                       key={b.id}
                       onClick={() => handleSelectBiz(b.id)}
-                      className={`p-2.5 border rounded-xl flex items-center justify-between cursor-pointer transition-all ${
-                        isSelected
-                          ? 'border-amber-500 bg-amber-50/80 shadow-xs ring-1 ring-amber-400'
-                          : 'hover:bg-gray-50 border-gray-200/80'
-                      }`}
+                      className={`p-2.5 border rounded-xl flex items-center justify-between cursor-pointer transition-all ${isSelected
+                        ? 'border-amber-500 bg-amber-50/80 shadow-xs ring-1 ring-amber-400'
+                        : 'hover:bg-gray-50 border-gray-200/80'
+                        }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-amber-950 font-bold flex items-center justify-center shrink-0 overflow-hidden text-[11px] p-0.5">

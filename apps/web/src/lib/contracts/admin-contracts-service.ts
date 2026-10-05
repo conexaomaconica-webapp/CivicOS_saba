@@ -1156,6 +1156,9 @@ export interface PublicContractDetailsResult {
     signer_cpf?: string;
     accepted_at?: string;
     payment_token?: string;
+    /** Nota fiscal opcional: 'pending' segura o pagamento até o admin registrar a emissão. */
+    invoice_status?: 'not_required' | 'pending' | 'issued';
+    invoice_number?: string;
     active_charge?: {
       invoice_id: string;
       payment_method: string;
@@ -1873,7 +1876,7 @@ export async function getPublicContractByTokenAction(
     // 5. Busca dados dos termos comerciais conferidos
     const { data: terms } = await (dbClient as any)
       .from('business_commercial_terms')
-      .select('plan_name, amount_cents, billing_cycle, payment_method, installments_count, installment_amount_cents, is_pedra_fundamental, responsible_cpf')
+      .select('plan_name, amount_cents, billing_cycle, payment_method, installments_count, installment_amount_cents, is_pedra_fundamental, responsible_cpf, invoice_required, invoice_issued_at, invoice_number')
       .eq('business_id', biz.id)
       .maybeSingle();
 
@@ -2026,6 +2029,8 @@ export async function getPublicContractByTokenAction(
         signer_cpf: snap.signer_cpf || undefined,
         accepted_at: isSigned ? contract.updated_at : undefined,
         payment_token: activePaymentToken,
+        invoice_status: terms?.invoice_required ? (terms?.invoice_issued_at ? 'issued' : 'pending') : 'not_required',
+        invoice_number: terms?.invoice_number || undefined,
         active_charge: existingCharge || undefined,
       },
     };

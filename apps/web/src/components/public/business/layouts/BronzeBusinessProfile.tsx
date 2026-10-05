@@ -5,6 +5,7 @@ import { Heart, Share2, Building2 } from 'lucide-react';
 import { useFavorites } from '@/lib/directory/favorites-context';
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
 import { getObjectPosition } from '@/lib/business/public-business-presentation';
+import { ReferBusinessModal } from '../sections/ReferBusinessModal';
 import { InstitutionalBadges } from '../shared/InstitutionalBadges';
 import { QuickActionBar } from '../shared/BusinessActionButtons';
 import { BusinessOwnerCard } from '../sections/BusinessOwnerCard';
@@ -21,26 +22,15 @@ type BronzeBusinessProfileProps = {
 
 export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
   const [activeTab, setActiveTab] = useState('visao-geral');
-  const [copiedShare, setCopiedShare] = useState(false);
+  const [referOpen, setReferOpen] = useState(false);
   const { isFavorite, toggleFavorite } = useFavorites();
 
   const { identity, recognition, authority, location, contacts, owner, media } = profile;
   const isFavorited = isFavorite(identity.slug);
   const coverUrl = media.cover?.url || '/capafallback.png';
 
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: identity.name,
-        text: identity.description || `Conheça ${identity.name} no Guia Conexão Maçônica`,
-        url: window.location.href,
-      }).catch(() => {});
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      setCopiedShare(true);
-      setTimeout(() => setCopiedShare(false), 2500);
-    }
-  };
+  // "Indicar esta empresa": link de indicação rastreável (membro logado) ou link comum com convite para entrar.
+  const handleShare = () => setReferOpen(true);
 
   return (
     <div className="min-h-screen overflow-x-clip bg-[#F8F7F5] pb-16 font-sans text-stone-900">
@@ -114,7 +104,7 @@ export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
                   className="inline-flex h-9 items-center gap-1.5 rounded-full border border-stone-200 bg-white/90 px-2.5 text-xs font-semibold text-stone-800 shadow-xs backdrop-blur-xs transition-all hover:bg-white sm:h-auto sm:px-3 sm:py-1.5"
                 >
                   <Share2 className="w-3.5 h-3.5 text-stone-600" />
-                  <span className="hidden sm:inline">{copiedShare ? 'Copiado!' : 'Compartilhar'}</span>
+                  <span className="hidden sm:inline">Indicar</span>
                 </button>
 
                 <button
@@ -187,6 +177,10 @@ export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
 
       </div>
 
+
+      {referOpen && (
+        <ReferBusinessModal businessName={identity.name} businessSlug={identity.slug} onClose={() => setReferOpen(false)} />
+      )}
     </div>
   );
 }

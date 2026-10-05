@@ -4,6 +4,7 @@ import React from 'react';
 import { X } from 'lucide-react';
 import type { FilterState } from './BusinessFilters';
 
+import { planLabel, relationshipLabel } from '@/lib/directory/business-filters';
 type BusinessActiveFiltersProps = {
   filters: FilterState;
   categoryName?: string;
@@ -29,15 +30,14 @@ export function BusinessActiveFilters({
     chips.push({ label: `Categoria: ${categoryName || filters.category}`, key: 'category' });
   }
   filters.relationships.forEach((rel) => {
-    const map: Record<string, string> = { brother: 'Irmão', wife: 'Cunhada', child: 'Sobrinho(a)', representative: 'Representante' };
-    chips.push({ label: `Vínculo: ${map[rel] || rel}`, key: 'relationships', value: rel });
+    chips.push({ label: `Vínculo: ${relationshipLabel(rel)}`, key: 'relationships', value: rel });
   });
   filters.recognitions.forEach((rec) => {
     const map: Record<string, string> = { pedra_fundamental: 'Pedra Fundamental', coluna_honra: 'Coluna de Honra' };
     chips.push({ label: `Selo: ${map[rec] || rec}`, key: 'recognitions', value: rec });
   });
   filters.plans.forEach((plan) => {
-    chips.push({ label: `Plano: ${plan.toUpperCase()}`, key: 'plans', value: plan });
+    chips.push({ label: `Plano: ${planLabel(plan)}`, key: 'plans', value: plan });
   });
   if (filters.verified) {
     chips.push({ label: 'Empresa Verificada', key: 'verified' });

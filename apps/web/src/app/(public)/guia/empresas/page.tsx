@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { ChevronRight, Search, Sparkles } from 'lucide-react';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
@@ -14,6 +14,14 @@ import type { FilterState } from '@/components/public/directory/BusinessFilters'
 import type { ViewMode } from '@/components/public/directory/BusinessResultsToolbar';
 import type { BusinessCardData } from '@/components/public/directory/BusinessCard';
 import { StructuredData } from '@/components/seo/StructuredData';
+import { fetchFilterCategories } from '@/lib/directory/filter-categories';
+import {
+  expandPlans,
+  expandRecognitions,
+  expandRelationships,
+  GEO_COOKIE,
+  parseGeoCookie,
+} from '@/lib/directory/business-filters';
 import '@/styles/directory-home.css';
 
 function appUrl(path: string) {
@@ -78,6 +86,11 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
   const supabase = await createServerSideClient();
   const tenantBrand = await resolveTenantBrandContext();
 
+  // Localização do visitante (cookie curto definido pelo filtro de distância). Só é usada se a pessoa pediu
+  // distância máxima ou ordenação por proximidade.
+  const geo = parseGeoCookie((await cookies()).get(GEO_COOKIE)?.value);
+  const needsLocation = Boolean(maxDist) || sort === 'distance';
+
   // 1. Fetch Tenant Directory Home metadata & categories
   let homeData: any = null;
   try {
@@ -118,7 +131,8 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
     } catch (_e) {}
   }
 
-  const categories = homeData?.categories || [];
+  // Filtro: todas as categorias que têm empresas (as "em destaque" da home eram só uma parte).
+  const categories = await fetchFilterCategories(supabase, host, homeData?.categories || []);
 
 
 
@@ -131,14 +145,15 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
     p_city: city || null,
     p_category_slug: cat || null,
     p_subcategory_slug: subcat || null,
-    p_relationships: relArr.length > 0 ? relArr : null,
-    p_recognitions: recArr.length > 0 ? recArr : null,
-    p_plans: planArr.length > 0 ? planArr : null,
+    // A tela e o banco usam nomes diferentes; traduz para os valores reais (plano, vínculo e selos).
+    p_relationships: relArr.length > 0 ? expandRelationships(relArr) : null,
+    p_recognitions: recArr.length > 0 ? expandRecognitions(recArr) : null,
+    p_plans: planArr.length > 0 ? expandPlans(planArr) : null,
     p_verified: verified || null,
     p_has_benefits: null,
-    p_user_lat: null,
-    p_user_lng: null,
-    p_max_distance_km: maxDist || null,
+    p_user_lat: needsLocation && geo ? geo.lat : null,
+    p_user_lng: needsLocation && geo ? geo.lng : null,
+    p_max_distance_km: needsLocation && geo ? maxDist || null : null,
     p_sort: sort,
     p_page: page,
     p_page_size: pageSize,

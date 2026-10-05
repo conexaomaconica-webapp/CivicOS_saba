@@ -66,6 +66,7 @@ import { compressImageOnClient } from '@/lib/media/client-image-compressor';
 import { formatCpfCnpj, formatPhone } from '@/lib/onboarding/onboarding-validation';
 import { AdminLodgeNameCombobox } from '@/components/admin/AdminLodgeNameCombobox';
 import { getCommercialPlanName } from '@/lib/admin/approval-display';
+import { ConnectionMetricsCard } from './connection-metrics-card';
 import {
   unlockAdminCommercialDossierAction,
   advanceToReadyForPublicationAction,
@@ -3555,6 +3556,7 @@ export default function Company360Client({ initialData }: Props) {
 
       {/* ABA 7: ANALYTICS */}
       {activeTab === 'analytics' && (
+        <div className="space-y-6">
         <div className="bg-white border border-stone-300 rounded-2xl p-6 shadow-xs space-y-4">
           <h3 className="font-serif font-bold text-base text-stone-900 border-b border-stone-200 pb-3 flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-[#3B0B14]" /> Performance & Interações (Últimos 30 dias)
@@ -3582,6 +3584,8 @@ export default function Company360Client({ initialData }: Props) {
               <p className="text-2xl font-serif font-bold text-stone-900 mt-1">{data.analytics_summary.website_clicks_30d}</p>
             </div>
           </div>
+        </div>
+        <ConnectionMetricsCard businessId={data.business.id} />
         </div>
       )}
 

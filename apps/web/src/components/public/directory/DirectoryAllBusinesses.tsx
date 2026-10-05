@@ -159,6 +159,9 @@ export function DirectoryAllBusinesses({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="dh-section-title">Todas as Empresas</h2>
+          <p className="text-sm text-stone-600 mt-1">
+            Explore as empresas da Conexão Maçônica e encontre produtos, serviços e novas conexões.
+          </p>
           <p className="text-xs text-stone-600 mt-1">
             {total === 0 ? (
               'Nenhuma empresa encontrada com os filtros selecionados.'

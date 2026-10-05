@@ -104,7 +104,7 @@ export default async function AdminLodge360Page({ params }: AdminLodge360PagePro
             <AlertTriangle className="w-4 h-4 text-amber-600" /> Alerta de Possível Duplicidade Detectada
           </div>
           <p>
-            O sistema identificou {possible_duplicates.length} outra(s) Loja(s) cadastrada(s) com a mesma Potência e Número/Oriente:
+            O sistema identificou {possible_duplicates.length} outra(s) Loja(s) cadastrada(s) com o mesmo nome:
           </p>
           <div className="space-y-1 pt-1">
             {possible_duplicates.map((dup) => (
