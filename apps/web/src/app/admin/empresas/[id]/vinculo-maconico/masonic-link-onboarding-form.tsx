@@ -22,6 +22,7 @@ import {
 import { upsertAdminMasonicLinkAction } from '@/lib/admin/admin-businesses-service';
 import type { MasonicEligibilityType } from '@/lib/masonic/masonic-links-service';
 import { AdminLodgeNameCombobox } from '@/components/admin/AdminLodgeNameCombobox';
+import { AdminPotencyCombobox } from '@/components/admin/AdminPotencyCombobox';
 
 export interface MasonicLinkDetail {
   id?: string;
@@ -102,6 +103,7 @@ export default function MasonicLinkOnboardingForm({
   );
   const [potency, setPotency] = useState(initialMasonicLink?.potency || '');
   const [lodgeName, setLodgeName] = useState(initialMasonicLink?.lodge_name || '');
+  const [organizationId, setOrganizationId] = useState<string | undefined>(undefined);
   const [notes, setNotes] = useState(initialMasonicLink?.notes || '');
 
   // UI state
@@ -175,6 +177,7 @@ export default function MasonicLinkOnboardingForm({
 
       const res = await upsertAdminMasonicLinkAction(businessId, {
         lodge_name: lodgeName.trim(),
+        organization_id: organizationId,
         potency: potency.trim(),
         link_type: resolvedLinkType,
         eligibility_type: eligibilityType,
@@ -631,12 +634,10 @@ export default function MasonicLinkOnboardingForm({
             <label className="block text-xs font-bold text-stone-700 mb-1">
               Potência Maçônica <span className="text-rose-500">*</span>
             </label>
-            <input
-              type="text"
+            <AdminPotencyCombobox
               required
-              placeholder="Ex: GOB, GLMMG, COMAB, etc."
               value={potency}
-              onChange={(e) => setPotency(e.target.value)}
+              onChange={setPotency}
               className={inputClass}
             />
           </div>
@@ -649,6 +650,11 @@ export default function MasonicLinkOnboardingForm({
               required
               value={lodgeName}
               onChange={setLodgeName}
+              onPick={(lodge) => {
+                // Loja do cadastro escolhida: guarda o id e usa a potência dela.
+                setOrganizationId(lodge?.id);
+                if (lodge?.potency) setPotency(lodge.potency);
+              }}
               placeholder="Busque uma Loja cadastrada ou informe uma nova"
               className={inputClass}
             />

@@ -16,6 +16,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { createAdminAdvertiserAction } from '@/lib/admin/admin-advertiser-create-service';
+import { createAdminBusinessCategoryAction } from '@/lib/admin/admin-businesses-service';
 import { formatCpfCnpj, formatPhone } from '@/lib/onboarding/onboarding-validation';
 import { getCommercialPlanName } from '@/lib/admin/approval-display';
 
@@ -24,7 +25,7 @@ interface PlanOption { code: string; title: string }
 
 export default function AdvertiserCreateForm({
   tenantId,
-  categories,
+  categories: initialCategories,
   plans,
   pedraFundamentalCount = 0,
   pedraFundamentalQuota = 50,
@@ -43,6 +44,37 @@ export default function AdvertiserCreateForm({
   const [paymentCondition, setPaymentCondition] = useState<'avista_1200' | 'parcelado_4x325'>('avista_1200');
   const [cnpjCpf, setCnpjCpf] = useState('');
   const [phone, setPhone] = useState('');
+  const [categories, setCategories] = useState<Option[]>(initialCategories);
+  const [categoryId, setCategoryId] = useState('');
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+
+  // Cria a categoria só se ainda não existir (a ação devolve a existente quando o nome já está no catálogo) e a seleciona.
+  async function handleCreateCategory() {
+    setCategoryError(null);
+    const name = newCategoryName.trim().replace(/\s+/g, ' ');
+    const existing = categories.find((item) => item.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      setCategoryId(existing.id);
+      setNewCategoryName('');
+      setAddingCategory(false);
+      return;
+    }
+    setSavingCategory(true);
+    const result = await createAdminBusinessCategoryAction(tenantId, name);
+    setSavingCategory(false);
+    if (!result.success || !result.category) {
+      setCategoryError(result.error ?? 'Não foi possível criar a categoria.');
+      return;
+    }
+    const created = result.category;
+    setCategories((current) => [...current.filter((item) => item.id !== created.id), created].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')));
+    setCategoryId(created.id);
+    setNewCategoryName('');
+    setAddingCategory(false);
+  }
 
   const isPromoPlan = selectedPlan === 'acacia_pedra_fundamental';
   const remainingPromoSpots = Math.max(0, pedraFundamentalQuota - pedraFundamentalCount);
@@ -183,7 +215,7 @@ export default function AdvertiserCreateForm({
           </label>
           <label className="space-y-1.5 text-xs font-bold text-stone-700">
             Categoria
-            <select required name="categoryId" defaultValue="" className={inputClass}>
+            <select required name="categoryId" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass}>
               <option value="">Selecione uma categoria</option>
               {categories.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -191,6 +223,43 @@ export default function AdvertiserCreateForm({
                 </option>
               ))}
             </select>
+            {!addingCategory ? (
+              <button
+                type="button"
+                onClick={() => setAddingCategory(true)}
+                className="mt-1 text-xs font-bold text-[#3B0B14] underline underline-offset-2 hover:text-[#5d1523]"
+              >
+                Não encontrou? Cadastrar nova categoria
+              </button>
+            ) : (
+              <div className="mt-2 space-y-2 rounded-xl border border-stone-300 bg-stone-50 p-3">
+                <input
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="Nome da nova categoria (3 a 80 caracteres)"
+                  maxLength={80}
+                  className={inputClass}
+                />
+                {categoryError && <p className="text-xs font-semibold text-rose-700" role="alert">{categoryError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCreateCategory}
+                    disabled={savingCategory || newCategoryName.trim().length < 3}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#3B0B14] px-3 py-1.5 text-xs font-bold text-[#C9A227] disabled:opacity-60"
+                  >
+                    {savingCategory && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Criar e selecionar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAddingCategory(false); setCategoryError(null); setNewCategoryName(''); }}
+                    className="rounded-lg bg-stone-200 px-3 py-1.5 text-xs font-bold text-stone-700"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
           </label>
 
           <label className="space-y-1.5 text-xs font-bold text-stone-700">

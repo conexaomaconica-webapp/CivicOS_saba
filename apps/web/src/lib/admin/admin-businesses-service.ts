@@ -2408,6 +2408,8 @@ export async function upsertAdminMasonicLinkAction(
   businessId: string,
   payload: {
     lodge_name: string;
+    /** Loja do cadastro escolhida na busca; evita ambiguidade entre lojas de mesmo nome. */
+    organization_id?: string;
     potency?: string;
     link_type: string;
     eligibility_type?: 'mason' | 'mason_spouse' | 'mason_family' | string;
@@ -2447,18 +2449,38 @@ export async function upsertAdminMasonicLinkAction(
 
     let organizationId: string | null = null;
     if (payload.lodge_name.trim()) {
-      const { data: existingOrg, error: orgLookupError } = await (supabase as any)
-        .from('organizations')
-        .select('id')
-        .eq('tenant_id', biz.tenant_id)
-        .ilike('name', payload.lodge_name.trim())
-        .maybeSingle();
+      // Lojas de mesmo nome existem (números/cidades diferentes): usa o id escolhido; sem ele, prefere a da potência
+      // informada e nunca falha por haver mais de uma.
+      let existingOrg: { id: string; potency?: string | null } | null = null;
+      let orgLookupError: { message: string } | null = null;
+      if (payload.organization_id) {
+        const byId = await (supabase as any)
+          .from('organizations')
+          .select('id, potency')
+          .eq('id', payload.organization_id)
+          .eq('tenant_id', biz.tenant_id)
+          .maybeSingle();
+        existingOrg = byId.data;
+        orgLookupError = byId.error;
+        if (!orgLookupError && !existingOrg) return { success: false, error: 'A Loja escolhida não foi encontrada no cadastro.' };
+      } else {
+        const byName = await (supabase as any)
+          .from('organizations')
+          .select('id, potency')
+          .eq('tenant_id', biz.tenant_id)
+          .ilike('name', payload.lodge_name.trim())
+          .limit(50);
+        orgLookupError = byName.error;
+        const rows: Array<{ id: string; potency?: string | null }> = byName.data || [];
+        const wanted = (payload.potency || '').trim().toLowerCase();
+        existingOrg = rows.find((row) => wanted && (row.potency || '').trim().toLowerCase() === wanted) ?? rows[0] ?? null;
+      }
 
       if (orgLookupError) return { success: false, error: `Falha ao consultar Loja Maçônica: ${orgLookupError.message}` };
 
       if (existingOrg) {
         organizationId = existingOrg.id;
-        if (payload.potency && payload.potency.trim()) {
+        if (!payload.organization_id && payload.potency && payload.potency.trim()) {
           await (supabase as any)
             .from('organizations')
             .update({
