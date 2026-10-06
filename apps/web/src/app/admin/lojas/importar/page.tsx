@@ -89,8 +89,8 @@ export default function AdminImportarLojasPage() {
       let updateCount = 0;
       let dupCount = 0;
       const rows: ParsedLodgeRow[] = result.data.map((row) => {
-        const byNumber = (existing || []).find((item: any) => item.potency?.toLowerCase() === row.potency.toLowerCase() && Number(item.code_number) === row.code_number);
         const byNameCity = (existing || []).find((item: any) => item.name?.trim().toLowerCase() === row.name.toLowerCase() && item.city?.trim().toLowerCase() === row.city.toLowerCase());
+        const byNumber = byNameCity && byNameCity.potency?.toLowerCase() === row.potency.toLowerCase() && Number(byNameCity.code_number) === row.code_number;
         const status = byNumber ? 'update' : byNameCity ? 'duplicate' : 'new';
         if (status === 'update') updateCount++; else if (status === 'duplicate') dupCount++; else newCount++;
         return {
@@ -162,7 +162,6 @@ export default function AdminImportarLojasPage() {
       // Regra: duplicidade = mesmo NOME e mesma CIDADE, ambos preenchidos. Campo vazio nunca marca duplicidade
       // (a loja é importada normalmente e o campo fica vazio). Potência ou número iguais não bastam.
       const nameSeenInFile = new Map<string, number>(); // nome|cidade normalizados -> linha
-      const numberKeyInFile = new Map<string, { line: number; name: string }>(); // potência#número -> loja
 
       for (const [rowIndex, rowData] of spreadsheetRows.entries()) {
         const line = rowIndex + 2; // linha da planilha (1 = cabeçalho)
@@ -212,34 +211,8 @@ export default function AdminImportarLojasPage() {
             results.push({ raw: rowData, status: 'duplicate', warnings, ...values, reason: 'Já existe uma loja com este nome e cidade na base: revisar' });
             continue;
           }
-        } else if (values.code_number != null) {
-          // 3. Nome novo, mas a base só aceita uma loja por potência + número. Em conflito, a UF entra na potência
-          //    (ex.: "CMSB/SP"), que a busca e os filtros já tratam como a mesma potência.
-          const keyOf = (potency: string) => `${potency.toLowerCase()}#${values.code_number}`;
-          const takenBy = (potency: string) =>
-            numberKeyInFile.get(keyOf(potency)) ||
-            (existingList.find((item: any) => Number(item.code_number) === values.code_number && String(item.potency || '').toLowerCase() === potency.toLowerCase())
-              ? { line: 0, name: '' }
-              : undefined);
-          let conflict = takenBy(values.potency);
-          if (conflict && values.state) {
-            const qualified = `${values.potency}/${values.state.toUpperCase()}`;
-            extraWarnings.push(
-              `Outra loja já usa o nº ${values.code_number} em ${values.potency}${conflict.line ? ` (linha ${conflict.line})` : ''}: potência gravada como ${qualified}`,
-            );
-            values = { ...values, potency: qualified };
-            conflict = takenBy(values.potency);
-          }
-          if (conflict) {
-            errC++;
-            results.push({
-              raw: rowData, status: 'error', warnings, ...values,
-              reason: `O nº ${values.code_number} em ${values.potency} já é de outra loja${conflict.name ? ` (${conflict.name})` : ''} e a linha não tem UF para diferenciar`,
-            });
-            continue;
-          }
-          numberKeyInFile.set(keyOf(values.potency), { line, name: values.name });
         }
+        // A loja é identificada por potência + número + nome + cidade: o mesmo número em outra cidade/nome é outra loja.
 
         if (nameKey) nameSeenInFile.set(nameKey, line);
         if (status === 'update') updC++; else newC++;
@@ -326,6 +299,7 @@ export default function AdminImportarLojasPage() {
           name: row.name,
           code_number: row.code_number ?? null,
           potency: row.potency,
+          city: row.city || '',
           slug: slugifyLodge(row.name, row.code_number),
           is_published: true,
           updated_at: new Date().toISOString(),
@@ -360,9 +334,12 @@ export default function AdminImportarLojasPage() {
           }
         }
 
+        // A cidade faz parte da chave única da loja: nunca nula (vazia = '').
+        if (lodgePayload.city == null) lodgePayload.city = '';
+
         const { data: orgData, error: orgErr } = await (supabase as any)
           .from('organizations')
-          .upsert(lodgePayload, { onConflict: 'tenant_id,potency,code_number' })
+          .upsert(lodgePayload, { onConflict: 'tenant_id,potency,code_number,name,city' })
           .select()
           .single();
 

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { getAdminLodge360DetailsAction } from '@/lib/admin/admin-lodges-service';
 import LodgeGovernanceControls from './lodge-governance-client';
+import { canonicalPotencyCode } from '@/lib/lodges/potency';
 
 type AdminLodge360PageProps = {
   params: Promise<{
@@ -69,7 +70,7 @@ export default async function AdminLodge360Page({ params }: AdminLodge360PagePro
             </span>
 
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#3B0B14] text-[#C9A227] border border-[#C9A227]/40">
-              {lodge.potency} • Nº {lodge.code_number || 'S/N'}
+              {canonicalPotencyCode(lodge.potency) || lodge.potency} • Nº {lodge.code_number || 'S/N'}
             </span>
           </div>
           <p className="text-xs text-stone-500 mt-1 font-mono">
@@ -110,7 +111,7 @@ export default async function AdminLodge360Page({ params }: AdminLodge360PagePro
             {possible_duplicates.map((dup) => (
               <div key={dup.id} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-amber-300">
                 <span className="font-bold text-stone-900">
-                  {dup.name} (Nº {dup.code_number}) — {dup.city} ({dup.potency})
+                  {dup.name} (Nº {dup.code_number}) — {dup.city} ({canonicalPotencyCode(dup.potency) || dup.potency})
                 </span>
                 <span className="text-[11px] text-amber-800 font-medium">{dup.reason}</span>
               </div>
@@ -189,7 +190,7 @@ export default async function AdminLodge360Page({ params }: AdminLodge360PagePro
 
             <div className="flex justify-between border-b border-stone-100 pb-1">
               <span className="font-bold text-stone-500">Potência Maçônica:</span>
-              <span className="font-bold text-[#4B161B]">{lodge.potency}</span>
+              <span className="font-bold text-[#4B161B]">{canonicalPotencyCode(lodge.potency) || lodge.potency}</span>
             </div>
 
             <div className="flex justify-between border-b border-stone-100 pb-1">

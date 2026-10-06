@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { getCanonicalAdminTenantAction } from '@/app/actions/admin-tenant-context';
 import { createAdminLodgeAction, updateAdminLodgeAction } from '@/lib/admin/admin-lodges-service';
+import { getLodgeFormOptionsAction, type LodgeFormOption } from '@/lib/admin/admin-lodges-list-service';
 import { BrazilianLocationFields } from '@/components/admin/BrazilianLocationFields';
 import { Landmark, ArrowLeft, Save, Loader2, Upload, Image as ImageIcon } from 'lucide-react';
 
@@ -15,8 +16,8 @@ export default function AdminNovaLojaPage() {
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const [potencies, setPotencies] = useState<{ id: string; slug: string; name: string; abbreviation: string }[]>([]);
-  const [rites, setRites] = useState<{ id: string; slug: string; name: string }[]>([]);
+  const [potencies, setPotencies] = useState<LodgeFormOption[]>([]);
+  const [rites, setRites] = useState<LodgeFormOption[]>([]);
 
   // Form States
   const [name, setName] = useState('');
@@ -59,20 +60,10 @@ export default function AdminNovaLojaPage() {
   useEffect(() => {
     async function loadAux() {
       try {
-        const supabase = createClient();
-        const [{ data: potData }, { data: riteData }] = await Promise.all([
-          (supabase as any).from('masonic_potencies').select('id, slug, name, abbreviation').eq('is_active', true),
-          (supabase as any).from('masonic_rites').select('id, slug, name').eq('is_active', true),
-        ]);
-
-        if (potData) {
-          setPotencies(potData as any);
-          if (potData[0]) setPotencyId((potData[0] as any).id);
-        }
-        if (riteData) {
-          setRites(riteData as any);
-          if (riteData[0]) setRiteId((riteData[0] as any).id);
-        }
+        // Mesmas potências e ritos que as demais lojas já usam (não só o catálogo).
+        const options = await getLodgeFormOptionsAction();
+        setPotencies(options.potencies);
+        setRites(options.rites);
       } catch (err) {
         console.error(err);
       } finally {
@@ -106,17 +97,17 @@ export default function AdminNovaLojaPage() {
     setErrorMessage(null);
     try {
       const num = codeNumber ? parseInt(codeNumber, 10) : null;
-      const selectedPotency = potencies.find((p) => p.id === potencyId);
-      const selectedRite = rites.find((r) => r.id === riteId);
+      const selectedPotency = potencies.find((p) => p.value === potencyId);
+      const selectedRite = rites.find((r) => r.value === riteId);
 
       // Passo 1: Criar o registro da Loja no banco e obter o ID REAL
       const lodgePayload = {
         name,
         code_number: num,
-        potency_id: potencyId || null,
-        potency: selectedPotency?.abbreviation || 'GOB',
-        rite_id: riteId || null,
-        rite: selectedRite?.name || 'REAA',
+        potency_id: selectedPotency?.id || null,
+        potency: potencyId,
+        rite_id: selectedRite?.id || null,
+        rite: riteId || null,
         foundation_date: foundationDate || null,
         worshipful_master_name: worshipfulMaster || null,
         city: city || null,
@@ -342,11 +333,13 @@ export default function AdminNovaLojaPage() {
               <select
                 value={potencyId}
                 onChange={(e) => setPotencyId(e.target.value)}
+                required
                 className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
               >
+                <option value="">Selecione a potência</option>
                 {potencies.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.abbreviation} - {p.name}
+                  <option key={p.value} value={p.value}>
+                    {p.label}
                   </option>
                 ))}
               </select>
@@ -359,9 +352,10 @@ export default function AdminNovaLojaPage() {
                 onChange={(e) => setRiteId(e.target.value)}
                 className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
               >
+                <option value="">Não informado</option>
                 {rites.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
+                  <option key={r.value} value={r.value}>
+                    {r.label}
                   </option>
                 ))}
               </select>

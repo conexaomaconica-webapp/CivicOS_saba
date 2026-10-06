@@ -29,6 +29,7 @@ export default function AdminPotenciasPage() {
   const [mergeTo, setMergeTo] = useState('');
   const [mergeName, setMergeName] = useState('');
   const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmDeleteCatalog, setConfirmDeleteCatalog] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<CatalogPotency | null>(null);
@@ -97,6 +98,16 @@ export default function AdminPotenciasPage() {
       () => {
         setSelUsage(new Set());
         setConfirmClear(false);
+      },
+    );
+
+  const doDeleteCatalog = () =>
+    run(
+      () => deleteCatalogPotenciesAction({ ids: [...selCatalog] }),
+      (r) => `${r.deleted} potência(s) excluída(s) do catálogo.`,
+      () => {
+        setSelCatalog(new Set());
+        setConfirmDeleteCatalog(false);
       },
     );
 
@@ -198,7 +209,7 @@ export default function AdminPotenciasPage() {
               {pending && <Loader2 className="h-4 w-4 animate-spin" />}
             </div>
             <p className="text-[11px] text-white/80">
-              Lojas que já têm o mesmo número na potência de destino não são movidas (a base não aceita duplicar potência + número); elas são contadas no aviso.
+              Lojas que já têm o mesmo número, nome e cidade na potência de destino não são movidas (seriam duplicadas); elas são contadas no aviso.
             </p>
           </div>
         )}
@@ -248,10 +259,7 @@ export default function AdminPotenciasPage() {
               <button
                 type="button"
                 disabled={pending}
-                onClick={() => {
-                  if (!confirm(`Excluir ${selCatalog.size} potência(s) do catálogo? As lojas mantêm o texto da potência.`)) return;
-                  run(() => deleteCatalogPotenciesAction({ ids: [...selCatalog] }), (r) => `${r.deleted} potência(s) excluída(s) do catálogo.`, () => setSelCatalog(new Set()));
-                }}
+                onClick={() => setConfirmDeleteCatalog(true)}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-rose-700 px-4 py-2 text-xs font-bold text-white hover:bg-rose-600 disabled:opacity-50"
               >
                 <Trash2 className="w-4 h-4" /> Excluir {selCatalog.size} selecionada(s)
@@ -302,6 +310,23 @@ export default function AdminPotenciasPage() {
           </table>
         </div>
       </section>
+
+      {confirmDeleteCatalog && (
+        <div role="alertdialog" aria-modal="true" aria-labelledby="confirm-delete-catalog-title" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <h3 id="confirm-delete-catalog-title" className="font-serif font-bold text-lg text-gray-900">
+              Excluir {selCatalog.size} potência(s) do catálogo?
+            </h3>
+            <p className="text-sm text-stone-600">As lojas mantêm o texto da potência. Só o item do catálogo é removido.</p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setConfirmDeleteCatalog(false)} className="px-4 py-2 text-xs font-bold text-stone-600 hover:bg-stone-100 rounded-xl">Cancelar</button>
+              <button type="button" disabled={pending} onClick={doDeleteCatalog} className="bg-rose-700 text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-rose-600 disabled:opacity-50">
+                {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">

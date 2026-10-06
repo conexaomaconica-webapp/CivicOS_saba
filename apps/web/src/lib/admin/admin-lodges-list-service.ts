@@ -97,7 +97,7 @@ function applyFilters(query: any, f: LodgeListFilters) {
   if (f.potency) {
     // "CMSB" também traz as variantes por estado: CMSB/BA, CMSB-RJ, "CMSB SP".
     const p = f.potency;
-    query = query.or([`potency.ilike.${p}`, `potency.ilike.${p}/%`, `potency.ilike.${p}-%`, `potency.ilike.${p} %`].join(','));
+    query = query.or([`potency.ilike.${p}`, `potency.ilike.${p}/%`, `potency.ilike.${p}-%`, `potency.ilike.${p} %`, `potency.ilike."${p})"`].join(','));
   }
   if (f.rite) query = query.ilike('rite', `%${f.rite}%`);
   if (f.status === 'published') query = query.eq('is_active', true).eq('is_published', true);
@@ -295,6 +295,79 @@ export async function getAdminLodgeFacetsAction(): Promise<LodgeFacets & { tenan
     return { ...(await loadFacets(tenantId)), tenantId };
   } catch {
     return { states: [], potencies: [], tenantId: '' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Opções dos formulários de loja (nova/editar): as mesmas potências e ritos que as lojas já usam
+// ---------------------------------------------------------------------------
+export type LodgeFormOption = { value: string; label: string; id: string | null };
+export type LodgeFormOptions = { potencies: LodgeFormOption[]; rites: LodgeFormOption[] };
+
+const foldKey = (text: string) => text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+
+export async function getLodgeFormOptionsAction(): Promise<LodgeFormOptions> {
+  try {
+    const { tenantId } = await resolveCanonicalAdminTenant();
+    const db = getServiceClient();
+    const potencies = new Map<string, { value: string; count: number }>();
+    const rites = new Map<string, Map<string, number>>();
+
+    for (let from = 0; from < MAX_BULK; from += IDS_PAGE) {
+      const { data } = await db
+        .from('organizations')
+        .select('potency, rite')
+        .eq('tenant_id', tenantId)
+        .order('id', { ascending: true })
+        .range(from, from + IDS_PAGE - 1);
+      const rows = data || [];
+      for (const row of rows as Array<{ potency?: string | null; rite?: string | null }>) {
+        const potency = canonicalPotencyCode(row.potency);
+        if (potency) {
+          const entry = potencies.get(foldKey(potency));
+          if (entry) entry.count += 1;
+          else potencies.set(foldKey(potency), { value: potency, count: 1 });
+        }
+        const rite = (row.rite || '').replace(/\s+/g, ' ').trim();
+        if (rite) {
+          const spellings = rites.get(foldKey(rite)) || new Map<string, number>();
+          spellings.set(rite, (spellings.get(rite) || 0) + 1);
+          rites.set(foldKey(rite), spellings);
+        }
+      }
+      if (rows.length < IDS_PAGE) break;
+    }
+
+    const [{ data: catPotencies }, { data: catRites }] = await Promise.all([
+      db.from('masonic_potencies').select('id, abbreviation').eq('tenant_id', tenantId).eq('is_active', true),
+      db.from('masonic_rites').select('id, name').eq('tenant_id', tenantId).eq('is_active', true),
+    ]);
+
+    // Vincula ao catálogo quando a sigla do catálogo é o próprio valor ou o termina ("... - CMSB" ~ "CMSB").
+    const potencyId = (value: string) => {
+      const upper = value.toUpperCase();
+      const match = ((catPotencies || []) as Array<{ id: string; abbreviation: string }>).find((c) => {
+        const abbr = (c.abbreviation || '').trim().toUpperCase();
+        return abbr && (upper === abbr || upper.endsWith(` ${abbr}`));
+      });
+      return match?.id ?? null;
+    };
+
+    const collator = new Intl.Collator('pt-BR');
+    return {
+      potencies: [...potencies.values()]
+        .sort((a, b) => collator.compare(a.value, b.value))
+        .map(({ value }) => ({ value, label: value, id: potencyId(value) })),
+      rites: [...rites.entries()]
+        .map(([key, spellings]) => {
+          const value = [...spellings.entries()].sort((a, b) => b[1] - a[1])[0]![0];
+          const match = ((catRites || []) as Array<{ id: string; name: string }>).find((c) => foldKey(c.name || '') === key);
+          return { value, label: value, id: match?.id ?? null };
+        })
+        .sort((a, b) => collator.compare(a.value, b.value)),
+    };
+  } catch {
+    return { potencies: [], rites: [] };
   }
 }
 

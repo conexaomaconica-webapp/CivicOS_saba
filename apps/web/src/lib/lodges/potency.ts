@@ -19,7 +19,12 @@ export const KNOWN_POTENCY_NAMES: Record<string, string> = {
 
 /** "CMSB/BA" -> "CMSB"; "gob - rj" -> "GOB"; "Grande Oriente do Brasil" fica igual. */
 export function canonicalPotencyCode(raw?: string | null): string {
-  const text = String(raw ?? '').trim();
+  // Parêntese final ("(...)" ou ")" solto) e traço pendente não fazem parte do nome: "GRANDE ORIENTE DO BRASIL – GOB)".
+  const text = String(raw ?? '')
+    .replace(/\s*\([^)]*\)?\s*$/, '')
+    .replace(/\s*\)+\s*$/, '')
+    .replace(/\s*[-–—]\s*$/, '')
+    .trim();
   if (!text) return '';
   const base = text.match(UF_SUFFIX)?.[1]?.trim() || text;
   // Siglas (sem espaços) ficam em maiúsculas; nomes por extenso preservam a grafia.

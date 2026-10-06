@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { geocodeAdminLodgeAddressAction, updateAdminLodgeAction } from '@/lib/admin/admin-lodges-service';
+import { getLodgeFormOptionsAction, type LodgeFormOption } from '@/lib/admin/admin-lodges-list-service';
+import { canonicalPotencyCode } from '@/lib/lodges/potency';
 import { compressImageOnClient } from '@/lib/media/client-image-compressor';
 import {
   LODGE_GALLERY_MAX_DIMENSION,
@@ -32,8 +34,10 @@ export default function AdminEditarLojaPage({ params }: Props) {
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const [potencies, setPotencies] = useState<{ id: string; slug: string; name: string; abbreviation: string }[]>([]);
-  const [rites, setRites] = useState<{ id: string; slug: string; name: string }[]>([]);
+  const [potencies, setPotencies] = useState<LodgeFormOption[]>([]);
+  const [rites, setRites] = useState<LodgeFormOption[]>([]);
+  // Valor gravado na loja: mantido se a potência não for trocada (a chave única ainda pode depender do texto original).
+  const [originalPotency, setOriginalPotency] = useState('');
   const [tenantId, setTenantId] = useState('');
 
   // Form States
@@ -82,21 +86,31 @@ export default function AdminEditarLojaPage({ params }: Props) {
     async function loadData() {
       try {
         const supabase = createClient();
-        const [{ data: potData }, { data: riteData }, { data: lodgeData }] = await Promise.all([
-          (supabase as any).from('masonic_potencies').select('id, slug, name, abbreviation').eq('is_active', true),
-          (supabase as any).from('masonic_rites').select('id, slug, name').eq('is_active', true),
+        const [options, { data: lodgeData }] = await Promise.all([
+          getLodgeFormOptionsAction(),
           (supabase as any).from('organizations').select('*').eq('id', id).single(),
         ]);
 
-        if (potData) setPotencies(potData);
-        if (riteData) setRites(riteData);
+        // Mesmas potências e ritos que as demais lojas já usam; se a da loja não estiver na lista, ela é incluída.
+        const fold = (text: string) => text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+        const potencyOptions = [...options.potencies];
+        const riteOptions = [...options.rites];
+        const currentPotency = canonicalPotencyCode(lodgeData?.potency);
+        const currentRite = String(lodgeData?.rite || '').replace(/\s+/g, ' ').trim();
+        const potencyMatch = potencyOptions.find((o) => fold(o.value) === fold(currentPotency));
+        const riteMatch = riteOptions.find((o) => fold(o.value) === fold(currentRite));
+        if (currentPotency && !potencyMatch) potencyOptions.push({ value: currentPotency, label: currentPotency, id: lodgeData?.potency_id || null });
+        if (currentRite && !riteMatch) riteOptions.push({ value: currentRite, label: currentRite, id: lodgeData?.rite_id || null });
+        setPotencies(potencyOptions);
+        setRites(riteOptions);
 
         if (lodgeData) {
           setTenantId(lodgeData.tenant_id || '');
           setName(lodgeData.name || '');
           setCodeNumber(lodgeData.code_number != null ? String(lodgeData.code_number) : '');
-          setPotencyId(lodgeData.potency_id || '');
-          setRiteId(lodgeData.rite_id || '');
+          setOriginalPotency(lodgeData.potency || '');
+          setPotencyId(potencyMatch?.value || currentPotency);
+          setRiteId(riteMatch?.value || currentRite);
           setFoundationDate(lodgeData.foundation_date || '');
           setWorshipfulMaster(lodgeData.worshipful_master_name || '');
           setSlug(lodgeData.slug || '');
@@ -286,16 +300,18 @@ export default function AdminEditarLojaPage({ params }: Props) {
     setErrorMessage(null);
     try {
       const num = codeNumber ? parseInt(codeNumber, 10) : null;
-      const selectedPotency = potencies.find((p) => p.id === potencyId);
-      const selectedRite = rites.find((r) => r.id === riteId);
+      const selectedPotency = potencies.find((p) => p.value === potencyId);
+      const selectedRite = rites.find((r) => r.value === riteId);
+      // Potência não trocada: mantém o texto gravado (ex.: com /UF) em vez de reescrever a chave da loja.
+      const keepOriginalPotency = canonicalPotencyCode(originalPotency).toLowerCase() === potencyId.toLowerCase();
 
       const res = await updateAdminLodgeAction(id, {
         name,
         code_number: num,
-        potency_id: potencyId || null,
-        potency: selectedPotency?.abbreviation || 'GOB',
-        rite_id: riteId || null,
-        rite: selectedRite?.name || 'REAA',
+        potency_id: selectedPotency?.id || null,
+        potency: keepOriginalPotency ? originalPotency : potencyId,
+        rite_id: selectedRite?.id || null,
+        rite: riteId || null,
         foundation_date: foundationDate || null,
         worshipful_master_name: worshipfulMaster || null,
         city: city || null,
@@ -532,11 +548,13 @@ export default function AdminEditarLojaPage({ params }: Props) {
               <select
                 value={potencyId}
                 onChange={(e) => setPotencyId(e.target.value)}
+                required
                 className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
               >
+                <option value="">Selecione a potência</option>
                 {potencies.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.abbreviation} - {p.name}
+                  <option key={p.value} value={p.value}>
+                    {p.label}
                   </option>
                 ))}
               </select>
@@ -549,9 +567,10 @@ export default function AdminEditarLojaPage({ params }: Props) {
                 onChange={(e) => setRiteId(e.target.value)}
                 className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900"
               >
+                <option value="">Não informado</option>
                 {rites.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
+                  <option key={r.value} value={r.value}>
+                    {r.label}
                   </option>
                 ))}
               </select>

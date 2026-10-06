@@ -90,13 +90,13 @@ export async function getPotencyOverviewAction(): Promise<{
 }
 
 async function lodgesWithPotency(client: ReturnType<typeof db>, tenantId: string, value: string) {
-  const out: Array<{ id: string; code_number: number | null }> = [];
+  const out: Array<{ id: string; code_number: number | null; name: string | null; city: string | null }> = [];
   for (let from = 0; from < MAX_ROWS; from += PAGE) {
-    let q = client.from('organizations').select('id, code_number').eq('tenant_id', tenantId);
+    let q = client.from('organizations').select('id, code_number, name, city').eq('tenant_id', tenantId);
     q = value === EMPTY ? q.or('potency.is.null,potency.eq.') : q.eq('potency', value);
     const { data, error } = await q.order('id', { ascending: true }).range(from, from + PAGE - 1);
     if (error) throw error;
-    out.push(...((data || []) as Array<{ id: string; code_number: number | null }>));
+    out.push(...((data || []) as Array<{ id: string; code_number: number | null; name: string | null; city: string | null }>));
     if (!data || data.length < PAGE) break;
   }
   return out;
@@ -118,8 +118,8 @@ async function setPotency(client: ReturnType<typeof db>, tenantId: string, ids: 
 
 /**
  * Unifica/renomeia: todas as lojas com qualquer dos valores `from` passam a ter a potência `to`.
- * Lojas que colidiriam com uma loja de mesmo número já existente na potência de destino NÃO são movidas
- * (a base não permite duas lojas com a mesma potência e número) e voltam no relatório.
+ * Lojas que colidiriam com a mesma loja (número + nome + cidade) já existente na potência de destino NÃO são movidas
+ * (a base não permite duplicá-la) e voltam no relatório.
  */
 export async function mergePotenciesAction(input: {
   from: string[];
@@ -149,8 +149,11 @@ export async function mergePotenciesAction(input: {
       potencyId = created.id;
     }
 
-    const taken = new Set<number>();
-    for (const lodge of await lodgesWithPotency(client, tenantId, to)) if (lodge.code_number != null) taken.add(lodge.code_number);
+    // A loja é única por potência + número + nome + cidade: o mesmo número em outra cidade/nome é outra loja.
+    const identity = (l: { code_number: number | null; name: string | null; city: string | null }) =>
+      `${l.code_number}|${(l.name || '').trim()}|${(l.city || '').trim()}`;
+    const taken = new Set<string>();
+    for (const lodge of await lodgesWithPotency(client, tenantId, to)) if (lodge.code_number != null) taken.add(identity(lodge));
 
     let moved = 0;
     let skipped = 0;
@@ -158,11 +161,11 @@ export async function mergePotenciesAction(input: {
       const movable: string[] = [];
       for (const lodge of await lodgesWithPotency(client, tenantId, source)) {
         if (lodge.code_number != null) {
-          if (taken.has(lodge.code_number)) {
+          if (taken.has(identity(lodge))) {
             skipped += 1;
             continue;
           }
-          taken.add(lodge.code_number);
+          taken.add(identity(lodge));
         }
         movable.push(lodge.id);
       }
