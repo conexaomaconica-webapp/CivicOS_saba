@@ -15,6 +15,8 @@ import {
   TimePeriod,
   getAdvertiserResultsDTOAction,
 } from '@/lib/advertiser/advertiser-results-service';
+import { CONNECTION_ORIGIN_LABELS, CONNECTION_VALUE_LABELS } from '@/lib/connections/labels';
+import type { ConnectionOrigin, ConnectionValueRange } from '@/app/actions/connections';
 
 export default function AdvertiserResultsClient({ initialData }: { initialData: AdvertiserResultsDTO }) {
   const [data, setData] = useState<AdvertiserResultsDTO>(initialData);
@@ -32,6 +34,15 @@ export default function AdvertiserResultsClient({ initialData }: { initialData: 
   };
 
   const isDataEmpty = kpis.views === 0;
+  const results = data.connectionResults;
+  const value = data.valueSummary;
+  const originEntries = results
+    ? Object.entries(results.byOrigin).sort((a, b) => b[1] - a[1])
+    : [];
+  const valueEntries = results
+    ? (Object.keys(CONNECTION_VALUE_LABELS) as ConnectionValueRange[])
+        .filter((key) => key !== 'nao_informar' && (results.byValueRange[key] ?? 0) > 0)
+    : [];
 
   return (
     <div className="space-y-6 text-left">
@@ -91,6 +102,104 @@ export default function AdvertiserResultsClient({ initialData }: { initialData: 
           </button>
         </div>
       </div>
+
+      {/* RESULTADO: o que a Conexão gerou para a empresa (vem antes de visualizações) */}
+      {results && (
+        <section className="space-y-3" aria-label="Resultado das conexões">
+          <h2 className="text-sm font-serif font-bold text-stone-900">Sua Conexão — {data.periodLabel.toLowerCase()}</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+            <div className="p-4 bg-[#3B0B14] text-[#F9F6F0] rounded-2xl space-y-1">
+              <span className="text-[#C9A227] font-medium block">Conexões registradas</span>
+              <strong className="text-2xl font-serif font-bold block">{results.registered}</strong>
+            </div>
+            <div className="p-4 bg-white border border-stone-200 rounded-2xl space-y-1">
+              <span className="text-stone-500 font-medium block">Compras e serviços</span>
+              <strong className="text-2xl font-serif font-bold text-stone-900 block">{results.commercial}</strong>
+            </div>
+            <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-1">
+              <span className="text-emerald-900 font-medium block">Confirmadas por você</span>
+              <strong className="text-2xl font-serif font-bold text-emerald-700 block">{results.confirmedCommercial}</strong>
+              {results.pending > 0 && (
+                <span className="text-[10px] text-amber-800 font-bold">{results.pending} aguardando sua confirmação</span>
+              )}
+            </div>
+            <div className="p-4 bg-white border border-stone-200 rounded-2xl space-y-1">
+              <span className="text-stone-500 font-medium block">Negócios declarados</span>
+              <strong className="text-2xl font-serif font-bold text-stone-900 block">{results.commercial}</strong>
+              <span className="text-[10px] text-stone-500">{results.withValue} com valor informado (declaratório)</span>
+            </div>
+          </div>
+
+          {(originEntries.length > 0 || valueEntries.length > 0) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              {originEntries.length > 0 && (
+                <div className="bg-white border border-stone-200 rounded-2xl p-4 space-y-2">
+                  <span className="text-[10px] font-mono font-bold uppercase text-stone-500">Como as conexões aconteceram</span>
+                  {originEntries.map(([key, count]) => (
+                    <div key={key} className="flex justify-between text-stone-800">
+                      <span>{CONNECTION_ORIGIN_LABELS[key as ConnectionOrigin] ?? key}</span>
+                      <strong className="font-mono">{count}</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {valueEntries.length > 0 && (
+                <div className="bg-white border border-stone-200 rounded-2xl p-4 space-y-2">
+                  <span className="text-[10px] font-mono font-bold uppercase text-stone-500">Faixas de valor declaradas</span>
+                  {valueEntries.map((key) => (
+                    <div key={key} className="flex justify-between text-stone-800">
+                      <span>{CONNECTION_VALUE_LABELS[key]}</span>
+                      <strong className="font-mono">{results.byValueRange[key]}</strong>
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-stone-400">Valores informados pelos membros; não representam faturamento auditado.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2 text-[11px] text-stone-600">
+            <span className="px-3 py-1 bg-stone-100 rounded-full">{results.referrals} indicações</span>
+            <span className="px-3 py-1 bg-stone-100 rounded-full">{results.shares} compartilhamentos</span>
+            <span className="px-3 py-1 bg-stone-100 rounded-full">{results.benefitClaims} benefícios resgatados</span>
+            <span className="px-3 py-1 bg-stone-100 rounded-full">{results.searchImpressions} aparições na busca</span>
+          </div>
+        </section>
+      )}
+
+      {/* RESUMO DE VALOR DO MÊS + MARCOS */}
+      {value && (
+        <section className="rounded-2xl border border-[#C9A227]/40 bg-[#FBF7EC] p-5 space-y-3" aria-label="Resumo do mês">
+          <h2 className="text-sm font-serif font-bold text-[#3B0B14]">{value.headline}</h2>
+          <ul className="space-y-1 text-sm text-stone-800">
+            {value.lines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          {value.opportunity && (
+            <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+              <strong>Oportunidade:</strong> {value.opportunity}
+            </p>
+          )}
+          {(value.milestones.length > 0 || value.nextConnectionMilestone) && (
+            <div className="border-t border-[#C9A227]/30 pt-3 space-y-1.5">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-500">Marcos da sua empresa</span>
+              <ul className="flex flex-wrap gap-2">
+                {value.milestones.slice(-4).map((m) => (
+                  <li key={m.key} className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[#3B0B14] border border-[#C9A227]/40">
+                    {m.title}
+                  </li>
+                ))}
+              </ul>
+              {value.nextConnectionMilestone && (
+                <p className="text-[11px] text-stone-600">
+                  Faltam {value.nextConnectionMilestone.remaining} para a {value.nextConnectionMilestone.target}ª conexão.
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* ESTADO SEM DADOS (NOVAS EMPRESAS) */}
       {isDataEmpty ? (

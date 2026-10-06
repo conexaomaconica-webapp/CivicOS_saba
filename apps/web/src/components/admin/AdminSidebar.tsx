@@ -29,6 +29,7 @@ import {
   ClipboardList,
   KeyRound,
   Handshake,
+  AlertTriangle,
 } from 'lucide-react';
 import { getApprovalDirectoryListAction } from '@/lib/admin/admin-approval-service';
 
@@ -56,6 +57,12 @@ export const adminNavSections: NavSection[] = [
         label: 'Dashboard',
         path: '/admin',
         icon: LayoutDashboard,
+      },
+      {
+        id: 'risco',
+        label: 'Empresas em risco',
+        path: '/admin/risco',
+        icon: AlertTriangle,
       },
     ],
   },

@@ -16,7 +16,8 @@ export default function AdvertiserNotificationsClient({ data }: { data: Advertis
   const [notifications, setNotifications] = useState<AdvertiserNotificationItem[]>(data.notifications);
 
   const handleMarkAsRead = async (id: string) => {
-    await markNotificationAsReadAction(id);
+    const res = await markNotificationAsReadAction(id);
+    if (!res.success) return;
     setNotifications(
       notifications.map((n) => (n.id === id ? { ...n, is_read: true } : n))
     );

@@ -22,6 +22,7 @@ import {
   User,
   X,
   LogOut,
+  QrCode,
 } from 'lucide-react';
 
 interface NavigationGroup {
@@ -57,6 +58,7 @@ const ADVERTISER_NAV_GROUPS: NavigationGroup[] = [
       { label: 'Validar benefício', href: '/anunciante/beneficios/validar', icon: FileCheck2 },
       { label: 'Conexões', href: '/anunciante/conexoes', icon: Handshake },
       { label: 'Indicações', href: '/anunciante/indicacoes', icon: Users },
+      { label: 'QR da empresa', href: '/anunciante/qr', icon: QrCode },
       { label: 'Eventos', href: '/anunciante/conteudo/eventos', icon: Calendar },
       { label: 'Publicações', href: '/anunciante/conteudo/posts', icon: FileText },
     ],

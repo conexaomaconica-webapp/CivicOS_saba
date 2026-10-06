@@ -6,6 +6,7 @@ import { Heart, Share2, MapPin, Briefcase, Star, Crown, Award, ShieldCheck, User
 import { useFavorites } from '@/lib/directory/favorites-context';
 import { usePedraCardDisplay, usePedraHorizontalSeal, type PedraCardDisplay } from '@/lib/directory/pedra-card-display-context';
 import { trackDirectoryEventAction } from '@/lib/analytics/analytics-service';
+import { useSearchImpression } from '@/lib/analytics/use-search-impression';
 
 export type BusinessCardData = {
   id: string;
@@ -190,6 +191,8 @@ export function BusinessCard({
     toggleFavorite(data.slug);
   };
 
+  const impressionRef = useSearchImpression<HTMLDivElement>(data.id);
+
   const handleShare = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -202,6 +205,7 @@ export function BusinessCard({
           text: `Confira ${data.name} no Guia Conexão Maçônica`,
           url: shareUrl,
         });
+        void trackDirectoryEventAction({ businessId: data.id, eventType: 'share', source: 'directory_card' });
         return;
       } catch {
         // Fallback
@@ -210,6 +214,7 @@ export function BusinessCard({
 
     try {
       await navigator.clipboard.writeText(shareUrl);
+      void trackDirectoryEventAction({ businessId: data.id, eventType: 'share', source: 'directory_card' });
       setCopiedShare(true);
       setTimeout(() => setCopiedShare(false), 2000);
     } catch {
@@ -274,7 +279,7 @@ export function BusinessCard({
   const masonicConnection = formatMasonicConnection(data);
 
   return (
-    <div className="bg-white border border-amber-900/15 rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col group relative">
+    <div ref={impressionRef} className="bg-white border border-amber-900/15 rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col group relative">
       {/* 1. Capa (Com Ações de Favoritar e Compartilhar) */}
       <div className={`relative w-full bg-stone-800 overflow-hidden ${isFeatured ? 'h-40' : 'h-32'}`}>
         {data.cover_url ? (

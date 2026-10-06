@@ -7,10 +7,13 @@ import { optimizeImageForUpload } from '@/lib/media/optimize-image';
 import { ConnectionLikeButton } from './ConnectionLikeButton';
 import { getPublicReferralCountAction } from '@/app/actions/referrals';
 import { ReportConnectionButton } from './ReportConnectionButton';
+import { CONNECTION_ORIGIN_LABELS, CONNECTION_VALUE_LABELS } from '@/lib/connections/labels';
 import {
   getPublicBusinessConnectionsAction,
   registerConnectionAction,
+  type ConnectionOrigin,
   type ConnectionType,
+  type ConnectionValueRange,
   type PublicConnectionItem,
 } from '@/app/actions/connections';
 
@@ -150,15 +153,29 @@ export function BusinessConnectionsCard({ businessSlug }: Props) {
   );
 }
 
-export function RegisterConnectionModal({ businessSlug, onClose }: { businessSlug: string; onClose: () => void }) {
-  const [type, setType] = useState<ConnectionType>('compra');
+export function RegisterConnectionModal({
+  businessSlug,
+  onClose,
+  defaultType = 'compra',
+  defaultOrigin = '',
+}: {
+  businessSlug: string;
+  onClose: () => void;
+  defaultType?: ConnectionType;
+  defaultOrigin?: ConnectionOrigin | '';
+}) {
+  const [type, setType] = useState<ConnectionType>(defaultType);
   const [item, setItem] = useState('');
   const [message, setMessage] = useState('');
+  const [origin, setOrigin] = useState<ConnectionOrigin | ''>(defaultOrigin);
+  const [valueRange, setValueRange] = useState<ConnectionValueRange | ''>('');
+  const [shareOnMural, setShareOnMural] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState<string | null>(null);
+  const [doneShared, setDoneShared] = useState(false);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => event.key === 'Escape' && !submitting && onClose();
@@ -191,7 +208,7 @@ export function RegisterConnectionModal({ businessSlug, onClose }: { businessSlu
 
     try {
       let photoUrl: string | null = null;
-      if (photo) {
+      if (photo && shareOnMural) {
         const { data: userData } = await supabase.auth.getUser();
         if (!userData.user) throw new Error('Sua sessão expirou. Entre novamente.');
         const optimized = await optimizeImageForUpload(photo, { maxBytes: 700 * 1024, maxDimension: 1600 });
@@ -203,11 +220,21 @@ export function RegisterConnectionModal({ businessSlug, onClose }: { businessSlu
         photoUrl = supabase.storage.from('connection-photos').getPublicUrl(uploadedPath).data.publicUrl;
       }
 
-      const res = await registerConnectionAction({ businessSlug, type, item, message, photoUrl });
+      const res = await registerConnectionAction({
+        businessSlug,
+        type,
+        item,
+        message,
+        photoUrl,
+        origin: origin || null,
+        valueRange: valueRange || null,
+        shareOnMural,
+      });
       if (!res.success) {
         if (uploadedPath) await supabase.storage.from('connection-photos').remove([uploadedPath]);
         throw new Error(res.error || 'Não foi possível registrar a conexão.');
       }
+      setDoneShared(shareOnMural);
       setDone(res.businessName || 'a empresa');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível registrar a conexão.');
@@ -240,7 +267,9 @@ export function RegisterConnectionModal({ businessSlug, onClose }: { businessSlu
             <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
             <h4 className="font-serif text-lg font-bold text-[#4B161B]">Conexão registrada!</h4>
             <p className="text-sm text-stone-600">
-              Avisamos {done}. Assim que a empresa confirmar o atendimento, a conexão aparece no mural; a foto, se houver, aparece depois da análise da plataforma. Obrigado por fortalecer a rede!
+              Avisamos {done}. {doneShared
+                ? 'Assim que a empresa confirmar o atendimento, a conexão aparece no Mural; a foto, se houver, aparece depois da análise da plataforma. Obrigado por fortalecer a rede!'
+                : 'Assim que a empresa confirmar o atendimento, o registro passa a contar para ela. Como você não escolheu o Mural, ele não aparece publicamente. Obrigado por fortalecer a rede!'}
             </p>
             <button type="button" onClick={onClose} className="rounded-xl bg-[#4B161B] px-5 py-2 text-sm font-bold text-[#F3EEDD]">
               Fechar
@@ -251,7 +280,7 @@ export function RegisterConnectionModal({ businessSlug, onClose }: { businessSlu
             <div>
               <h4 className="font-serif text-lg font-bold text-[#4B161B]">Comprei na Conexão</h4>
               <p className="mt-1 text-xs text-stone-600">
-                Conte como foi sua experiência. A empresa confirma o atendimento, sem precisar informar valores.
+                Conte como foi sua experiência. A empresa confirma o atendimento. Informar origem e valor é opcional.
               </p>
             </div>
 
@@ -298,6 +327,56 @@ export function RegisterConnectionModal({ businessSlug, onClose }: { businessSlu
               />
             </label>
 
+            <label className="block text-xs font-bold text-stone-700">
+              Como essa conexão aconteceu? <span className="font-normal text-stone-500">(opcional)</span>
+              <select
+                value={origin}
+                onChange={(e) => setOrigin(e.target.value as ConnectionOrigin | '')}
+                className="mt-1 block w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-normal"
+              >
+                <option value="">Selecione</option>
+                {(Object.keys(CONNECTION_ORIGIN_LABELS) as ConnectionOrigin[]).map((key) => (
+                  <option key={key} value={key}>
+                    {CONNECTION_ORIGIN_LABELS[key]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {type !== 'visita' && (
+              <label className="block text-xs font-bold text-stone-700">
+                Valor aproximado <span className="font-normal text-stone-500">(opcional, não é exibido publicamente)</span>
+                <select
+                  value={valueRange}
+                  onChange={(e) => setValueRange(e.target.value as ConnectionValueRange | '')}
+                  className="mt-1 block w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-normal"
+                >
+                  <option value="">Selecione</option>
+                  {(Object.keys(CONNECTION_VALUE_LABELS) as ConnectionValueRange[]).map((key) => (
+                    <option key={key} value={key}>
+                      {CONNECTION_VALUE_LABELS[key]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-stone-200 bg-stone-50 p-3 text-xs text-stone-700">
+              <input
+                type="checkbox"
+                checked={shareOnMural}
+                onChange={(e) => setShareOnMural(e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-[#4B161B]"
+              />
+              <span>
+                <strong className="text-stone-900">Compartilhar no Mural de Conexões</strong>
+                <span className="block text-stone-500">
+                  Registros confirmados poderão aparecer no Mural, com seu primeiro nome, e ajudar a fortalecer a empresa. Sem isso, o registro conta apenas para a empresa, sem aparecer publicamente.
+                </span>
+              </span>
+            </label>
+
+            {shareOnMural && (
             <div>
               <span className="block text-xs font-bold text-stone-700">
                 Foto <span className="font-normal text-stone-500">(opcional)</span>
@@ -325,6 +404,7 @@ export function RegisterConnectionModal({ businessSlug, onClose }: { businessSlu
                 </label>
               )}
             </div>
+            )}
 
             {error && (
               <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800" role="alert">
@@ -333,7 +413,7 @@ export function RegisterConnectionModal({ businessSlug, onClose }: { businessSlu
             )}
 
             <p className="text-[11px] text-stone-500">
-              Seu primeiro nome aparece no mural só depois da confirmação da empresa. Nada de preço é exibido. Se você enviar foto, ela passa por uma análise rápida da plataforma antes de aparecer.
+              Se você escolher o Mural, seu primeiro nome aparece só depois da confirmação da empresa. Nada de preço é exibido. Fotos passam por uma análise rápida da plataforma antes de aparecer.
             </p>
 
             <div className="flex justify-end gap-2">

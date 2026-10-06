@@ -1,6 +1,13 @@
 'use server';
 
 import { createServerSideClient } from '@/lib/supabase/server';
+import {
+  buildMilestones,
+  buildMonthlySummary,
+  nextConnectionMilestone,
+  type Milestone,
+  type ValueSummaryRaw,
+} from '@/lib/advertiser/value-summary';
 
 export type TimePeriod = '7d' | '30d' | '90d';
 
@@ -59,6 +66,74 @@ export interface AdvertiserResultsDTO {
     description: string;
     type: 'success' | 'info';
   }>;
+  /** Resultado do período (conexões registradas pela rede). Null quando indisponível. */
+  connectionResults: ConnectionResultsDTO | null;
+  /** Resumo do mês e marcos alcançados. Null quando indisponível. */
+  valueSummary: ValueSummaryDTO | null;
+}
+
+export interface ValueSummaryDTO {
+  headline: string;
+  lines: string[];
+  opportunity: string | null;
+  milestones: Milestone[];
+  nextConnectionMilestone: { target: number; remaining: number } | null;
+}
+
+async function loadValueSummary(supabase: any, businessId: string): Promise<ValueSummaryDTO | null> {
+  try {
+    const { data, error } = await supabase.rpc('business_value_summary', { p_business_id: businessId });
+    if (error || !data) return null;
+    const raw = data as ValueSummaryRaw;
+    const summary = buildMonthlySummary(raw);
+    return {
+      ...summary,
+      milestones: buildMilestones(raw.lifetime, raw.months_on_platform),
+      nextConnectionMilestone: nextConnectionMilestone(raw.lifetime),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export interface ConnectionResultsDTO {
+  registered: number;
+  commercial: number;
+  visits: number;
+  confirmedCommercial: number;
+  pending: number;
+  withValue: number;
+  byValueRange: Record<string, number>;
+  byOrigin: Record<string, number>;
+  searchImpressions: number;
+  shares: number;
+  referrals: number;
+  benefitClaims: number;
+}
+
+async function loadConnectionResults(supabase: any, businessId: string, days: number): Promise<ConnectionResultsDTO | null> {
+  try {
+    const { data, error } = await supabase.rpc('business_results_summary', { p_business_id: businessId, p_days: days });
+    if (error || !data) return null;
+    const c = data.connections ?? {};
+    const e = data.events ?? {};
+    return {
+      registered: Number(c.registered ?? 0),
+      commercial: Number(c.commercial ?? 0),
+      visits: Number(c.visits ?? 0),
+      confirmedCommercial: Number(c.confirmed_commercial ?? 0),
+      pending: Number(c.pending ?? 0),
+      withValue: Number(c.with_value ?? 0),
+      byValueRange: c.by_value_range ?? {},
+      byOrigin: c.by_origin ?? {},
+      searchImpressions: Number(e.search_impression ?? 0),
+      shares: Number(e.share ?? 0),
+      referrals: Number(e.referral ?? 0),
+      benefitClaims: Number(e.benefit_claim ?? 0),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function getAdvertiserResultsDTOAction(
@@ -84,6 +159,17 @@ export async function getAdvertiserResultsDTOAction(
     const businessId = b.id;
 
     const periodLabel = period === '7d' ? 'Últimos 7 dias' : period === '90d' ? 'Últimos 90 dias' : 'Últimos 30 dias';
+    const periodDays = period === '7d' ? 7 : period === '90d' ? 90 : 30;
+    // Registra marcos novos (visualizações e meses de casa não têm trigger) e gera o aviso in-app, uma única vez.
+    try {
+      await supabase.rpc('sync_business_milestones' as any, { p_business_id: businessId } as any);
+    } catch {
+      // Marcos nunca bloqueiam o painel.
+    }
+    const [connectionResults, valueSummary] = await Promise.all([
+      loadConnectionResults(supabase, businessId, periodDays),
+      loadValueSummary(supabase, businessId),
+    ]);
     const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
 
     let realEvents: any[] = [];
@@ -91,7 +177,8 @@ export async function getAdvertiserResultsDTOAction(
       const { data } = await (supabase as any)
         .from('analytics_events')
         .select('event_name, created_at')
-        .eq('business_id', businessId);
+        .eq('business_id', businessId)
+        .gte('created_at', new Date(Date.now() - periodDays * 86_400_000).toISOString());
       if (Array.isArray(data)) realEvents = data;
     } catch {
       // Ignora erro de tabela inexistente
@@ -188,6 +275,8 @@ export async function getAdvertiserResultsDTOAction(
       topContent: {},
       geographicAggregation,
       recommendations,
+      connectionResults,
+      valueSummary,
     };
   } catch (_e) {
     const multiplier = period === '7d' ? 0.25 : period === '90d' ? 2.8 : 1.0;
@@ -223,6 +312,8 @@ export async function getAdvertiserResultsDTOAction(
       topContent: {},
       geographicAggregation: [],
       recommendations: [],
+      connectionResults: null,
+      valueSummary: null,
     };
   }
 }

@@ -5,7 +5,18 @@ import { createServerSideClient } from '@/lib/supabase/server';
 import { linkVisitorToCurrentUser } from '@/lib/referrals/attribution';
 
 export type ConnectionType = 'compra' | 'servico' | 'parceria' | 'visita';
-export type ConnectionStatus = 'pendente' | 'confirmada' | 'recusada' | 'removida';
+export type ConnectionOrigin =
+  | 'busca'
+  | 'oferta'
+  | 'indicacao'
+  | 'evento'
+  | 'compartilhamento'
+  | 'qr_empresa'
+  | 'ja_conhecia'
+  | 'outro';
+export type ConnectionValueRange = 'ate_250' | '251_500' | '501_1000' | '1001_5000' | 'acima_5000' | 'nao_informar';
+
+export type ConnectionStatus ='pendente' | 'confirmada' | 'recusada' | 'removida';
 export type PhotoModerationStatus = 'nao_requerida' | 'pendente' | 'aprovada' | 'rejeitada';
 
 export type PublicConnectionItem = {
@@ -80,6 +91,10 @@ export async function registerConnectionAction(input: {
   item?: string;
   message?: string;
   photoUrl?: string | null;
+  origin?: ConnectionOrigin | null;
+  valueRange?: ConnectionValueRange | null;
+  /** Consentimento do membro para a conexão aparecer no Mural público (padrão: não). */
+  shareOnMural?: boolean;
 }): Promise<{ success: boolean; error?: string; businessName?: string }> {
   try {
     const supabase = await createServerSideClient();
@@ -102,6 +117,9 @@ export async function registerConnectionAction(input: {
       p_item: input.item?.trim() || null,
       p_message: input.message?.trim() || null,
       p_photo_url: input.photoUrl || null,
+      p_origin: input.origin || null,
+      p_value_range: input.type === 'visita' ? null : input.valueRange || null,
+      p_share_on_mural: input.shareOnMural === true,
     });
     if (error) return { success: false, error: friendlyError(error, 'Não foi possível registrar a conexão agora.') };
 

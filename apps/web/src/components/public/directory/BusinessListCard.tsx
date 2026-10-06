@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Heart, Share2, Star, Crown, Award, ShieldCheck, Users, Map } from 'lucide-react';
 import { useFavorites } from '@/lib/directory/favorites-context';
+import { trackDirectoryEventAction } from '@/lib/analytics/analytics-service';
+import { useSearchImpression } from '@/lib/analytics/use-search-impression';
 import { usePedraCardDisplay, usePedraHorizontalSeal, type PedraCardDisplay } from '@/lib/directory/pedra-card-display-context';
 import {
   type BusinessCardData,
@@ -98,6 +100,8 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay }: Busine
     toggleFavorite(data.slug);
   };
 
+  const impressionRef = useSearchImpression<HTMLDivElement>(data.id);
+
   const handleShare = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -109,6 +113,7 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay }: Busine
           text: `Confira ${data.name} no Guia Conexão Maçônica`,
           url: shareUrl,
         });
+        void trackDirectoryEventAction({ businessId: data.id, eventType: 'share', source: 'directory_list' });
         return;
       } catch {
         // Fallback
@@ -116,6 +121,7 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay }: Busine
     }
     try {
       await navigator.clipboard.writeText(shareUrl);
+      void trackDirectoryEventAction({ businessId: data.id, eventType: 'share', source: 'directory_list' });
       setCopiedShare(true);
       setTimeout(() => setCopiedShare(false), 2000);
     } catch {
@@ -153,7 +159,7 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay }: Busine
   const masonicConnection = formatMasonicConnection(data);
 
   return (
-    <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-2xs hover:shadow-md transition-all flex flex-col md:flex-row gap-5 items-start md:items-center justify-between group">
+    <div ref={impressionRef} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-2xs hover:shadow-md transition-all flex flex-col md:flex-row gap-5 items-start md:items-center justify-between group">
       {/* Esquerda: Logo e Imagem */}
       <div className="flex items-center gap-4.5 shrink-0 w-full md:w-auto">
         <div
