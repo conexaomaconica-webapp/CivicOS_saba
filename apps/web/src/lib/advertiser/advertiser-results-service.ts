@@ -1,6 +1,7 @@
 'use server';
 
 import { createServerSideClient } from '@/lib/supabase/server';
+import { findAdvertiserBusiness } from '@/lib/advertiser/advertiser-access';
 import {
   buildMilestones,
   buildMonthlySummary,
@@ -146,11 +147,7 @@ export async function getAdvertiserResultsDTOAction(
     let b: any = null;
 
     if (userRes?.user) {
-      const { data: userBiz } = await supabase
-        .from('businesses')
-        .select('id, name, slug')
-        .eq('owner_id', userRes.user.id)
-        .maybeSingle();
+      const userBiz = await findAdvertiserBusiness(supabase, userRes.user.id);
       b = userBiz;
     }
 

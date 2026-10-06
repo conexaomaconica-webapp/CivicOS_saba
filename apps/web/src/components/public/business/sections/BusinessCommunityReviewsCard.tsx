@@ -11,6 +11,8 @@ type BusinessCommunityReviewsCardProps = {
   owner: PublicBusinessPresentation['owner'];
   businessSlug: string;
   className?: string;
+  /** 'reviews' = só indicações e avaliações; 'connections' = só o mural de conexões; 'all' = tudo (padrão). */
+  part?: 'all' | 'reviews' | 'connections';
 };
 
 export function BusinessCommunityReviewsCard({
@@ -18,7 +20,9 @@ export function BusinessCommunityReviewsCard({
   owner,
   businessSlug,
   className = '',
+  part = 'all',
 }: BusinessCommunityReviewsCardProps) {
+  const showConnections = part === 'all';
   const count = reviews.count || (reviews.items ? reviews.items.length : 0);
   const average = count > 0 ? (reviews.average ?? 5.0) : 0;
   const endorsedCount = owner?.endorsedByCount || 0;
@@ -28,6 +32,15 @@ export function BusinessCommunityReviewsCard({
     count: reviews.items.filter((review) => review.rating === stars).length,
   }));
   const distributionTotal = ratingCounts.reduce((total, row) => total + row.count, 0);
+
+  if (part === 'connections') {
+    return (
+      <div className={`space-y-6 ${className}`}>
+        <ReferralTracker businessSlug={businessSlug} />
+        <BusinessConnectionsCard businessSlug={businessSlug} />
+      </div>
+    );
+  }
 
   return (
     <div id="comentarios" className={`space-y-6 ${className}`}>
@@ -63,10 +76,14 @@ export function BusinessCommunityReviewsCard({
         </div>
       )}
 
-      <ReferralTracker businessSlug={businessSlug} />
+      {showConnections && (
+        <>
+          <ReferralTracker businessSlug={businessSlug} />
 
-      {/* MURAL DE CONEXÕES ("Comprei na Conexão") */}
-      <BusinessConnectionsCard businessSlug={businessSlug} />
+          {/* MURAL DE CONEXÕES ("Comprei na Conexão") */}
+          <BusinessConnectionsCard businessSlug={businessSlug} />
+        </>
+      )}
 
       {/* SEÇÃO AVALIAÇÕES E DEPOIMENTOS */}
       <div className="flex flex-col gap-4">

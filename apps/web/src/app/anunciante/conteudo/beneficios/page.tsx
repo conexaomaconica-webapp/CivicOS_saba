@@ -1,7 +1,10 @@
 import React from 'react';
+import { listMyChangeRequestsAction } from '@/lib/advertiser/change-requests-service';
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { getAdvertiserContentDataAction } from '@/lib/advertiser/advertiser-content-service';
+import { getAdvertiserFeaturesAction } from '@/lib/advertiser/advertiser-entitlements';
+import { FeatureLockedNotice } from '@/components/advertiser/FeatureLockedNotice';
 import AdvertiserBenefitsClient from './benefits-client';
 
 export const metadata = {
@@ -23,7 +26,10 @@ export default async function AdvertiserBenefitsPage() {
     redirect('/login?redirect=%2Fanunciante%2Fconteudo%2Fbeneficios');
   }
 
-  const dto = await getAdvertiserContentDataAction();
+  const features = await getAdvertiserFeaturesAction();
+  if (features && !features.allows.benefits) return <FeatureLockedNotice feature="Benefícios e Ofertas" planName={features.planName} />;
 
-  return <AdvertiserBenefitsClient data={dto} />;
+  const [dto, requests] = await Promise.all([getAdvertiserContentDataAction(), listMyChangeRequestsAction()]);
+
+  return <AdvertiserBenefitsClient data={dto} requests={requests} />;
 }

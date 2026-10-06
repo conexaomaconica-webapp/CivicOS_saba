@@ -35,3 +35,14 @@ export async function findAdvertiserBusiness(supabase: any, userId: string): Pro
   const { data: managed } = await supabase.from('businesses').select('*').eq('id', membership.business_id).maybeSingle();
   return managed ?? null;
 }
+
+/**
+ * A empresa informada, somente se for do usuário logado (dono ou equipe). Serve de autorização explícita para ações
+ * que gravam com a chave de serviço: o identificador vindo do navegador nunca é confiado por si só.
+ */
+export async function findOwnBusinessById(supabase: any, businessId: string): Promise<any | null> {
+  const { data: userRes } = await supabase.auth.getUser();
+  if (!userRes?.user || !businessId) return null;
+  const business = await findAdvertiserBusiness(supabase, userRes.user.id);
+  return business && business.id === businessId ? business : null;
+}

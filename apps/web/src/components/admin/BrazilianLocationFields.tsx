@@ -6,9 +6,23 @@ import { createClient } from '@/lib/supabase/client';
 
 type StateOption = { ibge_code: number; uf: string; name: string };
 type CityOption = { ibge_code: number; name: string };
-type Props = { state: string; city: string; onStateChange: (value: string) => void; onCityChange: (value: string) => void };
+type Props = {
+  state: string;
+  city: string;
+  onStateChange: (value: string) => void;
+  onCityChange: (value: string) => void;
+  /** 'member' = visual da área do membro (campos maiores, rótulos neutros). */
+  variant?: 'admin' | 'member';
+};
 
-export function BrazilianLocationFields({ state, city, onStateChange, onCityChange }: Props) {
+const fold = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+export function BrazilianLocationFields({ state, city, onStateChange, onCityChange, variant = 'admin' }: Props) {
+  const member = variant === 'member';
+  const labelClass = member ? 'block text-xs font-bold text-stone-700' : 'block text-xs font-bold text-stone-800 mb-1';
+  const selectClass = member
+    ? 'mt-1 block min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm font-normal text-stone-900 outline-none focus:ring-2 focus:ring-[var(--member-primary,#5d1523)] disabled:opacity-60'
+    : 'w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900 disabled:opacity-60';
   const [states, setStates] = useState<StateOption[]>([]);
   const [cities, setCities] = useState<CityOption[]>([]);
   const [loadingStates, setLoadingStates] = useState(true);
@@ -41,11 +55,18 @@ export function BrazilianLocationFields({ state, city, onStateChange, onCityChan
     return () => { active = false; };
   }, [state, states]);
 
+  // Cadastro antigo com grafia diferente (caixa/acentos): troca pelo nome oficial da lista, sem o usuário precisar fazer nada.
+  useEffect(() => {
+    if (!city || loadingCities || cities.length === 0 || cities.some((item) => item.name === city)) return;
+    const official = cities.find((item) => fold(item.name) === fold(city));
+    if (official) onCityChange(official.name);
+  }, [city, cities, loadingCities, onCityChange]);
+
   return <>
     <div>
-      <label className="block text-xs font-bold text-stone-800 mb-1">Estado (UF)</label>
+      <label className={labelClass} htmlFor="loc-state">Estado (UF)</label>
       <div className="relative">
-        <select value={state} disabled={loadingStates} onChange={(event) => { onStateChange(event.target.value); onCityChange(''); }} className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900 disabled:opacity-60">
+        <select id="loc-state" value={state} disabled={loadingStates} required={member} onChange={(event) => { onStateChange(event.target.value); onCityChange(''); }} className={selectClass}>
           <option value="">Selecione o estado</option>
           {states.map((item) => <option key={item.ibge_code} value={item.uf}>{item.uf} — {item.name}</option>)}
         </select>
@@ -53,16 +74,16 @@ export function BrazilianLocationFields({ state, city, onStateChange, onCityChan
       </div>
     </div>
     <div>
-      <label className="block text-xs font-bold text-stone-800 mb-1">Cidade / Oriente</label>
+      <label className={labelClass} htmlFor="loc-city">{member ? 'Cidade' : 'Cidade / Oriente'}</label>
       <div className="relative">
-        <select value={city} disabled={!state || loadingCities} onChange={(event) => onCityChange(event.target.value)} className="w-full px-3 py-2 border border-stone-300 rounded-xl text-xs text-stone-900 bg-stone-50 outline-none focus:ring-2 focus:ring-amber-900 disabled:opacity-60">
+        <select id="loc-city" value={city} disabled={!state || loadingCities} required={member} onChange={(event) => onCityChange(event.target.value)} className={selectClass}>
           <option value="">{state ? 'Selecione a cidade' : 'Selecione primeiro o estado'}</option>
-          {city && !cities.some((item) => item.name === city) && <option value={city}>{city}</option>}
+          {!member && city && !cities.some((item) => item.name === city) && <option value={city}>{city}</option>}
           {cities.map((item) => <option key={item.ibge_code} value={item.name}>{item.name}</option>)}
         </select>
         {loadingCities && <Loader2 className="absolute right-3 top-2.5 h-3.5 w-3.5 animate-spin text-stone-500" />}
       </div>
     </div>
-    {error && <p className="md:col-span-3 text-xs font-semibold text-red-700">{error}</p>}
+    {error && <p className={`${member ? 'sm:col-span-2' : 'md:col-span-3'} text-xs font-semibold text-red-700`}>{error}</p>}
   </>;
 }

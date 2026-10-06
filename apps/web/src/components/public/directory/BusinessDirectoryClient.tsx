@@ -11,6 +11,7 @@ import { BusinessListCard } from './BusinessListCard';
 import { BusinessMapView } from './BusinessMapView';
 import { DirectoryPagination } from './DirectoryPagination';
 import { GEO_COOKIE, parseGeoCookie } from '@/lib/directory/business-filters';
+import { createClient } from '@/lib/supabase/client';
 
 type BusinessDirectoryClientProps = {
   initialFilters: FilterState;
@@ -95,6 +96,28 @@ export function BusinessDirectoryClient({
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [locationBusy, setLocationBusy] = useState(false);
   const [locationError, setLocationError] = useState('');
+  const [responsibles, setResponsibles] = useState<Record<string, { name?: string; community_label?: string; organization?: string }>>({});
+
+  // Modo lista: busca, em uma única chamada, o responsável e a loja das empresas da página (dados já públicos no perfil).
+  const listSlugsKey = viewMode === 'list' ? businessItems.map((item) => item.slug).join(',') : '';
+  React.useEffect(() => {
+    if (!listSlugsKey) return;
+    let active = true;
+    void (async () => {
+      try {
+        const { data } = await (createClient() as any).rpc('public_business_responsibles', {
+          p_host: window.location.host,
+          p_slugs: listSlugsKey.split(','),
+        });
+        if (active && data && typeof data === 'object') setResponsibles(data);
+      } catch {
+        // Sem o responsável, o cartão continua completo.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [listSlugsKey]);
 
   // Sincroniza filtros locais quando props/URL forem atualizadas
   React.useEffect(() => {
@@ -307,9 +330,20 @@ export function BusinessDirectoryClient({
             <BusinessMapView items={businessItems} />
           ) : viewMode === 'list' ? (
             <div className="space-y-4">
-              {businessItems.map((biz) => (
-                <BusinessListCard key={biz.id} data={biz} />
-              ))}
+              {businessItems.map((biz) => {
+                const info = responsibles[biz.slug];
+                return (
+                  <BusinessListCard
+                    key={biz.id}
+                    data={{
+                      ...biz,
+                      responsible_name: info?.name ?? null,
+                      responsible_label: info?.community_label ?? null,
+                      responsible_lodge: info?.organization ?? null,
+                    }}
+                  />
+                );
+              })}
             </div>
           ) : (
             /* Modo Grade (3 colunas no desktop) */

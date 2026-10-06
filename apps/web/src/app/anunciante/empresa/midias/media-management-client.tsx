@@ -1,6 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import type { ChangeRequestItem } from '@/lib/advertiser/change-requests-service';
+import { PendingChangesNotice } from '@/components/advertiser/PendingChangesNotice';
+import { ImageFramingModal } from '@/components/advertiser/ImageFramingModal';
+import type { FramingKind } from '@/lib/media/image-framing';
 import Link from 'next/link';
 import {
   Image as ImageIcon,
@@ -12,7 +17,6 @@ import {
   Eye,
   CheckCircle2,
   AlertCircle,
-  Loader2,
   Sparkles,
   Award,
   ArrowRight,
@@ -25,129 +29,89 @@ import {
   updateAdvertiserMediaAction,
   uploadAdvertiserAssetAction,
 } from '@/lib/advertiser/advertiser-profile-service';
-import { optimizeImageForUpload } from '@/lib/media/optimize-image';
 
-export default function AdvertiserMediaManagementClient({ data }: { data: AdvertiserProfileDTO }) {
+export default function AdvertiserMediaManagementClient({
+  data,
+  requests,
+}: {
+  data: AdvertiserProfileDTO;
+  requests: { pending: ChangeRequestItem[]; recent: ChangeRequestItem[] };
+}) {
   const { business, quotas, gallery_photos: initialGallery } = data;
+  const router = useRouter();
+  const mediaTypes = ['logo', 'cover', 'gallery', 'video'];
 
-  const [logoUrl, setLogoUrl] = useState(business.logo_url || '/logoconexao_red_vert.png');
-  const [coverUrl, setCoverUrl] = useState(business.cover_url || '/capa-padrao.jpg');
+  const [logoUrl] = useState(business.logo_url || '/logoconexao_red_vert.png');
+  const [coverUrl] = useState(business.cover_url || '/capa-padrao.jpg');
   const [gallery, setGallery] = useState<AdvertiserMediaItem[]>(initialGallery);
   const [videoUrl, setVideoUrl] = useState(data.business_video?.url || '');
   const [hasVideo, setHasVideo] = useState(Boolean(data.business_video));
   const [savingVideo, setSavingVideo] = useState(false);
 
-  const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [uploadingCover, setUploadingCover] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [newPhotoTitle, setNewPhotoTitle] = useState('');
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Enquadramento (zoom, posição, ajuste e fundo) antes de enviar: igual ao Prontuário 360.
+  const [framing, setFraming] = useState<{ kind: FramingKind; source: File | string; title: string } | null>(null);
 
-    setUploadingLogo(true);
-    setFeedback(null);
-
-    try {
-      const optimizedFile = await optimizeImageForUpload(file, { maxBytes: 4.5 * 1024 * 1024, maxDimension: 1400 });
-      const formData = new FormData();
-      formData.append('file', optimizedFile);
-      formData.append('businessId', business.id);
-      formData.append('assetType', 'logo');
-
-      const res = await uploadAdvertiserAssetAction(formData);
-
-      if (res.success && res.url) {
-        setLogoUrl(res.url);
-        setFeedback({ type: 'success', message: 'Logotipo atualizado e salvo no Storage com sucesso.' });
-      } else {
-        setFeedback({ type: 'error', message: res.message || 'Falha ao atualizar logotipo.' });
-      }
-    } catch (err: any) {
-      setFeedback({ type: 'error', message: 'Erro ao processar upload de logotipo.' });
-    } finally {
-      setUploadingLogo(false);
-    }
+  const FRAMING_TITLE: Record<FramingKind, string> = {
+    logo: 'Ajustar logomarca',
+    cover: 'Ajustar imagem de capa',
+    gallery: 'Ajustar foto da galeria',
   };
 
-  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadingCover(true);
+  const openFraming = (kind: FramingKind, source: File | string) => {
     setFeedback(null);
-
-    try {
-      const optimizedFile = await optimizeImageForUpload(file, { maxBytes: 4.5 * 1024 * 1024, maxDimension: 2400 });
-      const formData = new FormData();
-      formData.append('file', optimizedFile);
-      formData.append('businessId', business.id);
-      formData.append('assetType', 'cover');
-
-      const res = await uploadAdvertiserAssetAction(formData);
-
-      if (res.success && res.url) {
-        setCoverUrl(res.url);
-        setFeedback({ type: 'success', message: 'Imagem de capa atualizada e salva no Storage com sucesso.' });
-      } else {
-        setFeedback({ type: 'error', message: res.message || 'Falha ao atualizar capa.' });
-      }
-    } catch (err: any) {
-      setFeedback({ type: 'error', message: 'Erro ao processar upload de capa.' });
-    } finally {
-      setUploadingCover(false);
-    }
+    setFraming({ kind, source, title: FRAMING_TITLE[kind] });
   };
 
-  const handleAddGalleryPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const pickFile = (kind: FramingKind) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = ''; // permite escolher o mesmo arquivo de novo
     if (!file) return;
-
-    if (gallery.length >= quotas.photos_limit) {
-      setFeedback({
-        type: 'error',
-        message: `Você utilizou todas as ${quotas.photos_limit} fotos disponíveis no seu plano.`,
-      });
+    if (!file.type.startsWith('image/')) {
+      setFeedback({ type: 'error', message: 'Selecione um arquivo de imagem (JPG, PNG ou WebP).' });
       return;
     }
-
-    setUploadingPhoto(true);
-    setFeedback(null);
-
-    try {
-      const optimizedFile = await optimizeImageForUpload(file, { maxBytes: 4.5 * 1024 * 1024, maxDimension: 2200 });
-      const formData = new FormData();
-      formData.append('file', optimizedFile);
-      formData.append('businessId', business.id);
-      formData.append('assetType', 'gallery');
-      if (newPhotoTitle) formData.append('title', newPhotoTitle);
-
-      const res = await uploadAdvertiserAssetAction(formData);
-
-      if (res.success && res.url) {
-        const newPhoto: AdvertiserMediaItem = {
-          id: `photo-${Date.now()}`,
-          url: res.url,
-          title: newPhotoTitle || `Foto ${gallery.length + 1}`,
-          display_order: gallery.length + 1,
-        };
-        setGallery((prev) => [...prev, newPhoto]);
-        setNewPhotoTitle('');
-        setFeedback({ type: 'success', message: 'Foto adicionada à galeria e salva no Storage com sucesso.' });
-      } else {
-        setFeedback({ type: 'error', message: res.message || 'Falha ao adicionar foto.' });
-      }
-    } catch (err: any) {
-      setFeedback({ type: 'error', message: 'Erro ao enviar foto para a galeria.' });
-    } finally {
-      setUploadingPhoto(false);
+    if (file.size > 15 * 1024 * 1024) {
+      setFeedback({ type: 'error', message: 'A imagem excede 15 MB. Escolha um arquivo menor.' });
+      return;
     }
+    if (kind === 'gallery' && gallery.length + pendingGallery >= quotas.photos_limit) {
+      setFeedback({ type: 'error', message: `Você utilizou todas as ${quotas.photos_limit} fotos disponíveis no seu plano.` });
+      return;
+    }
+    openFraming(kind, file);
   };
+
+  const handleLogoChange = pickFile('logo');
+  const handleCoverChange = pickFile('cover');
+  const handleAddGalleryPhoto = pickFile('gallery');
+
+  /** Recebe a imagem já enquadrada e envia. Devolve o erro (o editor continua aberto) ou nada (fecha). */
+  const submitFramed = async (file: File): Promise<string | void> => {
+    if (!framing) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('businessId', business.id);
+    formData.append('assetType', framing.kind);
+    if (framing.kind === 'gallery' && newPhotoTitle) formData.append('title', newPhotoTitle);
+
+    const res = await uploadAdvertiserAssetAction(formData);
+    if (!res.success) return res.message || 'Não foi possível enviar a imagem.';
+
+    // Fica em análise; o que está publicado continua sendo exibido até a aprovação.
+    if (framing.kind === 'gallery') setNewPhotoTitle('');
+    setFeedback({ type: 'success', message: res.message });
+    setFraming(null);
+    router.refresh();
+  };
+
+  const hasRealLogo = Boolean(business.logo_url) && !/logofallback|logoconexao/i.test(business.logo_url ?? '');
+  const hasRealCover = Boolean(business.cover_url) && !/capafallback|capa-padrao/i.test(business.cover_url ?? '');
 
   const handleDeletePhoto = async (photoId: string) => {
     setGallery(gallery.filter((p) => p.id !== photoId));
@@ -165,16 +129,20 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
     updated[newIdx] = temp;
 
     setGallery(updated);
-    setFeedback({ type: 'success', message: 'Ordem das fotos atualizada.' });
+    void updateAdvertiserMediaAction(business.id, 'gallery_reorder', { order: updated.map((photo) => photo.id) }).then((result) => {
+      setFeedback({ type: result.success ? 'success' : 'error', message: result.success ? 'Ordem das fotos atualizada.' : result.message });
+    });
   };
 
-  const isQuotaFull = gallery.length >= quotas.photos_limit;
+  const pendingGallery = requests.pending.filter((r) => r.entityType === 'gallery').length;
+  const isQuotaFull = gallery.length + pendingGallery >= quotas.photos_limit;
 
   const handleSaveVideo = async () => {
     setSavingVideo(true);
     const result = await updateAdvertiserMediaAction(business.id, 'video_set', { url: videoUrl });
-    if (result.success) setHasVideo(true);
+    // O vídeo novo fica em análise: o que está publicado não muda até a aprovação.
     setFeedback({ type: result.success ? 'success' : 'error', message: result.message });
+    if (result.success) router.refresh();
     setSavingVideo(false);
   };
 
@@ -189,6 +157,18 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
 
   return (
     <div className="space-y-6 text-left">
+      {framing && (
+        <ImageFramingModal
+          kind={framing.kind}
+          source={framing.source}
+          title={framing.title}
+          onConfirm={submitFramed}
+          onCancel={() => setFraming(null)}
+        />
+      )}
+
+      <PendingChangesNotice pending={requests.pending.filter((r) => mediaTypes.includes(r.entityType))} recent={requests.recent.filter((r) => mediaTypes.includes(r.entityType))} />
+
       {/* HEADER DA TELA & PRÉ-VISUALIZAÇÃO */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-4">
         <div>
@@ -246,12 +226,6 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
                 alt="Logotipo da Empresa"
                 className="max-w-full max-h-full object-contain"
               />
-              {uploadingLogo && (
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center text-amber-300 text-xs font-bold gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Enviando...</span>
-                </div>
-              )}
             </div>
 
             <div className="space-y-2">
@@ -267,9 +241,17 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
                   accept="image/png,image/jpeg,image/webp"
                   className="hidden"
                   onChange={handleLogoChange}
-                  disabled={uploadingLogo}
                 />
               </label>
+              {hasRealLogo && (
+                <button
+                  type="button"
+                  onClick={() => openFraming('logo', logoUrl)}
+                  className="ml-2 inline-flex min-h-9 items-center gap-2 rounded-xl border border-stone-300 px-3 text-xs font-bold text-stone-700 hover:bg-stone-50"
+                >
+                  Ajustar a logo atual
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -287,12 +269,6 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
                 alt="Capa da Empresa"
                 className="w-full h-full object-cover"
               />
-              {uploadingCover && (
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center text-amber-300 text-xs font-bold gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Enviando Capa...</span>
-                </div>
-              )}
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
@@ -308,9 +284,17 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
                   accept="image/png,image/jpeg,image/webp"
                   className="hidden"
                   onChange={handleCoverChange}
-                  disabled={uploadingCover}
                 />
               </label>
+              {hasRealCover && (
+                <button
+                  type="button"
+                  onClick={() => openFraming('cover', coverUrl)}
+                  className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-xl border border-stone-300 px-3 text-xs font-bold text-stone-700 hover:bg-stone-50"
+                >
+                  Ajustar a capa atual
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -350,18 +334,13 @@ export default function AdvertiserMediaManagementClient({ data }: { data: Advert
                 className="px-3 py-1.5 bg-stone-50 border border-stone-200 rounded-xl text-xs focus:outline-none focus:border-[#C9A227]"
               />
               <label className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-xl cursor-pointer transition-colors flex items-center gap-1.5 shrink-0">
-                {uploadingPhoto ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
-                ) : (
-                  <Upload className="w-4 h-4 text-amber-400" />
-                )}
+                <Upload className="w-4 h-4 text-amber-400" />
                 <span>Adicionar Foto</span>
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
                   className="hidden"
                   onChange={handleAddGalleryPhoto}
-                  disabled={uploadingPhoto}
                 />
               </label>
             </div>

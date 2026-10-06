@@ -4,61 +4,71 @@ import React, { useState } from 'react';
 import { Menu, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { AdvertiserSidebar } from '@/components/advertiser/AdvertiserSidebar';
+import type { AdvertiserFeatures } from '@/lib/advertiser/advertiser-entitlements';
+import { resolvePortalTheme, type PortalBrandInput } from '@/lib/tenant/portal-theme';
 
 interface AdvertiserLayoutWrapperProps {
   children: React.ReactNode;
-  businessName?: string;
-  businessSlug?: string;
+  businessName: string;
+  businessSlug: string;
+  features: AdvertiserFeatures | null;
+  unreadCount: number;
+  brand: PortalBrandInput;
 }
 
-export function AdvertiserLayoutWrapper({
-  children,
-  businessName = 'Minha Empresa',
-  businessSlug = '',
-}: AdvertiserLayoutWrapperProps) {
+export function AdvertiserLayoutWrapper({ children, businessName, businessSlug, features, unreadCount, brand }: AdvertiserLayoutWrapperProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const theme = resolvePortalTheme(brand);
 
   return (
-    <div className="min-h-screen bg-[#FDFBF7] text-[#1f1914] flex flex-col md:flex-row font-sans">
-      {/* SIDEBAR DO ANUNCIANTE */}
+    <div className="flex min-h-screen flex-col bg-[#FDFBF7] font-sans text-[#1f1914] md:flex-row" style={theme.vars as React.CSSProperties}>
       <AdvertiserSidebar
         isMobileOpen={isMobileMenuOpen}
         onMobileClose={() => setIsMobileMenuOpen(false)}
         businessName={businessName}
         businessSlug={businessSlug}
+        unreadNotificationsCount={unreadCount}
+        features={features}
+        brandLogo={theme.logo}
+        brandName={brand.name}
+        brandOnDark={theme.onDark}
       />
 
-      {/* ÁREA PRINCIPAL */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* HEADER MOBILE (390px) */}
-        <header className="md:hidden bg-[#1A1612] text-stone-100 px-4 py-3 border-b border-[#C9A227]/30 flex items-center justify-between sticky top-0 z-20">
-          <div className="flex items-center gap-3">
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* CABEÇALHO DO CELULAR: logomarca do tenant + atalhos */}
+        <header
+          className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-[#C9A227]/30 px-4 py-2.5 text-stone-100 md:hidden"
+          style={{ background: 'var(--member-primary)' }}
+        >
+          <div className="flex min-w-0 items-center gap-2">
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(true)}
-              className="p-2 text-stone-300 hover:text-white rounded-lg hover:bg-stone-800"
+              aria-label="Abrir menu"
+              aria-expanded={isMobileMenuOpen}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[#F9F6F0] hover:bg-white/10"
             >
-              <Menu className="w-5 h-5 text-[#C9A227]" />
+              <Menu className="h-5 w-5" />
             </button>
-            <span className="font-serif font-bold text-sm text-[#F9F6F0] truncate max-w-[180px]">
-              Portal do Anunciante
-            </span>
+            {theme.logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={theme.logo} alt={`Logomarca ${brand.name}`} className="h-8 w-auto max-w-[9rem] object-contain object-left" />
+            ) : (
+              <span className="truncate font-serif text-sm font-bold text-[#F9F6F0]">{brand.name}</span>
+            )}
           </div>
 
           <Link
             href={`/guia/${businessSlug}`}
             target="_blank"
-            className="p-1.5 bg-[#3B0B14] text-[#C9A227] rounded-lg border border-[#C9A227]/40 text-xs font-bold flex items-center gap-1"
+            className="flex min-h-10 shrink-0 items-center gap-1 rounded-lg border border-[#C9A227]/50 bg-black/20 px-3 text-xs font-bold text-[#C9A227]"
           >
-            <Eye className="w-3.5 h-3.5" />
-            <span className="text-[11px]">Guia</span>
+            <Eye className="h-3.5 w-3.5" />
+            <span>Meu anúncio</span>
           </Link>
         </header>
 
-        {/* CONTEÚDO DA PÁGINA */}
-        <main className="flex-1 p-4 md:p-8 max-w-6xl w-full mx-auto space-y-6">
-          {children}
-        </main>
+        <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 p-4 sm:p-6 md:p-8">{children}</main>
       </div>
     </div>
   );

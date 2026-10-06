@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
-import { trackSearchImpressionsAction } from '@/lib/analytics/analytics-service';
 
 const SEEN_KEY = 'cm_seen_impressions_v1';
 const FLUSH_MS = 2000;
@@ -30,11 +29,30 @@ function persistSeen() {
   }
 }
 
+/** Envia o lote com sendBeacon/keepalive: sobrevive ao clique que troca de página. */
 function flush() {
-  timer = null;
+  if (timer) {
+    clearTimeout(timer);
+    timer = null;
+  }
   const batch = queue;
   queue = [];
-  if (batch.length > 0) void trackSearchImpressionsAction(batch);
+  if (batch.length === 0) return;
+  try {
+    const body = JSON.stringify({ eventType: 'search_impression', businessIds: batch, source: 'directory_list' });
+    if (typeof navigator.sendBeacon === 'function' && navigator.sendBeacon('/api/analytics/track', new Blob([body], { type: 'application/json' }))) return;
+    void fetch('/api/analytics/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => undefined);
+  } catch {
+    // Telemetria não pode quebrar a página.
+  }
+}
+
+if (typeof window !== 'undefined') {
+  // Ao sair ou esconder a aba, o que estiver na fila é enviado na hora.
+  window.addEventListener('pagehide', flush);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flush();
+  });
 }
 
 function enqueue(businessId: string) {

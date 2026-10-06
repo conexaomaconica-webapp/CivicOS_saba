@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import type { ChangeRequestItem } from '@/lib/advertiser/change-requests-service';
+import { PendingChangesNotice } from '@/components/advertiser/PendingChangesNotice';
 import Link from 'next/link';
 import {
   Award,
@@ -20,7 +22,13 @@ import {
   saveAdvertiserBenefitAction,
 } from '@/lib/advertiser/advertiser-content-service';
 
-export default function AdvertiserBenefitsClient({ data }: { data: AdvertiserContentDTO }) {
+export default function AdvertiserBenefitsClient({
+  data,
+  requests,
+}: {
+  data: AdvertiserContentDTO;
+  requests: { pending: ChangeRequestItem[]; recent: ChangeRequestItem[] };
+}) {
   const { business, quotas, benefits: initialBenefits } = data;
   const [benefits, setBenefits] = useState<AdvertiserBenefitItem[]>(initialBenefits);
 
@@ -116,6 +124,8 @@ export default function AdvertiserBenefitsClient({ data }: { data: AdvertiserCon
 
   return (
     <div className="space-y-6 text-left">
+      <PendingChangesNotice pending={requests.pending.filter((r) => r.entityType === 'benefit')} recent={requests.recent.filter((r) => r.entityType === 'benefit')} />
+
       {/* HEADER DA TELA & BOTÃO ADICIONAR */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-4">
         <div>

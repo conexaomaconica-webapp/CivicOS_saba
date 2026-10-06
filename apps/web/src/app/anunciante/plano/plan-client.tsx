@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   CreditCard,
   ShieldCheck,
@@ -17,19 +18,25 @@ import {
   requestPlanUpgradeAction,
 } from '@/lib/advertiser/advertiser-billing-service';
 
-export default function AdvertiserPlanClient({ data }: { data: AdvertiserPlanBillingDTO }) {
+export default function AdvertiserPlanClient({
+  data,
+  limits,
+}: {
+  data: AdvertiserPlanBillingDTO;
+  limits?: { photos: number; services: number; benefits: number; events: number; posts: number; videos: number } | null;
+}) {
   const { plan, is_empty, business } = data;
   const [requestingUpgrade, setRequestingUpgrade] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const router = useRouter();
+  const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
 
   const handleUpgradeRequest = async (targetCode: string) => {
     setRequestingUpgrade(true);
     setFeedback(null);
     const res = await requestPlanUpgradeAction(targetCode);
     setRequestingUpgrade(false);
-    if (res.success) {
-      setFeedback(res.message);
-    }
+    setFeedback({ ok: res.success, text: res.message });
+    if (res.success) router.refresh();
   };
 
   const formatBRL = (cents?: number) =>
@@ -92,9 +99,12 @@ export default function AdvertiserPlanClient({ data }: { data: AdvertiserPlanBil
 
       {/* FEEDBACK DE UPGRADE */}
       {feedback && (
-        <div className="p-4 rounded-2xl border text-xs flex items-center gap-3 bg-emerald-50 border-emerald-200 text-emerald-900">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-          <span className="font-medium">{feedback}</span>
+        <div
+          className={`p-4 rounded-2xl border text-xs flex items-center gap-3 ${feedback.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}
+          role={feedback.ok ? 'status' : 'alert'}
+        >
+          {feedback.ok ? <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" /> : <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />}
+          <span className="font-medium">{feedback.text}</span>
         </div>
       )}
 
@@ -133,28 +143,62 @@ export default function AdvertiserPlanClient({ data }: { data: AdvertiserPlanBil
         </div>
       </div>
 
-      {/* RECOMENDAÇÃO DE ALTERAÇÃO/UPGRADE */}
-      {plan.code !== 'ouro' && (
+      {/* O QUE O PLANO INCLUI (cadastro do plano em /admin/planos + cotas reais) */}
+      <div className="p-6 bg-white border border-stone-200 rounded-3xl space-y-4 shadow-sm">
+        <h3 className="font-serif font-bold text-base text-stone-900">O que o seu plano inclui</h3>
+        <ul className="grid grid-cols-1 gap-2 text-xs text-stone-700 sm:grid-cols-2">
+          {plan.features.map((feature) => (
+            <li key={feature} className="flex items-start gap-2">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+        {limits && (
+          <div className="grid grid-cols-2 gap-3 border-t border-stone-100 pt-4 text-xs sm:grid-cols-4">
+            {[
+              ['Fotos na galeria', limits.photos],
+              ['Serviços', limits.services],
+              ['Ofertas', limits.benefits],
+              ['Eventos', limits.events],
+              ['Publicações', limits.posts],
+              ['Vídeo institucional', limits.videos],
+            ]
+              .filter(([, value]) => Number(value) > 0)
+              .map(([label, value]) => (
+                <div key={String(label)} className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+                  <span className="block text-stone-500">{label}</span>
+                  <strong className="font-mono text-base text-stone-900">até {value}</strong>
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+
+      {/* MUDANÇA DE PLANO */}
+      {plan.next_plan && (
         <div className="p-6 bg-white border border-stone-200 rounded-3xl space-y-4 shadow-sm">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-[#C9A227]" />
             <h3 className="font-serif font-bold text-base text-stone-900">Deseja expandir a visibilidade comercial?</h3>
           </div>
           <p className="text-xs text-stone-600 leading-relaxed">
-            Consulte nossa equipe comercial para realizar o upgrade de plano e liberar destaque máximo no Guia Maçônico.
+            O {plan.next_plan.name} libera mais recursos e cotas no Guia ({formatBRL(plan.next_plan.amount_cents)} por ano). O pedido vai para a nossa equipe comercial, que conclui a contratação com você.
           </p>
-          <button
-            type="button"
-            disabled={requestingUpgrade}
-            onClick={() => handleUpgradeRequest('ouro')}
-            className="px-4 py-2.5 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl border border-[#C9A227]/40 flex items-center gap-2 cursor-pointer"
-          >
-            {requestingUpgrade ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <span>Solicitar Upgrade para Plano Acácia</span>
-            )}
-          </button>
+          {plan.pending_upgrade ? (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+              Pedido para o {plan.pending_upgrade.target_name} em análise. Nossa equipe entrará em contato.
+            </p>
+          ) : (
+            <button
+              type="button"
+              disabled={requestingUpgrade}
+              onClick={() => handleUpgradeRequest(plan.next_plan!.code)}
+              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-[#C9A227]/40 bg-[#3B0B14] px-4 py-2.5 text-xs font-bold text-[#C9A227] hover:bg-[#4B161B] disabled:opacity-60"
+            >
+              {requestingUpgrade ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Solicitar upgrade para o {plan.next_plan.name}</span>}
+            </button>
+          )}
         </div>
       )}
     </div>

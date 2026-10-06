@@ -50,6 +50,7 @@ import {
   togglePublicationStatusAction,
   toggleRecognitionAction,
   updateAdminBusinessDetailsAction,
+  locateBusinessAddressAction,
   verifyAdminMasonicLinkAction,
   upsertAdminMasonicLinkAction,
   manageAdminServiceAction,
@@ -144,6 +145,41 @@ export default function Company360Client({ initialData }: Props) {
   const [locationOptions, setLocationOptions] = useState<Array<{ city: string; state: string }>>([]);
   const [loadingLocations, setLoadingLocations] = useState(true);
   const [address, setAddress] = useState(data.business.address || '');
+  // Localização no mapa do Guia: coordenadas como texto (aceita vírgula), preenchidas pelo botão "Localizar" ou à mão.
+  const [latitudeText, setLatitudeText] = useState(data.business.latitude != null ? String(data.business.latitude) : '');
+  const [longitudeText, setLongitudeText] = useState(data.business.longitude != null ? String(data.business.longitude) : '');
+  const [locating, setLocating] = useState(false);
+  const [locationHint, setLocationHint] = useState<{ ok: boolean; text: string } | null>(null);
+  const parseCoordinate = (value: string) => {
+    const parsed = Number(value.replace(',', '.').trim());
+    return value.trim() !== '' && Number.isFinite(parsed) ? parsed : undefined;
+  };
+  const handleLocate = async () => {
+    setLocating(true);
+    setLocationHint(null);
+    const res = await locateBusinessAddressAction({
+      address,
+      number: data.business.number,
+      neighborhood: data.business.neighborhood,
+      postal_code: data.business.postal_code,
+      city,
+      state,
+    });
+    setLocating(false);
+    if (res.success && res.latitude != null && res.longitude != null) {
+      setLatitudeText(String(res.latitude));
+      setLongitudeText(String(res.longitude));
+      const approximate = res.precision === 'postal_code' || res.precision === 'city';
+      setLocationHint({
+        ok: !approximate,
+        text: approximate
+          ? `Localizada por ${res.precision === 'city' ? 'cidade' : 'CEP'} (posição aproximada). Confira e ajuste as coordenadas se necessário, depois salve.`
+          : 'Localizada pelo endereço. Confira o ponto no mapa e salve.',
+      });
+    } else {
+      setLocationHint({ ok: false, text: res.error || 'Não foi possível localizar.' });
+    }
+  };
   const [description, setDescription] = useState(data.business.description || '');
 
   // Form States para Dados do Empresário / Anunciante Responsável
@@ -724,6 +760,11 @@ export default function Company360Client({ initialData }: Props) {
         city,
         state,
         address,
+        latitude: parseCoordinate(latitudeText),
+        longitude: parseCoordinate(longitudeText),
+        number: data.business.number,
+        neighborhood: data.business.neighborhood,
+        postal_code: data.business.postal_code,
         description,
         responsible_name: respName,
         responsible_role: respRole,
@@ -2280,6 +2321,60 @@ export default function Company360Client({ initialData }: Props) {
                   onChange={(e) => setAddress(e.target.value)}
                   className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
                 />
+              </div>
+
+              <div className="md:col-span-2 rounded-xl border border-stone-200 bg-stone-50/60 p-3 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="block font-bold text-stone-800">Localização no mapa do Guia</span>
+                  <button
+                    type="button"
+                    onClick={handleLocate}
+                    disabled={locating || !city || !state}
+                    className="px-3 py-1.5 rounded-lg bg-[#3B0B14] text-[#C9A227] font-bold text-xs disabled:opacity-50"
+                  >
+                    {locating ? 'Localizando…' : 'Localizar pelo endereço'}
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block text-stone-700 font-semibold">
+                    Latitude
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={latitudeText}
+                      onChange={(e) => setLatitudeText(e.target.value)}
+                      placeholder="-12.2740977"
+                      className="mt-1 w-full px-3 py-2 border border-stone-300 rounded-xl bg-white text-stone-900 font-normal outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                    />
+                  </label>
+                  <label className="block text-stone-700 font-semibold">
+                    Longitude
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={longitudeText}
+                      onChange={(e) => setLongitudeText(e.target.value)}
+                      placeholder="-38.9594723"
+                      className="mt-1 w-full px-3 py-2 border border-stone-300 rounded-xl bg-white text-stone-900 font-normal outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                    />
+                  </label>
+                </div>
+                {locationHint && (
+                  <p className={`text-xs font-semibold ${locationHint.ok ? 'text-emerald-700' : 'text-amber-800'}`}>{locationHint.text}</p>
+                )}
+                {parseCoordinate(latitudeText) !== undefined && parseCoordinate(longitudeText) !== undefined && (
+                  <a
+                    href={`https://www.google.com/maps?q=${parseCoordinate(latitudeText)},${parseCoordinate(longitudeText)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block text-xs font-bold text-[#3B0B14] underline"
+                  >
+                    Ver este ponto no Google Maps
+                  </a>
+                )}
+                <p className="text-[11px] text-stone-500">
+                  Sem coordenadas, a empresa não aparece no mapa. Se o endereço não for encontrado, o sistema usa o CEP e, por fim, a cidade (posição aproximada). Para o ponto exato, cole aqui a latitude e a longitude do Google Maps (botão direito no local).
+                </p>
               </div>
 
               <div className="md:col-span-2">

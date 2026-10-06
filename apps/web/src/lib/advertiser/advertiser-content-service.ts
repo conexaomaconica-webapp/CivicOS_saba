@@ -1,6 +1,11 @@
 'use server';
 
 import { createServerSideClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
+import { findOwnBusinessById } from '@/lib/advertiser/advertiser-access';
+import { submitBusinessChangeRequest } from '@/lib/advertiser/change-requests';
+import { findAdvertiserBusiness } from '@/lib/advertiser/advertiser-access';
+import { checkAdvertiserQuotaAction } from '@/lib/advertiser/advertiser-entitlements';
 
 export type ContentStatus = 'published' | 'under_review' | 'draft' | 'inactive' | 'expired';
 
@@ -137,18 +142,18 @@ export async function getAdvertiserContentDataAction(): Promise<AdvertiserConten
   }
 
   // 1. Resolve a empresa do usuário autenticado
-  const { data: b, error: bizError } = await supabase
-    .from('businesses')
-    .select('id, name, slug, tenant_id')
-    .eq('owner_id', userRes.user.id)
-    .maybeSingle();
+  const b = await findAdvertiserBusiness(supabase, userRes.user.id);
 
-  if (bizError || !b) {
+  if (!b) {
     throw new Error('Nenhuma empresa encontrada para a conta de anunciante conectada.');
   }
 
   const businessId = b.id;
   const tenantId = b.tenant_id;
+
+  // Empresa já confirmada como do usuário logado: a leitura do conteúdo dela não depende de políticas por tabela
+  // que escondiam registros de donos sem vínculo em business_members.
+  const reader: any = createServiceRoleClient() ?? supabase;
 
   // 2. Resolve plano efetivo via _effective_business_plan
   const { data: effPlan } = await supabase.rpc('_effective_business_plan', {
@@ -171,7 +176,7 @@ export async function getAdvertiserContentDataAction(): Promise<AdvertiserConten
   });
 
   // 4. Carrega serviços reais do Postgres
-  const { data: dbServices, error: errServices } = await (supabase as any)
+  const { data: dbServices, error: errServices } = await reader
     .from('business_services')
     .select('id, name, description, icon_name, price_info, is_active')
     .eq('tenant_id', tenantId)
@@ -183,7 +188,7 @@ export async function getAdvertiserContentDataAction(): Promise<AdvertiserConten
   }
 
   // 5. Carrega benefícios reais do Postgres (excluindo arquivados)
-  const { data: rawDbBenefits, error: errBenefits } = await (supabase as any)
+  const { data: rawDbBenefits, error: errBenefits } = await reader
     .from('business_benefits')
     .select('id, title, description, benefit_type, discount_percentage, discount_amount, discount_code, redeem_instructions, valid_until, is_active, status, archived_at')
     .eq('tenant_id', tenantId)
@@ -197,7 +202,7 @@ export async function getAdvertiserContentDataAction(): Promise<AdvertiserConten
   }
 
   // 6. Carrega eventos reais do Postgres
-  const { data: dbEvents, error: errEvents } = await (supabase as any)
+  const { data: dbEvents, error: errEvents } = await reader
     .from('business_events')
     .select('id, title, description, starts_at, location_name, cover_image_url, external_ticket_url, is_active, publication_status')
     .eq('tenant_id', tenantId)
@@ -209,7 +214,7 @@ export async function getAdvertiserContentDataAction(): Promise<AdvertiserConten
   }
 
   // 7. Carrega posts reais do Postgres
-  const { data: dbPosts, error: errPosts } = await (supabase as any)
+  const { data: dbPosts, error: errPosts } = await reader
     .from('business_posts')
     .select('id, title, content, cover_image_url, published_at, is_active, publication_status')
     .eq('tenant_id', tenantId)
@@ -315,23 +320,35 @@ export async function getAdvertiserContentDataAction(): Promise<AdvertiserConten
 // ----------------------------------------------------------------------
 // SERVER ACTIONS: SERVIÇOS
 // ----------------------------------------------------------------------
+/** Troca mensagens técnicas do banco por um texto que o anunciante entende. */
+function friendlyDbError(message: string): string {
+  if (/row-level security|permission denied/i.test(message)) {
+    return 'Sem permissão para salvar nesta empresa. Entre com a conta responsável pela empresa ou fale com o suporte.';
+  }
+  return message || 'Não foi possível salvar agora. Tente novamente.';
+}
+
 export async function saveAdvertiserServiceAction(
   service: Partial<AdvertiserServiceItem> & { business_id: string }
 ): Promise<{ success: boolean; message: string }> {
   try {
     const supabase = await createServerSideClient();
-    const { data: biz, error: bizErr } = await supabase
-      .from('businesses')
-      .select('tenant_id')
-      .eq('id', service.business_id)
-      .single();
-
-    if (bizErr || !biz) {
+    // Autorização explícita (dono/equipe da empresa) e escrita com a chave de serviço, sem depender de políticas por tabela.
+    const biz = await findOwnBusinessById(supabase, service.business_id);
+    if (!biz) {
       return { success: false, message: 'Empresa não encontrada.' };
+    }
+    const writer: any = createServiceRoleClient() ?? supabase;
+
+    // Plano: o recurso precisa estar incluído e a cota não pode estar esgotada (vale também fora da interface).
+    if (!service.id) {
+      const { count: activeCount } = await writer.from('business_services').select('id', { count: 'exact', head: true }).eq('business_id', service.business_id).eq('is_active', true);
+      const quotaError = await checkAdvertiserQuotaAction('services', activeCount ?? 0);
+      if (quotaError) return { success: false, message: quotaError };
     }
 
     if (!service.id) {
-      const { error } = await (supabase as any)
+      const { error } = await writer
         .from('business_services')
         .insert({
           business_id: service.business_id,
@@ -346,7 +363,7 @@ export async function saveAdvertiserServiceAction(
         .single();
 
       if (error) {
-        return { success: false, message: error.message };
+        return { success: false, message: friendlyDbError(error.message) };
       }
 
       return {
@@ -355,7 +372,7 @@ export async function saveAdvertiserServiceAction(
       };
     }
 
-    const { error } = await (supabase as any)
+    const { error } = await writer
       .from('business_services')
       .update({
         name: (service.title || '').trim(),
@@ -368,7 +385,7 @@ export async function saveAdvertiserServiceAction(
       .eq('business_id', service.business_id);
 
     if (error) {
-      return { success: false, message: error.message };
+      return { success: false, message: friendlyDbError(error.message) };
     }
 
     return {
@@ -389,13 +406,30 @@ export async function toggleServiceActiveAction(
 ): Promise<{ success: boolean; message: string }> {
   try {
     const supabase = await createServerSideClient();
-    const { error } = await (supabase as any)
+    const { data: userRes } = await supabase.auth.getUser();
+    const own = userRes?.user ? await findAdvertiserBusiness(supabase, userRes.user.id) : null;
+    if (!own) return { success: false, message: 'Empresa do anunciante não localizada.' };
+    const writer: any = createServiceRoleClient() ?? supabase;
+
+    // Só serviços da própria empresa; reativar também respeita a cota do plano.
+    if (isActive) {
+      const { count: activeCount } = await writer
+        .from('business_services')
+        .select('id', { count: 'exact', head: true })
+        .eq('business_id', own.id)
+        .eq('is_active', true);
+      const quotaError = await checkAdvertiserQuotaAction('services', activeCount ?? 0);
+      if (quotaError) return { success: false, message: quotaError };
+    }
+
+    const { error } = await writer
       .from('business_services')
       .update({ is_active: isActive, updated_at: new Date().toISOString() })
-      .eq('id', serviceId);
+      .eq('id', serviceId)
+      .eq('business_id', own.id);
 
     if (error) {
-      return { success: false, message: error.message };
+      return { success: false, message: friendlyDbError(error.message) };
     }
 
     return {
@@ -428,45 +462,51 @@ export async function saveAdvertiserBenefitAction(
       return { success: false, message: 'Empresa não encontrada.' };
     }
 
+    // Plano: o recurso precisa estar incluído e a cota não pode estar esgotada (vale também fora da interface).
     if (!benefit.id) {
-      const { error } = await (supabase as any)
-        .from('business_benefits')
-        .insert({
-          business_id: benefit.business_id,
-          tenant_id: biz.tenant_id,
-          title: (benefit.title || '').trim(),
-          description: (benefit.description || '').trim(),
-          benefit_type: benefit.benefit_type || 'special_condition',
-          discount_code: benefit.promo_code || null,
-          redeem_instructions: benefit.rules || null,
-          is_active: true,
-        });
-
-      if (error) {
-        return { success: false, message: error.message };
-      }
-    } else {
-      const { error } = await (supabase as any)
-        .from('business_benefits')
-        .update({
-          title: (benefit.title || '').trim(),
-          description: (benefit.description || '').trim(),
-          benefit_type: benefit.benefit_type || 'special_condition',
-          discount_code: benefit.promo_code || null,
-          redeem_instructions: benefit.rules || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', benefit.id)
-        .eq('business_id', benefit.business_id);
-
-      if (error) {
-        return { success: false, message: error.message };
-      }
+      const { count: activeCount } = await (supabase as any).from('business_benefits').select('id', { count: 'exact', head: true }).eq('business_id', benefit.business_id).is('archived_at', null).in('status', ['scheduled', 'active', 'paused', 'exhausted']);
+      const quotaError = await checkAdvertiserQuotaAction('benefits', activeCount ?? 0);
+      if (quotaError) return { success: false, message: quotaError };
     }
+
+    // Benefícios e ofertas passam por validação da plataforma: a oferta só entra no Guia depois da aprovação,
+    // e a versão publicada de uma oferta existente continua no ar enquanto a alteração é analisada.
+    const title = (benefit.title || '').trim();
+    if (title.length < 3) return { success: false, message: 'Informe o título da oferta (mínimo de 3 caracteres).' };
+    const payload = {
+      title,
+      description: (benefit.description || '').trim(),
+      benefit_type: benefit.benefit_type || 'special_condition',
+      discount_code: (benefit.promo_code || '').trim() || null,
+      redeem_instructions: (benefit.rules || '').trim() || null,
+    };
+
+    let previous: Record<string, unknown> | null = null;
+    if (benefit.id) {
+      const { data: current } = await (supabase as any)
+        .from('business_benefits')
+        .select('title, description, benefit_type, discount_code, redeem_instructions')
+        .eq('id', benefit.id)
+        .eq('business_id', benefit.business_id)
+        .maybeSingle();
+      previous = current ?? null;
+    }
+
+    const submitted = await submitBusinessChangeRequest(supabase, {
+      businessId: benefit.business_id,
+      entityType: 'benefit',
+      entityId: benefit.id ?? null,
+      action: benefit.id ? 'update' : 'create',
+      payload,
+      previous,
+    });
+    if (!submitted.ok) return { success: false, message: submitted.message };
 
     return {
       success: true,
-      message: 'Oferta Fraterna salva com sucesso!',
+      message: benefit.id
+        ? 'Alteração da oferta enviada para validação da plataforma. A versão atual continua publicada até a aprovação.'
+        : 'Oferta enviada para validação da plataforma. Ela aparece no Guia assim que for aprovada.',
     };
   } catch (err: unknown) {
     return {
@@ -498,6 +538,7 @@ export async function saveAdvertiserEventAction(
     if (bizErr || !biz) {
       return { success: false, message: 'Empresa não encontrada.' };
     }
+
 
     const res = await createBusinessEventAction({
       id: event.id,
@@ -541,6 +582,7 @@ export async function saveAdvertiserPostAction(
     if (bizErr || !biz) {
       return { success: false, message: 'Empresa não encontrada.' };
     }
+
 
     const res = await createBusinessPostAction({
       id: post.id,

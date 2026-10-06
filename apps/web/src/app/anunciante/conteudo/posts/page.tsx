@@ -2,6 +2,8 @@ import React from 'react';
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { getAdvertiserContentDataAction } from '@/lib/advertiser/advertiser-content-service';
+import { getAdvertiserFeaturesAction } from '@/lib/advertiser/advertiser-entitlements';
+import { FeatureLockedNotice } from '@/components/advertiser/FeatureLockedNotice';
 import AdvertiserPostsClient from './posts-client';
 
 export const metadata = {
@@ -22,6 +24,9 @@ export default async function AdvertiserPostsPage() {
   if (!isUserAuthenticated) {
     redirect('/login?redirect=%2Fanunciante%2Fconteudo%2Fposts');
   }
+
+  const features = await getAdvertiserFeaturesAction();
+  if (features && !features.allows.posts) return <FeatureLockedNotice feature="Publicações" planName={features.planName} />;
 
   const dto = await getAdvertiserContentDataAction();
 

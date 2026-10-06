@@ -2,7 +2,10 @@ import React from 'react';
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { getAdvertiserPlanBillingDTOAction } from '@/lib/advertiser/advertiser-billing-service';
+import { getAdvertiserFeaturesAction } from '@/lib/advertiser/advertiser-entitlements';
 import AdvertiserPlanClient from './plan-client';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'Meu Plano & Assinatura · Portal do Anunciante | Conexão Maçônica',
@@ -23,7 +26,7 @@ export default async function AdvertiserPlanPage() {
     redirect('/login?redirect=%2Fanunciante%2Fplano');
   }
 
-  const dto = await getAdvertiserPlanBillingDTOAction();
+  const [dto, features] = await Promise.all([getAdvertiserPlanBillingDTOAction(), getAdvertiserFeaturesAction()]);
 
-  return <AdvertiserPlanClient data={dto} />;
+  return <AdvertiserPlanClient data={dto} limits={features?.limits ?? null} />;
 }

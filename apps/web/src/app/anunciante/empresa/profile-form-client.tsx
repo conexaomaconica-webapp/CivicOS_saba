@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { BrazilianLocationFields } from '@/components/admin/BrazilianLocationFields';
 import Link from 'next/link';
 import {
   Building2,
@@ -17,11 +19,35 @@ import {
 } from 'lucide-react';
 import {
   AdvertiserProfileDTO,
+  type AdvertiserHourRow,
   updateAdvertiserProfileFieldsAction,
 } from '@/lib/advertiser/advertiser-profile-service';
+import type { ChangeRequestItem } from '@/lib/advertiser/change-requests-service';
+import { PendingChangesNotice } from '@/components/advertiser/PendingChangesNotice';
 
-export default function AdvertiserProfileFormClient({ data }: { data: AdvertiserProfileDTO }) {
+const WEEK_DAYS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+// Segunda a domingo (a semana comercial começa na segunda).
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+/** Aviso nos campos que passam por validação da plataforma antes de publicar. */
+function ReviewTag() {
+  return <span className="font-mono text-[10px] font-bold text-amber-800">Passa por validação</span>;
+}
+
+export default function AdvertiserProfileFormClient({
+  data,
+  requests,
+  categories = [],
+}: {
+  data: AdvertiserProfileDTO;
+  requests: { pending: ChangeRequestItem[]; recent: ChangeRequestItem[] };
+  categories?: string[];
+}) {
   const { business } = data;
+  const router = useRouter();
+  const [hours, setHours] = useState<AdvertiserHourRow[]>(business.hours);
+  const setHour = (day: number, patch: Partial<AdvertiserHourRow>) =>
+    setHours((current) => current.map((row) => (row.day_of_week === day ? { ...row, ...patch } : row)));
 
   const [formData, setFormData] = useState({
     name: business.name || '',
@@ -39,7 +65,10 @@ export default function AdvertiserProfileFormClient({ data }: { data: Advertiser
     city: business.city || '',
     state: business.state || '',
     zip_code: business.zip_code || '',
-    business_hours: business.business_hours || '',
+    instagram: business.instagram || '',
+    facebook: business.facebook || '',
+    linkedin: business.linkedin || '',
+    youtube: business.youtube || '',
   });
 
   const [saving, setSaving] = useState(false);
@@ -53,20 +82,12 @@ export default function AdvertiserProfileFormClient({ data }: { data: Advertiser
     const res = await updateAdvertiserProfileFieldsAction({
       business_id: business.id,
       ...formData,
+      hours,
     });
 
     setSaving(false);
-    if (res.requiresReview) {
-      setFeedback({
-        type: 'info',
-        message: res.message,
-      });
-    } else {
-      setFeedback({
-        type: 'success',
-        message: res.message,
-      });
-    }
+    setFeedback({ type: !res.success ? 'error' : res.requiresReview ? 'info' : 'success', message: res.message });
+    if (res.success) router.refresh();
   };
 
   return (
@@ -133,13 +154,17 @@ export default function AdvertiserProfileFormClient({ data }: { data: Advertiser
         )}
       </div>
 
+      <PendingChangesNotice pending={requests.pending.filter((r) => r.entityType === 'profile')} recent={requests.recent.filter((r) => r.entityType === 'profile')} />
+
       {/* FEEDBACK DE SALVAMENTO */}
       {feedback && (
         <div
           className={`p-4 rounded-2xl border text-xs flex items-center gap-3 ${
             feedback.type === 'success'
               ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-              : 'bg-amber-50 border-amber-200 text-amber-900'
+              : feedback.type === 'error'
+                ? 'bg-rose-50 border-rose-200 text-rose-900'
+                : 'bg-amber-50 border-amber-200 text-amber-900'
           }`}
         >
           {feedback.type === 'success' ? (
@@ -161,7 +186,10 @@ export default function AdvertiserProfileFormClient({ data }: { data: Advertiser
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             <div className="space-y-1">
-              <label className="font-bold text-stone-800">Nome Fantasia (Público)</label>
+              <label className="font-bold text-stone-800 flex items-center justify-between">
+                <span>Nome Fantasia (Público)</span>
+                <ReviewTag />
+              </label>
               <input
                 type="text"
                 value={formData.name}
@@ -174,7 +202,7 @@ export default function AdvertiserProfileFormClient({ data }: { data: Advertiser
             <div className="space-y-1">
               <label className="font-bold text-stone-800 flex items-center justify-between">
                 <span>Razão Social</span>
-                <span className="text-[10px] text-amber-800 font-mono">Revisão Admin</span>
+                <ReviewTag />
               </label>
               <input
                 type="text"
@@ -187,7 +215,7 @@ export default function AdvertiserProfileFormClient({ data }: { data: Advertiser
             <div className="space-y-1">
               <label className="font-bold text-stone-800 flex items-center justify-between">
                 <span>CNPJ / CPF</span>
-                <span className="text-[10px] text-amber-800 font-mono">Revisão Admin</span>
+                <ReviewTag />
               </label>
               <input
                 type="text"
@@ -198,9 +226,13 @@ export default function AdvertiserProfileFormClient({ data }: { data: Advertiser
             </div>
 
             <div className="space-y-1">
-              <label className="font-bold text-stone-800">Categoria Principal</label>
+              <label className="font-bold text-stone-800 flex items-center justify-between">
+                <span>Categoria Principal</span>
+                <ReviewTag />
+              </label>
               <input
                 type="text"
+                list="advertiser-categories"
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
@@ -208,7 +240,10 @@ export default function AdvertiserProfileFormClient({ data }: { data: Advertiser
             </div>
 
             <div className="md:col-span-2 space-y-1">
-              <label className="font-bold text-stone-800">Descrição Comercial (Sobre a Empresa)</label>
+              <label className="font-bold text-stone-800 flex items-center justify-between">
+                <span>Descrição Comercial (Sobre a Empresa)</span>
+                <ReviewTag />
+              </label>
               <textarea
                 rows={4}
                 value={formData.description}
@@ -219,6 +254,12 @@ export default function AdvertiserProfileFormClient({ data }: { data: Advertiser
             </div>
           </div>
         </div>
+
+        <datalist id="advertiser-categories">
+          {categories.map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
 
         {/* BLOCO 2: CONTATO */}
         <div className="bg-white border border-stone-200 rounded-3xl p-6 shadow-sm space-y-4">
@@ -267,6 +308,50 @@ export default function AdvertiserProfileFormClient({ data }: { data: Advertiser
                 onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                 className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
                 placeholder="suaempresa.com.br ou https://suaempresa.com.br"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-bold text-stone-800">Instagram</label>
+              <input
+                type="text"
+                value={formData.instagram}
+                onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
+                className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
+                placeholder="@suaempresa"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-bold text-stone-800">Facebook</label>
+              <input
+                type="text"
+                value={formData.facebook}
+                onChange={(e) => setFormData({ ...formData, facebook: e.target.value })}
+                className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
+                placeholder="facebook.com/suaempresa"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-bold text-stone-800">LinkedIn</label>
+              <input
+                type="text"
+                value={formData.linkedin}
+                onChange={(e) => setFormData({ ...formData, linkedin: e.target.value })}
+                className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
+                placeholder="linkedin.com/company/suaempresa"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-bold text-stone-800">YouTube</label>
+              <input
+                type="text"
+                value={formData.youtube}
+                onChange={(e) => setFormData({ ...formData, youtube: e.target.value })}
+                className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
+                placeholder="youtube.com/@suaempresa"
               />
             </div>
           </div>
@@ -319,24 +404,14 @@ export default function AdvertiserProfileFormClient({ data }: { data: Advertiser
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="font-bold text-stone-800">Cidade / UF</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={formData.city}
-                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  className="flex-1 px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
-                  placeholder="Cidade"
-                />
-                <input
-                  type="text"
-                  value={formData.state}
-                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                  className="w-16 px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium uppercase text-center"
-                  placeholder="UF"
-                />
-              </div>
+            <div className="sm:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <BrazilianLocationFields
+                variant="member"
+                state={formData.state}
+                city={formData.city}
+                onStateChange={(value) => setFormData((current) => ({ ...current, state: value }))}
+                onCityChange={(value) => setFormData((current) => ({ ...current, city: value }))}
+              />
             </div>
           </div>
         </div>
@@ -347,15 +422,39 @@ export default function AdvertiserProfileFormClient({ data }: { data: Advertiser
             <Clock className="w-4 h-4 text-stone-700" /> 4. Horário de Funcionamento
           </h2>
 
-          <div className="space-y-1 text-xs">
-            <label className="font-bold text-stone-800">Horários de Atendimento</label>
-            <input
-              type="text"
-              value={formData.business_hours}
-              onChange={(e) => setFormData({ ...formData, business_hours: e.target.value })}
-              className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
-              placeholder="Ex: Segunda a Sexta: 08h às 18h | Sábado: 08h às 12h"
-            />
+          <p className="text-xs text-stone-500">Dia sem horário preenchido e não marcado como fechado fica sem informação no Guia.</p>
+          <div className="space-y-2 text-xs">
+            {WEEK_ORDER.map((day) => {
+              const row = hours.find((h) => h.day_of_week === day)!;
+              return (
+                <div key={day} className="grid grid-cols-1 items-center gap-2 rounded-xl border border-stone-100 bg-stone-50/60 p-2.5 sm:grid-cols-[9rem_auto_1fr]">
+                  <span className="font-bold text-stone-800">{WEEK_DAYS[day]}</span>
+                  <label className="flex min-h-9 items-center gap-2 font-medium text-stone-700">
+                    <input type="checkbox" checked={row.is_closed} onChange={(e) => setHour(day, { is_closed: e.target.checked })} className="h-4 w-4" />
+                    Fechado
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="time"
+                      aria-label={`Abertura de ${WEEK_DAYS[day]}`}
+                      value={row.open_time}
+                      disabled={row.is_closed}
+                      onChange={(e) => setHour(day, { open_time: e.target.value })}
+                      className="min-h-9 rounded-lg border border-stone-200 bg-white px-2 disabled:opacity-40"
+                    />
+                    <span className="text-stone-500">às</span>
+                    <input
+                      type="time"
+                      aria-label={`Fechamento de ${WEEK_DAYS[day]}`}
+                      value={row.close_time}
+                      disabled={row.is_closed}
+                      onChange={(e) => setHour(day, { close_time: e.target.value })}
+                      className="min-h-9 rounded-lg border border-stone-200 bg-white px-2 disabled:opacity-40"
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

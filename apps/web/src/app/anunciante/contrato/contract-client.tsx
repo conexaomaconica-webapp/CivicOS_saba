@@ -92,10 +92,10 @@ export default function AdvertiserContractClient({ data }: { data: AdvertiserPla
             </div>
             <div>
               <h2 className="font-serif font-bold text-lg text-stone-900">
-                CONEXÃO MAÇÔNICA SAAS PLATFORM
+                CONEXÃO MAÇÔNICA
               </h2>
               <p className="text-xs text-stone-500 font-mono">
-                Termo de Adesão e Licenciamento de Uso de Software Comercial
+                Termo de Adesão e Licenciamento de Uso da Plataforma Comercial
               </p>
             </div>
           </div>

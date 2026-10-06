@@ -8,13 +8,8 @@ import { getObjectPosition } from '@/lib/business/public-business-presentation';
 import { ReferBusinessModal } from '../sections/ReferBusinessModal';
 import { InstitutionalBadges } from '../shared/InstitutionalBadges';
 import { QuickActionBar } from '../shared/BusinessActionButtons';
-import { BusinessOwnerCard } from '../sections/BusinessOwnerCard';
 import { CompanyLogoWithZoom } from '../shared/CompanyLogoWithZoom';
-import { BusinessLocationCard } from '../sections/BusinessLocationCard';
-import { BusinessHours } from '../sections/BusinessHours';
-import { BusinessContacts } from '../sections/BusinessContacts';
-import { BusinessProfileSections } from '../sections/BusinessProfileSections';
-import { BusinessCommunityReviewsCard } from '../sections/BusinessCommunityReviewsCard';
+import { ProfileContentGrid } from '../sections/ProfileContentGrid';
 
 type BronzeBusinessProfileProps = {
   profile: PublicBusinessPresentation;
@@ -25,7 +20,7 @@ export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
   const [referOpen, setReferOpen] = useState(false);
   const { isFavorite, toggleFavorite } = useFavorites();
 
-  const { identity, recognition, authority, location, contacts, owner, media } = profile;
+  const { identity, recognition, location, contacts, owner, media } = profile;
   const isFavorited = isFavorite(identity.slug);
   const coverUrl = media.cover?.url || '/capafallback.png';
 
@@ -140,40 +135,8 @@ export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
           onTabChange={setActiveTab}
         />
 
-        {/* GRID DE CONTEÚDO EM 3 COLUNAS */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* COLUNA ESQUERDA (Conteúdo Principal - 8 cols no desktop) */}
-          <main className="lg:col-span-8 space-y-6">
-            
-            <BusinessProfileSections profile={profile} />
-
-          </main>
-
-          {/* COLUNA DIREITA (Sidebar - 4 cols no desktop) */}
-          <aside className="lg:col-span-4 space-y-6">
-            
-            {/* Card do Responsável com Foto, Vínculo Fraterno e Loja Maçônica */}
-            <BusinessOwnerCard owner={owner} logo={identity.logo} businessName={identity.name} isVerified={authority?.isVerified || recognition?.verified} />
-
-            {/* Card de Horário de Funcionamento */}
-            <BusinessHours hours={profile.hours} />
-
-            {/* Card de Endereço com Mapa Interativo Incorporado */}
-            <BusinessLocationCard location={profile.location} businessName={identity.name} />
-
-            {/* Card de Contatos Directos */}
-            <div id="contato">
-              <BusinessContacts contacts={profile.contacts} />
-            </div>
-
-            <div id="comentarios">
-              <BusinessCommunityReviewsCard reviews={profile.reviews} owner={owner} businessSlug={profile.identity.slug} />
-            </div>
-
-          </aside>
-
-        </div>
+        {/* CORPO DO PERFIL: lateral sempre começa com o card do plano e o do responsável */}
+        <ProfileContentGrid profile={profile} />
 
       </div>
 

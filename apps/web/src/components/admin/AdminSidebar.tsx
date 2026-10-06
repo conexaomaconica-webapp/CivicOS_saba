@@ -77,6 +77,12 @@ export const adminNavSections: NavSection[] = [
         badge: 'Pendentes',
       },
       {
+        id: 'alteracoes',
+        label: 'Alterações dos Anunciantes',
+        path: '/admin/alteracoes',
+        icon: CheckSquare,
+      },
+      {
         id: 'empresas',
         label: 'Empresas (Pós-Aprovação)',
         path: '/admin/empresas',

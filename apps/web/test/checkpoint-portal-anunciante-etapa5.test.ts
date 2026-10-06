@@ -77,6 +77,7 @@ vi.mock('../src/lib/supabase/server', () => ({
             error: null,
           });
         }
+        if (fnName === 'submit_business_change_request') return Promise.resolve({ data: 'req-plan-1', error: null });
         return Promise.resolve({ data: null, error: null });
       },
       auth: {
@@ -109,8 +110,23 @@ describe('Portal do Anunciante — Etapa 5: Plano, Financeiro e Contrato (/anunc
   });
 
   it('4. Non-aggressive Upgrade Request — Ação de upgrade amigável', async () => {
-    const res = await requestPlanUpgradeAction('ouro');
-    expect(res.success).toBe(true);
-    expect(res.message).toContain('comercial');
+    const original = (mockBiz as any).plan_tier;
+    const originalCode = (mockBiz as any).plan_code;
+    (mockBiz as any).plan_tier = 'prata';
+    (mockBiz as any).plan_code = 'prata';
+    try {
+      const res = await requestPlanUpgradeAction('ouro');
+      expect(res.success).toBe(true);
+      expect(res.message).toContain('comercial');
+
+      // Não aceita pedido para o mesmo plano ou inferior.
+      (mockBiz as any).plan_tier = 'ouro';
+      (mockBiz as any).plan_code = 'ouro';
+      const same = await requestPlanUpgradeAction('ouro');
+      expect(same.success).toBe(false);
+    } finally {
+      (mockBiz as any).plan_tier = original;
+      (mockBiz as any).plan_code = originalCode;
+    }
   });
 });

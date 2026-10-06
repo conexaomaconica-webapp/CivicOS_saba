@@ -36,6 +36,19 @@ export async function updateMemberProfileAction(formData: FormData): Promise<{ s
     if (!STATES.has(state)) return { success: false, error: 'Informe uma UF válida.' };
     if (phone && validatePhone(phone)) return { success: false, error: 'Informe um telefone válido.' };
 
+    // Cidade só vale se for oficial do estado (evita grafias diferentes para a mesma cidade).
+    // Se a base de referência estiver indisponível, não bloqueia o salvamento.
+    const { data: stateRow, error: stateError } = await (supabase as any).from('brazilian_states').select('ibge_code').eq('uf', state).maybeSingle();
+    if (!stateError && stateRow) {
+      const { data: cityRow, error: cityError } = await (supabase as any)
+        .from('brazilian_cities')
+        .select('ibge_code')
+        .eq('state_ibge_code', stateRow.ibge_code)
+        .eq('name', city)
+        .maybeSingle();
+      if (!cityError && !cityRow) return { success: false, error: 'Selecione uma cidade da lista para o estado escolhido.' };
+    }
+
     const { data: currentProfile } = await (supabase as any)
       .from('profiles')
       .select('avatar_url')

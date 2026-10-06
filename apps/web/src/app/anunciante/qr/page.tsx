@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { findAdvertiserBusiness } from '@/lib/advertiser/advertiser-access';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { CompanyQrClient } from './company-qr-client';
 
@@ -14,11 +15,7 @@ export default async function AdvertiserQrPage() {
   const { data: userRes } = await supabase.auth.getUser();
   if (!userRes?.user) redirect('/login');
 
-  const { data: business } = await supabase
-    .from('businesses')
-    .select('name, slug')
-    .eq('owner_id', userRes.user.id)
-    .maybeSingle();
+  const business = await findAdvertiserBusiness(supabase, userRes.user.id);
 
   if (!business || !business.slug) {
     return <p className="rounded-xl border border-stone-200 bg-white p-4 text-sm text-stone-700">Empresa não localizada.</p>;

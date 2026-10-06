@@ -1,6 +1,7 @@
 'use server';
 
 import { assertPlatformAdminAccess } from './admin-auth-helper';
+import { geocodeBrazilianAddress, isValidBrazilianCoordinate, type GeocodePrecision } from '@/lib/geo/geocode';
 import { resolveCanonicalAdminTenant } from './admin-tenant-context';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
@@ -78,41 +79,6 @@ function stripLocationTail(address: string, city: string, state: string): string
       return true;
     });
   return segments.join(', ');
-}
-
-async function geocodeBusinessAddress(input: {
-  address: string;
-  city: string;
-  state: string;
-}): Promise<{ latitude: number; longitude: number } | null> {
-  const query = [input.address, input.city, input.state, 'Brasil']
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join(', ');
-
-  if (!input.address || !input.city || !input.state) return null;
-
-  try {
-    const params = new URLSearchParams({ q: query, format: 'jsonv2', limit: '1', countrycodes: 'br' });
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'ConexaoMaconica/1.0 (geocodificacao administrativa)',
-      },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!response.ok) return null;
-
-    const results = (await response.json()) as Array<{ lat: string; lon: string }>;
-    const latitude = Number(results[0]?.lat);
-    const longitude = Number(results[0]?.lon);
-    return Number.isFinite(latitude) && Number.isFinite(longitude)
-      ? { latitude, longitude }
-      : null;
-  } catch {
-    return null;
-  }
 }
 
 export async function listAdminBusinessCategoriesAction(tenantId: string): Promise<{
@@ -1785,6 +1751,12 @@ export async function updateAdminBusinessDetailsAction(
     phone?: string;
     whatsapp?: string;
     address?: string;
+    number?: string;
+    neighborhood?: string;
+    postal_code?: string;
+    /** Coordenadas digitadas à mão (prevalecem sobre a localização automática). */
+    latitude?: number;
+    longitude?: number;
     city?: string;
     state?: string;
     description?: string;
@@ -2126,6 +2098,7 @@ export async function updateAdminBusinessDetailsAction(
     }
     revalidatePath('/guia', 'layout');
 
+    let geocodePrecisionResult: GeocodePrecision | null = null;
     if (payload.city !== undefined || payload.state !== undefined) {
       const cityVal = payload.city?.trim() || '';
       const stateVal = payload.state?.trim().toUpperCase() || '';
@@ -2153,16 +2126,43 @@ export async function updateAdminBusinessDetailsAction(
 
       const { data: locs } = await (supabase as any)
         .from('business_locations')
-        .select('id, is_headquarters')
+        .select('id, is_headquarters, latitude, longitude, street, city, state, postal_code')
         .eq('business_id', businessId);
 
       const primaryLoc = (locs || []).find((l: any) => l.is_headquarters === true) || (locs || [])[0];
       const canonicalAddress =
         stripLocationTail(payload.address?.trim() || '', canonicalCity.name, stateVal) || 'Endereço não informado';
 
-      const coordinates = payload.address?.trim()
-        ? await geocodeBusinessAddress({ address: payload.address.trim(), city: canonicalCity.name, state: stateVal })
-        : null;
+      // Coordenadas: as digitadas à mão prevalecem; senão, localiza pelo endereço (com queda para CEP e cidade)
+      // quando a empresa ainda não tem coordenadas ou o endereço mudou. Coordenadas já salvas não são refeitas à toa.
+      const hadCoordinates = primaryLoc?.latitude != null && primaryLoc?.longitude != null;
+      const addressChanged =
+        !primaryLoc || primaryLoc.street !== canonicalAddress || primaryLoc.city !== canonicalCity.name || primaryLoc.state !== stateVal;
+      const manualChanged =
+        isValidBrazilianCoordinate(payload.latitude, payload.longitude) &&
+        (!hadCoordinates || Number(primaryLoc.latitude) !== payload.latitude || Number(primaryLoc.longitude) !== payload.longitude);
+
+      let coordinates: { latitude: number; longitude: number } | null = null;
+      let geocodePrecision: GeocodePrecision | null = null;
+      if (manualChanged) {
+        coordinates = { latitude: payload.latitude as number, longitude: payload.longitude as number };
+        geocodePrecision = 'manual';
+      } else if (!hadCoordinates || addressChanged) {
+        const located = await geocodeBrazilianAddress({
+          street: payload.address?.trim() || '',
+          number: payload.number,
+          neighborhood: payload.neighborhood,
+          city: canonicalCity.name,
+          state: stateVal,
+          postalCode: payload.postal_code || primaryLoc?.postal_code,
+        });
+        if (located) {
+          coordinates = { latitude: located.latitude, longitude: located.longitude };
+          geocodePrecision = located.precision;
+        }
+      }
+
+      geocodePrecisionResult = geocodePrecision;
 
       if (primaryLoc) {
         const { error: locationUpdateError } = await (supabase as any)
@@ -2223,6 +2223,7 @@ export async function updateAdminBusinessDetailsAction(
       success: true,
       data: {
         ...updated,
+        geocode_precision: geocodePrecisionResult,
         slug: nextSlug,
         category_id: selectedCategory?.id,
         category: selectedCategory?.name || updated.category,
@@ -3872,5 +3873,32 @@ export async function updateAdminBusinessPlanAction(
     };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao alterar plano comercial.' };
+  }
+}
+
+/** Localiza um endereço (endereço -> rua -> CEP -> cidade) para o administrador conferir antes de salvar. */
+export async function locateBusinessAddressAction(input: {
+  address?: string;
+  number?: string;
+  neighborhood?: string;
+  postal_code?: string;
+  city: string;
+  state: string;
+}): Promise<{ success: boolean; latitude?: number; longitude?: number; precision?: GeocodePrecision; error?: string }> {
+  try {
+    await assertPlatformAdminAccess();
+    const located = await geocodeBrazilianAddress({
+      street: input.address,
+      number: input.number,
+      neighborhood: input.neighborhood,
+      city: input.city,
+      state: input.state,
+      postalCode: input.postal_code,
+    });
+    if (!located) return { success: false, error: 'Não foi possível localizar este endereço. Informe as coordenadas manualmente.' };
+    return { success: true, latitude: located.latitude, longitude: located.longitude, precision: located.precision };
+  } catch (err) {
+    console.error('[locateBusinessAddressAction]', err);
+    return { success: false, error: 'Não foi possível localizar o endereço agora.' };
   }
 }

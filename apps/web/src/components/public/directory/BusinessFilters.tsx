@@ -160,7 +160,6 @@ export function BusinessFilters({
 
         {[
           { id: 'pedra_fundamental', label: 'Pedra Fundamental' },
-          { id: 'coluna_honra', label: 'Coluna de Honra' },
         ].map((rec) => (
           <label key={rec.id} className="flex items-center gap-2 text-xs text-stone-700 cursor-pointer hover:text-amber-900">
             <input

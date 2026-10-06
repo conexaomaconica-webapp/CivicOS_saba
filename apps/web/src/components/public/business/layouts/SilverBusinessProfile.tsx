@@ -8,13 +8,8 @@ import { getObjectPosition } from '@/lib/business/public-business-presentation';
 import { ReferBusinessModal } from '../sections/ReferBusinessModal';
 import { InstitutionalBadges } from '../shared/InstitutionalBadges';
 import { QuickActionBar } from '../shared/BusinessActionButtons';
-import { BusinessOwnerCard } from '../sections/BusinessOwnerCard';
 import { CompanyLogoWithZoom } from '../shared/CompanyLogoWithZoom';
-import { BusinessLocationCard } from '../sections/BusinessLocationCard';
-import { BusinessHours } from '../sections/BusinessHours';
-import { BusinessContacts } from '../sections/BusinessContacts';
-import { BusinessProfileSections } from '../sections/BusinessProfileSections';
-import { BusinessCommunityReviewsCard } from '../sections/BusinessCommunityReviewsCard';
+import { ProfileContentGrid } from '../sections/ProfileContentGrid';
 
 type SilverBusinessProfileProps = {
   profile: PublicBusinessPresentation;
@@ -25,7 +20,7 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
   const [referOpen, setReferOpen] = useState(false);
   const { isFavorite, toggleFavorite } = useFavorites();
 
-  const { identity, recognition, authority, location, contacts, owner, media } = profile;
+  const { identity, recognition, location, contacts, owner, media } = profile;
   const isFavorited = isFavorite(identity.slug);
 
   // 1. Filtrar lista de mídias eliminando duplicatas entre cover e gallery
@@ -273,31 +268,8 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
           onTabChange={setActiveTab}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          <main className="lg:col-span-8 space-y-6">
-            
-            <BusinessProfileSections profile={profile} />
-
-          </main>
-
-          <aside className="lg:col-span-4 space-y-6">
-            
-            <BusinessOwnerCard owner={owner} logo={identity.logo} businessName={identity.name} isVerified={authority?.isVerified || recognition?.verified} />
-            <BusinessHours hours={profile.hours} />
-            <BusinessLocationCard location={profile.location} businessName={identity.name} />
-
-            <div id="contato">
-              <BusinessContacts contacts={profile.contacts} />
-            </div>
-
-            <div id="comentarios">
-              <BusinessCommunityReviewsCard reviews={profile.reviews} owner={owner} businessSlug={profile.identity.slug} />
-            </div>
-
-          </aside>
-
-        </div>
+        {/* CORPO DO PERFIL: lateral sempre começa com o card do plano e o do responsável */}
+        <ProfileContentGrid profile={profile} />
 
       </div>
 

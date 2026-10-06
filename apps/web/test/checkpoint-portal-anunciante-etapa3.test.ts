@@ -7,6 +7,12 @@ import {
 } from '../src/lib/advertiser/advertiser-content-service';
 import { processAndOptimizeMediaAction } from '../src/lib/media/media-optimization-service';
 
+// A cota de plano tem teste próprio (advertiser-entitlements.test.ts); aqui o foco é a gestão de conteúdo.
+vi.mock('../src/lib/advertiser/advertiser-entitlements', () => ({
+  checkAdvertiserQuotaAction: vi.fn().mockResolvedValue(null),
+  getAdvertiserFeaturesAction: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock('next/headers', () => ({
   cookies: () => Promise.resolve({ get: () => undefined, getAll: () => [], set: () => {}, delete: () => {} }),
 }));
@@ -19,6 +25,8 @@ vi.mock('../src/lib/supabase/server', () => ({
         insert: () => Promise.resolve({ data: { id: 'srv-1' }, error: null }),
         update: () => c,
         eq: () => c,
+        is: () => c,
+        in: () => c,
         limit: () => c,
         order: () => Promise.resolve({
           data: [

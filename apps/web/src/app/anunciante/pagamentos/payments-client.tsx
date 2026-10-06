@@ -88,7 +88,7 @@ export default function AdvertiserPaymentsClient({ data }: { data: AdvertiserPla
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-4 print:hidden">
         <div>
           <span className="text-[11px] font-mono font-bold text-[#C9A227] uppercase tracking-wider block">
-            Financeiro &amp; Histórico • Faturas Factuais
+            Financeiro &amp; Histórico • Faturas
           </span>
           <h1 className="text-2xl font-serif font-bold text-stone-900 mt-0.5">
             Faturas &amp; Pagamentos ({business.name})
@@ -124,11 +124,10 @@ export default function AdvertiserPaymentsClient({ data }: { data: AdvertiserPla
             <span className="font-serif font-bold text-sm text-stone-900 flex items-center gap-2">
               <CreditCard className="w-4 h-4 text-[#C9A227]" /> {plan.name} — Status da Assinatura
             </span>
-            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
-              plan.is_active
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : 'bg-amber-50 text-amber-700 border-amber-200'
-            }`}>
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${plan.is_active
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              : 'bg-amber-50 text-amber-700 border-amber-200'
+              }`}>
               {plan.badge_label}
             </span>
           </div>
@@ -247,7 +246,7 @@ export default function AdvertiserPaymentsClient({ data }: { data: AdvertiserPla
                   </div>
                   <div>
                     <h3 className="font-serif font-bold text-base text-stone-900">
-                      CONEXÃO MAÇÔNICA SAAS PLATFORM
+                      CONEXÃO MAÇÔNICA
                     </h3>
                     <p className="text-[11px] text-stone-500 font-mono">
                       Comprovante Interno de Pagamento • Fatura {selectedInvoice.invoice_number}

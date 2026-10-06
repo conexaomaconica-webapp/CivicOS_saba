@@ -1,8 +1,11 @@
 'use server';
 
 import { createServerSideClient } from '@/lib/supabase/server';
+import { findAdvertiserBusiness } from '@/lib/advertiser/advertiser-access';
 import { getSignedContractSnapshotAction } from '@/app/actions/contract-actions';
 import { assertOperationalTenantId } from '@/lib/tenant/tenant-policy';
+import { fetchTenantPlans, getCanonicalPlanByCode, normalizeCanonicalPlanCode, type CommercialPlan } from '@/lib/billing/plans-service';
+import { submitBusinessChangeRequest } from '@/lib/advertiser/change-requests';
 
 export interface AdvertiserInvoiceItem {
   id: string;
@@ -39,6 +42,12 @@ export interface AdvertiserPlanBillingDTO {
     payment_method_summary: string;
     badge_label: string;
     status: string;
+    /** Recursos comerciais do plano (de /admin/planos; sem cadastro, os canônicos). */
+    features: string[];
+    /** Próximo plano (para o pedido de upgrade); nulo no plano mais alto. */
+    next_plan: { code: string; name: string; amount_cents: number } | null;
+    /** Pedido de mudança de plano já enviado e ainda não analisado. */
+    pending_upgrade: { target_name: string; submitted_at: string } | null;
   } | null;
   invoices: AdvertiserInvoiceItem[];
   contract?: {
@@ -149,8 +158,31 @@ export async function getAdvertiserPlanBillingDTOAction(targetBusinessId?: strin
       ? new Date(subData.current_period_end).toLocaleDateString('pt-BR')
       : 'A renovar';
 
-    const isOuro = planCode === 'ouro';
-    const isPrata = planCode === 'prata';
+    // Nome, texto e preço vêm das regras do tenant (plan_payment_rules, editadas em /admin/planos); sem elas, os canônicos.
+    const tierOf = (code: string): 'bronze' | 'prata' | 'ouro' => {
+      const canonical = normalizeCanonicalPlanCode(code);
+      return canonical === 'acacia' ? 'ouro' : canonical === 'compasso' ? 'prata' : 'bronze';
+    };
+    const currentTier = tierOf(planCode);
+    let tenantPlans: CommercialPlan[] = [];
+    try {
+      tenantPlans = await fetchTenantPlans(supabase as any, tenantId);
+    } catch {
+      tenantPlans = [];
+    }
+    const commercial = tenantPlans.find((p) => p.tier === currentTier) ?? { id: '', ...getCanonicalPlanByCode(planCode) };
+    const nextTier = currentTier === 'bronze' ? 'prata' : currentTier === 'prata' ? 'ouro' : null;
+    const nextPlan = nextTier ? tenantPlans.find((p) => p.tier === nextTier) ?? { id: '', ...getCanonicalPlanByCode(nextTier) } : null;
+
+    const { data: pendingUpgradeRow } = await (supabase as any)
+      .from('business_change_requests')
+      .select('payload, submitted_at')
+      .eq('business_id', businessId)
+      .eq('entity_type', 'plan')
+      .eq('status', 'pending')
+      .order('submitted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     // 3. Consulta Canônica de Faturas, Pagamentos e Estornos (Refunds)
     const { data: invoicesData } = await (supabase as any)
@@ -258,18 +290,21 @@ export async function getAdvertiserPlanBillingDTOAction(targetBusinessId?: strin
       },
       plan: {
         code: planCode,
-        name: isOuro ? 'Plano Acácia' : isPrata ? 'Plano Compasso' : 'Plano Esquadro',
-        slogan: isOuro ? 'Destaque Prioritário & Cotas Ampliadas' : isPrata ? 'Presença Avançada & Ofertas Fraternas' : 'Cadastro Essencial no Guia',
-        description: isOuro
-          ? 'Plano completo com prioridade de exibição no Guia Comercial.'
-          : 'Plano intermediário ideal para empresas em expansão regional.',
-        amount_cents: isOuro ? 238800 : isPrata ? 178800 : 0,
+        name: commercial.name,
+        slogan: commercial.tagline,
+        description: commercial.features.filter((f) => f.included).slice(0, 3).map((f) => f.text).join(' · '),
+        amount_cents: Math.round(Number(subData?.plan_versions?.price_annual ?? NaN) * 100) || commercial.annualPriceCents,
         billing_cycle: 'annual',
         is_active: isPlanActive,
         renews_at: renewsAtDate,
         payment_method_summary: paymentMethodSummary,
         badge_label: overallBillingStatus.label,
         status: overallBillingStatus.status,
+        features: commercial.features.filter((f) => f.included).map((f) => f.text),
+        next_plan: nextPlan ? { code: nextPlan.code ?? (nextTier === 'ouro' ? 'acacia' : 'compasso'), name: nextPlan.name, amount_cents: nextPlan.annualPriceCents } : null,
+        pending_upgrade: pendingUpgradeRow
+          ? { target_name: String(pendingUpgradeRow.payload?.target_plan_name ?? ''), submitted_at: pendingUpgradeRow.submitted_at }
+          : null,
       },
       invoices: mappedInvoices,
       contract: contractData,
@@ -285,11 +320,41 @@ export async function getAdvertiserPlanBillingDTOAction(targetBusinessId?: strin
   }
 }
 
+/**
+ * Pedido de mudança de plano. É um processo comercial (contrato e pagamento): o pedido entra na fila de
+ * "Alterações dos Anunciantes" do administrador e a equipe conclui a contratação. Nada muda no plano até lá.
+ */
 export async function requestPlanUpgradeAction(
   targetPlanCode: string
 ): Promise<{ success: boolean; message: string }> {
-  return {
-    success: true,
-    message: `Solicitação de alteração para o ${targetPlanCode.toUpperCase()} enviada com sucesso! Nossa equipe comercial entrará em contato.`,
-  };
+  try {
+    const supabase = await createServerSideClient();
+    const { data: userRes } = await supabase.auth.getUser();
+    if (!userRes?.user) return { success: false, message: 'Sessão expirada. Entre novamente.' };
+    const business = await findAdvertiserBusiness(supabase, userRes.user.id);
+    if (!business) return { success: false, message: 'Empresa do anunciante não localizada.' };
+
+    const currentPlan = getCanonicalPlanByCode(business.plan_code || business.plan_tier);
+    const targetCanonical = normalizeCanonicalPlanCode(targetPlanCode);
+    const rank = { esquadro: 0, compasso: 1, acacia: 2 } as const;
+    if (rank[targetCanonical] <= rank[normalizeCanonicalPlanCode(business.plan_code || business.plan_tier)]) {
+      return { success: false, message: 'Escolha um plano superior ao seu plano atual.' };
+    }
+    const targetPlan = getCanonicalPlanByCode(targetCanonical);
+
+    const submitted = await submitBusinessChangeRequest(supabase, {
+      businessId: business.id,
+      entityType: 'plan',
+      action: 'update',
+      payload: { target_plan: targetCanonical, target_plan_name: targetPlan.name },
+      previous: { current_plan_name: currentPlan.name },
+    });
+    if (!submitted.ok) return { success: false, message: submitted.message };
+    return {
+      success: true,
+      message: `Pedido de mudança para o ${targetPlan.name} enviado. Nossa equipe comercial entrará em contato para concluir a contratação.`,
+    };
+  } catch {
+    return { success: false, message: 'Não foi possível enviar o pedido agora. Tente novamente.' };
+  }
 }

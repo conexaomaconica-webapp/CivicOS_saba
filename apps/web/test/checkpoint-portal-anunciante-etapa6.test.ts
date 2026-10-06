@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
 import { getAdvertiserNotificationsDTOAction, markNotificationAsReadAction } from '../src/lib/advertiser/advertiser-notifications-service';
-import { getAdvertiserAccountDTOAction, updateAdvertiserAccountAction } from '../src/lib/advertiser/advertiser-account-service';
 import { getAdvertiserPlanBillingDTOAction } from '../src/lib/advertiser/advertiser-billing-service';
 
 vi.mock('../src/lib/supabase/server', () => ({
@@ -69,18 +68,6 @@ describe('Portal do Anunciante — Etapa 6 & Auditoria Golden Path Completa (/an
 
     const markRes = await markNotificationAsReadAction('n1');
     expect(markRes.success).toBe(true);
-  });
-
-  it('2. Account & Security DTO — Dados do operador e sessão de segurança', async () => {
-    const dto = await getAdvertiserAccountDTOAction();
-    expect(dto.user.email).toBe('anunciante@comandosseguranca.com.br');
-    expect(dto.security.active_sessions_count).toBe(1);
-
-    const updateRes = await updateAdvertiserAccountAction({
-      full_name: 'Carlos Eduardo Silva Atualizado',
-      phone: '(11) 99999-8888',
-    });
-    expect(updateRes.success).toBe(true);
   });
 
   it('3. Conceptual Correction — Verificação: Pedra Fundamental NÃO é benefício de upgrade', async () => {

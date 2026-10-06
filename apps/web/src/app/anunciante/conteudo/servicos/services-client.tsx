@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Briefcase,
@@ -25,6 +26,8 @@ import {
 export default function AdvertiserServicesClient({ data }: { data: AdvertiserContentDTO }) {
   const { business, quotas, services: initialServices } = data;
   const [services, setServices] = useState<AdvertiserServiceItem[]>(initialServices);
+  // Depois de salvar, o servidor devolve a lista atualizada (router.refresh): sincroniza o estado local.
+  useEffect(() => setServices(initialServices), [initialServices]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<Partial<AdvertiserServiceItem> | null>(null);
@@ -32,12 +35,18 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
 
+  const router = useRouter();
   const [saving, setSaving] = useState(false);
+  // Erro do salvamento exibido DENTRO do modal (o aviso geral da página fica atrás do modal).
+  const [modalError, setModalError] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
-  const isQuotaFull = services.length >= quotas.services_limit;
+  // A cota conta só os serviços ativos (mesma regra do servidor).
+  const activeCount = services.filter((item) => item.is_active).length;
+  const isQuotaFull = activeCount >= quotas.services_limit;
 
   const handleOpenCreateModal = () => {
+    setModalError('');
     setEditingService(null);
     setTitle('');
     setDescription('');
@@ -45,60 +54,55 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
   };
 
   const handleOpenEditModal = (srv: AdvertiserServiceItem) => {
+    setModalError('');
     setEditingService(srv);
     setTitle(srv.title);
     setDescription(srv.description);
     setIsModalOpen(true);
   };
 
+  const closeModal = () => {
+    if (saving) return;
+    setModalError('');
+    setIsModalOpen(false);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
+    setModalError('');
     setFeedback(null);
 
-    const res = await saveAdvertiserServiceAction({
-      id: editingService?.id,
-      business_id: business.id,
-      title,
-      description,
-    });
+    if (title.trim().length < 3) {
+      setModalError('Informe o título do serviço (mínimo de 3 caracteres).');
+      return;
+    }
+    if (description.trim().length < 10) {
+      setModalError('Descreva o serviço com pelo menos 10 caracteres.');
+      return;
+    }
 
-    setSaving(false);
-
-    if (res.success) {
-      if (editingService?.id) {
-        setServices(
-          services.map((s) =>
-            s.id === editingService.id
-              ? {
-                  ...s,
-                  title,
-                  description,
-                  status: 'published',
-                  status_label: 'Publicado',
-                }
-              : s
-          )
-        );
-      } else {
-        const newSrv: AdvertiserServiceItem = {
-          id: `srv-${Date.now()}`,
-          title,
-          description,
-          is_active: true,
-          status: 'published',
-          status_label: 'Publicado',
-        };
-        setServices([newSrv, ...services]);
-      }
-
-      setFeedback({
-        type: 'success',
-        message: res.message,
+    setSaving(true);
+    try {
+      const res = await saveAdvertiserServiceAction({
+        id: editingService?.id,
+        business_id: business.id,
+        title,
+        description,
       });
-      setIsModalOpen(false);
-    } else {
-      setFeedback({ type: 'error', message: res.message });
+
+      if (res.success) {
+        setFeedback({ type: 'success', message: res.message });
+        setIsModalOpen(false);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        // Recarrega do servidor: traz o identificador real e o estado publicado de verdade.
+        router.refresh();
+      } else {
+        setModalError(res.message || 'Não foi possível salvar o serviço.');
+      }
+    } catch {
+      setModalError('Não foi possível salvar agora. Verifique sua conexão e tente novamente.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -161,17 +165,17 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
       <div className="bg-white border border-stone-200 rounded-3xl p-5 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
           <span className="font-serif font-bold text-sm text-stone-900 flex items-center gap-2">
-            <Briefcase className="w-4 h-4 text-amber-600" /> Cotas do {business.plan_name}: {services.length} de {quotas.services_limit} serviços utilizados
+            <Briefcase className="w-4 h-4 text-amber-600" /> Cotas do {business.plan_name}: {activeCount} de {quotas.services_limit} serviços utilizados
           </span>
           <span className="text-xs font-mono font-bold text-stone-600">
-            {services.length} / {quotas.services_limit}
+            {activeCount} / {quotas.services_limit}
           </span>
         </div>
 
         <div className="w-full h-2 bg-stone-100 rounded-full overflow-hidden">
           <div
             className="h-full bg-[#C9A227] rounded-full"
-            style={{ width: `${(services.length / quotas.services_limit) * 100}%` }}
+            style={{ width: `${quotas.services_limit > 0 ? Math.min(100, (activeCount / quotas.services_limit) * 100) : 0}%` }}
           />
         </div>
       </div>
@@ -303,7 +307,8 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
               </h3>
               <button
                 type="button"
-                onClick={() => setIsModalOpen(false)}
+                onClick={closeModal}
+                aria-label="Fechar"
                 className="text-stone-400 hover:text-stone-900 p-1"
               >
                 <X className="w-5 h-5" />
@@ -335,20 +340,25 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
                 />
               </div>
 
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 space-y-1">
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-900 space-y-1">
                 <span className="font-bold block flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 text-amber-700" /> Política de Transparência &amp; Moderação:
+                  <Clock className="w-3.5 h-3.5 text-emerald-700" /> Publicação imediata
                 </span>
-                <p>
-                  A versão aprovada atual continuará pública no Guia Comercial enquanto a nova proposta é analisada pelo Admin.
-                </p>
+                <p>Serviços entram no Guia assim que você salva, dentro da cota do seu plano.</p>
               </div>
+
+              {modalError && (
+                <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-[12px] font-semibold text-rose-800" role="alert">
+                  {modalError}
+                </p>
+              )}
 
               <div className="flex items-center justify-end gap-3 pt-2 border-t border-stone-100">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-stone-100 text-stone-700 font-bold rounded-xl"
+                  onClick={closeModal}
+                  disabled={saving}
+                  className="px-4 py-2 bg-stone-100 text-stone-700 font-bold rounded-xl disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -358,7 +368,7 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
                   className="px-5 py-2 bg-[#3B0B14] text-[#C9A227] font-bold rounded-xl border border-[#C9A227]/40 flex items-center gap-2"
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin text-[#C9A227]" />}
-                  <span>Salvar Serviço</span>
+                  <span>{saving ? 'Salvando…' : 'Salvar Serviço'}</span>
                 </button>
               </div>
             </form>

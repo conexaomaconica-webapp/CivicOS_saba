@@ -3,7 +3,8 @@
 import React, { useEffect } from 'react';
 import { Phone, Mail, MapPin, Globe } from 'lucide-react';
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
-import { trackDirectoryEventAction, type AllowedEventType } from '@/lib/analytics/analytics-service';
+import { trackEvent } from '@/lib/analytics/track-client';
+import type { AllowedEventType } from '@/lib/analytics/analytics-service';
 
 type BusinessActionButtonsProps = {
   contacts: PublicBusinessPresentation['contacts'];
@@ -25,7 +26,7 @@ export function QuickActionBar({
   className = '',
 }: BusinessActionButtonsProps) {
   const track = (eventType: AllowedEventType, source: string) => {
-    void trackDirectoryEventAction({ businessId, eventType, source });
+    trackEvent({ businessId, eventType, source });
   };
   useEffect(() => {
     track('view', 'business_profile');

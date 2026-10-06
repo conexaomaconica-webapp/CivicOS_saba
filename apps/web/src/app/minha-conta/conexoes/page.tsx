@@ -31,12 +31,12 @@ export default async function MyConnectionsPage() {
   const confirmed = items.filter((item) => item.status === 'confirmada').length;
 
   return (
-    <main className="min-h-screen bg-stone-50 px-4 py-10">
+    <div>
       <div className="mx-auto max-w-4xl space-y-6">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="flex items-center gap-2 font-serif text-2xl font-bold text-[#4B161B]">
-              <Handshake className="h-6 w-6 text-[#C9A227]" />
+            <h1 className="flex items-center gap-2 font-serif text-2xl font-bold text-[var(--member-primary)]">
+              <Handshake className="h-6 w-6 text-[var(--member-accent)]" />
               Minhas conexões
             </h1>
             <p className="mt-1 text-sm text-stone-600">
@@ -97,6 +97,6 @@ export default async function MyConnectionsPage() {
           ))}
         </ul>
       </div>
-    </main>
+    </div>
   );
 }

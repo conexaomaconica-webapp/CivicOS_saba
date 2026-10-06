@@ -1,4 +1,5 @@
 import React from 'react';
+import { listMyChangeRequestsAction } from '@/lib/advertiser/change-requests-service';
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { getAdvertiserProfileDataAction } from '@/lib/advertiser/advertiser-profile-service';
@@ -23,7 +24,7 @@ export default async function AdvertiserMediaPage() {
     redirect('/login?redirect=%2Fanunciante%2Fempresa%2Fmidias');
   }
 
-  const dto = await getAdvertiserProfileDataAction();
+  const [dto, requests] = await Promise.all([getAdvertiserProfileDataAction(), listMyChangeRequestsAction()]);
 
-  return <AdvertiserMediaManagementClient data={dto} />;
+  return <AdvertiserMediaManagementClient data={dto} requests={requests} />;
 }

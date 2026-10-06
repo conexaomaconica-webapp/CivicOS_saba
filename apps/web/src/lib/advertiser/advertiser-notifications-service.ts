@@ -16,11 +16,6 @@ export interface AdvertiserNotificationItem {
 export interface AdvertiserNotificationsDTO {
   notifications: AdvertiserNotificationItem[];
   unreadCount: number;
-  preferences: {
-    email_moderation: boolean;
-    email_billing: boolean;
-    email_leads: boolean;
-  };
 }
 
 const CATEGORY_BY_EVENT: Record<string, { category: AdvertiserNotificationItem['category']; label: string }> = {
@@ -47,14 +42,12 @@ function formatWhen(iso: string): string {
   return date.toLocaleDateString('pt-BR');
 }
 
-const DEFAULT_PREFERENCES = { email_moderation: true, email_billing: true, email_leads: true };
-
 /** Avisos reais do usuário logado (operational_notifications). Sem dados de exemplo. */
 export async function getAdvertiserNotificationsDTOAction(): Promise<AdvertiserNotificationsDTO> {
   try {
     const supabase = await createServerSideClient();
     const { data: userRes } = await supabase.auth.getUser();
-    if (!userRes?.user) return { notifications: [], unreadCount: 0, preferences: DEFAULT_PREFERENCES };
+    if (!userRes?.user) return { notifications: [], unreadCount: 0 };
 
     const { data: rows } = await (supabase as any)
       .from('operational_notifications')
@@ -80,10 +73,9 @@ export async function getAdvertiserNotificationsDTOAction(): Promise<AdvertiserN
     return {
       notifications,
       unreadCount: notifications.filter((n) => !n.is_read).length,
-      preferences: DEFAULT_PREFERENCES,
     };
   } catch (_e) {
-    return { notifications: [], unreadCount: 0, preferences: DEFAULT_PREFERENCES };
+    return { notifications: [], unreadCount: 0 };
   }
 }
 
@@ -95,5 +87,22 @@ export async function markNotificationAsReadAction(notificationId: string): Prom
     return { success: !error && data === true };
   } catch (_e) {
     return { success: false };
+  }
+}
+
+/** Quantidade de avisos não lidos do usuário logado (selo do menu do portal). */
+export async function getAdvertiserUnreadCountAction(): Promise<number> {
+  try {
+    const supabase = await createServerSideClient();
+    const { data: userRes } = await supabase.auth.getUser();
+    if (!userRes?.user) return 0;
+    const { count } = await (supabase as any)
+      .from('operational_notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('recipient_id', userRes.user.id)
+      .eq('is_read', false);
+    return count ?? 0;
+  } catch {
+    return 0;
   }
 }

@@ -1,6 +1,7 @@
 'use server';
 
 import { headers } from 'next/headers';
+import { findAdvertiserBusiness } from '@/lib/advertiser/advertiser-access';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { linkVisitorToCurrentUser } from '@/lib/referrals/attribution';
 
@@ -166,11 +167,7 @@ export async function listMyBusinessConnectionsAction(): Promise<{
     const { data: userRes } = await supabase.auth.getUser();
     if (!userRes?.user) return { success: false, error: 'Sessão expirada.', items: [], metrics: null };
 
-    const { data: biz } = await (supabase as any)
-      .from('businesses')
-      .select('id, name')
-      .eq('owner_id', userRes.user.id)
-      .maybeSingle();
+    const biz = await findAdvertiserBusiness(supabase, userRes.user.id);
     if (!biz?.id) return { success: false, error: 'Nenhuma empresa encontrada para esta conta.', items: [], metrics: null };
 
     const [list, metrics] = await Promise.all([

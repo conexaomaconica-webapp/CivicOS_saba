@@ -221,70 +221,35 @@ export default function AdvertiserHomeClient({ data }: { data: AdvertiserDashboa
           </Link>
         </div>
 
+        {/* Só aparece o que o plano inclui (limite maior que zero); a barra nunca passa de 100% */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          {/* FOTOS */}
-          <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl space-y-2">
-            <div className="flex justify-between items-center font-semibold text-stone-800">
-              <span>Fotos na Galeria</span>
-              <strong className="font-mono text-stone-900">
-                {quotas.photos_used} / {quotas.photos_limit}
-              </strong>
-            </div>
-            <div className="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-amber-600 rounded-full"
-                style={{ width: `${(quotas.photos_used / quotas.photos_limit) * 100}%` }}
-              />
-            </div>
-          </div>
-
-          {/* SERVIÇOS */}
-          <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl space-y-2">
-            <div className="flex justify-between items-center font-semibold text-stone-800">
-              <span>Serviços Cadastrados</span>
-              <strong className="font-mono text-stone-900">
-                {quotas.services_used} / {quotas.services_limit}
-              </strong>
-            </div>
-            <div className="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-[#C9A227] rounded-full"
-                style={{ width: `${(quotas.services_used / quotas.services_limit) * 100}%` }}
-              />
-            </div>
-          </div>
-
-          {/* BENEFÍCIOS */}
-          <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl space-y-2">
-            <div className="flex justify-between items-center font-semibold text-stone-800">
-              <span>Benefícios &amp; Ofertas Fraternas</span>
-              <strong className="font-mono text-stone-900">
-                {quotas.benefits_used} / {quotas.benefits_limit}
-              </strong>
-            </div>
-            <div className="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-emerald-600 rounded-full"
-                style={{ width: `${(quotas.benefits_used / quotas.benefits_limit) * 100}%` }}
-              />
-            </div>
-          </div>
-
-          {/* EVENTOS */}
-          <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl space-y-2">
-            <div className="flex justify-between items-center font-semibold text-stone-800">
-              <span>Eventos da Empresa</span>
-              <strong className="font-mono text-stone-900">
-                {quotas.events_used} / {quotas.events_limit}
-              </strong>
-            </div>
-            <div className="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-stone-700 rounded-full"
-                style={{ width: `${(quotas.events_used / quotas.events_limit) * 100}%` }}
-              />
-            </div>
-          </div>
+          {[
+            { key: 'photos', label: 'Fotos na Galeria', used: quotas.photos_used, limit: quotas.photos_limit, bar: 'bg-amber-600' },
+            { key: 'services', label: 'Serviços Cadastrados', used: quotas.services_used, limit: quotas.services_limit, bar: 'bg-[#C9A227]' },
+            { key: 'benefits', label: 'Benefícios & Ofertas Fraternas', used: quotas.benefits_used, limit: quotas.benefits_limit, bar: 'bg-emerald-600' },
+            { key: 'events', label: 'Eventos da Empresa', used: quotas.events_used, limit: quotas.events_limit, bar: 'bg-stone-700' },
+          ]
+            .filter((quota) => quota.limit > 0)
+            .map((quota) => (
+              <div key={quota.key} className="p-4 bg-stone-50 border border-stone-200 rounded-2xl space-y-2">
+                <div className="flex justify-between items-center font-semibold text-stone-800">
+                  <span>{quota.label}</span>
+                  <strong className="font-mono text-stone-900">
+                    {quota.used} / {quota.limit}
+                  </strong>
+                </div>
+                <div
+                  className="w-full h-2 bg-stone-200 rounded-full overflow-hidden"
+                  role="progressbar"
+                  aria-label={quota.label}
+                  aria-valuemin={0}
+                  aria-valuemax={quota.limit}
+                  aria-valuenow={Math.min(quota.used, quota.limit)}
+                >
+                  <div className={`h-full rounded-full ${quota.bar}`} style={{ width: `${Math.min(100, (quota.used / quota.limit) * 100)}%` }} />
+                </div>
+              </div>
+            ))}
         </div>
       </div>
 

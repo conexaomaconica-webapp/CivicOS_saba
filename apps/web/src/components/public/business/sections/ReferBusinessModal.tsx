@@ -8,13 +8,15 @@ type Props = {
   businessName: string;
   businessSlug: string;
   onClose: () => void;
+  /** Chamado quando a pessoa de fato copia o link, abre o WhatsApp ou compartilha (para métricas). */
+  onShared?: () => void;
 };
 
 /**
  * "Indicar esta empresa". Membro logado: link com o próprio código (a indicação é contada e acompanhada).
  * Visitante sem login: link comum, com convite para entrar e acompanhar as indicações.
  */
-export function ReferBusinessModal({ businessName, businessSlug, onClose }: Props) {
+export function ReferBusinessModal({ businessName, businessSlug, onClose, onShared }: Props) {
   const [loading, setLoading] = useState(true);
   const [trackedUrl, setTrackedUrl] = useState<string | null>(null);
   const [needsLogin, setNeedsLogin] = useState(false);
@@ -48,6 +50,7 @@ export function ReferBusinessModal({ businessName, businessSlug, onClose }: Prop
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(url);
+      onShared?.();
       setCopied(true);
       setTimeout(() => setCopied(false), 2200);
     } catch {
@@ -58,6 +61,7 @@ export function ReferBusinessModal({ businessName, businessSlug, onClose }: Prop
   const nativeShare = async () => {
     try {
       await navigator.share({ title: businessName, text: `Conheça ${businessName} na Conexão Maçônica.`, url });
+      onShared?.();
     } catch {}
   };
 
@@ -110,6 +114,7 @@ export function ReferBusinessModal({ businessName, businessSlug, onClose }: Prop
                 href={`https://wa.me/?text=${encodeURIComponent(message)}`}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => onShared?.()}
                 className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2.5 text-xs font-bold text-white"
               >
                 <MessageCircle className="h-4 w-4" /> WhatsApp

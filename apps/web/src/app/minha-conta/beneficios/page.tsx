@@ -18,11 +18,11 @@ export default async function MyBenefitsPage() {
   const redemptions = result.redemptions || [];
 
   return (
-    <main className="min-h-screen bg-stone-50 px-4 py-10">
+    <div>
       <div className="mx-auto max-w-4xl space-y-6">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="flex items-center gap-2 font-serif text-2xl font-bold text-[#4B161B]"><Gift className="h-6 w-6 text-[#C9A227]" />Meus benefícios</h1>
+            <h1 className="flex items-center gap-2 font-serif text-2xl font-bold text-[var(--member-primary)]"><Gift className="h-6 w-6 text-[var(--member-accent)]" />Meus benefícios</h1>
             <p className="mt-1 text-sm text-stone-600">Códigos resgatados e situação de utilização.</p>
           </div>
           <Link href="/guia" className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-bold text-stone-700">Explorar empresas</Link>
@@ -41,7 +41,7 @@ export default async function MyBenefitsPage() {
                     <h2 className="font-serif font-bold text-stone-900">{snapshot.title || 'Benefício resgatado'}</h2>
                     <p className="mt-1 text-xs text-stone-500">Resgatado em {new Date(item.redeemed_at).toLocaleString('pt-BR')}</p>
                   </div>
-                  <TicketCheck className="h-5 w-5 text-[#C9A227]" />
+                  <TicketCheck className="h-5 w-5 text-[var(--member-accent)]" />
                 </div>
                 <div className="mt-4 rounded-xl bg-stone-900 px-4 py-3 text-center font-mono text-lg font-black tracking-wider text-[#E7C65D]">{item.public_code}</div>
                 <p className="mt-3 text-xs font-bold uppercase text-stone-600">Status: {item.status === 'redeemed' ? 'Disponível' : item.status === 'used' ? 'Utilizado' : item.status}</p>
@@ -50,6 +50,6 @@ export default async function MyBenefitsPage() {
           })}
         </div>
       </div>
-    </main>
+    </div>
   );
 }

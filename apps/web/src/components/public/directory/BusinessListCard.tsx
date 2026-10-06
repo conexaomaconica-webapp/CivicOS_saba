@@ -2,10 +2,10 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Heart, Share2, Star, Crown, Award, ShieldCheck, Users, Map } from 'lucide-react';
+import { Heart, Share2, Star, Crown, Award, ShieldCheck, Users, Map, Building2 } from 'lucide-react';
 import { useFavorites } from '@/lib/directory/favorites-context';
-import { trackDirectoryEventAction } from '@/lib/analytics/analytics-service';
 import { useSearchImpression } from '@/lib/analytics/use-search-impression';
+import { CardReferModal } from './CardReferModal';
 import { usePedraCardDisplay, usePedraHorizontalSeal, type PedraCardDisplay } from '@/lib/directory/pedra-card-display-context';
 import {
   type BusinessCardData,
@@ -60,7 +60,7 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay }: Busine
   const { isFavorite, toggleFavorite } = useFavorites();
   const contextPedraDisplay = usePedraCardDisplay();
   const pedraHorizontalSealUrl = usePedraHorizontalSeal();
-  const [copiedShare, setCopiedShare] = useState(false);
+  const [referOpen, setReferOpen] = useState(false);
   const favorited = isFavorite(data.slug);
 
   const effectivePedraDisplay =
@@ -102,55 +102,25 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay }: Busine
 
   const impressionRef = useSearchImpression<HTMLDivElement>(data.id);
 
-  const handleShare = async (e: React.MouseEvent) => {
+  // "Indicar": abre o mesmo modal da página da empresa (link pessoal do membro, WhatsApp, copiar, compartilhar).
+  const handleShare = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const shareUrl = `${window.location.origin}/guia/${data.slug}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: data.name,
-          text: `Confira ${data.name} no Guia Conexão Maçônica`,
-          url: shareUrl,
-        });
-        void trackDirectoryEventAction({ businessId: data.id, eventType: 'share', source: 'directory_list' });
-        return;
-      } catch {
-        // Fallback
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      void trackDirectoryEventAction({ businessId: data.id, eventType: 'share', source: 'directory_list' });
-      setCopiedShare(true);
-      setTimeout(() => setCopiedShare(false), 2000);
-    } catch {
-      // Ignore
-    }
+    setReferOpen(true);
   };
 
-  // Badge priority
+  // Selo ao lado do nome: SEMPRE o plano comercial (Acácia, Compasso ou Esquadro).
+  // Pedra Fundamental e Empresa Fundadora são reconhecimentos institucionais, não planos: aparecem à direita (selo)
+  // e nunca no lugar do plano.
   const resolveBadge = () => {
     const plan = (data.effective_plan_code || '').toLowerCase().trim();
-    if (data.is_pedra_fundamental || plan === 'pedra_fundamental') {
-      return { label: 'Pedra Fundamental', bg: 'bg-amber-100 text-amber-950 border-amber-400 font-bold', icon: Crown };
-    }
-    if (data.is_founder) {
-      return { label: 'Empresa Fundadora', bg: 'bg-amber-50 text-amber-950 border-amber-300 font-semibold', icon: ShieldCheck };
-    }
-    if (plan === 'ouro' || plan === 'gold' || plan === 'ouro_founder') {
+    if (plan === 'ouro' || plan === 'gold' || plan === 'ouro_founder' || plan === 'acacia') {
       return { label: 'Acácia', bg: 'bg-[#fdf8eb] text-[#855e10] border-[#e8d7ad] font-semibold', icon: Crown };
     }
-    if (plan === 'prata' || plan === 'silver') {
+    if (plan === 'prata' || plan === 'silver' || plan === 'compasso') {
       return { label: 'Compasso', bg: 'bg-slate-100 text-slate-800 border-slate-300 font-semibold', icon: Award };
     }
-    if (plan === 'bronze') {
-      return { label: 'Esquadro', bg: 'bg-orange-50 text-amber-900 border-orange-200 font-semibold', icon: Award };
-    }
-    if (data.is_verified) {
-      return { label: 'Verificada', bg: 'bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold', icon: ShieldCheck };
-    }
-    return { label: 'Esquadro', bg: 'bg-amber-50/60 text-amber-900 border-amber-200', icon: ShieldCheck };
+    return { label: 'Esquadro', bg: 'bg-orange-50 text-amber-900 border-orange-200 font-semibold', icon: ShieldCheck };
   };
 
   const badge = resolveBadge();
@@ -160,8 +130,11 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay }: Busine
 
   return (
     <div ref={impressionRef} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-2xs hover:shadow-md transition-all flex flex-col md:flex-row gap-5 items-start md:items-center justify-between group">
+      {referOpen && (
+        <CardReferModal businessId={data.id} businessName={data.name} businessSlug={data.slug} source="directory_list" onClose={() => setReferOpen(false)} />
+      )}
       {/* Esquerda: Logo e Imagem */}
-      <div className="flex items-center gap-4.5 shrink-0 w-full md:w-auto">
+      <div className="flex items-center gap-5 sm:gap-6 shrink-0 w-full md:w-auto">
         <div
           className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-stone-200/90 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-xs p-2 transition-all duration-300 ease-out group-hover:scale-105 hover:!scale-115 hover:shadow-xl hover:border-amber-400 cursor-pointer ${
             data.logo_url ? 'bg-white' : 'bg-amber-950 text-amber-400 font-bold'
@@ -200,6 +173,29 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay }: Busine
               </span>
             )}
           </p>
+
+          {/* Responsável e loja maçônica (mesmos dados públicos da página da empresa) */}
+          {(data.responsible_name || data.responsible_lodge) && (
+            <div className="mt-1.5 space-y-0.5 text-xs text-stone-600">
+              {data.responsible_name && (
+                <p>
+                  Responsável:{' '}
+                  <strong className="font-bold text-stone-900">
+                    {data.responsible_label ? `${data.responsible_label} ` : ''}
+                    {data.responsible_name}
+                  </strong>
+                </p>
+              )}
+              {data.responsible_lodge && (
+                <p className="inline-flex items-center gap-1 font-semibold text-[#5d1523]">
+                  <Building2 className="h-3.5 w-3.5 shrink-0 text-[#C9A227]" aria-hidden />
+                  <span>
+                    Loja: <strong>{data.responsible_lodge}</strong>
+                  </span>
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -267,28 +263,33 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay }: Busine
 
       {/* Direita: Ações e Botões */}
       <div className="flex items-center gap-2 self-end md:self-center shrink-0 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {/* Favoritar */}
           <button
+            type="button"
             onClick={handleToggleFavorite}
+            aria-pressed={favorited}
             title={favorited ? 'Remover dos favoritos' : 'Favoritar'}
-            className="p-2 rounded-xl text-stone-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              favorited
+                ? 'border-red-200 bg-red-50 text-red-700'
+                : 'border-stone-300 bg-white text-stone-700 hover:border-red-200 hover:bg-red-50 hover:text-red-700'
+            }`}
           >
-            <Heart className={`w-4 h-4 ${favorited ? 'fill-red-600 text-red-600' : ''}`} />
+            <Heart className={`h-4 w-4 ${favorited ? 'fill-red-600 text-red-600' : ''}`} />
+            <span>{favorited ? 'Favoritado' : 'Favoritar'}</span>
           </button>
 
-          {/* Compartilhar */}
+          {/* Indicar */}
           <button
+            type="button"
             onClick={handleShare}
-            title="Compartilhar"
-            className="p-2 rounded-xl text-stone-500 hover:text-amber-900 hover:bg-amber-50 transition-colors relative"
+            title="Indicar empresa"
+            aria-label="Indicar empresa"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-900"
           >
-            <Share2 className="w-4 h-4" />
-            {copiedShare && (
-              <span className="absolute -top-7 right-0 text-[10px] font-bold bg-amber-950 text-white px-2 py-0.5 rounded shadow-xs">
-                Copiado!
-              </span>
-            )}
+            <Share2 className="h-4 w-4" />
+            <span>Indicar</span>
           </button>
         </div>
 

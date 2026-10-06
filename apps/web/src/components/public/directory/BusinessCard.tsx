@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { Heart, Share2, MapPin, Briefcase, Star, Crown, Award, ShieldCheck, Users } from 'lucide-react';
 import { useFavorites } from '@/lib/directory/favorites-context';
 import { usePedraCardDisplay, usePedraHorizontalSeal, type PedraCardDisplay } from '@/lib/directory/pedra-card-display-context';
-import { trackDirectoryEventAction } from '@/lib/analytics/analytics-service';
+import { trackEvent } from '@/lib/analytics/track-client';
 import { useSearchImpression } from '@/lib/analytics/use-search-impression';
+import { CardReferModal } from './CardReferModal';
 
 export type BusinessCardData = {
   id: string;
@@ -35,6 +36,10 @@ export type BusinessCardData = {
   masonic_brother_name?: string | null;
   masonic_lodge_name?: string | null;
   is_masonic_connection_public?: boolean;
+  /** Responsável e loja (public_business_responsibles), preenchidos no modo lista. */
+  responsible_name?: string | null;
+  responsible_label?: string | null;
+  responsible_lodge?: string | null;
 };
 
 type BusinessCardProps = {
@@ -125,7 +130,7 @@ export function BusinessCard({
   const { isFavorite, toggleFavorite } = useFavorites();
   const contextPedraDisplay = usePedraCardDisplay();
   const pedraHorizontalSealUrl = usePedraHorizontalSeal();
-  const [copiedShare, setCopiedShare] = useState(false);
+  const [referOpen, setReferOpen] = useState(false);
   const favorited = isFavorite(data.slug);
 
   const effectivePedraDisplay =
@@ -193,33 +198,11 @@ export function BusinessCard({
 
   const impressionRef = useSearchImpression<HTMLDivElement>(data.id);
 
-  const handleShare = async (e: React.MouseEvent) => {
+  // "Indicar": abre o mesmo modal da página da empresa (link pessoal do membro, WhatsApp, copiar, compartilhar).
+  const handleShare = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const shareUrl = `${window.location.origin}/guia/${data.slug}`;
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: data.name,
-          text: `Confira ${data.name} no Guia Conexão Maçônica`,
-          url: shareUrl,
-        });
-        void trackDirectoryEventAction({ businessId: data.id, eventType: 'share', source: 'directory_card' });
-        return;
-      } catch {
-        // Fallback
-      }
-    }
-
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      void trackDirectoryEventAction({ businessId: data.id, eventType: 'share', source: 'directory_card' });
-      setCopiedShare(true);
-      setTimeout(() => setCopiedShare(false), 2000);
-    } catch {
-      // Ignore
-    }
+    setReferOpen(true);
   };
 
   // Badge Textual de Fallback para o Plano Comercial no Rodapé
@@ -280,6 +263,9 @@ export function BusinessCard({
 
   return (
     <div ref={impressionRef} className="bg-white border border-amber-900/15 rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col group relative">
+      {referOpen && (
+        <CardReferModal businessId={data.id} businessName={data.name} businessSlug={data.slug} source="directory_card" onClose={() => setReferOpen(false)} />
+      )}
       {/* 1. Capa (Com Ações de Favoritar e Compartilhar) */}
       <div className={`relative w-full bg-stone-800 overflow-hidden ${isFeatured ? 'h-40' : 'h-32'}`}>
         {data.cover_url ? (
@@ -308,15 +294,10 @@ export function BusinessCard({
 
           <button
             onClick={handleShare}
-            title="Compartilhar empresa"
+            title="Indicar empresa" aria-label="Indicar empresa"
             className="w-7 h-7 rounded-full bg-white/85 backdrop-blur-xs border border-white/40 flex items-center justify-center shadow-xs hover:bg-white transition-all active:scale-90 relative"
           >
             <Share2 className="w-3.5 h-3.5 text-[#3b0b14]" />
-            {copiedShare && (
-              <span className="absolute -bottom-7 right-0 text-[10px] font-bold bg-amber-950 text-white px-2 py-0.5 rounded shadow-sm whitespace-nowrap">
-                Link copiado!
-              </span>
-            )}
           </button>
         </div>
       </div>
@@ -479,7 +460,7 @@ export function BusinessCard({
           {/* Botão Ver Empresa */}
           <Link
             href={`/guia/${data.slug}`}
-            onClick={() => void trackDirectoryEventAction({ businessId: data.id, eventType: 'view', source: 'directory_card' })}
+            onClick={() => trackEvent({ businessId: data.id, eventType: 'view', source: 'directory_card' })}
             className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-xl border border-[#5d1523] text-[#5d1523] font-bold text-xs hover:bg-[#5d1523] hover:text-white transition-colors shrink-0"
           >
             Ver empresa
