@@ -28,6 +28,7 @@ export function LodgeListCard({ data }: LodgeListCardProps) {
       <div className="flex items-start gap-4 flex-1">
         <LodgeLogoZoom
           logoUrl={data.logo_url}
+          potency={data.potency}
           lodgeName={data.name}
           className={`w-16 h-16 rounded-xl border border-stone-200 shadow-2xs p-1 ${data.logo_url ? 'bg-white' : 'bg-gradient-to-br from-amber-50 to-stone-100'}`}
         />

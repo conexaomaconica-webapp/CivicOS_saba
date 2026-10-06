@@ -190,6 +190,7 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             <LodgeLogoZoom
               logoUrl={lodge.logo_url}
+              potency={lodge.potency}
               lodgeName={lodge.name}
               className="w-24 h-24 rounded-2xl bg-white p-2 shadow-xl border-2 border-amber-300"
               fallbackIconClassName="w-12 h-12 text-[#3b0b14]"

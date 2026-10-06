@@ -74,6 +74,7 @@ export function LodgeCard({ data, variant: _variant = 'compact' }: LodgeCardProp
         <div className="absolute -bottom-7 left-4 z-10">
           <LodgeLogoZoom
             logoUrl={data.logo_url}
+            potency={data.potency}
             lodgeName={data.name}
             className="w-16 h-16 rounded-xl bg-white border-2 border-stone-100 shadow-md p-1.5"
             fallbackIconClassName="w-8 h-8 text-[#3b0b14]"
