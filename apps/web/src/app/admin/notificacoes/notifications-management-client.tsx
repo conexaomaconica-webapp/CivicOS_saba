@@ -21,7 +21,7 @@ import {
 import {
   getAdminNotificationsListAction,
   reprocessNotificationAction,
-  OperationalNotificationItem,
+  type OperationalNotificationItem,
 } from '@/lib/notifications/notification-service';
 
 export default function NotificationsManagementClient() {

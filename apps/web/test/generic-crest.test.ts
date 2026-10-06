@@ -10,6 +10,13 @@ describe('genericCrestForPotency', () => {
     expect(genericCrestForPotency('GOSP')).toContain('logo-generico-gosp');
   });
 
+  it('resolve a potência escrita por extenso, como aparece nos cards', () => {
+    expect(genericCrestForPotency('GRANDE ORIENTE DO BRASIL – GOB')).toContain('logo-generico-gob-baiano');
+    expect(genericCrestForPotency('Grande Oriente do Brasil')).toContain('logo-generico-gob-baiano');
+    expect(genericCrestForPotency('GRANDE LOJA - CMSB')).toContain('logo-generico-cmsb');
+    expect(genericCrestForPotency('Grande Loja Maçônica')).toContain('logo-generico-cmsb');
+  });
+
   it('potência sem genérico ou vazia não devolve imagem', () => {
     expect(genericCrestForPotency('GLBA')).toBeNull();
     expect(genericCrestForPotency('')).toBeNull();

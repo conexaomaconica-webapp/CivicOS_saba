@@ -123,8 +123,8 @@ vi.mock('../src/lib/supabase/server', () => ({
   }),
 }));
 
-vi.mock('../src/lib/notifications/notification-service', () => ({
-  dispatchNotificationAction: vi.fn().mockResolvedValue({ success: true, notificationId: 'notif-1' }),
+vi.mock('../src/lib/notifications/notification-core', () => ({
+  dispatchNotification: vi.fn().mockResolvedValue({ success: true, notificationId: 'notif-1' }),
 }));
 
 vi.mock('next/cache', () => ({

@@ -3,7 +3,7 @@
 import { createServerSideClient } from '@/lib/supabase/server';
 import { getQuestionChoices } from '@/lib/surveys/conditional';
 import { resolveRequestOperationalTenantId } from '@/lib/tenant/tenant-policy';
-import { dispatchNotificationAction } from '@/lib/notifications/notification-service';
+import { dispatchNotification as dispatchNotificationAction } from '@/lib/notifications/notification-core';
 
 // Destinatário dos avisos de nova resposta de pesquisa (equipe administrativa da Conexão).
 const SURVEY_ADMIN_NOTIFICATION_EMAIL = 'conexaomaconica@gmail.com';

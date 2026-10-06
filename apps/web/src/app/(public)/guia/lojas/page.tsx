@@ -1,3 +1,5 @@
+import { resolvePortalTheme } from '@/lib/tenant/portal-theme';
+import { getLodgeFacetRows } from '@/lib/lodges/lodge-facets';
 import React from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -95,13 +97,16 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
   // Os catálogos podem estar protegidos por RLS, mas as opções públicas também
   // podem ser derivadas com segurança das próprias Lojas ativas e publicadas.
   try {
-    const { data: publicLodgeFacets } = await (supabase as any)
-      .from('organizations')
-      .select('city, state, potency, rite')
-      .eq('is_active', true)
-      .eq('is_published', true);
-
-    const facetRows = publicLodgeFacets || [];
+    // Todas as lojas publicadas (não só as primeiras 1000), em cache; se não for possível, tenta a leitura direta.
+    let facetRows: any[] = await getLodgeFacetRows(supabase, host);
+    if (facetRows.length === 0) {
+      const { data: publicLodgeFacets } = await (supabase as any)
+        .from('organizations')
+        .select('city, state, potency, rite')
+        .eq('is_active', true)
+        .eq('is_published', true);
+      facetRows = publicLodgeFacets || [];
+    }
     availableCities = Array.from(new Set([
       ...availableCities,
       ...facetRows.map((row: any) => row.city).filter(Boolean),
@@ -226,7 +231,7 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
 
   return (
     <FavoritesProvider>
-      <div className="min-h-screen bg-[#faf7f2] text-[#1f1914] font-sans antialiased relative">
+      <div className="min-h-screen bg-[#faf7f2] text-[#1f1914] font-sans antialiased relative" style={resolvePortalTheme({ name: tenantBrand?.appName || 'Conexão Maçônica', logoUrl: null, primaryColor: tenantBrand?.primaryColor ?? null }).vars as React.CSSProperties}>
         <StructuredData
           schema={{
             '@context': 'https://schema.org',

@@ -1,3 +1,4 @@
+import { resolveLogoUrl } from '@/lib/business/business-media-helpers';
 import React from 'react';
 import { redirect } from 'next/navigation';
 import { AdvertiserLayoutWrapper } from './advertiser-layout-wrapper';
@@ -29,6 +30,7 @@ export default async function AdvertiserLayout({ children }: { children: React.R
     <AdvertiserLayoutWrapper
       businessName={data.business.name}
       businessSlug={data.business.slug}
+      businessLogo={data.business.logo_url && data.business.logo_url !== resolveLogoUrl(null) ? data.business.logo_url : null}
       features={features}
       unreadCount={unreadCount}
       brand={{ name: brand.appName || 'Conexão Maçônica', logoUrl: brand.logoUrl, primaryColor: brand.primaryColor }}

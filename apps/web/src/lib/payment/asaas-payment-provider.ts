@@ -36,6 +36,33 @@ export class AsaasPaymentProvider implements IPaymentProvider {
     return this.configured;
   }
 
+  /**
+   * Link de pagamento (fatura/boleto/PIX hospedado no Asaas) da cobrança com este externalReference.
+   * Só leitura: não cria nem altera cobrança.
+   */
+  async findPaymentLinkByExternalReference(externalReference: string): Promise<{
+    found: boolean;
+    status?: string;
+    invoiceUrl?: string;
+    bankSlipUrl?: string;
+  }> {
+    if (!this.isConfigured() || !externalReference) return { found: false };
+    try {
+      const res = await fetch(`${this.baseUrl}/payments?externalReference=${encodeURIComponent(externalReference)}`, {
+        method: 'GET',
+        headers: { access_token: this.apiKey, 'Content-Type': 'application/json' },
+        cache: 'no-store',
+      });
+      if (!res.ok) return { found: false };
+      const list = (await res.json())?.data || [];
+      if (list.length !== 1) return { found: false };
+      const pay = list[0];
+      return { found: true, status: pay.status, invoiceUrl: pay.invoiceUrl, bankSlipUrl: pay.bankSlipUrl };
+    } catch {
+      return { found: false };
+    }
+  }
+
   // 0. Reconciliação Externa: Busca cobrança no Asaas por externalReference exata
   async findPaymentByExternalReference(externalReference: string): Promise<{
     found: boolean;

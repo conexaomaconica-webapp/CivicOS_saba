@@ -16,7 +16,7 @@ import { DirectorySponsored, type DirectorySponsoredItem } from '@/components/pu
 import { DirectoryAllBusinesses, type PublicSearchResultItem } from '@/components/public/directory/DirectoryAllBusinesses';
 import { DirectoryMapExplore } from '@/components/public/directory/DirectoryMapExplore';
 import { DirectoryLodgesGuide } from '@/components/public/directory/DirectoryLodgesGuide';
-import { fetchLodgeFacets } from '@/lib/lodges/facets';
+import { fetchLodgeGuideFacets } from '@/lib/lodges/lodge-facets';
 import { fetchFilterCategories } from '@/lib/directory/filter-categories';
 import { getConfirmedConnectionsCountAction, getConnectionsFeedAction } from '@/app/actions/connections';
 import { DirectoryConnectionsMural } from '@/components/public/directory/DirectoryConnectionsMural';
@@ -122,7 +122,7 @@ export default async function GuiaPage({ searchParams }: Props) {
       p_page_size: configuredPageSize,
     }),
     // Opções reais dos filtros da seção "Guia de Lojas" (a lista de lojas só carrega depois de filtrar).
-    fetchLodgeFacets(supabase),
+    fetchLodgeGuideFacets(supabase),
     // Mural de Conexões: total de negócios confirmados pelas empresas (aparece no hero quando maior que zero).
     getConfirmedConnectionsCountAction(),
     getConnectionsFeedAction(5),

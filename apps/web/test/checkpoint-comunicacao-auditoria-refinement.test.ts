@@ -41,6 +41,26 @@ vi.mock('../src/lib/supabase/server', () => ({
   }),
 }));
 
+vi.mock('../src/lib/admin/admin-auth-helper', () => ({
+  assertPlatformAdminAccess: vi.fn().mockResolvedValue({ supabase: {}, user: { id: 'admin-1' } }),
+}));
+
+vi.mock('../src/lib/notifications/notification-core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/lib/notifications/notification-core')>();
+  const rows = [
+    { id: 'n1', recipient_email: 'anunciante@x.com', event_type: 'company_approved', title: 'T', body: 'B', channel: 'both', is_read: true, status: 'sent', created_at: new Date().toISOString() },
+  ];
+  const builder: any = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    range: vi.fn().mockResolvedValue({ data: rows, count: rows.length }),
+    then: (resolve: any) => resolve({ data: rows, error: null }),
+  };
+  return { ...actual, getAdminSupabase: () => ({ from: () => builder }) };
+});
+
 describe('Refinamento Comunicação & Auditoria (/admin/notificacoes & /admin/auditoria)', () => {
   it('1. Central de Notificações — Carrega KPIs e lista de disparos operacionais', async () => {
     const res = await getAdminNotificationsListAction();

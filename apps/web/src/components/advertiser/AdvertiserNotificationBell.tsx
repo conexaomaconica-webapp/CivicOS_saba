@@ -6,21 +6,21 @@ import { Bell, Check, ArrowRight, X } from 'lucide-react';
 import {
   getInAppNotificationsAction,
   markNotificationAsReadAction,
-  OperationalNotificationItem,
+  type OperationalNotificationItem,
 } from '@/lib/notifications/notification-service';
 
 type AdvertiserNotificationBellProps = {
   userId?: string;
 };
 
-export default function AdvertiserNotificationBell({ userId }: AdvertiserNotificationBellProps) {
+export default function AdvertiserNotificationBell(_props: AdvertiserNotificationBellProps) {
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<OperationalNotificationItem[]>([]);
 
   const loadNotifications = async () => {
     try {
-      const res = await getInAppNotificationsAction(userId);
+      const res = await getInAppNotificationsAction();
       setUnreadCount(res.unreadCount);
       setNotifications(res.items);
     } catch (_err) {
@@ -30,7 +30,7 @@ export default function AdvertiserNotificationBell({ userId }: AdvertiserNotific
 
   useEffect(() => {
     void loadNotifications();
-  }, [userId]);
+  }, []);
 
   const handleMarkRead = async (id: string) => {
     await markNotificationAsReadAction(id);

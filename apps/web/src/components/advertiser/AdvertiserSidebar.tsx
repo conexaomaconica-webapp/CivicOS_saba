@@ -94,6 +94,8 @@ export interface AdvertiserSidebarProps {
   onMobileClose?: () => void;
   businessName: string;
   businessSlug: string;
+  /** Logomarca da própria empresa, exibida logo abaixo da marca da plataforma. */
+  businessLogo?: string | null;
   unreadNotificationsCount?: number;
   /** Plano e recursos liberados; sem isso (falha de leitura) o menu mostra só o essencial. */
   features: AdvertiserFeatures | null;
@@ -108,6 +110,7 @@ export function AdvertiserSidebar({
   onMobileClose,
   businessName,
   businessSlug,
+  businessLogo = null,
   unreadNotificationsCount = 0,
   features,
   brandLogo,
@@ -177,6 +180,12 @@ export function AdvertiserSidebar({
         </div>
 
         <div className="space-y-1 px-4 py-3">
+          {businessLogo && (
+            <div className="mb-2 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-[#C9A227]/30 bg-white p-1">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={businessLogo} alt={`Logomarca de ${businessName}`} className="max-h-full max-w-full object-contain" />
+            </div>
+          )}
           <span className="block truncate font-serif text-sm font-bold leading-tight text-[#F9F6F0]">{businessName}</span>
           <div className="flex items-center gap-2">
             <span className="font-mono text-[10px] text-stone-400">Portal do Anunciante</span>

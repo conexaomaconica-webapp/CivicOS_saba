@@ -1,29 +1,20 @@
-import React from 'react';
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
-import { getAdvertiserPlanBillingDTOAction } from '@/lib/advertiser/advertiser-billing-service';
+import { getAdvertiserContractAction } from '@/lib/advertiser/advertiser-contract-service';
 import AdvertiserContractClient from './contract-client';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'Meu Contrato Digital · Portal do Anunciante | Conexão Maçônica',
+  robots: { index: false, follow: false },
 };
 
 export default async function AdvertiserContractPage() {
-  let isUserAuthenticated = false;
+  const supabase = await createServerSideClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data?.user) redirect('/login?redirect=%2Fanunciante%2Fcontrato');
 
-  try {
-    const supabase = await createServerSideClient();
-    const { data } = await supabase.auth.getUser();
-    isUserAuthenticated = Boolean(data?.user);
-  } catch (_e) {
-    isUserAuthenticated = false;
-  }
-
-  if (!isUserAuthenticated) {
-    redirect('/login?redirect=%2Fanunciante%2Fcontrato');
-  }
-
-  const dto = await getAdvertiserPlanBillingDTOAction();
-
+  const dto = await getAdvertiserContractAction();
   return <AdvertiserContractClient data={dto} />;
 }

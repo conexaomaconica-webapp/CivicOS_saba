@@ -50,11 +50,11 @@ export function LodgeCard({ data, variant: _variant = 'compact' }: LodgeCardProp
     : null;
 
   return (
-    <article className="group bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-2xs hover:shadow-md hover:border-amber-300 transition-all flex flex-col justify-between h-full relative">
+    <article className="group bg-white border border-stone-200 rounded-2xl shadow-2xs hover:shadow-md hover:border-amber-300 transition-all flex flex-col justify-between h-full relative">
       {/* Imagem de Capa ou Banner Institucional */}
       {/* O recorte (overflow-hidden) fica só na capa; o brasão é irmão dela para não ser cortado ao "vazar" para o conteúdo. */}
       <div className="relative">
-        <div className="relative h-28 w-full bg-gradient-to-r from-[#3b0b14] via-[#5d1523] to-[#2b060d] overflow-hidden">
+        <div className="relative h-28 w-full bg-gradient-to-r from-[#3b0b14] via-[#5d1523] to-[#2b060d] rounded-t-2xl overflow-hidden">
           {data.cover_url ? (
             <img src={data.cover_url} alt={data.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-80" />
           ) : (
@@ -71,19 +71,19 @@ export function LodgeCard({ data, variant: _variant = 'compact' }: LodgeCardProp
         </div>
 
         {/* Avatar / Brasão da Loja */}
-        <div className="absolute -bottom-7 left-4 z-10">
+        <div className="absolute -bottom-10 left-4 z-10 hover:z-40">
           <LodgeLogoZoom
             logoUrl={data.logo_url}
             potency={data.potency}
             lodgeName={data.name}
-            className="w-16 h-16 rounded-xl bg-white border-2 border-stone-100 shadow-md p-1.5"
-            fallbackIconClassName="w-8 h-8 text-[#3b0b14]"
+            className="w-24 h-24 rounded-xl bg-white border-2 border-stone-100 shadow-md p-1"
+            fallbackIconClassName="w-10 h-10 text-[#3b0b14]"
           />
         </div>
       </div>
 
       {/* Conteúdo do Card */}
-      <div className="p-4 pt-10 flex-1 flex flex-col justify-between space-y-3">
+      <div className="p-4 pt-14 flex-1 flex flex-col justify-between space-y-3">
         <div>
           {/* Tag Potência + Rito */}
           <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-semibold text-amber-900 mb-1">
@@ -100,8 +100,8 @@ export function LodgeCard({ data, variant: _variant = 'compact' }: LodgeCardProp
           </div>
 
           {/* Nome da Loja + Número */}
-          <h3 className="font-serif font-bold text-gray-900 text-base leading-snug group-hover:text-[#3b0b14] transition-colors">
-            <Link href={`/guia/lojas/${data.slug}`}>
+          <h3 className="font-serif font-bold text-base leading-snug transition-colors">
+            <Link href={`/guia/lojas/${data.slug}`} className="text-[color:var(--member-primary,#5d1523)] hover:underline">
               {data.name} {data.code_number ? `nº ${data.code_number}` : ''}
             </Link>
           </h3>

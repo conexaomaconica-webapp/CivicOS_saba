@@ -11,12 +11,13 @@ interface AdvertiserLayoutWrapperProps {
   children: React.ReactNode;
   businessName: string;
   businessSlug: string;
+  businessLogo?: string | null;
   features: AdvertiserFeatures | null;
   unreadCount: number;
   brand: PortalBrandInput;
 }
 
-export function AdvertiserLayoutWrapper({ children, businessName, businessSlug, features, unreadCount, brand }: AdvertiserLayoutWrapperProps) {
+export function AdvertiserLayoutWrapper({ children, businessName, businessSlug, businessLogo = null, features, unreadCount, brand }: AdvertiserLayoutWrapperProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const theme = resolvePortalTheme(brand);
 
@@ -27,6 +28,7 @@ export function AdvertiserLayoutWrapper({ children, businessName, businessSlug, 
         onMobileClose={() => setIsMobileMenuOpen(false)}
         businessName={businessName}
         businessSlug={businessSlug}
+        businessLogo={businessLogo}
         unreadNotificationsCount={unreadCount}
         features={features}
         brandLogo={theme.logo}

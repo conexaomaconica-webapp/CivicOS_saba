@@ -2,7 +2,7 @@
 
 import { createServerSideClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
-import { dispatchNotificationAction } from '@/lib/notifications/notification-service';
+import { dispatchNotification as dispatchNotificationAction } from '@/lib/notifications/notification-core';
 import { getCommercialPlanName } from '@/lib/admin/approval-display';
 import { evaluateBusinessProfileReadiness } from '@/lib/admin/admin-commercial-dossier-readiness';
 import { resolveCanonicalApprovalFlags } from '@/lib/admin/approval-canonical-status';

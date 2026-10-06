@@ -17,10 +17,30 @@ import {
 import {
   AdvertiserPlanBillingDTO,
   AdvertiserInvoiceItem,
+  getInvoicePaymentLinkAction,
 } from '@/lib/advertiser/advertiser-billing-service';
 
 export default function AdvertiserPaymentsClient({ data }: { data: AdvertiserPlanBillingDTO }) {
   const router = useRouter();
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [payError, setPayError] = useState<{ id: string; text: string } | null>(null);
+
+  const handlePay = async (invoiceId: string) => {
+    setPayError(null);
+    setPayingId(invoiceId);
+    try {
+      const res = await getInvoicePaymentLinkAction(invoiceId);
+      if (res.success && res.url) {
+        window.open(res.url, '_blank', 'noopener,noreferrer');
+      } else {
+        setPayError({ id: invoiceId, text: res.message || 'Não foi possível abrir o pagamento.' });
+      }
+    } catch {
+      setPayError({ id: invoiceId, text: 'Não foi possível abrir o pagamento agora. Tente novamente.' });
+    } finally {
+      setPayingId(null);
+    }
+  };
   const { plan, invoices, business, is_empty, requires_selection, available_businesses } = data;
   const [selectedInvoice, setSelectedInvoice] = useState<AdvertiserInvoiceItem | null>(null);
 
@@ -184,12 +204,26 @@ export default function AdvertiserPaymentsClient({ data }: { data: AdvertiserPla
                     <p className="text-stone-600">
                       Vencimento: <span className="font-mono">{inv.due_date}</span> {inv.paid_at && `• Liquidado em ${inv.paid_at}`}
                     </p>
+                    {payError?.id === inv.id && (
+                      <p className="font-semibold text-rose-700" role="alert">{payError.text}</p>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between sm:justify-end gap-4">
                     <strong className="font-serif font-bold text-base text-stone-900">
                       {formatBRL(inv.amount_cents)}
                     </strong>
+
+                    {(inv.status === 'pending' || inv.status === 'overdue') && (
+                      <button
+                        type="button"
+                        onClick={() => handlePay(inv.id)}
+                        disabled={payingId === inv.id}
+                        className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#C9A227]/40 bg-[#3B0B14] px-3.5 py-1.5 text-xs font-bold text-[#C9A227] disabled:opacity-60"
+                      >
+                        {payingId === inv.id ? 'Abrindo…' : 'Pagar agora'}
+                      </button>
+                    )}
 
                     <button
                       type="button"

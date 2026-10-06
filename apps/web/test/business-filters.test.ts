@@ -6,6 +6,7 @@ import {
   parseGeoCookie,
   planLabel,
   relationshipLabel,
+  RELATIONSHIP_OPTIONS,
 } from '@/lib/directory/business-filters';
 
 describe('filtros de /guia/empresas', () => {
@@ -22,12 +23,14 @@ describe('filtros de /guia/empresas', () => {
     expect(planLabel('bronze')).toBe('Esquadro');
   });
 
-  it('vínculo maçônico: converte para os tipos reais do banco', () => {
-    expect(expandRelationships(['brother'])).toEqual(['owner', 'equity_partner']);
-    expect(expandRelationships(['representative'])).toEqual(['sales_representative', 'authorized_agent']);
-    expect(expandRelationships(['wife', 'child'])).toEqual(['family_owner']);
-    expect(expandRelationships(['owner'])).toEqual(['owner']);
-    expect(relationshipLabel('wife')).toContain('Familiar');
+  it('vínculo maçônico: só Maçom, Cunhada e Sobrinho(a); ids antigos são convertidos e os removidos descartados', () => {
+    expect(RELATIONSHIP_OPTIONS.map((o) => o.label)).toEqual(['Maçom', 'Cunhada', 'Sobrinho(a)']);
+    expect(expandRelationships(['macom', 'cunhada'])).toEqual(['macom', 'cunhada']);
+    expect(expandRelationships(['brother'])).toEqual(['macom']);
+    expect(expandRelationships(['wife', 'child'])).toEqual(['cunhada', 'sobrinho']);
+    expect(expandRelationships(['family'])).toEqual(['cunhada', 'sobrinho']);
+    expect(expandRelationships(['representative', 'staff', 'institutional'])).toEqual([]);
+    expect(relationshipLabel('wife')).toBe('Cunhada');
   });
 
   it('selos: Coluna de Honra usa a chave do banco', () => {

@@ -28,6 +28,7 @@ import { PendingChangesNotice } from '@/components/advertiser/PendingChangesNoti
 const WEEK_DAYS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 // Segunda a domingo (a semana comercial começa na segunda).
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+const NEW_CATEGORY = '__new__';
 
 /** Aviso nos campos que passam por validação da plataforma antes de publicar. */
 function ReviewTag() {
@@ -48,6 +49,13 @@ export default function AdvertiserProfileFormClient({
   const [hours, setHours] = useState<AdvertiserHourRow[]>(business.hours);
   const setHour = (day: number, patch: Partial<AdvertiserHourRow>) =>
     setHours((current) => current.map((row) => (row.day_of_week === day ? { ...row, ...patch } : row)));
+
+  // Categoria atual que ainda não está no catálogo aparece na lista para não ser perdida ao abrir o formulário.
+  const currentCategory = (business.category || '').trim();
+  const categoryOptions = currentCategory && !categories.some((c) => c.toLowerCase() === currentCategory.toLowerCase())
+    ? [currentCategory, ...categories]
+    : categories;
+  const [categoryIsCustom, setCategoryIsCustom] = useState(false);
 
   const [formData, setFormData] = useState({
     name: business.name || '',
@@ -230,13 +238,37 @@ export default function AdvertiserProfileFormClient({
                 <span>Categoria Principal</span>
                 <ReviewTag />
               </label>
-              <input
-                type="text"
-                list="advertiser-categories"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              <select
+                value={categoryIsCustom ? NEW_CATEGORY : formData.category}
+                onChange={(e) => {
+                  if (e.target.value === NEW_CATEGORY) {
+                    setCategoryIsCustom(true);
+                    setFormData({ ...formData, category: '' });
+                  } else {
+                    setCategoryIsCustom(false);
+                    setFormData({ ...formData, category: e.target.value });
+                  }
+                }}
                 className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
-              />
+              >
+                <option value="">Selecione uma categoria</option>
+                {categoryOptions.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+                <option value={NEW_CATEGORY}>Não encontrei minha categoria…</option>
+              </select>
+              {categoryIsCustom && (
+                <div className="space-y-1 pt-1">
+                  <input
+                    type="text"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    placeholder="Nome da nova categoria"
+                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
+                  />
+                  <p className="text-[11px] text-stone-500">Confira a lista antes: a nova categoria só é criada se ainda não existir e depois da aprovação da equipe.</p>
+                </div>
+              )}
             </div>
 
             <div className="md:col-span-2 space-y-1">
@@ -254,12 +286,6 @@ export default function AdvertiserProfileFormClient({
             </div>
           </div>
         </div>
-
-        <datalist id="advertiser-categories">
-          {categories.map((name) => (
-            <option key={name} value={name} />
-          ))}
-        </datalist>
 
         {/* BLOCO 2: CONTATO */}
         <div className="bg-white border border-stone-200 rounded-3xl p-6 shadow-sm space-y-4">

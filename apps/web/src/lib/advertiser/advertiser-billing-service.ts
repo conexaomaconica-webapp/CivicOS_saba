@@ -1,6 +1,8 @@
 'use server';
 
 import { createServerSideClient } from '@/lib/supabase/server';
+import { AsaasPaymentProvider } from '@/lib/payment/asaas-payment-provider';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { findAdvertiserBusiness } from '@/lib/advertiser/advertiser-access';
 import { getSignedContractSnapshotAction } from '@/app/actions/contract-actions';
 import { assertOperationalTenantId } from '@/lib/tenant/tenant-policy';
@@ -356,5 +358,49 @@ export async function requestPlanUpgradeAction(
     };
   } catch {
     return { success: false, message: 'Não foi possível enviar o pedido agora. Tente novamente.' };
+  }
+}
+
+/**
+ * Link para pagar uma fatura em aberto (cobrança hospedada no Asaas). A fatura precisa ser de uma empresa do usuário
+ * logado e não pode estar paga/cancelada; o link só é entregue se a cobrança existir no Asaas e ainda estiver pendente.
+ */
+export async function getInvoicePaymentLinkAction(invoiceId: string): Promise<{ success: boolean; url?: string; message?: string }> {
+  try {
+    const supabase = await createServerSideClient();
+    const { data: userRes } = await supabase.auth.getUser();
+    if (!userRes?.user) return { success: false, message: 'Sessão expirada. Entre novamente.' };
+
+    const business = await findAdvertiserBusiness(supabase, userRes.user.id);
+    if (!business) return { success: false, message: 'Empresa do anunciante não localizada.' };
+
+    // Autorização explícita: a fatura precisa ser desta empresa (leitura com chave de serviço, que não depende de política).
+    const reader: any = createServiceRoleClient() ?? supabase;
+    const { data: invoice } = await reader
+      .from('invoices')
+      .select('id, business_id, status, idempotency_key')
+      .eq('id', invoiceId)
+      .eq('business_id', business.id)
+      .maybeSingle();
+    if (!invoice) return { success: false, message: 'Fatura não encontrada.' };
+    if (['paid', 'void', 'canceled', 'refunded'].includes(String(invoice.status))) {
+      return { success: false, message: 'Esta fatura não está em aberto.' };
+    }
+    if (!invoice.idempotency_key) {
+      return { success: false, message: 'A cobrança desta fatura ainda não foi gerada. Fale com o suporte para receber o link de pagamento.' };
+    }
+
+    const link = await new AsaasPaymentProvider().findPaymentLinkByExternalReference(String(invoice.idempotency_key));
+    const url = link.invoiceUrl || link.bankSlipUrl;
+    if (!link.found || !url) {
+      return { success: false, message: 'Não encontramos a cobrança desta fatura no momento. Tente novamente em instantes ou fale com o suporte.' };
+    }
+    if (['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH', 'REFUNDED'].includes(String(link.status))) {
+      return { success: false, message: 'Esta cobrança já consta como paga. A confirmação pode levar alguns minutos para aparecer aqui.' };
+    }
+    return { success: true, url };
+  } catch (err) {
+    console.error('[getInvoicePaymentLinkAction]', err);
+    return { success: false, message: 'Não foi possível obter o link de pagamento agora.' };
   }
 }

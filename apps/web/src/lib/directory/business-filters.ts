@@ -3,32 +3,40 @@
  * A tela e o banco usavam nomes diferentes, por isso vários filtros nunca casavam.
  */
 
-/** Vínculo maçônico da empresa: opção da tela -> tipos de vínculo (business_masonic_links.link_type). */
-export const RELATIONSHIP_OPTIONS: Array<{ id: string; label: string; linkTypes: string[] }> = [
-  { id: 'brother', label: 'Irmão (proprietário ou sócio)', linkTypes: ['owner', 'equity_partner'] },
-  { id: 'family', label: 'Familiar (cunhada, sobrinho(a)…)', linkTypes: ['family_owner'] },
-  { id: 'representative', label: 'Representante', linkTypes: ['sales_representative', 'authorized_agent'] },
-  { id: 'staff', label: 'Colaborador ou executivo', linkTypes: ['employee', 'executive'] },
-  { id: 'institutional', label: 'Parceiro institucional', linkTypes: ['institutional_partner'] },
+/**
+ * Vínculo maçônico da empresa (tratamento do responsável): Maçom, Cunhada e Sobrinho(a).
+ * Os ids são os mesmos que a busca do banco entende (p_relationships).
+ */
+export const RELATIONSHIP_OPTIONS: Array<{ id: string; label: string }> = [
+  { id: 'macom', label: 'Maçom' },
+  { id: 'cunhada', label: 'Cunhada' },
+  { id: 'sobrinho', label: 'Sobrinho(a)' },
 ];
 
-// Ids antigos que ainda podem estar em links salvos.
-const LEGACY_RELATIONSHIP_IDS: Record<string, string> = { wife: 'family', child: 'family' };
+// Ids antigos que ainda podem estar em links salvos ou favoritos de busca. Opções removidas (representante,
+// colaborador, parceiro institucional) deixam de existir e são ignoradas.
+const LEGACY_RELATIONSHIP_IDS: Record<string, string[]> = {
+  brother: ['macom'],
+  owner: ['macom'],
+  wife: ['cunhada'],
+  child: ['sobrinho'],
+  family: ['cunhada', 'sobrinho'],
+};
 
 export function relationshipLabel(id: string): string {
-  const canonical = LEGACY_RELATIONSHIP_IDS[id] || id;
+  const canonical = LEGACY_RELATIONSHIP_IDS[id]?.[0] ?? id;
   return RELATIONSHIP_OPTIONS.find((option) => option.id === canonical)?.label || id;
 }
 
+/** Converte os ids da tela (inclusive antigos) nos valores aceitos pela busca; ids desconhecidos são descartados. */
 export function expandRelationships(ids: string[]): string[] {
-  const types = new Set<string>();
+  const known = new Set(RELATIONSHIP_OPTIONS.map((option) => option.id));
+  const out = new Set<string>();
   for (const raw of ids) {
-    const canonical = LEGACY_RELATIONSHIP_IDS[raw] || raw;
-    const option = RELATIONSHIP_OPTIONS.find((item) => item.id === canonical);
-    if (option) option.linkTypes.forEach((type) => types.add(type));
-    else types.add(raw); // valor já no formato do banco
+    const mapped = LEGACY_RELATIONSHIP_IDS[raw] ?? [raw];
+    mapped.filter((id) => known.has(id)).forEach((id) => out.add(id));
   }
-  return [...types];
+  return [...out];
 }
 
 /** Plano comercial: nome canônico da tela -> todos os códigos que o banco pode ter para ele. */

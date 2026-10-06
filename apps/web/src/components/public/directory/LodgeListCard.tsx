@@ -55,8 +55,8 @@ export function LodgeListCard({ data }: LodgeListCardProps) {
           </div>
 
           {/* Nome completo + Número */}
-          <h3 className="font-serif font-bold text-gray-900 text-base md:text-lg leading-snug group-hover:text-[#3b0b14] transition-colors">
-            <Link href={`/guia/lojas/${data.slug}`}>
+          <h3 className="font-serif font-bold text-base md:text-lg leading-snug transition-colors">
+            <Link href={`/guia/lojas/${data.slug}`} className="text-[color:var(--member-primary,#5d1523)] hover:underline">
               {data.name} {data.code_number ? `nº ${data.code_number}` : ''}
             </Link>
           </h3>

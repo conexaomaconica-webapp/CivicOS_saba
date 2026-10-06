@@ -1,184 +1,60 @@
 'use server';
 
-import { createClient } from '@supabase/supabase-js';
-import { assertOperationalTenantId, resolveRequestOperationalTenantId } from '@/lib/tenant/tenant-policy';
+import { createServerSideClient } from '@/lib/supabase/server';
+import { assertPlatformAdminAccess } from '@/lib/admin/admin-auth-helper';
+import {
+  getAdminSupabase,
+  mapNotificationRow,
+  maskEmailSync,
+  type OperationalNotificationItem,
+} from '@/lib/notifications/notification-core';
 
-function getAdminSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 'sb_secret_key';
-  return createClient(url, key);
-}
-
-export type NotificationEventType =
-  | 'registration_completed'
-  | 'contract_signed'
-  | 'payment_confirmed'
-  | 'payment_pending'
-  | 'payment_overdue'
-  | 'company_approved'
-  | 'company_rejected'
-  | 'company_suspended'
-  | 'correction_requested'
-  | 'masonic_link_verified'
-  | 'subscription_expiring'
-  | 'quota_reached'
-  | 'survey_response_received';
-
-export interface OperationalNotificationItem {
-  id: string;
-  recipient_email: string;
-  recipient_masked_email: string;
-  event_type: NotificationEventType;
-  title: string;
-  body: string;
-  action_url?: string;
-  channel: 'email' | 'in_app' | 'both';
-  is_read: boolean;
-  status: 'queued' | 'sent' | 'failed';
-  error_details?: string;
-  created_at: string;
-  sent_at?: string;
-}
-
-function maskEmailSync(email: string): string {
-  if (!email || !email.includes('@')) return 'anunciante@***.com';
-  const parts = email.split('@');
-  const user = parts[0] || 'usuario';
-  const domain = parts[1] || 'conexaomaconica.com.br';
-  const maskedUser = user.length > 2 ? `${user.slice(0, 2)}***` : `${user}***`;
-  return `${maskedUser}@${domain}`;
-}
+// Somente funções assíncronas podem ser exportadas de um arquivo 'use server'; tipos são apagados na compilação.
+export type { NotificationEventType, OperationalNotificationItem } from '@/lib/notifications/notification-core';
 
 export async function maskEmail(email: string): Promise<string> {
   return maskEmailSync(email);
 }
 
-// 1. Disparar Notificação Operacional (Com Deduplicação e Email HTML Branded)
-export async function dispatchNotificationAction(payload: {
-  tenantId?: string;
-  recipientId?: string;
-  recipientEmail: string;
-  eventType: NotificationEventType;
-  title: string;
-  body: string;
-  actionUrl?: string;
-  channel?: 'email' | 'in_app' | 'both';
-}): Promise<{ success: boolean; notificationId?: string; deduplicated?: boolean }> {
-  const supabase = getAdminSupabase();
-
-  try {
-    const { data } = await supabase.rpc('trigger_operational_notification', {
-      p_tenant_id: payload.tenantId
-        ? assertOperationalTenantId(payload.tenantId, 'Notificação operacional')
-        : await resolveRequestOperationalTenantId(supabase),
-      p_recipient_id: payload.recipientId || null,
-      p_recipient_email: payload.recipientEmail,
-      p_event_type: payload.eventType,
-      p_title: payload.title,
-      p_body: payload.body,
-      p_action_url: payload.actionUrl || null,
-      p_channel: payload.channel || 'both',
-    });
-
-    if (data && data.ok) {
-      return {
-        success: true,
-        notificationId: data.notification_id,
-        deduplicated: Boolean(data.deduplicated),
-      };
-    }
-  } catch (_e) {
-    // Segue para fallback gracioso em ambiente dev
-  }
-
-  return { success: true, notificationId: 'notif_dev_fallback_01' };
-}
-
-// 2. Buscar Notificações In-App do Anunciante (Central / Sino)
-export async function getInAppNotificationsAction(userId?: string): Promise<{
+// 1. Notificações in-app do PRÓPRIO usuário logado (sino). Não aceita id de terceiros.
+export async function getInAppNotificationsAction(): Promise<{
   unreadCount: number;
   items: OperationalNotificationItem[];
 }> {
-  const supabase = getAdminSupabase();
-
   try {
-    let query = supabase.from('operational_notifications').select('*').order('created_at', { ascending: false }).limit(10);
-    if (userId) {
-      query = query.eq('recipient_id', userId);
-    }
+    const supabase = await createServerSideClient();
+    const { data: userRes } = await supabase.auth.getUser();
+    if (!userRes?.user) return { unreadCount: 0, items: [] };
 
-    const { data } = await query;
+    const { data } = await (supabase as any)
+      .from('operational_notifications')
+      .select('*')
+      .eq('recipient_id', userRes.user.id)
+      .order('created_at', { ascending: false })
+      .limit(10);
 
-    if (data && data.length > 0) {
-      const items: OperationalNotificationItem[] = data.map((n: any) => ({
-        id: n.id,
-        recipient_email: n.recipient_email,
-        recipient_masked_email: maskEmailSync(n.recipient_email),
-        event_type: n.event_type as NotificationEventType,
-        title: n.title,
-        body: n.body,
-        action_url: n.action_url,
-        channel: n.channel || 'both',
-        is_read: Boolean(n.is_read),
-        status: n.status || 'sent',
-        error_details: n.error_details,
-        created_at: n.created_at,
-        sent_at: n.sent_at,
-      }));
-
-      const unreadCount = items.filter((i) => !i.is_read).length;
-      return { unreadCount, items };
-    }
-  } catch (_e) {
-    // Segue para fallback
-  }
-
-  // Fallback com notificações de exemplo
-  const defaultItems: OperationalNotificationItem[] = [
-    {
-      id: 'notif_01',
-      recipient_email: 'contato@comandosseguranca.com.br',
-      recipient_masked_email: 'co***@comandosseguranca.com.br',
-      event_type: 'company_approved',
-      title: 'Sua empresa foi aprovada no Guia!',
-      body: 'Sua publicação da Comandos Terceirização está ativa no Guia Comercial.',
-      action_url: '/guia/comandos-terceirizacao-e-seguranca-eletronica',
-      channel: 'both',
-      is_read: false,
-      status: 'sent',
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'notif_02',
-      recipient_email: 'contato@comandosseguranca.com.br',
-      recipient_masked_email: 'co***@comandosseguranca.com.br',
-      event_type: 'payment_confirmed',
-      title: 'Pagamento confirmado com sucesso',
-      body: 'Sua assinatura do Plano Compasso foi confirmada via Asaas Gateway.',
-      action_url: '/anunciante',
-      channel: 'both',
-      is_read: true,
-      status: 'sent',
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-    },
-  ];
-
-  return { unreadCount: 1, items: defaultItems };
-}
-
-// 3. Marcar Notificação In-App como Lida
-export async function markNotificationAsReadAction(notificationId: string) {
-  const supabase = getAdminSupabase();
-
-  try {
-    await supabase.from('operational_notifications').update({ is_read: true }).eq('id', notificationId);
-    return { success: true };
-  } catch (_e) {
-    return { success: true };
+    const items = (data || []).map(mapNotificationRow);
+    return { unreadCount: items.filter((i: OperationalNotificationItem) => !i.is_read).length, items };
+  } catch {
+    return { unreadCount: 0, items: [] };
   }
 }
 
-// 4. Buscar Lista de Notificações para o Painel Admin (/admin/notificacoes)
+// 2. Marcar como lida: a RPC só altera notificação do próprio usuário autenticado.
+export async function markNotificationAsReadAction(notificationId: string): Promise<{ success: boolean }> {
+  try {
+    const supabase = await createServerSideClient();
+    const { data: userRes } = await supabase.auth.getUser();
+    if (!userRes?.user || !notificationId) return { success: false };
+
+    const { data, error } = await (supabase as any).rpc('mark_my_notification_read', { p_notification_id: notificationId });
+    return { success: !error && data !== false };
+  } catch {
+    return { success: false };
+  }
+}
+
+// 3. Lista para o painel admin (/admin/notificacoes) — exige admin de plataforma.
 export async function getAdminNotificationsListAction(params?: {
   status?: string;
   eventType?: string;
@@ -195,10 +71,13 @@ export async function getAdminNotificationsListAction(params?: {
     failed: number;
   };
 }> {
+  await assertPlatformAdminAccess();
+
   const supabase = getAdminSupabase();
   const page = params?.page || 1;
   const pageSize = params?.pageSize || 10;
   const offset = (page - 1) * pageSize;
+  const empty = { items: [], total: 0, kpis: { total: 0, sent: 0, queued: 0, failed: 0 } };
 
   try {
     let query = supabase.from('operational_notifications').select('*', { count: 'exact' });
@@ -226,57 +105,21 @@ export async function getAdminNotificationsListAction(params?: {
       failed: allNotifs?.filter((n) => n.status === 'failed').length || 0,
     };
 
-    if (data && data.length > 0) {
-      const items: OperationalNotificationItem[] = data.map((n: any) => ({
-        id: n.id,
-        recipient_email: n.recipient_email,
-        recipient_masked_email: maskEmailSync(n.recipient_email),
-        event_type: n.event_type as NotificationEventType,
-        title: n.title,
-        body: n.body,
-        action_url: n.action_url,
-        channel: n.channel || 'both',
-        is_read: Boolean(n.is_read),
-        status: n.status || 'sent',
-        error_details: n.error_details,
-        created_at: n.created_at,
-        sent_at: n.sent_at,
-      }));
-
-      return { items, total: count || items.length, kpis };
-    }
-  } catch (_e) {
-    // Segue para fallback
+    const items = (data || []).map(mapNotificationRow);
+    return { items, total: count || items.length, kpis };
+  } catch {
+    return empty;
   }
-
-  const defaultItem: OperationalNotificationItem = {
-    id: 'notif_admin_01',
-    recipient_email: 'contato@comandosseguranca.com.br',
-    recipient_masked_email: 'co***@comandosseguranca.com.br',
-    event_type: 'company_approved',
-    title: 'Sua empresa foi aprovada no Guia!',
-    body: 'Sua publicação da Comandos Terceirização está ativa no Guia Comercial.',
-    action_url: '/guia/comandos-terceirizacao-e-seguranca-eletronica',
-    channel: 'both',
-    is_read: true,
-    status: 'sent',
-    created_at: new Date().toISOString(),
-  };
-
-  return {
-    items: [defaultItem],
-    total: 1,
-    kpis: {
-      total: 1,
-      sent: 1,
-      queued: 0,
-      failed: 0,
-    },
-  };
 }
 
-// 5. Reprocessar Notificação com Falha
+// 4. Reprocessar notificação com falha — exige admin de plataforma.
 export async function reprocessFailedNotificationAction(notificationId: string) {
+  try {
+    await assertPlatformAdminAccess();
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Acesso negado.' };
+  }
+
   const supabase = getAdminSupabase();
 
   try {
@@ -295,5 +138,6 @@ export async function reprocessFailedNotificationAction(notificationId: string) 
   }
 }
 
-export const reprocessNotificationAction = reprocessFailedNotificationAction;
-
+export async function reprocessNotificationAction(notificationId: string) {
+  return reprocessFailedNotificationAction(notificationId);
+}

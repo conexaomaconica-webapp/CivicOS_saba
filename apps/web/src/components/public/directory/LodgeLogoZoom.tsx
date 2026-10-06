@@ -31,26 +31,17 @@ export function LodgeLogoZoom({
   const [genericFailed, setGenericFailed] = useState(false);
   const genericSrc = !logoUrl && !genericFailed ? genericCrestForPotency(potency) : null;
 
-  if (!logoUrl) {
+  // Brasão próprio da loja ou, na falta dele, o genérico da potência: ambos ampliam ao clicar.
+  const shownSrc = logoUrl || genericSrc;
+  if (!shownSrc) {
     return (
       <div className={`${className} shrink-0 flex items-center justify-center overflow-hidden`}>
-        {genericSrc ? (
-          // Brasão genérico da potência: sem zoom, e o texto alternativo não o apresenta como brasão da loja.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={genericSrc}
-            alt="Brasão da potência (genérico)"
-            className="max-w-full max-h-full object-contain object-center"
-            onError={() => setGenericFailed(true)}
-          />
-        ) : (
-          <Landmark className={fallbackIconClassName} />
-        )}
+        <Landmark className={fallbackIconClassName} />
       </div>
     );
   }
 
-  const altText = `Brasão — ${lodgeName}`;
+  const altText = logoUrl ? `Brasão — ${lodgeName}` : `Brasão da potência (genérico) — ${lodgeName}`;
 
   return (
     <>
@@ -58,16 +49,21 @@ export function LodgeLogoZoom({
         type="button"
         onClick={() => setIsOpen(true)}
         aria-label={`Ampliar o brasão — ${lodgeName}`}
-        className={`${className} group/logo relative shrink-0 flex items-center justify-center overflow-hidden cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500`}
+        className={`${className} group/logo relative shrink-0 flex items-center justify-center overflow-hidden cursor-zoom-in origin-top-left transition-all duration-200 ease-out hover:scale-[1.3] hover:z-40 hover:shadow-2xl focus-visible:scale-[1.3] focus-visible:z-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={logoUrl} alt={altText} className="max-w-full max-h-full object-contain object-center" />
-        <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-stone-900/45 opacity-0 transition-opacity group-hover/logo:opacity-100 group-focus-visible/logo:opacity-100">
+        <img
+          src={shownSrc}
+          alt={altText}
+          className="max-w-full max-h-full object-contain object-center"
+          onError={logoUrl ? undefined : () => setGenericFailed(true)}
+        />
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-stone-900/35 opacity-0 transition-opacity group-hover/logo:opacity-100 group-focus-visible/logo:opacity-100">
           <ZoomIn className="w-5 h-5 text-white drop-shadow-md" aria-hidden="true" />
         </span>
       </button>
 
-      <ImageZoomModal isOpen={isOpen} onClose={() => setIsOpen(false)} imageUrl={logoUrl} altText={altText} imageOnly />
+      <ImageZoomModal isOpen={isOpen} onClose={() => setIsOpen(false)} imageUrl={shownSrc} altText={altText} imageOnly />
     </>
   );
 }
