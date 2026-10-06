@@ -227,7 +227,11 @@ export default async function AdminDashboardPage() {
           </div>
           <p className="text-3xl font-serif font-bold text-stone-900 mt-2">{data.kpis.activeSubscriptions}</p>
           <p className="text-[11px] text-stone-500 mt-1 flex items-center justify-between">
-            <span>Esquadro, Compasso e Acácia</span>
+            <span>
+              {(data.kpis.publishedWithoutActivePayment ?? 0) > 0
+                ? `Com pagamento vigente · ${data.kpis.publishedWithoutActivePayment} publicada(s) sem pagamento`
+                : 'Com pagamento vigente'}
+            </span>
             <ArrowIcon className="w-3.5 h-3.5 text-[#C9A227] group-hover:translate-x-1 transition-transform" />
           </p>
         </Link>

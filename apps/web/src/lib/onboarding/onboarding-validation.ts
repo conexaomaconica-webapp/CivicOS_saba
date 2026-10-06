@@ -8,19 +8,22 @@ export type ResponsibleRelationship = 'owner' | 'representative';
 
 export const RESPONSIBLE_RELATIONSHIP_LABELS: Record<ResponsibleRelationship, string> = {
   owner: 'Proprietário / Sócio Diretor',
-  representative: 'Representante Comercial / Procurador',
+  representative: 'Representante / Procurador',
 };
 
 export interface ResponsibleStepFields {
   name: string;
   email: string;
   relationship: ResponsibleRelationship | '';
+  /** WhatsApp/telefone do responsável (opcional na validação antiga; obrigatório quando informado no formulário). */
+  phone?: string;
 }
 
 export interface ResponsibleStepErrors {
   name?: string;
   email?: string;
   relationship?: string;
+  phone?: string;
 }
 
 export function validateResponsibleRelationship(value: ResponsibleStepFields['relationship']): string | null {
@@ -38,6 +41,10 @@ export function validateResponsibleStep(fields: ResponsibleStepFields): Responsi
 
   const name = validateName(fields.name);
   if (name) errors.name = name;
+  // O nome vai para o contrato e para a assinatura: precisa ser o nome completo (nome e sobrenome).
+  else if (fields.name.trim().split(/\s+/).filter(Boolean).length < 2) {
+    errors.name = 'Informe o nome completo (nome e sobrenome).';
+  }
 
   const email = validateEmail(fields.email);
   if (email) errors.email = email;
@@ -45,11 +52,16 @@ export function validateResponsibleStep(fields: ResponsibleStepFields): Responsi
   const relationship = validateResponsibleRelationship(fields.relationship);
   if (relationship) errors.relationship = relationship;
 
+  if (fields.phone !== undefined) {
+    const phone = validatePhone(fields.phone);
+    if (phone) errors.phone = phone;
+  }
+
   return errors;
 }
 
 export function hasResponsibleStepErrors(errors: ResponsibleStepErrors): boolean {
-  return Boolean(errors.name || errors.email || errors.relationship);
+  return Boolean(errors.name || errors.email || errors.relationship || errors.phone);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +135,7 @@ export function validateCpf(cpf: string): string | null {
   if (!digits) return 'Informe o CPF.';
   if (digits.length !== 11) return 'CPF deve ter 11 dígitos.';
   if (/^(\d)\1{10}$/.test(digits)) return 'CPF inválido.';
-  
+
   let sum = 0;
   for (let i = 0; i < 9; i++) sum += Number(digits[i]) * (10 - i);
   let rem = (sum * 10) % 11;

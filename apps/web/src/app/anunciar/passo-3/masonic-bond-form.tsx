@@ -1,9 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShieldCheck, ArrowRight, Loader2 } from 'lucide-react';
 import { saveStepDataAction } from '@/lib/onboarding/onboarding-server-state';
+import { loadResponsibleDraft } from '@/lib/onboarding/responsible-flow';
+import { LodgeAutocomplete } from '@/components/onboarding/LodgeAutocomplete';
+import { bondStatusFromAffiliation, companyRelationshipFromResponsible } from '@/lib/onboarding/vinculo-mapping';
 
 export interface MasonicBondFormProps {
   businessId: string;
@@ -17,6 +20,21 @@ export default function MasonicBondForm({ businessId, businessName }: MasonicBon
   const [companyRelationship, setCompanyRelationship] = useState<'owner' | 'partner' | 'representative' | 'attorney'>('owner');
   const [cimbCode, setCimbCode] = useState('');
   const [lodgeName, setLodgeName] = useState('');
+  const [lodgeOrganizationId, setLodgeOrganizationId] = useState<string | undefined>(undefined);
+  // Dados que o responsável já informou no passo 1 (nome, WhatsApp, maçom de referência): não são pedidos de novo.
+  const [fromStep1, setFromStep1] = useState<{ name: string; phone: string; spouseMasonName: string } | null>(null);
+
+  useEffect(() => {
+    const draft = loadResponsibleDraft();
+    if (!draft) return;
+    const bond = bondStatusFromAffiliation(draft.masonic?.status);
+    if (bond !== 'none') setMasonicStatus(bond);
+    setCompanyRelationship(companyRelationshipFromResponsible(draft.relationship));
+    if (draft.masonic?.cimbCode) setCimbCode(draft.masonic.cimbCode);
+    if (draft.masonic?.lodgeName) setLodgeName(draft.masonic.lodgeName);
+    if (draft.lodgeOrganizationId) setLodgeOrganizationId(draft.lodgeOrganizationId);
+    setFromStep1({ name: draft.name, phone: draft.phone || '', spouseMasonName: draft.masonic?.spouseMasonName || '' });
+  }, []);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -35,6 +53,10 @@ export default function MasonicBondForm({ businessId, businessName }: MasonicBon
           companyRelationship,
           cimbCode,
           lodgeName,
+          lodgeOrganizationId: lodgeName.trim() ? lodgeOrganizationId : undefined,
+          responsibleName: fromStep1?.name || '',
+          responsiblePhone: fromStep1?.phone || '',
+          referenceMasonName: fromStep1?.spouseMasonName || '',
         },
       });
 
@@ -52,6 +74,12 @@ export default function MasonicBondForm({ businessId, businessName }: MasonicBon
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-left">
+      {fromStep1 && (
+        <p className="rounded-xl border border-[#C9A227]/30 bg-[#3B0B14]/60 p-3 text-[11px] leading-relaxed text-stone-200">
+          Já preenchemos com o que você informou no passo 1. Confira e ajuste se precisar: não é necessário digitar de novo.
+        </p>
+      )}
+
       {/* SEÇÃO 1: VÍNCULO COM A ORDEM */}
       <div className="space-y-3">
         <label className="text-xs font-serif font-bold text-[#C9A227] uppercase tracking-wider block">
@@ -85,11 +113,11 @@ export default function MasonicBondForm({ businessId, businessName }: MasonicBon
           <label className="text-xs font-semibold text-stone-300 block mb-1">
             Loja Maçônica / Potência (Opcional)
           </label>
-          <input
-            type="text"
-            placeholder="Ex: ARLS União Fraterna nº 100"
+          <LodgeAutocomplete
             value={lodgeName}
-            onChange={(e) => setLodgeName(e.target.value)}
+            onChange={setLodgeName}
+            onPick={(lodge) => setLodgeOrganizationId(lodge?.id)}
+            placeholder="Digite o nome da Loja e escolha na lista"
             className="w-full p-3 rounded-xl bg-stone-900 border border-stone-800 text-xs text-white outline-none focus:border-[#C9A227]"
           />
         </div>

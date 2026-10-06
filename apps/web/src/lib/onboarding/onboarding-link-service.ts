@@ -5,6 +5,7 @@ import { headers } from 'next/headers';
 import crypto from 'crypto';
 import { getCanonicalPlanByCode, normalizeCanonicalPlanCode } from '@/lib/billing/plans-service';
 import { assertOperationalTenantId } from '@/lib/tenant/tenant-policy';
+import { assertPlatformAdminAccess } from '@/lib/admin/admin-auth-helper';
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.E2E_SUPABASE_URL || 'https://rwvztwsjcjljphqttiws.supabase.co';
@@ -57,6 +58,8 @@ export interface OnboardingLinkData {
 }
 
 export async function generateOnboardingLinkAction(businessId: string, customExpiresInDays = 30) {
+  // Gera acesso a dados e contratação da empresa: só admin de plataforma (a chave de serviço abaixo ignora RLS).
+  const { user: adminUser } = await assertPlatformAdminAccess();
   const supabase = getAdminSupabase();
   const token = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + customExpiresInDays * 24 * 60 * 60 * 1000).toISOString();
@@ -92,6 +95,7 @@ export async function generateOnboardingLinkAction(businessId: string, customExp
       .from('business_onboarding_tokens')
       .update({ is_revoked: true, revoked_at: new Date().toISOString() })
       .eq('business_id', businessId)
+      .is('token_hash', null) // só os links de adesão antigos (texto puro); nunca os de assinatura/pagamento do contrato
       .eq('is_revoked', false);
   } catch (_e) {
     // Tabela criada via migration ou fallback seguro
@@ -124,12 +128,12 @@ export async function generateOnboardingLinkAction(businessId: string, customExp
   try {
     await (supabase as any).from('admin_audit_logs').insert({
       tenant_id: assertOperationalTenantId(biz.tenant_id, `Empresa ${businessId}`),
-      admin_user_id: 'admin-user',
-      action_type: 'GENERATE_ONBOARDING_LINK',
+      actor_id: adminUser.id,
+      action: 'GENERATE_ONBOARDING_LINK',
       entity_type: 'business',
       entity_id: businessId,
-      after_state: { commercial_status: 'contrato_enviado', token_expires_at: expiresAt },
-      justification: 'Link individual de adesão gerado e enviado ao empresário.',
+      after_value: { commercial_status: 'contrato_enviado', token_expires_at: expiresAt },
+      reason: 'Link individual de adesão gerado e enviado ao empresário.',
     });
   } catch (_e) {}
 
@@ -172,11 +176,7 @@ export async function validateAndGetOnboardingLinkAction(token: string): Promise
     }
   } catch (_e) {}
 
-  // 2. Se não achou na tabela, verifica se o token é um UUID direto de empresa (Fallback seguro)
-  if (!businessId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)) {
-    businessId = token;
-  }
-
+  // O token precisa existir na tabela de links: o id da empresa (que aparece em buscas públicas) nunca vale como acesso.
   if (!businessId) {
     throw new Error('LINK_INVALIDO: O link acessado é inválido ou revogado. Entre em contato com a Conexão Maçônica.');
   }
@@ -270,7 +270,14 @@ export async function getOnboardingSessionAction(token: string) {
   }
 }
 
-export async function signContractInOnboardingSessionAction(params: {
+const LEGACY_FLOW_DISABLED =
+  'Esta etapa foi movida para o link de contratação enviado pela equipe da Conexão. Solicite o link ao suporte.';
+
+/**
+ * Desativada: aceitava o texto do contrato e a assinatura enviados pelo navegador, sem versão oficial do termo nem prova de
+ * integridade. A assinatura válida acontece em /contratacao/[token] (contrato versionado, com snapshot e hash).
+ */
+export async function signContractInOnboardingSessionAction(_params: {
   token: string;
   signerName: string;
   signerCpf: string;
@@ -278,191 +285,18 @@ export async function signContractInOnboardingSessionAction(params: {
   contractText: string;
   signatureImageData?: string;
 }): Promise<{ success: boolean; contractId?: string; sha256Hash?: string; error?: string }> {
-  try {
-    const session = await validateAndGetOnboardingLinkAction(params.token);
-    const supabase = getAdminSupabase();
-
-    const sha256Hash = crypto
-      .createHash('sha256')
-      .update(`${params.contractText}-${params.signerName}-${params.signerCpf}-${params.signatureImageData || ''}-${Date.now()}`)
-      .digest('hex');
-
-    // Registra contrato
-    let contractId = crypto.randomUUID();
-    try {
-      const { data: contractRow } = await (supabase as any)
-        .from('contracts')
-        .insert({
-          business_id: session.businessId,
-          plan_code: session.planCode,
-          status: 'signed',
-          signed_at: new Date().toISOString(),
-          payment_condition: params.paymentConditionChoice,
-        })
-        .select('id')
-        .single();
-
-      if (contractRow?.id) {
-        contractId = contractRow.id;
-      }
-    } catch (_e) {}
-
-    // Registra snapshot com hash de integridade e assinatura desenhada
-    try {
-      await (supabase as any).from('contract_snapshots').insert({
-        contract_id: contractId,
-        business_id: session.businessId,
-        contract_body: params.contractText,
-        sha256_hash: sha256Hash,
-        signer_name: params.signerName,
-        signer_cpf: params.signerCpf,
-        signature_image_data: params.signatureImageData || null,
-        signed_at: new Date().toISOString(),
-      });
-    } catch (_e) {}
-
-    // Atualiza commercial_status da empresa para contrato_assinado sem alterar publication_status
-    await supabase
-      .from('businesses')
-      .update({
-        commercial_status: 'contrato_assinado',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', session.businessId);
-
-    return {
-      success: true,
-      contractId,
-      sha256Hash,
-    };
-  } catch (err: any) {
-    return {
-      success: false,
-      error: err?.message || 'Erro ao assinar contrato digital.',
-    };
-  }
+  return { success: false, error: LEGACY_FLOW_DISABLED };
 }
 
-export async function processCheckoutInOnboardingSessionAction(params: {
+/**
+ * Desativada: confirmava o pagamento sem cobrança nem retorno do provedor (bastava ter o link). A confirmação de pagamento
+ * só vem do webhook assinado do Asaas (/api/webhooks/asaas).
+ */
+export async function processCheckoutInOnboardingSessionAction(_params: {
   token: string;
   paymentMethod: 'pix' | 'credit_card';
   paymentConditionChoice: 'upfront' | 'installments';
   simulateWebhookConfirmation?: boolean;
 }): Promise<{ success: boolean; error?: string }> {
-  try {
-    const session = await validateAndGetOnboardingLinkAction(params.token);
-    const supabase = getAdminSupabase();
-
-    // Se simulateWebhookConfirmation for true ou em ambiente dev, processa confirmação
-    const isConfirmed = Boolean(params.simulateWebhookConfirmation ?? true);
-
-    if (!isConfirmed) {
-      // Atualiza commercial_status para aguardando_pagamento
-      await supabase
-        .from('businesses')
-        .update({
-          commercial_status: 'aguardando_pagamento',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', session.businessId);
-
-      return {
-        success: true,
-      };
-    }
-
-    // Processa confirmação efetiva do gateway/provedor
-    try {
-      await (supabase as any).from('subscriptions').upsert({
-        business_id: session.businessId,
-        status: 'active',
-        plan_code: session.planCode,
-        billing_cycle: 'annual',
-        payment_method: params.paymentMethod,
-        updated_at: new Date().toISOString(),
-      });
-    } catch (_e) {}
-
-    await supabase
-      .from('businesses')
-      .update({
-        commercial_status: 'pagamento_confirmado',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', session.businessId);
-
-    return {
-      success: true,
-    };
-  } catch (err: any) {
-    return {
-      success: false,
-      error: err?.message || 'Erro ao processar checkout.',
-    };
-  }
-}
-
-export async function processPaymentProviderWebhookAction(params: {
-  businessId: string;
-  provider: string;
-  eventType: string;
-  paymentStatus: string;
-  payload?: any;
-}): Promise<{ success: boolean; message?: string; error?: string }> {
-  try {
-    const supabase = getAdminSupabase();
-
-    const confirmedStatuses = ['RECEIVED', 'CONFIRMED', 'SETTLED', 'APPROVED', 'paid', 'PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED'];
-    const isPaymentConfirmed = confirmedStatuses.includes(params.paymentStatus.toUpperCase());
-
-    if (!isPaymentConfirmed) {
-      return {
-        success: false,
-        error: `PAGAMENTO_NAO_CONFIRMADO: Status ${params.paymentStatus} não autoriza confirmação comercial.`,
-      };
-    }
-
-    // Invoca RPC reconciliadora ou atualiza tabela diretamente
-    try {
-      const eventId = params.payload?.id || null;
-      const amountCents = params.payload?.amount ? Math.round(params.payload.amount * 100) : 0;
-
-      const { data: rpcRes } = await (supabase as any).rpc('reconcile_commercial_payment_webhook', {
-        p_business_id: params.businessId,
-        p_provider: params.provider,
-        p_event_id: eventId,
-        p_event_type: params.eventType,
-        p_payment_status: params.paymentStatus,
-        p_amount_cents: amountCents,
-        p_payload: params.payload || {},
-      });
-
-      if (rpcRes) return rpcRes;
-    } catch (_e) {}
-
-    // Fallback de atualização
-    await supabase
-      .from('businesses')
-      .update({
-        commercial_status: 'pagamento_confirmado',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', params.businessId);
-
-    await (supabase as any).from('subscriptions').upsert({
-      business_id: params.businessId,
-      status: 'active',
-      updated_at: new Date().toISOString(),
-    });
-
-    return {
-      success: true,
-      message: 'Pagamento confirmado e subscrição ativada via Webhook.',
-    };
-  } catch (err: any) {
-    return {
-      success: false,
-      error: err?.message || 'Erro ao processar webhook de pagamento.',
-    };
-  }
+  return { success: false, error: LEGACY_FLOW_DISABLED };
 }

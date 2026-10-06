@@ -226,7 +226,7 @@ export async function reconcileCommercialPaymentWebhook(
           commercial_status: 'pagamento_confirmado',
           updated_at: new Date().toISOString(),
         })
-        .eq('id', businessId);
+        .eq('id', businessId).throwOnError();
 
       // Atualiza fatura
       if (invoiceId) {
@@ -238,7 +238,7 @@ export async function reconcileCommercialPaymentWebhook(
             paid_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
-          .eq('id', invoiceId);
+          .eq('id', invoiceId).throwOnError();
       }
 
       // Atualiza tentativa
@@ -256,7 +256,7 @@ export async function reconcileCommercialPaymentWebhook(
               },
             },
           })
-          .eq('id', attempt.id);
+          .eq('id', attempt.id).throwOnError();
       }
 
       // Log de auditoria
@@ -427,7 +427,7 @@ export async function checkCommercialPaymentStatusAction(token: string): Promise
             await (dbClient as any)
               .from('payment_attempts')
               .update({ status: 'success' })
-              .eq('id', successfulAttempt.id);
+              .eq('id', successfulAttempt.id).throwOnError();
           }
         }
       }

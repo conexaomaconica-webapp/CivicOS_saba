@@ -1,5 +1,6 @@
 'use server';
 
+import { isInApprovalQueue } from '@/lib/admin/approval-queue';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { dispatchNotification as dispatchNotificationAction } from '@/lib/notifications/notification-core';
@@ -377,7 +378,9 @@ export async function getApprovalDirectoryListAction(statusFilter: string = 'tod
         has_masonic_link: hasMasonicLink,
         has_signed_contract: hasSignedContract,
         has_valid_payment: hasValidPayment,
+        // "Pronto p/ aprovar" só faz sentido para quem ainda está na fila: empresa já publicada, rejeitada ou suspensa não.
         is_ready_for_approval:
+          isInApprovalQueue(item.publication_status, business.commercial_status) &&
           item.has_responsible && readiness.details.nome && hasMasonicLink && hasSignedContract && hasValidPayment,
         completeness_percent: readiness.completion_percentage,
       };
@@ -394,26 +397,33 @@ export async function getApprovalDirectoryListAction(statusFilter: string = 'tod
       };
     }
 
+    // Fila de análise: só empresas que ainda dependem da equipe (rascunho, em análise, correção). Empresas já publicadas,
+    // rejeitadas ou suspensas não contam como "prontas" nem como pendências. A mesma regra vale no painel /admin.
+    const inQueue = (item: ApprovalDirectoryItem) =>
+      isInApprovalQueue(item.publication_status, businessById.get(item.id)?.commercial_status);
+    const queue = allItems.filter(inQueue);
+
     const counts = {
       total: allItems.length,
-      ready: allItems.filter((i) => i.is_ready_for_approval).length,
-      pendingReview: allItems.filter((i) => i.publication_status === 'pending_review').length,
-      missingContract: allItems.filter((i) => !i.has_signed_contract).length,
-      missingPayment: allItems.filter((i) => !i.has_valid_payment).length,
-      missingLink: allItems.filter((i) => !i.has_masonic_link).length,
-      incomplete: allItems.filter((i) => i.completeness_percent < 70).length,
-      correctionRequested: allItems.filter((i) => i.publication_status === 'correction_requested' || i.publication_status === 'draft').length,
+      ready: queue.filter((i) => i.is_ready_for_approval).length,
+      pendingReview: queue.length,
+      missingContract: queue.filter((i) => !i.has_signed_contract).length,
+      missingPayment: queue.filter((i) => !i.has_valid_payment).length,
+      missingLink: queue.filter((i) => !i.has_masonic_link).length,
+      incomplete: queue.filter((i) => i.completeness_percent < 70).length,
+      correctionRequested: allItems.filter((i) => i.publication_status === 'correction_requested').length,
       rejected: allItems.filter((i) => i.publication_status === 'rejected').length,
     };
 
     let items = allItems;
     if (statusFilter && statusFilter !== 'todos') {
       items = allItems.filter((item) => {
-        if (statusFilter === 'pronto_para_aprovacao') return item.is_ready_for_approval;
-        if (statusFilter === 'cadastro_incompleto') return item.completeness_percent < 70;
-        if (statusFilter === 'aguardando_contrato') return !item.has_signed_contract;
-        if (statusFilter === 'aguardando_pagamento') return !item.has_valid_payment;
-        if (statusFilter === 'aguardando_vinculo') return !item.has_masonic_link;
+        if (statusFilter === 'pending_review') return inQueue(item);
+        if (statusFilter === 'pronto_para_aprovacao') return inQueue(item) && item.is_ready_for_approval;
+        if (statusFilter === 'cadastro_incompleto') return inQueue(item) && item.completeness_percent < 70;
+        if (statusFilter === 'aguardando_contrato') return inQueue(item) && !item.has_signed_contract;
+        if (statusFilter === 'aguardando_pagamento') return inQueue(item) && !item.has_valid_payment;
+        if (statusFilter === 'aguardando_vinculo') return inQueue(item) && !item.has_masonic_link;
         return item.publication_status === statusFilter;
       });
     }
@@ -628,7 +638,7 @@ export async function updateBusinessDataBeforeApprovalAction(
         address: companyPayload.address,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', businessId);
+      .eq('id', businessId).throwOnError();
 
     await (supabase as any).from('admin_audit_logs').insert({
       tenant_id: await resolveBusinessTenantId(supabase, businessId),
@@ -669,7 +679,7 @@ export async function updateBusinessMediaBeforeApprovalAction(
         logo_url: mediaPayload.logo_url,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', businessId);
+      .eq('id', businessId).throwOnError();
 
     await (supabase as any).from('admin_audit_logs').insert({
       tenant_id: await resolveBusinessTenantId(supabase, businessId),
@@ -724,7 +734,7 @@ export async function requestBusinessCorrectionAction(businessId: string, observ
         correction_notes: fullNotes,
         last_correction_requested_at: new Date().toISOString(),
       })
-      .eq('id', businessId);
+      .eq('id', businessId).throwOnError();
 
     await (supabase as any).from('admin_audit_logs').insert({
       tenant_id: await resolveBusinessTenantId(supabase, businessId),
@@ -784,7 +794,7 @@ export async function approveEligibilityAndGenerateLinkAction(businessId: string
       await (supabase as any)
         .from('business_masonic_links')
         .update({ status: 'approved', updated_at: new Date().toISOString() })
-        .eq('business_id', businessId);
+        .eq('business_id', businessId).throwOnError();
     } else {
       await (supabase as any)
         .from('business_masonic_links')
@@ -795,7 +805,7 @@ export async function approveEligibilityAndGenerateLinkAction(businessId: string
           status: 'approved',
           verified_at: new Date().toISOString(),
           verified_by: 'admin-approval'
-        });
+        }).throwOnError();
     }
 
     await (supabase as any)
@@ -804,7 +814,7 @@ export async function approveEligibilityAndGenerateLinkAction(businessId: string
         commercial_status: 'aprovado',
         updated_at: new Date().toISOString(),
       })
-      .eq('id', businessId);
+      .eq('id', businessId).throwOnError();
 
     const { generateOnboardingLinkAction } = await import('@/lib/onboarding/onboarding-link-service');
     const linkResult = await generateOnboardingLinkAction(businessId);
@@ -866,7 +876,7 @@ export async function finalizeApprovalDecisionAction(
       if (pendingCriteria.length > 0) {
         throw new Error(`REGRA_CENTRAL_BLOQUEIO: Publicação negada. Requisitos pendentes:\n- ${pendingCriteria.join('\n- ')}`);
       }
-      await (supabase as any).from('businesses').update({ publication_status: 'published', commercial_status: 'publicado', updated_at: new Date().toISOString() }).eq('id', businessId);
+      await (supabase as any).from('businesses').update({ publication_status: 'published', commercial_status: 'publicado', updated_at: new Date().toISOString() }).eq('id', businessId).throwOnError();
       
 
       await dispatchNotificationAction({
@@ -886,7 +896,7 @@ export async function finalizeApprovalDecisionAction(
           publication_status: newStatus,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', businessId);
+        .eq('id', businessId).throwOnError();
 
       await (supabase as any).from('admin_audit_logs').insert({
         tenant_id: await resolveBusinessTenantId(supabase, businessId),

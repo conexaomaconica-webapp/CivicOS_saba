@@ -3,7 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Loader2 } from 'lucide-react';
+import { LodgeAutocomplete } from '@/components/onboarding/LodgeAutocomplete';
 import {
+  formatPhone,
   validateResponsibleStep,
   hasResponsibleStepErrors,
   RESPONSIBLE_RELATIONSHIP_LABELS,
@@ -35,6 +37,7 @@ export interface ResponsibleFormProps {
   initial: {
     name: string;
     email: string;
+    phone?: string;
   };
 }
 
@@ -43,6 +46,8 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
 
   const [name, setName] = useState(initial.name);
   const [email, setEmail] = useState(initial.email);
+  const [phone, setPhone] = useState(initial.phone || '');
+  const [lodgeOrganizationId, setLodgeOrganizationId] = useState<string | undefined>(undefined);
   const [relationship, setRelationship] = useState<ResponsibleRelationship | ''>('');
   const [masonic, setMasonic] = useState<MasonicAffiliationInput>(emptyMasonicAffiliation);
   const [errors, setErrors] = useState<ResponsibleStepErrors>({});
@@ -54,6 +59,11 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
     const existing = loadResponsibleDraft();
     if (!existing) return;
     setRelationship(existing.relationship);
+    // Não sobrescreve o que já veio do perfil da conta; só completa o que faltar com o rascunho salvo neste navegador.
+    if (existing.name && !initial.name) setName(existing.name);
+    if (existing.email && !initial.email) setEmail(existing.email);
+    if (existing.phone) setPhone(existing.phone);
+    if (existing.lodgeOrganizationId) setLodgeOrganizationId(existing.lodgeOrganizationId);
     if (existing.masonic) {
       setMasonic({
         status: existing.masonic.status,
@@ -67,8 +77,8 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
     }
   }, []);
 
-  const updateField = (field: 'name' | 'email' | 'relationship', value: string) => {
-    const next = { name, email, relationship };
+  const updateField = (field: 'name' | 'email' | 'phone' | 'relationship', value: string) => {
+    const next = { name, email, phone, relationship };
     if (field === 'name') {
       next.name = value;
       setName(value);
@@ -76,6 +86,11 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
     if (field === 'email') {
       next.email = value;
       setEmail(value);
+    }
+    if (field === 'phone') {
+      const formatted = formatPhone(value);
+      next.phone = formatted;
+      setPhone(formatted);
     }
     if (field === 'relationship') {
       next.relationship = value as ResponsibleRelationship | '';
@@ -107,7 +122,7 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
     setLoading(true);
     setErrorMsg(null);
 
-    const nextErrors = validateResponsibleStep({ name, email, relationship });
+    const nextErrors = validateResponsibleStep({ name, email, phone, relationship });
     const nextMasonicErrors = validateMasonicStep(masonic);
     setErrors(nextErrors);
     setMasonicErrors(nextMasonicErrors);
@@ -118,8 +133,10 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
     }
 
     const saved = saveResponsibleDraft({
-      name: name.trim(),
-      email: email.trim(),
+      name: name.trim().replace(/\s+/g, ' '),
+      email: email.trim().toLowerCase(),
+      phone: phone.trim(),
+      lodgeOrganizationId: masonic.lodgeName.trim() ? lodgeOrganizationId : undefined,
       relationship: relationship as ResponsibleRelationship,
       masonic: toPersistedAffiliation(masonic),
     });
@@ -147,14 +164,15 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
       {/* Nome Completo */}
       <div className="space-y-1">
         <label htmlFor="name" className="block text-xs font-bold text-stone-200">
-          Nome Completo do Responsável Legal
+          Nome completo do Responsável Legal
         </label>
         <input
           id="name"
           type="text"
+          autoComplete="name"
           value={name}
           onChange={(e) => updateField('name', e.target.value)}
-          placeholder="Seu nome completo"
+          placeholder="Nome e sobrenome, como nos documentos"
           className="w-full px-3 py-2.5 bg-[#1f0509]/80 border border-[#C9A227]/40 rounded-xl text-xs text-white placeholder-stone-500 outline-none focus:border-[#C9A227] focus:ring-1 focus:ring-[#C9A227]"
         />
         <FieldError message={errors.name} />
@@ -174,6 +192,26 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
           className="w-full px-3 py-2.5 bg-[#1f0509]/80 border border-[#C9A227]/40 rounded-xl text-xs text-white placeholder-stone-500 outline-none focus:border-[#C9A227] focus:ring-1 focus:ring-[#C9A227]"
         />
         <FieldError message={errors.email} />
+        <p className="text-[11px] text-stone-400">Será o seu acesso à plataforma e o e-mail de contato comercial.</p>
+      </div>
+
+      {/* WhatsApp / telefone */}
+      <div className="space-y-1">
+        <label htmlFor="phone" className="block text-xs font-bold text-stone-200">
+          WhatsApp / telefone do responsável
+        </label>
+        <input
+          id="phone"
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          value={phone}
+          onChange={(e) => updateField('phone', e.target.value)}
+          placeholder="(00) 00000-0000"
+          className="w-full px-3 py-2.5 bg-[#1f0509]/80 border border-[#C9A227]/40 rounded-xl text-xs text-white placeholder-stone-500 outline-none focus:border-[#C9A227] focus:ring-1 focus:ring-[#C9A227]"
+        />
+        <FieldError message={errors.phone} />
+        <p className="text-[11px] text-stone-400">Usado para contato sobre o contrato e o pagamento. Já aproveitamos no cadastro da empresa.</p>
       </div>
 
       {/* Relação com a Empresa */}
@@ -187,11 +225,10 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
             return (
               <label
                 key={value}
-                className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                  isChecked
+                className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${isChecked
                     ? 'bg-[#3B0B14] text-[#C9A227] border-[#C9A227] shadow-sm'
                     : 'bg-[#1f0509]/60 text-stone-300 border-stone-800 hover:border-stone-700'
-                }`}
+                  }`}
               >
                 <input
                   type="radio"
@@ -226,11 +263,10 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
             return (
               <label
                 key={statusOption}
-                className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                  isChecked
+                className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${isChecked
                     ? 'bg-[#3B0B14] text-[#C9A227] border-[#C9A227] shadow-sm'
                     : 'bg-[#1f0509]/60 text-stone-300 border-stone-800 hover:border-stone-700'
-                }`}
+                  }`}
               >
                 <input
                   type="radio"
@@ -272,11 +308,10 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
               <span className="block text-xs font-bold text-stone-300">Você está ativo na Ordem?</span>
               <div className="flex gap-2">
                 <label
-                  className={`flex-1 flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
-                    masonic.isActive === true
+                  className={`flex-1 flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-bold cursor-pointer transition-all ${masonic.isActive === true
                       ? 'bg-[#3B0B14] text-[#C9A227] border-[#C9A227]'
                       : 'bg-stone-900 text-stone-400 border-stone-800'
-                  }`}
+                    }`}
                 >
                   <input
                     type="radio"
@@ -290,11 +325,10 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
                 </label>
 
                 <label
-                  className={`flex-1 flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
-                    masonic.isActive === false
+                  className={`flex-1 flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-bold cursor-pointer transition-all ${masonic.isActive === false
                       ? 'bg-[#3B0B14] text-[#C9A227] border-[#C9A227]'
                       : 'bg-stone-900 text-stone-400 border-stone-800'
-                  }`}
+                    }`}
                 >
                   <input
                     type="radio"
@@ -329,16 +363,17 @@ export default function ResponsibleForm({ authenticated, initial }: ResponsibleF
             {/* Loja Maçônica */}
             <div className="space-y-1">
               <label htmlFor="lodge" className="block text-xs font-bold text-stone-300">
-                Loja Maçônica Simbólica (opcional)
+                Loja Maçônica (opcional)
               </label>
-              <input
+              <LodgeAutocomplete
                 id="lodge"
-                type="text"
                 value={masonic.lodgeName}
-                onChange={(e) => updateMasonic({ lodgeName: e.target.value })}
-                placeholder="Ex: Loja Simbólica 13 de Maio (Nº 450)"
+                onChange={(value) => updateMasonic({ lodgeName: value })}
+                onPick={(lodge) => setLodgeOrganizationId(lodge?.id)}
+                placeholder="Digite o nome da Loja e escolha na lista"
                 className="w-full px-3 py-2.5 bg-[#1f0509] border border-stone-700 rounded-xl text-xs text-white placeholder-stone-500 outline-none focus:border-[#C9A227]"
               />
+              <p className="text-[11px] text-stone-400">Não achou? Pode digitar o nome mesmo: a equipe ajusta depois.</p>
             </div>
           </div>
         )}

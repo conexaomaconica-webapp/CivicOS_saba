@@ -1,5 +1,6 @@
 'use server';
 
+import { isInApprovalQueue } from '@/lib/admin/approval-queue';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 
@@ -56,6 +57,8 @@ export interface AdminDashboardDTO {
     activeCompanies: number;
     pendingApprovals: number;
     activeSubscriptions: number;
+    /** Empresas publicadas sem pagamento vigente (cortesia, fundadoras, em implantação). */
+    publishedWithoutActivePayment?: number;
     confirmedMonthlyRevenueBrl: number;
     confirmedAnnualRevenueBrl: number;
     pendingPaymentsCount: number;
@@ -219,7 +222,10 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
       }
     }
     const activeSubscriptionsList = subscriptions.filter((s) => s.status === 'active');
-    const activeSubscriptionsCount = activeSubscriptionsList.length;
+    // Recalculado depois das faturas: o cadastro de assinaturas (subscriptions) não é preenchido pelo fluxo de pagamento
+    // atual; a fonte real de "quem está pagando" são as faturas pagas dentro da vigência.
+    let activeSubscriptionsCount = activeSubscriptionsList.length;
+    let publishedWithoutActivePayment = 0;
 
     // 3.2 Reconhecimentos Canônicos (Pedra Fundamental / Fundadora / Coluna de Honra)
     let recognitions: any[] = [];
@@ -265,12 +271,8 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
     // Métricas reais de empresas
     const totalCompanies = businesses.length;
     const publishedCompanies = businesses.filter((b) => b.publication_status === 'published' && b.is_active !== false).length;
-    const pendingCompanies = businesses.filter(
-      (b) =>
-        b.publication_status === 'pending_review' ||
-        (!['publicado'].includes(b.commercial_status || '') &&
-          !['published', 'rejected', 'suspended'].includes(b.publication_status || 'draft')),
-    ).length;
+    // Mesma regra da Central de Aprovações (lib/admin/approval-queue.ts): os números do painel e da central batem.
+    const pendingCompanies = businesses.filter((b) => isInApprovalQueue(b.publication_status, b.commercial_status)).length;
     const suspendedCompanies = businesses.filter((b) => b.publication_status === 'suspended').length;
     const draftCompanies = businesses.filter((b) => b.publication_status === 'draft').length;
 
@@ -312,14 +314,17 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
     let newLodges30d = 0;
 
     try {
-      const { data: lodgesData } = await (dbClient as any)
-        .from('organizations')
-        .select('id, is_active, latitude, longitude, created_at');
-
-      const lodges = (lodgesData || []) as any[];
-      publishedLodgesCount = lodges.filter((l) => l.is_active !== false).length;
-      lodgesWithoutCoordinates = lodges.filter((l) => l.is_active !== false && (!l.latitude || !l.longitude || Number(l.latitude) === 0)).length;
-      newLodges30d = lodges.filter((l) => l.created_at && new Date(l.created_at) >= new Date(thirtyDaysAgo)).length;
+      // Contagens exatas no banco (head + count): uma consulta comum devolve no máximo 1000 linhas e subcontava as lojas.
+      const publishedLodges = () =>
+        (dbClient as any).from('organizations').select('id', { count: 'exact', head: true }).eq('is_active', true).eq('is_published', true);
+      const [{ count: lodgesTotal }, { count: lodgesNoCoords }, { count: lodgesNew }] = await Promise.all([
+        publishedLodges(),
+        publishedLodges().or('latitude.is.null,longitude.is.null,latitude.eq.0'),
+        publishedLodges().gte('created_at', new Date(thirtyDaysAgo).toISOString()),
+      ]);
+      publishedLodgesCount = lodgesTotal || 0;
+      lodgesWithoutCoordinates = lodgesNoCoords || 0;
+      newLodges30d = lodgesNew || 0;
     } catch {
       // Ignora erro se tabela não estiver disponível
     }
@@ -343,6 +348,7 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
     let monthlyRevenueBrl = 0;
     let annualRevenueBrl = 0;
     const paymentStatusByBusinessId = new Map<string, 'paid' | 'pending' | 'overdue'>();
+    const payingBusinessIds = new Set<string>();
 
     try {
       const { data: invoicesData } = await (dbClient as any)
@@ -357,6 +363,21 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
       confirmedPaymentsCount = paidInvoices.length;
       pendingPaymentsCount = openInvoices.length;
       overduePaymentsCount = overdueInvoices.length;
+
+      // Empresas com pagamento vigente: fatura paga dentro da vigência do contrato (12 meses; 24 no plano bienal).
+      const validityDays = new Map<string, number>();
+      try {
+        const { data: termsRows } = await (dbClient as any).from('business_commercial_terms').select('business_id, billing_cycle');
+        for (const t of termsRows || []) validityDays.set(t.business_id, t.billing_cycle === 'biennial' ? 730 : 365);
+      } catch {
+        // sem termos comerciais: vigência padrão de 12 meses
+      }
+      const nowMs = Date.now();
+      for (const inv of paidInvoices) {
+        const paidMs = new Date(inv.paid_at || inv.created_at).getTime();
+        if (!inv.business_id || Number.isNaN(paidMs)) continue;
+        if (nowMs - paidMs <= (validityDays.get(inv.business_id) ?? 365) * 86_400_000) payingBusinessIds.add(inv.business_id);
+      }
 
       invoices.forEach((inv) => {
         if (!inv.business_id) return;
@@ -388,7 +409,6 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
         const parsedDate = new Date(rawDate);
         return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
       };
-      const totalPaidAmount = paidInvoices.reduce((sum, inv) => sum + paidInvoiceAmount(inv), 0);
       const currentMonthPaidAmount = paidInvoices.reduce((sum, inv) => {
         const paidDate = paidInvoiceDate(inv);
         if (!paidDate || paidDate.getFullYear() !== now.getFullYear() || paidDate.getMonth() !== now.getMonth()) {
@@ -406,34 +426,32 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
         return sum + paidInvoiceAmount(inv);
       }, 0);
 
-      // Se houver faturas pagas reais, usa caixa confirmado por perÃ­odo.
-      if (totalPaidAmount > 0) {
-        annualRevenueBrl = Math.round(currentYearPaidAmount > 0 ? currentYearPaidAmount : totalPaidAmount);
-        monthlyRevenueBrl = Math.round(currentMonthPaidAmount);
-      } else {
-        // Recorrência calculada pela carteira de planos comerciais das empresas publicadas
-        // Acácia/Ouro = R$ 1.080/ano | Compasso/Prata = R$ 855/ano | Esquadro/Bronze = R$ 635/ano
-        const pubOuro = businesses.filter((b) => b.publication_status === 'published' && ['ouro', 'acacia', 'ouro_founder'].includes((b.plan_tier || '').toLowerCase())).length;
-        const pubPrata = businesses.filter((b) => b.publication_status === 'published' && ['prata', 'compasso'].includes((b.plan_tier || '').toLowerCase())).length;
-        const pubBronze = businesses.filter((b) => b.publication_status === 'published' && ['bronze', 'esquadro'].includes((b.plan_tier || 'bronze').toLowerCase())).length;
-
-        const calculatedAnnual = (pubOuro * 1080) + (pubPrata * 855) + (pubBronze * 635);
-        annualRevenueBrl = calculatedAnnual > 0 ? calculatedAnnual : (activeSubscriptionsCount * 1080);
-        monthlyRevenueBrl = Math.round(annualRevenueBrl / 12);
-        confirmedPaymentsCount = publishedCompanies || activeSubscriptionsCount;
-        pendingPaymentsCount = pendingCompanies;
-      }
+      // Receita CONFIRMADA = faturas pagas (caixa): no mês e no ano corrente. Nada de estimativa por plano aqui: carteira
+      // estimada e receita confirmada são números diferentes e não podem aparecer com o mesmo rótulo.
+      annualRevenueBrl = Math.round(currentYearPaidAmount);
+      monthlyRevenueBrl = Math.round(currentMonthPaidAmount);
     } catch {
-      // Fallback pela carteira de planos comerciais das empresas publicadas
-      const pubOuro = businesses.filter((b) => b.publication_status === 'published' && ['ouro', 'acacia', 'ouro_founder'].includes((b.plan_tier || '').toLowerCase())).length;
-      const pubPrata = businesses.filter((b) => b.publication_status === 'published' && ['prata', 'compasso'].includes((b.plan_tier || '').toLowerCase())).length;
-      const pubBronze = businesses.filter((b) => b.publication_status === 'published' && ['bronze', 'esquadro'].includes((b.plan_tier || 'bronze').toLowerCase())).length;
+      // Falha ao ler faturas: zera (melhor mostrar zero do que um valor inventado).
+      annualRevenueBrl = 0;
+      monthlyRevenueBrl = 0;
+    }
 
-      const calculatedAnnual = (pubOuro * 1080) + (pubPrata * 855) + (pubBronze * 635);
-      annualRevenueBrl = calculatedAnnual > 0 ? calculatedAnnual : (activeSubscriptionsCount * 1080);
-      monthlyRevenueBrl = Math.round(annualRevenueBrl / 12);
-      confirmedPaymentsCount = publishedCompanies || activeSubscriptionsCount;
-      pendingPaymentsCount = pendingCompanies;
+    // Assinaturas ativas = empresas distintas com pagamento vigente (faturas pagas) ou assinatura ativa registrada,
+    // ainda existentes e não suspensas/rejeitadas. As publicadas sem pagamento vigente (cortesia, fundadoras, em
+    // implantação) aparecem à parte, para explicar a diferença para "Empresas ativas".
+    {
+      const liveBusinessIds = new Set(
+        businesses.filter((b) => b.is_active !== false && !['suspended', 'rejected'].includes(b.publication_status || '')).map((b) => b.id),
+      );
+      const activeIds = new Set<string>();
+      for (const sub of activeSubscriptionsList) if (sub.business_id && liveBusinessIds.has(sub.business_id)) activeIds.add(sub.business_id);
+      payingBusinessIds.forEach((id) => {
+        if (liveBusinessIds.has(id)) activeIds.add(id);
+      });
+      activeSubscriptionsCount = activeIds.size;
+      publishedWithoutActivePayment = businesses.filter(
+        (b) => b.publication_status === 'published' && b.is_active !== false && !activeIds.has(b.id),
+      ).length;
     }
 
     // 3.7 Perfis Incompletos (< 70% de dados essenciais)
@@ -639,6 +657,7 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
         activeCompanies: publishedCompanies,
         pendingApprovals: pendingCompanies,
         activeSubscriptions: activeSubscriptionsCount,
+        publishedWithoutActivePayment,
         confirmedMonthlyRevenueBrl: monthlyRevenueBrl,
         confirmedAnnualRevenueBrl: annualRevenueBrl,
         pendingPaymentsCount: pendingPaymentsCount,

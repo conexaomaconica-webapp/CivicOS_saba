@@ -1,5 +1,6 @@
 'use client';
 
+import { systemConfirm, systemNotify } from '@/components/system/SystemFeedback';
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { getCanonicalAdminTenantAction } from '@/app/actions/admin-tenant-context';
@@ -186,14 +187,14 @@ export default function AdminGuiaCategoriasPage() {
       fetchData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro ao salvar categoria';
-      alert(msg);
+      systemNotify({ type: 'danger', message: msg });
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Deseja remover esta categoria do destaque?')) return;
+    if (!(await systemConfirm({ message: 'Deseja remover esta categoria do destaque?', danger: true, confirmLabel: 'Remover' }))) return;
     try {
       const supabase = createClient();
       await (supabase as any).from('directory_featured_categories').delete().eq('id', id);
@@ -286,7 +287,7 @@ export default function AdminGuiaCategoriasPage() {
   };
 
   const handleCategoryDelete = async (category: BaseCategory) => {
-    if (!confirm(`Excluir permanentemente a categoria “${category.name}”? Esta ação não pode ser desfeita.`)) return;
+    if (!(await systemConfirm({ message: `Excluir permanentemente a categoria “${category.name}”? Esta ação não pode ser desfeita.`, danger: true, confirmLabel: 'Excluir' }))) return;
     setUpdatingCategoryId(category.id);
     setLoadError(null);
     const result = await deleteAdminGuideCategoryAction(category.id);

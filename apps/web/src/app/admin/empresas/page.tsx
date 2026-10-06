@@ -633,7 +633,7 @@ export default function AdminBusinessesDirectoryPage() {
                     {item.name.charAt(0)}
                   </div>
                   <div className="min-w-0">
-                    <div className="font-serif font-bold text-stone-900 truncate">{item.name}</div>
+                    <div className="font-serif font-bold text-[#3B0B14] truncate">{item.name}</div>
                     <div className="text-[11px] text-stone-500 font-semibold truncate">
                       {item.category} • {item.city}{item.state ? `, ${item.state}` : ''}
                     </div>
@@ -642,14 +642,33 @@ export default function AdminBusinessesDirectoryPage() {
                 <div className="mt-3 space-y-0.5 text-xs text-stone-700 min-w-0">
                   <div className="truncate">
                     <span className="text-stone-400">Responsável:</span>{' '}
-                    <span className="font-bold text-stone-900">{item.owner_name}</span>
+                    <span className="font-bold text-[#3B0B14]">{item.owner_name}</span>
                   </div>
                   <div className="text-[11px] text-stone-500 font-mono truncate">{item.owner_email}</div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
-                  <span className="px-2 py-0.5 rounded-full bg-stone-100 border border-stone-200 font-bold uppercase">{item.plan_code}</span>
-                  <span className="px-2 py-0.5 rounded-full bg-stone-100 border border-stone-200 font-bold">{item.publication_status}</span>
-                  <span className="px-2 py-0.5 rounded-full bg-stone-100 border border-stone-200 font-bold">Completude {item.completeness_percent}%</span>
+                  <span className="px-2 py-0.5 rounded-full bg-stone-100 border border-stone-300 font-extrabold uppercase text-[#3B0B14]">
+                    {PLAN_LABELS[item.plan_code.toLowerCase()] ?? item.plan_code}
+                  </span>
+                  {item.publication_status === 'published' ? (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold">✓ Publicada</span>
+                  ) : item.publication_status === 'suspended' ? (
+                    <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-900 border border-rose-300 font-bold">Suspensa</span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-300 font-bold">
+                      {PUBLICATION_STATUS_LABELS[item.publication_status] ?? item.publication_status}
+                    </span>
+                  )}
+                  {item.payment_status === 'paid' ? (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold">✓ Pagamento confirmado</span>
+                  ) : item.payment_status === 'overdue' ? (
+                    <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-900 border border-rose-300 font-bold">Pagamento em atraso</span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold">Pagamento pendente</span>
+                  )}
+                  <span className="px-2 py-0.5 rounded-full bg-stone-100 border border-stone-300 font-bold text-[#3B0B14]">
+                    Cadastro {item.completeness_percent}% completo
+                  </span>
                   {item.is_verified && (
                     <span className="px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold">Verificada</span>
                   )}

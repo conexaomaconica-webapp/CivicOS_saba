@@ -22,6 +22,7 @@ import {
   formatDataInicioVigencia,
   appendSignatureImageToContractText,
 } from './contract-template-renderer';
+import { pickResponsibleName } from '@/lib/contracts/responsible-name';
 import { generatePublicLinkToken, MIN_PUBLIC_LINK_TOKEN_LENGTH } from '@/lib/security/public-link-token';
 import {
   CANONICAL_ADVERTISER_CONTRACT_CODE,
@@ -228,7 +229,7 @@ export async function getAdminContractDraftPreviewAction(
     const rawCnpj = biz.cnpj || biz.cnpj_cpf || '00000000000000';
     const formattedCnpj = formatCpfCnpj(rawCnpj);
 
-    const responsavelNome = resp?.name || ownerProfile?.name || 'Responsável Legal';
+    const responsavelNome = pickResponsibleName(resp?.name, ownerProfile?.name) || 'Responsável Legal';
     const overrideCpfDigits = overrideResponsibleCpf?.replace(/\D/g, '') || '';
     const overrideCpfError = overrideCpfDigits ? validateCpf(overrideCpfDigits) : null;
     if (overrideCpfError) {
@@ -550,7 +551,7 @@ export async function generateAdminContractSnapshotAction(
     const rawCnpj = biz.cnpj || biz.cnpj_cpf || '00000000000000';
     const formattedCnpj = formatCpfCnpj(rawCnpj);
 
-    const responsavelNome = resp?.name || ownerProfile?.name || 'Responsável Legal';
+    const responsavelNome = pickResponsibleName(resp?.name, ownerProfile?.name) || 'Responsável Legal';
     const rawCpf = ctRow.responsible_cpf || '00000000000';
     const formattedCpf = formatCpfCnpj(rawCpf);
     const responsavelEmail = ownerProfile?.email || biz.email || 'contato@anunciante.com.br';
@@ -615,7 +616,7 @@ export async function generateAdminContractSnapshotAction(
                 commercial_status: 'contrato_gerado',
                 updated_at: new Date().toISOString(),
               })
-              .eq('id', biz.id);
+              .eq('id', biz.id).throwOnError();
           }
 
           return {
@@ -1169,6 +1170,8 @@ export interface PublicContractDetailsResult {
       pix_copia_e_cola?: string;
       qr_code_base64?: string;
       payment_id?: string;
+      /** Pix direto na conta da Conexão (conta do gateway ainda não aprovada): a equipe confirma o recebimento. */
+      is_manual_pix?: boolean;
     };
   };
 }
@@ -1176,6 +1179,8 @@ export interface PublicContractDetailsResult {
 export interface SignPublicContractPayload {
   token: string;
   signer_cpf: string;
+  /** Nome completo do representante, quando o signatário corrige o cadastro no ato da assinatura. */
+  signer_name?: string;
   agree_terms: boolean;
   signature_image_data: string;
 }
@@ -1245,7 +1250,7 @@ export async function renewAdminContractPaymentLinkAction(
       .update({ is_revoked: true, revoked_at: new Date().toISOString() })
       .eq('business_id', businessId)
       .eq('token_type', 'onboarding_payment')
-      .eq('is_revoked', false);
+      .eq('is_revoked', false).throwOnError();
 
     const token = generatePublicLinkToken();
     const tokenHash = crypto.createHash('sha256').update(token, 'utf8').digest('hex');
@@ -1277,7 +1282,7 @@ export async function renewAdminContractPaymentLinkAction(
         expires_at: expiresAt,
         commercial_status: 'contrato_enviado',
         already_sent: true,
-        responsavel_nome: resp?.name || biz.name,
+        responsavel_nome: pickResponsibleName(resp?.name) || biz.name,
         responsavel_whatsapp: resp?.whatsapp || undefined,
       },
     };
@@ -1301,6 +1306,46 @@ export async function renewAdminContractPaymentLinkAction(
  * - Registra auditoria em admin_audit_logs.
  * - Retorna o link /contratacao/[token].
  */
+/**
+ * Situação do link público da empresa, SOMENTE LEITURA. Não cria, não gira e não revoga link algum.
+ * (Abrir a tela de contratação nunca pode invalidar um link que o cliente já recebeu; só os botões explícitos fazem isso.)
+ */
+export async function getActiveContractLinkInfoAction(businessId: string): Promise<{
+  success: boolean;
+  hasActive: boolean;
+  kind: 'signature' | 'payment' | null;
+  expiresAt: string | null;
+}> {
+  try {
+    const { supabase } = await assertPlatformAdminAccess();
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const dbClient = (serviceRoleKey && supabaseUrl)
+      ? createClient<Database>(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+      : supabase;
+
+    const { data } = await (dbClient as any)
+      .from('business_onboarding_tokens')
+      .select('token_type, expires_at')
+      .eq('business_id', businessId)
+      .eq('is_revoked', false)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!data) return { success: true, hasActive: false, kind: null, expiresAt: null };
+    return {
+      success: true,
+      hasActive: true,
+      kind: data.token_type === 'onboarding_payment' ? 'payment' : 'signature',
+      expiresAt: data.expires_at,
+    };
+  } catch {
+    return { success: false, hasActive: false, kind: null, expiresAt: null };
+  }
+}
+
 export async function sendAdminContractForSignatureAction(
   businessId: string
 ): Promise<SendContractForSignatureResult> {
@@ -1337,14 +1382,14 @@ export async function sendAdminContractForSignatureAction(
       .eq('business_id', businessId)
       .maybeSingle();
 
-    let responsavelNome = resp?.name;
+    let responsavelNome = pickResponsibleName(resp?.name);
     if (!responsavelNome && biz.owner_id) {
       const { data: prof } = await (dbClient as any)
         .from('profiles')
         .select('name')
         .eq('id', biz.owner_id)
         .maybeSingle();
-      responsavelNome = prof?.name;
+      responsavelNome = pickResponsibleName(prof?.name);
     }
     responsavelNome = responsavelNome || biz.name;
 
@@ -1404,7 +1449,7 @@ export async function sendAdminContractForSignatureAction(
             await (dbClient as any)
               .from('business_onboarding_tokens')
               .update({ is_revoked: true, revoked_at: new Date().toISOString() })
-              .eq('id', existingToken.id);
+              .eq('id', existingToken.id).throwOnError();
           }
 
           const rawToken = generatePublicLinkToken();
@@ -1421,7 +1466,7 @@ export async function sendAdminContractForSignatureAction(
               token: null,
               expires_at: expiresAt,
               is_revoked: false,
-            });
+            }).throwOnError();
 
           const publicUrl = `${baseUrl}/contratacao/${rawToken}`;
 
@@ -1507,7 +1552,7 @@ export async function sendAdminContractForSignatureAction(
         revoked_at: new Date().toISOString(),
       })
       .eq('business_id', businessId)
-      .eq('is_revoked', false);
+      .eq('is_revoked', false).throwOnError();
 
     // 9. Geração de token criptograficamente seguro (48 bytes hex = 96 chars)
     // HARDENING: Armazena apenas o hash SHA-256 no banco e vincula explicitamente a contract_id e snapshot_id
@@ -1687,7 +1732,7 @@ export async function revokeAdminContractSignatureTokenAction(
         revoked_at: revokedAt,
       })
       .eq('business_id', businessId)
-      .eq('is_revoked', false);
+      .eq('is_revoked', false).throwOnError();
 
     // 4. Retorna contrato para draft
     await (dbClient as any)
@@ -1696,7 +1741,7 @@ export async function revokeAdminContractSignatureTokenAction(
         status: 'draft',
         updated_at: revokedAt,
       })
-      .eq('id', awaitingContract.id);
+      .eq('id', awaitingContract.id).throwOnError();
 
     // 5. Retorna status comercial para contrato_gerado
     await (dbClient as any)
@@ -1705,7 +1750,7 @@ export async function revokeAdminContractSignatureTokenAction(
         commercial_status: 'contrato_gerado',
         updated_at: revokedAt,
       })
-      .eq('id', businessId);
+      .eq('id', businessId).throwOnError();
 
     // 6. Registra auditoria
     try {
@@ -1894,7 +1939,7 @@ export async function getPublicContractByTokenAction(
       .eq('business_id', biz.id)
       .maybeSingle();
 
-    let responsavelNome = resp?.name;
+    let responsavelNome = pickResponsibleName(resp?.name);
     let responsavelCpf: string | undefined = snap.signer_cpf || terms?.responsible_cpf || undefined;
     let responsavelEmail = biz.email;
 
@@ -1905,7 +1950,7 @@ export async function getPublicContractByTokenAction(
         .eq('id', biz.owner_id)
         .maybeSingle();
       if (prof) {
-        if (!responsavelNome) responsavelNome = prof.name;
+        if (!responsavelNome) responsavelNome = pickResponsibleName(prof.name);
         if (!responsavelCpf) responsavelCpf = prof.document_number;
         if (prof.email) responsavelEmail = prof.email;
       }
@@ -1942,7 +1987,7 @@ export async function getPublicContractByTokenAction(
           await (dbClient as any)
             .from('business_onboarding_tokens')
             .update({ is_revoked: true, revoked_at: new Date().toISOString() })
-            .eq('id', payTok.id);
+            .eq('id', payTok.id).throwOnError();
         }
 
         await (dbClient as any)
@@ -1956,7 +2001,7 @@ export async function getPublicContractByTokenAction(
             token: null,
             expires_at: payExpires,
             is_revoked: false,
-          });
+          }).throwOnError();
 
         activePaymentToken = rawPayTok;
       }
@@ -1976,7 +2021,7 @@ export async function getPublicContractByTokenAction(
       if (inv) {
         const { data: attempt } = await (dbClient as any)
           .from('payment_attempts')
-          .select('id, payment_method, status, payload_received')
+          .select('id, payment_method, status, payload_received, provider_code')
           .eq('invoice_id', inv.id)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -1993,6 +2038,7 @@ export async function getPublicContractByTokenAction(
           pix_copia_e_cola: attempt?.payload_received?.pix_copia_e_cola,
           qr_code_base64: attempt?.payload_received?.qr_code_base64,
           payment_id: attempt?.payload_received?.payment_id,
+          is_manual_pix: attempt?.provider_code === 'manual_pix',
         };
       }
     }
@@ -2093,6 +2139,14 @@ export async function signPublicContractAction(
       };
     }
 
+    // Nome informado pelo signatário (opcional): nome completo, sem texto genérico.
+    const declaredNameRaw = String(payload.signer_name ?? '').replace(/\s+/g, ' ').trim();
+    if (declaredNameRaw) {
+      if (declaredNameRaw.length > 120 || declaredNameRaw.split(' ').filter(Boolean).length < 2 || !pickResponsibleName(declaredNameRaw)) {
+        return { success: false, error: 'Informe o nome completo do representante legal (nome e sobrenome).' };
+      }
+    }
+
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     if (!serviceRoleKey || !supabaseUrl) {
@@ -2147,8 +2201,8 @@ export async function signPublicContractAction(
       return { success: false, error: 'Empresa associada não encontrada.' };
     }
 
-    // A identidade do signatário é a já conferida nos termos comerciais.
-    // O navegador não pode substituir o CPF cadastrado pelo administrador.
+    // O CPF cadastrado pela equipe é a referência. O signatário pode corrigir nome e CPF no ato da assinatura (o CPF
+    // precisa ser válido): a divergência fica gravada no próprio contrato assinado e em alerta para a equipe conferir.
     const { data: commercialTerms, error: termsErr } = await (dbClient as any)
       .from('business_commercial_terms')
       .select('responsible_cpf')
@@ -2160,15 +2214,12 @@ export async function signPublicContractAction(
     }
 
     const registeredCpf = commercialTerms?.responsible_cpf?.replace(/\D/g, '') || '';
-    if (validateCpf(registeredCpf)) {
+    const cpfDiverges = cleanCpf !== registeredCpf;
+    if (!cpfDiverges && validateCpf(registeredCpf)) {
       return {
         success: false,
-        error: 'O CPF cadastrado para o representante legal é inválido. Solicite a correção dos dados antes de assinar.',
+        error: 'O CPF cadastrado para o representante legal é inválido. Corrija o CPF no campo acima antes de assinar.',
       };
-    }
-
-    if (cleanCpf !== registeredCpf) {
-      return { success: false, error: 'O CPF informado não corresponde ao representante legal cadastrado.' };
     }
 
     // 3. Valida contrato
@@ -2226,23 +2277,32 @@ export async function signPublicContractAction(
         .select('name')
         .eq('business_id', biz.id)
         .maybeSingle();
-      representativeName = respRow?.name || '';
+      representativeName = pickResponsibleName(respRow?.name);
       if (!representativeName && biz.owner_id) {
         const { data: ownerProfile } = await (dbClient as any)
           .from('profiles')
           .select('name')
           .eq('id', biz.owner_id)
           .maybeSingle();
-        representativeName = ownerProfile?.name || '';
+        representativeName = pickResponsibleName(ownerProfile?.name);
       }
     } catch (_respErr) {}
+
+    // Nome que sai abaixo da assinatura: o informado pelo signatário (se houver) ou o do cadastro.
+    const registeredRepresentativeName = representativeName;
+    const signerFinalName = declaredNameRaw || registeredRepresentativeName;
+    const normalizeName = (value: string) =>
+      value.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const nameDiverges = Boolean(declaredNameRaw) && normalizeName(declaredNameRaw) !== normalizeName(registeredRepresentativeName);
+    const signerDiverges = cpfDiverges || nameDiverges;
 
     const signedRenderedText = appendSignatureImageToContractText(
       snapshot.rendered_text,
       sigData,
       biz.name,
-      biz.legal_name,
-      representativeName
+      biz.legal_name || biz.name,
+      signerFinalName,
+      { cpf: cleanCpf, divergesFromRegistration: signerDiverges }
     );
     const signedSha256Hash = crypto
       .createHash('sha256')
@@ -2292,12 +2352,12 @@ export async function signPublicContractAction(
           rendered_text: signedRenderedText,
           sha256_hash: signedSha256Hash,
         })
-        .eq('id', snapshot.id);
+        .eq('id', snapshot.id).throwOnError();
 
       await (dbClient as any)
         .from('contract_acceptances')
         .update({ sha256_hash: signedSha256Hash })
-        .eq('snapshot_id', snapshot.id);
+        .eq('snapshot_id', snapshot.id).throwOnError();
     }
 
     if (!atomicSuccess) {
@@ -2370,7 +2430,7 @@ export async function signPublicContractAction(
           is_revoked: true,
           revoked_at: acceptedAt,
         })
-        .eq('id', tokenRow.id);
+        .eq('id', tokenRow.id).throwOnError();
     }
 
     // 11. Trilha de Auditoria
@@ -2389,12 +2449,33 @@ export async function signPublicContractAction(
           contract_status: 'signed',
           commercial_status: 'contrato_assinado',
           signer_cpf: cleanCpf,
+          signer_name: signerFinalName || null,
           accepted_at: acceptedAt,
           token_id: tokenRow.id,
           snapshot_id: snapshot.id,
         },
         reason: 'Assinatura eletrônica formalizada com sucesso pelo anunciante via link seguro.',
       });
+
+      // Dados do signatário diferentes do cadastro: alerta para a equipe conferir (aparece na contratação da empresa).
+      if (signerDiverges) {
+        await (dbClient as any).from('admin_audit_logs').insert({
+          tenant_id: biz.tenant_id,
+          actor_id: biz.owner_id || null,
+          action: 'CONTRACT_SIGNED_DIVERGENT_SIGNER',
+          entity_type: 'business',
+          entity_id: biz.id,
+          before_value: { registered_name: registeredRepresentativeName || null, registered_cpf: registeredCpf || null },
+          after_value: {
+            declared_name: signerFinalName || null,
+            declared_cpf: cleanCpf,
+            name_differs: nameDiverges,
+            cpf_differs: cpfDiverges,
+            contract_id: contract.id,
+          },
+          reason: 'O signatário informou nome e/ou CPF diferentes do cadastro ao assinar. Conferir o contrato assinado.',
+        });
+      }
     } catch (_auditErr) {}
 
     // 12. Busca dados comerciais para resumo pós-assinatura
@@ -2428,7 +2509,7 @@ export async function signPublicContractAction(
           token: null,
           expires_at: paymentExpiresAt,
           is_revoked: false,
-        });
+        }).throwOnError();
     } catch (_tokErr) {}
 
     // 14. Revalidação de rotas

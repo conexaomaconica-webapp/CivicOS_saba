@@ -140,8 +140,13 @@ export class AsaasPaymentProvider implements IPaymentProvider {
     }
 
     try {
-      // Busca cliente existente pelo CPF/CNPJ ou e-mail
-      const searchRes = await fetch(`${this.baseUrl}/customers?email=${encodeURIComponent(data.email)}`, {
+      // Busca cliente existente. O CPF/CNPJ identifica a pessoa/empresa; o e-mail só é usado quando não há documento
+      // (e-mails genéricos, como o do financeiro, são compartilhados e não podem apontar para o cliente de outra empresa).
+      const documentDigits = data.cpfCnpj ? data.cpfCnpj.replace(/\D/g, '') : '';
+      const lookup = documentDigits
+        ? `cpfCnpj=${encodeURIComponent(documentDigits)}`
+        : `email=${encodeURIComponent(data.email)}`;
+      const searchRes = await fetch(`${this.baseUrl}/customers?${lookup}`, {
         method: 'GET',
         headers: {
           access_token: this.apiKey,
@@ -153,8 +158,8 @@ export class AsaasPaymentProvider implements IPaymentProvider {
         const searchJson = await searchRes.json();
         if (searchJson?.data && searchJson.data.length > 0) {
           const existingCustomerId: string = searchJson.data[0].id;
-          // Clientes criados antes do ajuste podem ainda enviar notificações do Asaas.
-          // Desativa no cadastro existente; falha aqui não impede a cobrança.
+          // Notificações do Asaas desativadas; e, se o cliente existente não tiver documento, completa (o Asaas exige
+          // CPF/CNPJ no cliente para gerar PIX). Falha aqui não impede a cobrança.
           try {
             await fetch(`${this.baseUrl}/customers/${existingCustomerId}`, {
               method: 'PUT',
@@ -162,7 +167,10 @@ export class AsaasPaymentProvider implements IPaymentProvider {
                 access_token: this.apiKey,
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({ notificationDisabled: true }),
+              body: JSON.stringify({
+                notificationDisabled: true,
+                ...(documentDigits && !searchJson.data[0].cpfCnpj ? { cpfCnpj: documentDigits } : {}),
+              }),
             });
           } catch {
             // Ignorado de propósito: a notificação do Asaas é secundária à cobrança.

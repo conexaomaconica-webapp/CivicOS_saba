@@ -45,6 +45,7 @@ export default async function NewAdminAdvertiserPage() {
         <Link href="/admin/empresas" className="mb-3 inline-flex items-center gap-1.5 text-xs font-bold text-stone-600 hover:text-[#3B0B14]"><ArrowLeft className="h-4 w-4" /> Voltar para empresas</Link>
         <h1 className="font-serif text-3xl font-bold text-stone-900">Cadastrar anunciante</h1>
         <p className="mt-1 text-sm text-stone-600">Crie um rascunho vinculado ao responsável. Aprovação e publicação continuam sujeitas ao dossiê obrigatório.</p>
+        <p className="mt-2 text-sm text-stone-600">Prefere que o cliente preencha os dados? <Link href="/admin/empresas/convites" className="font-bold text-[#3B0B14] underline underline-offset-2">Enviar um convite de cadastro</Link> — você confere tudo antes de seguir para o contrato.</p>
       </div>
       <AdvertiserCreateForm
         tenantId={currentTenantId}

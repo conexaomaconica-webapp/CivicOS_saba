@@ -50,7 +50,8 @@ export default function BusinessForm({ categories, tenantId }: BusinessFormProps
   const [cnpj, setCnpj] = useState('');
   const [legalName, setLegalName] = useState('');
   const [tradingName, setTradingName] = useState('');
-  const [phone, setPhone] = useState('');
+  // O telefone informado no passo 1 já vale como contato da empresa (pode ser trocado aqui).
+  const [phone, setPhone] = useState(responsibleDraft?.phone || '');
   const [categoryId, setCategoryId] = useState('');
   const [isMasonicConnectionPublic, setIsMasonicConnectionPublic] = useState(true);
   const [errors, setErrors] = useState<BusinessStepErrors>({});
@@ -192,7 +193,7 @@ export default function BusinessForm({ categories, tenantId }: BusinessFormProps
         >
           <span>
             Responsável: <strong>{responsibleDraft.name}</strong> ·{' '}
-            {responsibleDraft.relationship === 'owner' ? 'Proprietário / Sócio Diretor' : 'Representante Comercial / Procurador'}
+            {responsibleDraft.relationship === 'owner' ? 'Proprietário / Sócio Diretor' : 'Representante / Procurador'}
           </span>
           {responsibleDraft.masonic && (
             <span>

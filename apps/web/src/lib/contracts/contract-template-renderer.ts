@@ -120,7 +120,8 @@ export function appendSignatureImageToContractText(
   signatureImageData: string,
   fantasyName: string,
   contractorLegalName?: string | null,
-  representativeName?: string | null
+  representativeName?: string | null,
+  signerDeclaration?: { cpf?: string | null; divergesFromRegistration?: boolean } | null
 ): string {
   const text = String(renderedText || '').trim();
   const signature = String(signatureImageData || '').trim();
@@ -134,6 +135,10 @@ export function appendSignatureImageToContractText(
   // quando a razão social não estiver cadastrada).
   const legalName = escapeHtml(String(contractorLegalName || fantasyName || '').trim());
   const representative = escapeHtml(String(representativeName || '').trim());
+  const signerCpfDigits = String(signerDeclaration?.cpf || '').replace(/\D/g, '');
+  const signerCpfLabel = signerCpfDigits.length === 11
+    ? `${signerCpfDigits.slice(0, 3)}.${signerCpfDigits.slice(3, 6)}.${signerCpfDigits.slice(6, 9)}-${signerCpfDigits.slice(9)}`
+    : '';
 
   if (!text) {
     throw new Error('Texto contratual renderizado e obrigatorio para anexar assinatura.');
@@ -151,7 +156,9 @@ export function appendSignatureImageToContractText(
   <img src="${signature}" alt="Assinatura eletronica do representante legal" style="display:block;max-width:320px;max-height:130px;margin:0 auto 6px;object-fit:contain" />
   <div style="width:360px;max-width:100%;margin:0 auto;border-top:1px solid #333;padding-top:6px;font-size:12px;font-weight:bold">
     <div>CONTRATANTE / RAZÃO SOCIAL: ${legalName || 'CONTRATANTE'}</div>${representative ? `
-    <div>REPRESENTANTE LEGAL: ${representative}</div>` : ''}
+    <div>REPRESENTANTE LEGAL: ${representative}</div>` : ''}${signerCpfLabel ? `
+    <div>CPF: ${signerCpfLabel}</div>` : ''}${signerDeclaration?.divergesFromRegistration ? `
+    <div style="font-weight:normal;font-size:10px;margin-top:4px">Nome e/ou CPF informados pelo signatário no ato da assinatura, diferentes do cadastro prévio.</div>` : ''}
   </div>
 </section>`;
 }

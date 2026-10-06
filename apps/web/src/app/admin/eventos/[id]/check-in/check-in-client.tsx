@@ -1,5 +1,6 @@
 'use client';
 
+import { systemConfirm, systemNotify } from '@/components/system/SystemFeedback';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
@@ -163,7 +164,7 @@ export function CheckinClient({ eventId }: Props) {
   };
 
   const handleUndoCheckin = async (reg: AdminRegistrationItem) => {
-    if (!window.confirm(`Confirma DESFAZER o check-in de "${reg.full_name}"?`)) {
+    if (!(await systemConfirm({ message: `Confirma DESFAZER o check-in de "${reg.full_name}"?`, danger: true, confirmLabel: 'Desfazer' }))) {
       return;
     }
 
@@ -180,7 +181,7 @@ export function CheckinClient({ eventId }: Props) {
       );
       loadDashboard();
     } else {
-      alert(result.error ?? 'Erro ao desfazer check-in.');
+      systemNotify({ type: 'danger', message: result.error ?? 'Erro ao desfazer check-in.' });
     }
   };
 

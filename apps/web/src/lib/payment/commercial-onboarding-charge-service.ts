@@ -7,11 +7,31 @@ import { AsaasPaymentProvider } from './asaas-payment-provider';
 import { getAsaasDynamicConfig } from './asaas-config-service';
 import type { CreditCardPayload } from './payment-provider.interface';
 import { buildOnboardingPaymentReference } from './payment-idempotency';
+import { buildManualPixCharge, getManualPixConfig, isAccountNotApprovedError } from './manual-pix';
 import { MIN_PUBLIC_LINK_TOKEN_LENGTH } from '@/lib/security/public-link-token';
 import {
   COMMERCIAL_STATUS,
   assertCommercialStatusTransition,
 } from '@/lib/commercial-onboarding-status';
+
+
+/** Mensagem para o cliente a partir do erro do gateway: orienta o que fazer sem revelar chaves ou configuração. */
+function friendlyGatewayError(raw: string | undefined, kind: 'PIX' | 'cartão'): string {
+  const text = String(raw || '').toLowerCase();
+  if (/cpf|cnpj/.test(text)) {
+    return `O gateway de pagamento recusou o CPF/CNPJ cadastrado para esta empresa. Peça à equipe da Conexão para conferir o documento no cadastro e tente de novo.`;
+  }
+  if (/e-?mail/.test(text)) {
+    return 'O gateway de pagamento recusou o e-mail cadastrado. Peça à equipe da Conexão para conferir o e-mail da empresa e tente de novo.';
+  }
+  if (/conta.*(aprova|analise|an[aá]lise|pendente|bloquead)|chave pix|pix.*(chave|habilit)|account.*(approved|pending)/.test(text)) {
+    return 'O pagamento por PIX ainda não está habilitado na conta de recebimento. A equipe da Conexão foi avisada; tente novamente mais tarde.';
+  }
+  if (/401|403|access_token|chave de api|invalid_access/.test(text)) {
+    return 'O pagamento está temporariamente indisponível. A equipe da Conexão foi avisada; tente novamente mais tarde.';
+  }
+  return `Não foi possível gerar a cobrança por ${kind} agora. Tente novamente em instantes; se persistir, fale com a equipe da Conexão.`;
+}
 
 export interface CommercialOnboardingCreditCardInput {
   holderName: string;
@@ -50,6 +70,8 @@ export interface CreateCommercialOnboardingChargeResult {
     status: string;
     pix_copia_e_cola?: string;
     qr_code_base64?: string;
+    /** Pix direto na conta da Conexão (conta do gateway ainda não aprovada): a equipe confirma o recebimento. */
+    is_manual_pix?: boolean;
     commercial_status: 'aguardando_pagamento';
   };
 }
@@ -334,19 +356,24 @@ export async function createCommercialOnboardingChargeAction(
     let qrCodeBase64: string | undefined;
     let chargeStatus = 'Aguardando pagamento';
     let isReusedAttempt = false;
+    let isManualPix = false;
+    // Tentativa anterior por Pix manual: só é reutilizada se o Asaas continuar recusando (conta ainda não aprovada).
+    let previousManualAttempt: any = null;
 
     // Se já houver cobrança PIX gerada para esta fatura, reutiliza sem chamar Asaas novamente
     if (existingInv && payload.payment_method === 'pix') {
       const { data: prevAttempt } = await (dbClient as any)
         .from('payment_attempts')
-        .select('id, payment_method, status, payload_received')
+        .select('id, payment_method, status, payload_received, provider_code')
         .eq('invoice_id', existingInv.id)
         .eq('payment_method', 'pix')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (prevAttempt?.payload_received?.pix_copia_e_cola) {
+      if (prevAttempt?.provider_code === 'manual_pix') {
+        previousManualAttempt = prevAttempt;
+      } else if (prevAttempt?.payload_received?.pix_copia_e_cola) {
         paymentId = prevAttempt.payload_received.payment_id || '';
         pixCopiaECola = prevAttempt.payload_received.pix_copia_e_cola;
         qrCodeBase64 = prevAttempt.payload_received.qr_code_base64;
@@ -359,12 +386,36 @@ export async function createCommercialOnboardingChargeAction(
       if (payload.payment_method === 'pix') {
         const pixRes = await paymentProvider.createPixCharge(chargePayload, customerData);
         if (!pixRes.success) {
-          return { success: false, error: 'Falha ao gerar cobrança PIX junto ao gateway de pagamentos.' };
+          // O motivo real fica no log do servidor; ao cliente vai uma mensagem útil, sem expor configuração interna.
+          console.error('[commercial-charge] falha ao gerar PIX no gateway:', pixRes.error);
+
+          // Conta do Asaas ainda não aprovada: se houver chave Pix própria configurada (MANUAL_PIX_*), mostra o Pix direto
+          // da conta da Conexão. A baixa é feita pela equipe (confirmação manual) depois de conferir o recebimento.
+          if (isAccountNotApprovedError(pixRes.error) && getManualPixConfig()) {
+            if (previousManualAttempt?.payload_received?.pix_copia_e_cola) {
+              paymentId = previousManualAttempt.payload_received.payment_id || '';
+              pixCopiaECola = previousManualAttempt.payload_received.pix_copia_e_cola;
+              qrCodeBase64 = previousManualAttempt.payload_received.qr_code_base64;
+              chargeStatus = 'Aguardando pagamento';
+              isReusedAttempt = true;
+            } else {
+              const manual = await buildManualPixCharge({ invoiceId, amountCents });
+              if (!manual) return { success: false, error: friendlyGatewayError(pixRes.error, 'PIX') };
+              paymentId = manual.paymentId;
+              pixCopiaECola = manual.pixCopiaECola;
+              qrCodeBase64 = manual.qrCodeBase64;
+              chargeStatus = 'Aguardando pagamento';
+            }
+            isManualPix = true;
+          } else {
+            return { success: false, error: friendlyGatewayError(pixRes.error, 'PIX') };
+          }
+        } else {
+          paymentId = pixRes.paymentId;
+          pixCopiaECola = pixRes.pixCopiaECola;
+          qrCodeBase64 = pixRes.qrCodeBase64;
+          chargeStatus = pixRes.status;
         }
-        paymentId = pixRes.paymentId;
-        pixCopiaECola = pixRes.pixCopiaECola;
-        qrCodeBase64 = pixRes.qrCodeBase64;
-        chargeStatus = pixRes.status;
       } else {
         const cardPayload: CreditCardPayload = {
           holderName: payload.credit_card!.holderName,
@@ -406,9 +457,9 @@ export async function createCommercialOnboardingChargeAction(
           tenant_id: biz.tenant_id,
           invoice_id: invoiceId,
           business_id: biz.id,
-          provider_code: 'asaas',
+          provider_code: isManualPix ? 'manual_pix' : 'asaas',
           provider_charge_id: paymentId,
-          provider_environment: asaasConfig.environment,
+          provider_environment: isManualPix ? 'manual' : asaasConfig.environment,
           payment_method: payload.payment_method,
           status: 'initiated',
           attempt_count: 1,
@@ -425,7 +476,7 @@ export async function createCommercialOnboardingChargeAction(
             qr_code_base64: qrCodeBase64,
             status: chargeStatus,
           },
-        });
+        }).throwOnError();
       } catch (_attErr) {}
     }
 
@@ -454,7 +505,7 @@ export async function createCommercialOnboardingChargeAction(
       await (dbClient as any)
         .from('payment_attempts')
         .update({ status: 'success' })
-        .eq('provider_charge_id', paymentId);
+        .eq('provider_charge_id', paymentId).throwOnError();
 
       const { error: businessConfirmationError } = await (dbClient as any)
         .from('businesses')
@@ -479,7 +530,7 @@ export async function createCommercialOnboardingChargeAction(
           commercial_status: 'aguardando_pagamento',
           updated_at: new Date().toISOString(),
         })
-        .eq('id', biz.id);
+        .eq('id', biz.id).throwOnError();
 
       try {
         await (dbClient as any).from('admin_audit_logs').insert({
@@ -518,6 +569,7 @@ export async function createCommercialOnboardingChargeAction(
         status: chargeStatus,
         pix_copia_e_cola: pixCopiaECola,
         qr_code_base64: qrCodeBase64,
+        is_manual_pix: isManualPix,
         commercial_status: 'aguardando_pagamento',
       },
     };

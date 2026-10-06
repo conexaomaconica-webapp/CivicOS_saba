@@ -1,5 +1,8 @@
 'use client';
 
+import { systemNotify } from '@/components/system/SystemFeedback';
+import { DEFAULT_SUPPORT_WHATSAPP, SUPPORT_CONTACT_ENTRY_ID, buildSupportContactEntry, parseSupportContact } from '@/lib/directory/support-contact';
+import { DEFAULT_HOME_SECTIONS, HOME_SECTION_LABELS, extraHomeSectionEntries, normalizeHomeSections } from '@/lib/directory/home-sections';
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Save, ArrowUp, ArrowDown, Eye, EyeOff, Loader2, CheckCircle2, Gauge, Sparkles } from 'lucide-react';
@@ -12,26 +15,6 @@ type SectionConfig = {
   order: number;
 };
 
-const SECTION_LABELS: Record<string, string> = {
-  hero: '1. Topo Hero & Busca Inteligente',
-  carousel: '2. Banner Carrossel (Destaque da Semana)',
-  categories: '3. Categorias em Destaque',
-  sponsored: '4. Empresas Patrocinadas',
-  all_businesses: '5. Diretório "Todas as Empresas" (Com Paginação)',
-  map: '6. Mapa "Explore perto de você"',
-  lodges: '7. Guia de Lojas Maçônicas',
-};
-
-const DEFAULT_SECTIONS: SectionConfig[] = [
-  { id: 'hero', enabled: true, order: 1 },
-  { id: 'carousel', enabled: true, order: 2 },
-  { id: 'categories', enabled: true, order: 3 },
-  { id: 'sponsored', enabled: true, order: 4 },
-  { id: 'all_businesses', enabled: true, order: 5 },
-  { id: 'map', enabled: true, order: 6 },
-  { id: 'lodges', enabled: true, order: 7 },
-];
-
 export default function AdminGuiaGeralPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,7 +24,12 @@ export default function AdminGuiaGeralPage() {
   const [heroSubtitle, setHeroSubtitle] = useState('Descubra oportunidades dentro de uma rede que valoriza relacionamento, credibilidade e propósito.');
   const [heroSearchPlaceholder, setHeroSearchPlaceholder] = useState('Pergunte à busca inteligente...');
   const [defaultPageSize, setDefaultPageSize] = useState(12);
-  const [sections, setSections] = useState<SectionConfig[]>(DEFAULT_SECTIONS);
+  const [sections, setSections] = useState<SectionConfig[]>(DEFAULT_HOME_SECTIONS);
+  // Entradas da configuração que não são seções da home (ex.: cota da Pedra Fundamental): preservadas ao salvar.
+  const [extraSections, setExtraSections] = useState<SectionConfig[]>([]);
+  // Contato de suporte do botão flutuante das páginas públicas.
+  const [supportWhatsapp, setSupportWhatsapp] = useState('');
+  const [supportEmail, setSupportEmail] = useState('');
   const [sponsoredDisplayMode, setSponsoredDisplayMode] = useState<'cards' | 'logos'>('cards');
   const [sponsoredSpeed, setSponsoredSpeed] = useState<number>(45);
   const [sponsoredLogoStyle, setSponsoredLogoStyle] = useState<'standard' | 'clean'>('standard');
@@ -79,7 +67,14 @@ export default function AdminGuiaGeralPage() {
             setSponsoredLogoStyle(data.sponsored_logo_style);
           }
           if (Array.isArray(data.sections_config) && data.sections_config.length > 0) {
-            setSections(data.sections_config as SectionConfig[]);
+            // Lista as seções REAIS da home (inclui as que ainda não estavam gravadas, como o Mural de Conexões).
+            setSections(normalizeHomeSections(data.sections_config));
+            setExtraSections(extraHomeSectionEntries(data.sections_config).filter((entry) => entry.id !== SUPPORT_CONTACT_ENTRY_ID));
+            const support = parseSupportContact(data.sections_config);
+            // Só preenche o campo quando há número configurado (o padrão aparece como dica, não como valor).
+            const hasCustomWhatsapp = support.whatsapp !== DEFAULT_SUPPORT_WHATSAPP;
+            setSupportWhatsapp(hasCustomWhatsapp ? support.whatsapp : '');
+            setSupportEmail(support.email);
             const spConfig = (data.sections_config as any[]).find((s) => s.id === 'sponsored');
             if (spConfig) {
               if (spConfig.display_mode === 'logos' || spConfig.display_mode === 'cards') {
@@ -131,7 +126,7 @@ export default function AdminGuiaGeralPage() {
         hero_subtitle: heroSubtitle,
         hero_search_placeholder: heroSearchPlaceholder,
         default_page_size: defaultPageSize,
-        sections_config: sections,
+        sections_config: [...sections, ...extraSections, buildSupportContactEntry({ whatsapp: supportWhatsapp, email: supportEmail })],
         sponsored_display_mode: sponsoredDisplayMode,
         sponsored_marquee_speed: sponsoredSpeed,
         sponsored_logo_style: sponsoredLogoStyle,
@@ -142,7 +137,7 @@ export default function AdminGuiaGeralPage() {
       setTimeout(() => setSuccessMessage(null), 5000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro desconhecido ao salvar';
-      alert(`Falha ao salvar: ${msg}`);
+      systemNotify({ type: 'danger', message: `Falha ao salvar: ${msg}` });
     } finally {
       setSaving(false);
     }
@@ -388,6 +383,42 @@ export default function AdminGuiaGeralPage() {
         )}
       </div>
 
+      {/* Contato de suporte: botão flutuante das páginas públicas */}
+      <div className="bg-white p-6 rounded-lg border shadow-sm space-y-4">
+        <div className="border-b pb-2">
+          <h2 className="text-lg font-bold text-gray-900">Contato de Suporte (botão flutuante)</h2>
+          <p className="text-xs text-gray-500">
+            Número e e-mail do atendimento que aparecem no botão do canto das páginas públicas. Com e-mail preenchido, o botão abre um
+            menu com WhatsApp e e-mail; sem e-mail, abre direto o WhatsApp.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">WhatsApp do suporte</label>
+            <input
+              type="tel"
+              inputMode="tel"
+              value={supportWhatsapp}
+              onChange={(e) => setSupportWhatsapp(e.target.value)}
+              placeholder="(75) 98127-2323"
+              className="w-full px-3 py-1.5 border rounded-md text-sm"
+            />
+            <p className="mt-1 text-xs text-gray-500">DDD + número. Vazio = número padrão da plataforma.</p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">E-mail do suporte</label>
+            <input
+              type="email"
+              value={supportEmail}
+              onChange={(e) => setSupportEmail(e.target.value)}
+              placeholder="suporte@seudominio.com.br"
+              className="w-full px-3 py-1.5 border rounded-md text-sm"
+            />
+            <p className="mt-1 text-xs text-gray-500">Opcional.</p>
+          </div>
+        </div>
+      </div>
+
       {/* Ordem e Visibilidade das Seções */}
       <div className="bg-white p-6 rounded-lg border shadow-sm space-y-4">
         <div className="border-b pb-2">
@@ -415,7 +446,7 @@ export default function AdminGuiaGeralPage() {
                   {sec.enabled ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
                 <span className="text-sm font-medium text-gray-900">
-                  {SECTION_LABELS[sec.id] || sec.id}
+                  {index + 1}. {HOME_SECTION_LABELS[sec.id] || sec.id}
                 </span>
               </div>
 

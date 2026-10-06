@@ -1,3 +1,4 @@
+import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { resolveRequestTenantId } from '@/lib/tenant/tenant-resolver';
@@ -10,6 +11,7 @@ export const metadata = {
 };
 
 export default async function OnboardingStep2Page() {
+  const brand = await resolveTenantBrandContext().catch(() => null);
   const supabase = await createServerSideClient();
   const {
     data: { user },
@@ -39,6 +41,8 @@ export default async function OnboardingStep2Page() {
 
       <div className="w-full max-w-xl z-10 relative space-y-6">
         <OnboardingHeader
+          logoUrl={brand?.logoUrl ?? null}
+          brandName={brand?.appName ?? null}
           currentStep={2}
           title="2. Sua Empresa Comercial"
           subtitle="Informe os dados essenciais da empresa. Você poderá completar fotos e galeria no seu painel."

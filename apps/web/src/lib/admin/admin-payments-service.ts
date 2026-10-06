@@ -451,7 +451,7 @@ export async function confirmPaymentManuallyAction(invoiceId: string) {
         paid_at: now,
         updated_at: now,
       })
-      .eq('id', invoice.id);
+      .eq('id', invoice.id).throwOnError();
 
     await (adminClient as any)
       .from('payment_attempts')
@@ -461,10 +461,10 @@ export async function confirmPaymentManuallyAction(invoiceId: string) {
           manual_confirmation: true,
           confirmed_by: user.id,
           confirmed_at: now,
-          source: 'admin_manual_asaas_sandbox_verification',
+          source: 'admin_manual_confirmation',
         },
       })
-      .eq('invoice_id', invoice.id);
+      .eq('invoice_id', invoice.id).throwOnError();
 
     let currentStatus: string | null = null;
     let canUseCommercialStatus = true;
@@ -494,7 +494,7 @@ export async function confirmPaymentManuallyAction(invoiceId: string) {
           commercial_status: COMMERCIAL_STATUS.PAGAMENTO_CONFIRMADO,
           updated_at: now,
         })
-        .eq('id', business.id);
+        .eq('id', business.id).throwOnError();
     }
 
     await (adminClient as any).from('admin_audit_logs').insert({
@@ -515,7 +515,7 @@ export async function confirmPaymentManuallyAction(invoiceId: string) {
         amount_paid: amountPaid,
         confirmed_at: now,
       },
-      reason: 'Confirmação manual de pagamento após verificação administrativa no Asaas Sandbox.',
+      reason: 'Confirmação manual de pagamento após verificação administrativa (Asaas ou Pix direto na conta da Conexão).',
     });
 
     revalidatePath('/admin/pagamentos');

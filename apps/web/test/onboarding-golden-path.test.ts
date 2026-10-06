@@ -32,8 +32,12 @@ const mockBiz = {
   publication_status: 'pending_review',
 };
 
+// O cliente real expõe .throwOnError() nas gravações e consultas únicas; o mock devolve a própria promessa/cadeia.
+const withThrowOnError = <T extends Promise<unknown>>(promise: T) => Object.assign(promise, { throwOnError: () => promise });
+
 const createMockSupabaseClient = () => {
   const chain: any = {
+    throwOnError: () => chain,
     select: () => chain,
     insert: () => chain,
     update: () => chain,
@@ -45,8 +49,8 @@ const createMockSupabaseClient = () => {
     or: () => chain,
     limit: () => chain,
     order: () => chain,
-    maybeSingle: () => Promise.resolve({ data: mockBiz, error: null }),
-    single: () => Promise.resolve({ data: mockBiz, error: null }),
+    maybeSingle: () => withThrowOnError(Promise.resolve({ data: mockBiz, error: null })),
+    single: () => withThrowOnError(Promise.resolve({ data: mockBiz, error: null })),
     then: (resolve: any) => resolve({ data: [mockBiz], count: 1, error: null }),
   };
 
@@ -149,14 +153,25 @@ describe('BLOCO 5 — SUÍTE INTEGRADA DO GOLDEN PATH DO ONBOARDING DO ANUNCIANT
       step: 3,
       businessId: 'biz-golden-1',
       data: {
-        masonicRelation: 'brother',
-        lodgeName: 'Lodge Fraternidade',
-        lodgeNumber: '123',
-        grandLodge: 'GLESP',
-        cimCpf: '123456',
+        masonicStatus: 'brother',
+        companyRelationship: 'owner',
+        lodgeName: 'Lodge Fraternidade nº 123',
+        cimbCode: '123456',
+        responsibleName: 'Maria da Silva',
+        responsiblePhone: '(75) 98102-8228',
       },
     });
     expect(res.success).toBe(true);
+  });
+
+  it('4b. Passo 3 sem escolher o vínculo não finge sucesso', async () => {
+    const res = await saveStepDataAction({
+      step: 3,
+      businessId: 'biz-golden-1',
+      data: { companyRelationship: 'owner', lodgeName: 'Lodge X' },
+    });
+    expect(res.success).toBe(false);
+    expect(res.message).toMatch(/vínculo/i);
   });
 
   it('5. Seleção de Plano (Passo 4): Exibe Bronze, Prata e Ouro', async () => {

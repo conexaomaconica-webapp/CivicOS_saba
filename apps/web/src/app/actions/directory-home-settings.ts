@@ -3,6 +3,12 @@
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { resolveCanonicalAdminTenant } from '@/lib/admin/admin-tenant-context';
+import {
+  SUPPORT_CONTACT_ENTRY_ID,
+  buildSupportContactEntry,
+  normalizeSupportEmail,
+  normalizeSupportWhatsapp,
+} from '@/lib/directory/support-contact';
 
 export type DirectoryHomeSettingsInput = {
   hero_title: string;
@@ -37,8 +43,22 @@ export async function saveDirectoryHomeSettingsAction(input: DirectoryHomeSettin
       return { success: false, error: 'Tenant do administrador não identificado. Nenhuma configuração foi alterada.' };
     }
 
+    // Contato de suporte (botão flutuante): valida antes de gravar; vazio é permitido (volta ao número padrão).
+    const supportEntry = (input.sections_config || []).find((sec: any) => sec?.id === SUPPORT_CONTACT_ENTRY_ID) as any;
+    if (supportEntry) {
+      const rawWhatsapp = String(supportEntry.whatsapp ?? '').trim();
+      const rawEmail = String(supportEntry.email ?? '').trim();
+      if (rawWhatsapp && !normalizeSupportWhatsapp(rawWhatsapp)) {
+        return { success: false, error: 'WhatsApp do suporte inválido. Informe DDD e número, por exemplo (75) 98127-2323.' };
+      }
+      if (rawEmail && !normalizeSupportEmail(rawEmail)) {
+        return { success: false, error: 'E-mail do suporte inválido.' };
+      }
+    }
+
     // Mesclar speed e logo_style em sections_config para o bloco sponsored como garantia
     const updatedSections = (input.sections_config || []).map((sec: any) => {
+      if (sec.id === SUPPORT_CONTACT_ENTRY_ID) return buildSupportContactEntry({ whatsapp: sec.whatsapp, email: sec.email });
       if (sec.id === 'sponsored') {
         return {
           ...sec,

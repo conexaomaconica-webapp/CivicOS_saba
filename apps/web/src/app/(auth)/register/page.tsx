@@ -1,5 +1,6 @@
 'use client';
 
+import { systemNotify } from '@/components/system/SystemFeedback';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -125,7 +126,7 @@ export default function RegisterPage() {
       if (result.error) {
         setErrorMsg(result.error.message);
       } else {
-        alert('Cadastro realizado com sucesso! Verifique seu e-mail para confirmação se necessário.');
+        systemNotify({ type: 'success', message: 'Cadastro realizado com sucesso! Verifique seu e-mail para confirmação se necessário.' });
         if (redirectTarget) {
           router.push(`/login?redirect=${encodeURIComponent(redirectTarget)}&registered=true`);
         } else {

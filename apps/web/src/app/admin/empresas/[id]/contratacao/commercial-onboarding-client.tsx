@@ -50,6 +50,7 @@ import {
   getAdminContractSnapshotsHistoryAction,
   invalidateAdminContractSnapshotAction,
   sendAdminContractForSignatureAction,
+  getActiveContractLinkInfoAction,
   renewAdminContractPaymentLinkAction,
   revokeAdminContractSignatureTokenAction,
   ContractDraftPreviewResult,
@@ -188,6 +189,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
   const [invalidationError, setInvalidationError] = useState<string | null>(null);
 
   // Estados para Microetapa 4.4: Envio para Assinatura e Token Seguro
+  const [activeLinkInfo, setActiveLinkInfo] = useState<{ hasActive: boolean; expiresAt: string | null } | null>(null);
   const [signatureTokenData, setSignatureTokenData] = useState<SendContractForSignatureResult['data'] | null>(null);
   const [isSendingForSignature, setIsSendingForSignature] = useState<boolean>(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -615,13 +617,10 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
           });
         }
         if (['contrato_enviado', 'contrato_assinado', 'aguardando_pagamento'].includes(commercialStatus)) {
-          const linkAction = commercialStatus === 'contrato_enviado'
-            ? sendAdminContractForSignatureAction
-            : renewAdminContractPaymentLinkAction;
-          linkAction(business.id).then((tokenRes) => {
-            if (tokenRes.success && tokenRes.data) {
-              setSignatureTokenData(tokenRes.data);
-            }
+          // Só LÊ a situação do link. Antes, abrir a tela gerava um link novo e revogava o anterior, e o cliente que já
+          // tinha recebido o link via "link revogado". Gerar/renovar agora só acontece nos botões explícitos.
+          getActiveContractLinkInfoAction(business.id).then((info) => {
+            if (info.success) setActiveLinkInfo({ hasActive: info.hasActive, expiresAt: info.expiresAt });
           });
         }
       }
@@ -1982,7 +1981,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
               <input
                 type="text"
                 readOnly
-                value={signatureTokenData?.public_url || 'Carregando link seguro...'}
+                value={signatureTokenData?.public_url || (activeLinkInfo?.hasActive ? 'Já existe um link ativo (oculto por segurança). Para reenviar, use "Renovar link seguro".' : 'Nenhum link ativo. Use "Renovar link seguro" para gerar um.')}
                 className="flex-1 rounded-xl border border-emerald-300 bg-white px-3.5 py-2.5 font-mono text-xs text-stone-800 select-all focus:outline-none"
               />
               <button

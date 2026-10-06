@@ -1,3 +1,4 @@
+import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { fetchTenantPlans } from '@/lib/billing/plans-service';
@@ -10,6 +11,7 @@ export const metadata = {
 };
 
 export default async function OnboardingStep4Page() {
+  const brand = await resolveTenantBrandContext().catch(() => null);
   const supabase = await createServerSideClient();
   const {
     data: { user },
@@ -42,6 +44,8 @@ export default async function OnboardingStep4Page() {
 
       <div className="w-full max-w-4xl z-10 relative space-y-6">
         <OnboardingHeader
+          logoUrl={brand?.logoUrl ?? null}
+          brandName={brand?.appName ?? null}
           currentStep={4}
           title="4. Escolha do Plano de Licenciamento"
           subtitle="Selecione a melhor modalidade comercial para destacar sua empresa no Guia."

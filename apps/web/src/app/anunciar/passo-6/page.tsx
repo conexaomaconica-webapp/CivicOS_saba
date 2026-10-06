@@ -1,3 +1,4 @@
+import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import OnboardingHeader from '@/components/onboarding/OnboardingHeader';
@@ -8,6 +9,7 @@ export const metadata = {
 };
 
 export default async function OnboardingStep6Page() {
+  const brand = await resolveTenantBrandContext().catch(() => null);
   const supabase = await createServerSideClient();
   const {
     data: { user },
@@ -36,6 +38,8 @@ export default async function OnboardingStep6Page() {
 
       <div className="w-full max-w-3xl z-10 relative space-y-6">
         <OnboardingHeader
+          logoUrl={brand?.logoUrl ?? null}
+          brandName={brand?.appName ?? null}
           currentStep={6}
           title="6. Checkout de Pagamento & Ativação"
           subtitle="Conclua o pagamento para ativar sua assinatura e submeter o perfil para análise editorial."

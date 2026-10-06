@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Copy, FileText, Lock, Printer, ShieldCheck } from 'lucide-react';
 import type { AdvertiserContractDTO } from '@/lib/advertiser/advertiser-contract-service';
+import { formatDateTimeBR } from '@/lib/format/datetime-br';
 import { contractTextForPlainDisplay } from '@/lib/contracts/contract-template-renderer';
 
 const escapeHtml = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -33,7 +34,7 @@ export default function AdvertiserContractClient({ data }: { data: AdvertiserCon
 
   const text = contractTextForPlainDisplay(contract.rendered_text);
   const signedAt = contract.signed_at ? new Date(contract.signed_at) : null;
-  const signedLabel = signedAt ? `${signedAt.toLocaleDateString('pt-BR')} às ${signedAt.toLocaleTimeString('pt-BR')}` : 'Ainda não assinado';
+  const signedLabel = signedAt ? formatDateTimeBR(signedAt).replace(', ', ' às ') : 'Ainda não assinado';
 
   const copyText = async () => {
     try {
@@ -156,7 +157,7 @@ export default function AdvertiserContractClient({ data }: { data: AdvertiserCon
                 <img src={contract.signature_image_data} alt={`Assinatura de ${contract.signer_name || business.name}`} className="max-h-28 max-w-full object-contain" />
               </div>
               <div className="border-t border-stone-700 pt-1.5 text-xs font-semibold text-stone-900">{contract.signer_name || business.name}</div>
-              <p className="text-[10px] text-stone-500">Registrada em {signedAt ? signedAt.toLocaleString('pt-BR') : 'data não disponível'}</p>
+              <p className="text-[10px] text-stone-500">Registrada em {signedAt ? formatDateTimeBR(signedAt) : 'data não disponível'}</p>
             </div>
           )}
 
@@ -167,7 +168,7 @@ export default function AdvertiserContractClient({ data }: { data: AdvertiserCon
             <div>• <strong>Empresa signatária:</strong> {business.name}{business.legal_name ? ` (${business.legal_name})` : ''}</div>
             <div>• <strong>Documento CNPJ/CPF:</strong> {business.document || 'Registrado na plataforma'}</div>
             <div>• <strong>Status jurídico:</strong> {contract.signed ? 'CONTRATO ASSINADO E HOMOLOGADO' : 'AGUARDANDO ASSINATURA'}</div>
-            <div>• <strong>Data/hora de aceite:</strong> {signedAt ? signedAt.toLocaleString('pt-BR') : 'Ainda não assinado'}</div>
+            <div>• <strong>Data/hora de aceite:</strong> {signedAt ? formatDateTimeBR(signedAt) : 'Ainda não assinado'}</div>
             <div className="break-all">• <strong>Hash SHA-256:</strong> {contract.sha256_hash}</div>
           </div>
         </div>

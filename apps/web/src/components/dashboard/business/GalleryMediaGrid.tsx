@@ -1,5 +1,6 @@
 'use client';
 
+import { systemConfirm } from '@/components/system/SystemFeedback';
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { addGalleryMediaAction, deleteGalleryMediaAction } from '@/app/actions/business-profile-actions';
@@ -56,7 +57,7 @@ export function GalleryMediaGrid({
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Deseja realmente remover esta imagem da galeria?')) return;
+    if (!(await systemConfirm({ message: 'Deseja realmente remover esta imagem da galeria?', danger: true, confirmLabel: 'Remover' }))) return;
     try {
       await deleteGalleryMediaAction(businessId, id);
       setItems(prev => prev.filter(item => item.id !== id));

@@ -1,5 +1,6 @@
 'use client';
 
+import { systemConfirm, systemNotify } from '@/components/system/SystemFeedback';
 import React, { useState, useEffect } from 'react';
 import {
   Search,
@@ -81,7 +82,7 @@ export default function AdminAprovacoesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir esta solicitação de anúncio? Esta ação não pode ser desfeita.')) return;
+    if (!(await systemConfirm({ message: 'Tem certeza que deseja excluir esta solicitação de anúncio? Esta ação não pode ser desfeita.', danger: true, confirmLabel: 'Excluir' }))) return;
     
     const res = await deleteApprovalAction(id);
     
@@ -89,7 +90,7 @@ export default function AdminAprovacoesPage() {
       // Reload current view
       loadData(selectedFilter);
     } else {
-      alert(res.error || 'Erro ao tentar excluir a solicitação.');
+      systemNotify({ type: 'danger', message: res.error || 'Erro ao tentar excluir a solicitação.' });
     }
   };
 

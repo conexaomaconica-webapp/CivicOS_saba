@@ -1,5 +1,6 @@
 'use client';
 
+import { systemNotify } from '@/components/system/SystemFeedback';
 import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileCheck, CheckCircle2, AlertCircle, Printer, Download, ShieldCheck, FileText } from 'lucide-react';
@@ -129,7 +130,7 @@ Hash de Integridade do Contrato: [PENDENTE DE ASSINATURA]
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      alert('Por favor, permita pop-ups para salvar/imprimir o PDF do contrato.');
+      systemNotify({ type: 'warning', message: 'Por favor, permita pop-ups para salvar/imprimir o PDF do contrato.' });
       return;
     }
 

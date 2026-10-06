@@ -8,6 +8,10 @@ import {
   Clock,
 } from 'lucide-react';
 import { getPublicContractByTokenAction } from '@/lib/contracts/admin-contracts-service';
+import { contractTextForPlainDisplay } from '@/lib/contracts/contract-template-renderer';
+import { formatDateTimeBR } from '@/lib/format/datetime-br';
+import { formatCpfCnpj } from '@/lib/onboarding/onboarding-validation';
+import { ContractPrintButton } from '@/components/contracts/ContractPrintButton';
 import { ContractSignatureClient } from './contract-signature-client';
 
 export const metadata: Metadata = {
@@ -171,10 +175,47 @@ export default async function ContratacaoPublicPage({ params }: ContratacaoPageP
             </span>
           </div>
 
+          <div className="flex justify-end">
+            <ContractPrintButton
+              text={contractTextForPlainDisplay(rendered_markdown)}
+              businessName={business_name}
+              legalName={res.data.business_legal_name || business_name}
+              signatureImage={res.data.signature_image_data}
+              signerName={responsavel_nome}
+              signerCpf={res.data.signer_cpf ? formatCpfCnpj(res.data.signer_cpf) : undefined}
+              signedAtLabel={res.data.accepted_at ? formatDateTimeBR(res.data.accepted_at) : undefined}
+              sha256Hash={sha256_hash}
+            />
+          </div>
+
           {/* Visualizador de Texto Integral */}
           <div className="rounded-xl border border-stone-300 bg-stone-50/60 p-6 sm:p-8 font-sans text-xs sm:text-sm text-stone-800 leading-relaxed max-h-[600px] overflow-y-auto whitespace-pre-wrap select-text space-y-4">
-            {rendered_markdown}
+            {contractTextForPlainDisplay(rendered_markdown)}
           </div>
+
+          {/* Assinatura eletrônica registrada (aparece assim que o contrato é assinado) */}
+          {res.data.signature_image_data && (
+            <div className="mx-auto w-full max-w-md space-y-2 rounded-xl border border-stone-200 bg-white p-4 text-center">
+              <p className="font-serif text-xs font-bold uppercase tracking-wider text-[#3B0B14]">
+                Assinatura eletrônica do representante legal
+              </p>
+              <div className="flex min-h-24 items-center justify-center rounded-lg bg-stone-50 p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={res.data.signature_image_data}
+                  alt="Assinatura eletrônica do representante legal"
+                  className="max-h-28 max-w-full object-contain"
+                />
+              </div>
+              <div className="border-t border-stone-700 pt-1.5 text-xs font-semibold text-stone-900">
+                {res.data.business_legal_name || business_name}
+              </div>
+              <p className="text-[10px] text-stone-500">
+                Representante legal: {responsavel_nome}
+                {res.data.accepted_at ? ` • Registrada em ${formatDateTimeBR(res.data.accepted_at)}` : ''}
+              </p>
+            </div>
+          )}
 
           {/* Resumo Criptográfico SHA-256 */}
           <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-xs space-y-2">

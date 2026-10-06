@@ -1,5 +1,6 @@
 'use client';
 
+import { systemNotify } from '@/components/system/SystemFeedback';
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -80,7 +81,7 @@ export default function AdminImportarLojasPage() {
     try {
       const result = await extractLodgesFromUrlAction({ url: sourceUrl, potency: sourcePotency });
       if (!result.success || !result.data) {
-        alert(result.error || 'Não foi possível extrair os cadastros desse endereço.');
+        systemNotify({ type: 'danger', message: result.error || 'Não foi possível extrair os cadastros desse endereço.' });
         return;
       }
       const supabase = createClient();
@@ -139,7 +140,7 @@ export default function AdminImportarLojasPage() {
   const analyzeSpreadsheetRows = async () => {
     const selected = (key: LodgeImportFieldKey) => fieldMapping[key];
     if (!selected('name')) {
-      alert('Associe pelo menos o campo obrigatório "Nome da Loja".');
+      systemNotify({ type: 'warning', message: 'Associe pelo menos o campo obrigatório "Nome da Loja".' });
       return;
     }
     setLoading(true);
@@ -239,7 +240,7 @@ export default function AdminImportarLojasPage() {
         const workbook = XLSX.read(buffer, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         if (!firstSheetName) {
-          alert('O arquivo selecionado não contém planilhas válidas.');
+          systemNotify({ type: 'warning', message: 'O arquivo selecionado não contém planilhas válidas.' });
           setLoading(false);
           return;
         }
@@ -248,7 +249,7 @@ export default function AdminImportarLojasPage() {
         const rawJson: any[] = XLSX.utils.sheet_to_json(worksheet!, { defval: '' });
 
         if (rawJson.length === 0) {
-          alert('A planilha está vazia.');
+          systemNotify({ type: 'warning', message: 'A planilha está vazia.' });
           setLoading(false);
           return;
         }
@@ -262,7 +263,7 @@ export default function AdminImportarLojasPage() {
         setSummary({ newCount: 0, updateCount: 0, dupCount: 0, errCount: 0 });
       } catch (err) {
         console.error(err);
-        alert('Erro ao processar planilha Excel. Verifique o formato do arquivo.');
+        systemNotify({ type: 'danger', message: 'Erro ao processar planilha Excel. Verifique o formato do arquivo.' });
       } finally {
         setLoading(false);
       }
@@ -275,7 +276,7 @@ export default function AdminImportarLojasPage() {
   const handleConfirmImport = async () => {
     const validRows = parsedRows.filter((r) => r.status === 'new' || r.status === 'update');
     if (validRows.length === 0) {
-      alert('Nenhuma loja válida para importar.');
+      systemNotify({ type: 'warning', message: 'Nenhuma loja válida para importar.' });
       return;
     }
 
@@ -430,11 +431,11 @@ export default function AdminImportarLojasPage() {
           router.push('/admin/lojas');
         }, 2000);
       } else if (imported === 0) {
-        alert('Nenhuma loja foi gravada. Veja os detalhes na página.');
+        systemNotify({ type: 'warning', message: 'Nenhuma loja foi gravada. Veja os detalhes na página.' });
       }
     } catch (err) {
       console.error(err);
-      alert('Falha durante a gravação no banco de dados.');
+      systemNotify({ type: 'danger', message: 'Falha durante a gravação no banco de dados.' });
     } finally {
       setImporting(false);
       setTimeout(() => setImportProgress(null), 1500);

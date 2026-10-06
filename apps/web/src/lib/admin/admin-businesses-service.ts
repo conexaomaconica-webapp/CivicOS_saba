@@ -1,5 +1,8 @@
 'use server';
 
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
+import { parseLegacyAddress } from '@/lib/admin/legacy-address';
+import { pickResponsibleName } from '@/lib/contracts/responsible-name';
 import { assertPlatformAdminAccess } from './admin-auth-helper';
 import { geocodeBrazilianAddress, isValidBrazilianCoordinate, type GeocodePrecision } from '@/lib/geo/geocode';
 import { resolveCanonicalAdminTenant } from './admin-tenant-context';
@@ -944,10 +947,18 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       longitude?: number;
     } = {};
     try {
-      const { data: locs } = await (supabase as any)
+      const locationReader: any = createServiceRoleClient() ?? supabase;
+      const { data: locs } = await locationReader
         .from('business_locations')
         .select('city, state, street, number, complement, neighborhood, postal_code, latitude, longitude, is_headquarters')
         .eq('business_id', businessId);
+      if (!locs || locs.length === 0) {
+        // Sem localização estruturada: aproveita o endereço antigo (texto único em businesses.address), se houver.
+        const legacy = parseLegacyAddress((b as any).address);
+        if (legacy.street) {
+          locationData = { street: legacy.street, number: legacy.number, neighborhood: legacy.neighborhood };
+        }
+      }
       if (locs && locs.length > 0) {
         const primary = locs.find((l: any) => l.is_headquarters === true) || locs[0];
         const formattedParts = [
@@ -1476,7 +1487,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       },
       owner: {
         id: b.owner_id || undefined,
-        full_name: (respData?.name || b.responsible?.name || b.name || 'Anunciante Titular') as string,
+        full_name: (pickResponsibleName(respData?.name, b.responsible?.name) || b.name || 'Responsável') as string,
         email: b.email || undefined,
         business_role: (respData?.business_role || b.responsible?.business_role || 'Proprietário') as string,
         community_label: (respData?.community_label || b.responsible?.community_label || 'Irmão') as string,
@@ -1663,7 +1674,7 @@ export async function toggleRecognitionAction(
             verified_by: user.id,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', linkRow.id);
+          .eq('id', linkRow.id).throwOnError();
       } else {
         await (supabase as any)
           .from('business_masonic_links')
@@ -1675,7 +1686,7 @@ export async function toggleRecognitionAction(
             status: newStatus,
             verified_at: newValue ? new Date().toISOString() : null,
             verified_by: user.id,
-          });
+          }).throwOnError();
       }
       auditAction = newValue ? 'VERIFY_BUSINESS_LINK' : 'REVOKE_BUSINESS_LINK';
     } else {
@@ -1700,7 +1711,7 @@ export async function toggleRecognitionAction(
               updated_at: new Date().toISOString(),
             },
             { onConflict: 'tenant_id, business_id, recognition_key' }
-          );
+          ).throwOnError();
       } else {
         // Revogar reconhecimento com semântica estrita (is_active = false e revoked_at = NOW)
         await (supabase as any)
@@ -1713,7 +1724,7 @@ export async function toggleRecognitionAction(
           })
           .eq('tenant_id', bData.tenant_id)
           .eq('business_id', businessId)
-          .eq('recognition_key', recKey);
+          .eq('recognition_key', recKey).throwOnError();
       }
     }
 
@@ -2422,7 +2433,10 @@ export async function upsertAdminMasonicLinkAction(
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { supabase, user } = await assertPlatformAdminAccess();
+    const { supabase: sessionClient, user } = await assertPlatformAdminAccess();
+    // Admin de plataforma já confirmado acima. As políticas da tabela business_masonic_links só liberam escrita a admin do
+    // tenant, master ou ao declarante do vínculo; por isso as gravações desta ação usam a chave de serviço (só no servidor).
+    const supabase: any = createServiceRoleClient() ?? sessionClient;
 
     // 1. Busca paralela dos registros essenciais
     const [{ data: biz }, { data: existingLink }, { data: existingResp }] = await Promise.all([
@@ -2487,7 +2501,7 @@ export async function upsertAdminMasonicLinkAction(
               potency: payload.potency.trim(),
               updated_at: new Date().toISOString(),
             })
-            .eq('id', existingOrg.id);
+            .eq('id', existingOrg.id).throwOnError();
         }
       } else {
         const { data: newOrg, error: orgCreateError } = await (supabase as any)
@@ -2634,13 +2648,19 @@ export async function upsertAdminMasonicLinkAction(
             .eq('id', existingResp.id)
         );
       } else {
+        // Nome real do responsável (perfil do dono da conta); nunca um nome genérico: ele iria para o contrato.
+        let responsibleName = '';
+        if (biz.owner_id) {
+          const { data: ownerProfile } = await (supabase as any).from('profiles').select('name').eq('id', biz.owner_id).maybeSingle();
+          responsibleName = pickResponsibleName(ownerProfile?.name);
+        }
         finishPromises.push(
           (supabase as any)
             .from('business_responsibles')
             .insert({
               tenant_id: biz.tenant_id,
               business_id: businessId,
-              name: 'Anunciante Titular',
+              name: responsibleName || payload.reference_mason_name?.trim() || biz.name || 'Responsável',
               organization: payload.lodge_name.trim(),
             })
         );
@@ -2825,7 +2845,9 @@ export async function saveAdminBusinessContractAddressAction(
   maybeInput?: SaveAdminBusinessContractAddressInput
 ): Promise<{ success: boolean; error?: string; formatted_address?: string }> {
   try {
-    const { supabase } = await assertPlatformAdminAccess();
+    const { supabase: sessionClient } = await assertPlatformAdminAccess();
+    // Admin de plataforma confirmado: gravação com chave de serviço (as políticas de linha só liberam admin do tenant/master).
+    const supabase: any = createServiceRoleClient() ?? sessionClient;
 
     const businessId =
       typeof businessIdOrInput === 'string'
@@ -2869,6 +2891,19 @@ export async function saveAdminBusinessContractAddressAction(
     ].filter(Boolean);
     const fullAddress = parts.join(', ');
 
+    // Código IBGE da cidade (catálogo oficial), quando existir: mantém o endereço consistente com os demais fluxos.
+    let cityIbgeCode: number | null = null;
+    try {
+      const { data: stateRow } = await (supabase as any).from('brazilian_states').select('ibge_code').eq('uf', state.toUpperCase()).maybeSingle();
+      if (stateRow) {
+        const { data: cityRow } = await (supabase as any)
+          .from('brazilian_cities').select('ibge_code').eq('state_ibge_code', stateRow.ibge_code).eq('name', city).maybeSingle();
+        cityIbgeCode = cityRow?.ibge_code ?? null;
+      }
+    } catch {
+      // sem catálogo: segue sem o código
+    }
+
     // 1. Busca localização Matriz
     const { data: existingLoc } = await (supabase as any)
       .from('business_locations')
@@ -2878,7 +2913,7 @@ export async function saveAdminBusinessContractAddressAction(
       .maybeSingle();
 
     if (existingLoc) {
-      await (supabase as any)
+      const { error: locUpdateError } = await (supabase as any)
         .from('business_locations')
         .update({
           street,
@@ -2888,11 +2923,13 @@ export async function saveAdminBusinessContractAddressAction(
           city,
           state,
           postal_code: postal_code || '00000-000',
+          ...(cityIbgeCode ? { city_ibge_code: cityIbgeCode } : {}),
           updated_at: new Date().toISOString(),
         })
         .eq('id', existingLoc.id);
+      if (locUpdateError) return { success: false, error: `Não foi possível atualizar o endereço: ${locUpdateError.message}` };
     } else {
-      await (supabase as any)
+      const { error: locInsertError } = await (supabase as any)
         .from('business_locations')
         .insert({
           tenant_id: biz.tenant_id,
@@ -2906,20 +2943,21 @@ export async function saveAdminBusinessContractAddressAction(
           state,
           postal_code: postal_code || '00000-000',
           is_headquarters: true,
-          is_active: true,
+          ...(cityIbgeCode ? { city_ibge_code: cityIbgeCode } : {}),
         });
+      if (locInsertError) return { success: false, error: `Não foi possível salvar o endereço: ${locInsertError.message}` };
     }
 
     // 2. Atualiza tabela businesses com endereço sincronizado
-    await (supabase as any)
+    // businesses guarda só o texto único (address); cidade e UF ficam em business_locations.
+    const { error: addressSyncError } = await (supabase as any)
       .from('businesses')
       .update({
         address: fullAddress,
-        city,
-        state,
         updated_at: new Date().toISOString(),
       })
       .eq('id', businessId);
+    if (addressSyncError) return { success: false, error: `Endereço salvo, mas não sincronizado no cadastro: ${addressSyncError.message}` };
 
     revalidatePath(`/admin/empresas/${businessId}`);
     revalidatePath(`/admin/empresas/${businessId}/contratacao`);
@@ -3088,7 +3126,7 @@ export async function confirmAdminCommercialTermsAction(
             postal_code: postal_code || '00000-000',
             updated_at: new Date().toISOString(),
           })
-          .eq('id', existingLoc.id);
+          .eq('id', existingLoc.id).throwOnError();
       } else if (street) {
         await (supabase as any)
           .from('business_locations')
@@ -3105,7 +3143,7 @@ export async function confirmAdminCommercialTermsAction(
             postal_code: postal_code || '00000-000',
             is_headquarters: true,
             is_active: true,
-          });
+          }).throwOnError();
       }
     }
 
@@ -3607,7 +3645,7 @@ export async function manageAdminMediaAction(
           logo_url: payload.url.trim(),
           updated_at: new Date().toISOString(),
         })
-        .eq('id', businessId);
+        .eq('id', businessId).throwOnError();
 
       await (supabase as any).from('admin_audit_logs').insert({
         tenant_id: biz.tenant_id,
@@ -3636,7 +3674,7 @@ export async function manageAdminMediaAction(
             url: payload.url.trim(),
             title: payload.title || 'Imagem de Capa',
           })
-          .eq('id', existingCover.id);
+          .eq('id', existingCover.id).throwOnError();
       } else {
         await (supabase as any)
           .from('business_media')
@@ -3647,7 +3685,7 @@ export async function manageAdminMediaAction(
             url: payload.url.trim(),
             title: payload.title || 'Imagem de Capa',
             display_order: 0,
-          });
+          }).throwOnError();
       }
 
       await (supabase as any).from('admin_audit_logs').insert({

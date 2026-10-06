@@ -1,5 +1,6 @@
 'use client';
 
+import { systemConfirm } from '@/components/system/SystemFeedback';
 import { useState } from 'react';
 import { BadgeCheck, Check, Flag, Handshake, ImageOff, Loader2, ShieldAlert, Trash2, X } from 'lucide-react';
 import {
@@ -55,7 +56,7 @@ export function ConnectionsModerationClient({
   };
 
   const resolveReport = async (item: ModerationItem, action: 'remover' | 'descartar') => {
-    if (action === 'remover' && !window.confirm('Remover esta conexão do mural? Ela deixa de aparecer para todos.')) return;
+    if (action === 'remover' && !(await systemConfirm({ message: 'Remover esta conexão do mural? Ela deixa de aparecer para todos.', danger: true, confirmLabel: 'Remover' }))) return;
     setBusyId(item.id);
     setMessage(null);
     const res = await resolveConnectionReportsAction(item.id, action, notes[item.id]);

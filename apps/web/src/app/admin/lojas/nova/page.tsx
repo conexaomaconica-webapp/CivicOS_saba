@@ -1,5 +1,6 @@
 'use client';
 
+import { systemNotify } from '@/components/system/SystemFeedback';
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -199,7 +200,7 @@ export default function AdminNovaLojaPage() {
         }
       }
 
-      alert('Loja Maçônica cadastrada com sucesso!');
+      systemNotify({ type: 'success', message: 'Loja Maçônica cadastrada com sucesso!' });
       router.push('/admin/lojas');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro inesperado ao salvar loja.';

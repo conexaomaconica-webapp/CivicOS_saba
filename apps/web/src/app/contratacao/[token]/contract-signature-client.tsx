@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   ShieldCheck,
@@ -58,7 +59,9 @@ export function ContractSignatureClient({
   );
 
   // 5.1 — Confirmação de Identidade e Aceite
-  const signerCpf = contractData.responsavel_cpf?.replace(/\D/g, '') || '';
+  // Nome e CPF vêm do cadastro, mas o signatário pode corrigi-los (a diferença fica registrada no contrato e a equipe é avisada).
+  const [signerCpf, setSignerCpf] = useState(contractData.responsavel_cpf?.replace(/\D/g, '') || '');
+  const [signerName, setSignerName] = useState(contractData.responsavel_nome || '');
   const [agreeTerms, setAgreeTerms] = useState(false);
 
   // 5.2 — Canvas de Assinatura
@@ -75,6 +78,7 @@ export function ContractSignatureClient({
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card'>(
     contractData.active_charge?.payment_method === 'credit_card' ? 'credit_card' : 'pix'
   );
+  const router = useRouter();
   const [activeCharge, setActiveCharge] = useState<any>(contractData.active_charge || null);
   const [isGeneratingCharge, setIsGeneratingCharge] = useState(false);
   const [chargeError, setChargeError] = useState<string | null>(null);
@@ -210,10 +214,14 @@ export function ContractSignatureClient({
       return;
     }
 
-    // Validação 2: CPF
+    // Validação 2: nome completo e CPF do signatário
+    if (signerName.trim().split(/\s+/).filter(Boolean).length < 2) {
+      setSubmitError('Informe o nome completo do representante legal (nome e sobrenome).');
+      return;
+    }
     const err = validateCpf(signerCpf);
     if (err) {
-      setSubmitError('O CPF cadastrado para o representante legal é inválido. Solicite a correção dos dados antes de assinar.');
+      setSubmitError('O CPF informado é inválido. Confira os 11 dígitos antes de assinar.');
       return;
     }
 
@@ -234,6 +242,7 @@ export function ContractSignatureClient({
       const res = await signPublicContractAction({
         token,
         signer_cpf: signerCpf,
+        signer_name: signerName.trim(),
         agree_terms: agreeTerms,
         signature_image_data: signatureImageData,
       });
@@ -242,6 +251,8 @@ export function ContractSignatureClient({
         setSubmitError(res.error || 'Falha ao processar assinatura eletrônica.');
       } else {
         setSignedState(res.data);
+        // A página do contrato é renderizada no servidor: atualiza para mostrar a assinatura registrada no documento.
+        router.refresh();
       }
     } catch (err: any) {
       setSubmitError(err?.message || 'Erro inesperado ao registrar assinatura eletrônica.');
@@ -370,13 +381,14 @@ export function ContractSignatureClient({
   if (signedState) {
     const formattedSignedDate = signedState.accepted_at
       ? new Date(signedState.accepted_at).toLocaleString('pt-BR', {
+          timeZone: 'America/Sao_Paulo', // fuso fixo: servidor e navegador geram o mesmo texto (evita erro de hidratação #418)
           day: '2-digit',
           month: '2-digit',
           year: 'numeric',
           hour: '2-digit',
           minute: '2-digit',
         })
-      : new Date().toLocaleString('pt-BR');
+      : '';
 
     const totalCents = signedState.amount_cents || contractData.amount_cents || 0;
     const installmentsCount = contractData.installments_count || 1;
@@ -651,6 +663,17 @@ export function ContractSignatureClient({
                       {signedState.formatted_amount}
                     </span>
                   </div>
+
+                  {activeCharge.is_manual_pix && (
+                    <div className="rounded-xl border border-sky-200 bg-sky-50 p-3.5 text-xs text-sky-900">
+                      <p className="font-bold">Pix direto para a Conexão Maçônica</p>
+                      <p className="mt-0.5">
+                        Pague pelo QR Code ou pelo código abaixo. Depois de pagar, a nossa equipe confere o recebimento e
+                        libera o próximo passo, em geral no mesmo dia útil. Você não precisa enviar comprovante, mas pode
+                        guardá-lo.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="flex flex-col md:flex-row items-center gap-6">
                     {/* Imagem do QR Code */}
@@ -974,18 +997,24 @@ export function ContractSignatureClient({
         </div>
       )}
 
-      {/* 5.1 — Identificação do Signatário */}
+      {/* 5.1 — Identificação do Signatário (editável: confira e corrija se necessário) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block">
-            Nome do Representante Legal
+          <label htmlFor="signer-name" className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block">
+            Nome completo do Representante Legal *
           </label>
           <div className="relative">
             <input
+              id="signer-name"
               type="text"
-              readOnly
-              value={contractData.responsavel_nome}
-              className="w-full rounded-xl border border-stone-200 bg-stone-100 px-3.5 py-2.5 text-xs text-stone-700 cursor-not-allowed"
+              value={signerName}
+              maxLength={120}
+              autoComplete="name"
+              onChange={(e) => {
+                setSignerName(e.target.value);
+                if (submitError) setSubmitError(null);
+              }}
+              className="w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 pr-10 text-xs text-stone-900 focus:border-[#3B0B14] focus:outline-none focus:ring-2 focus:ring-[#3B0B14]/15"
             />
             <UserCheck className="absolute right-3 top-2.5 h-4 w-4 text-stone-400" />
           </div>
@@ -998,12 +1027,19 @@ export function ContractSignatureClient({
           <input
             id="signer-cpf"
             type="text"
-            readOnly
+            inputMode="numeric"
             value={formatCpfCnpj(signerCpf)}
-            className="w-full cursor-not-allowed rounded-xl border border-stone-200 bg-stone-100 px-3.5 py-2.5 font-mono text-xs text-stone-700"
+            onChange={(e) => {
+              setSignerCpf(e.target.value.replace(/\D/g, '').slice(0, 11));
+              if (submitError) setSubmitError(null);
+            }}
+            className="w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 font-mono text-xs text-stone-900 focus:border-[#3B0B14] focus:outline-none focus:ring-2 focus:ring-[#3B0B14]/15"
           />
-          <p className="text-[11px] text-stone-500">Dado cadastral congelado na minuta.</p>
         </div>
+        <p className="text-[11px] text-stone-500 sm:col-span-2">
+          Confira o nome e o CPF e corrija, se precisar. Esses dados aparecem abaixo da assinatura. Se forem diferentes do
+          cadastro, isso fica registrado no contrato e a nossa equipe é avisada para conferir.
+        </p>
       </div>
 
       {/* Checkbox de Aceite Expresso */}

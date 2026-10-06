@@ -1,3 +1,4 @@
+import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import OnboardingHeader from '@/components/onboarding/OnboardingHeader';
@@ -8,6 +9,7 @@ export const metadata = {
 };
 
 export default async function OnboardingStep3Page() {
+  const brand = await resolveTenantBrandContext().catch(() => null);
   const supabase = await createServerSideClient();
 
   const {
@@ -37,6 +39,8 @@ export default async function OnboardingStep3Page() {
 
       <div className="w-full max-w-xl z-10 relative space-y-6">
         <OnboardingHeader
+          logoUrl={brand?.logoUrl ?? null}
+          brandName={brand?.appName ?? null}
           currentStep={3}
           title="3. Vínculo Fraterno & Comercial"
           subtitle="Declare seu vínculo com a ordem e sua relação administrativa com a empresa."

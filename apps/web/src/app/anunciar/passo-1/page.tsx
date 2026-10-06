@@ -1,3 +1,4 @@
+import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { createServerSideClient } from '@/lib/supabase/server';
 import OnboardingHeader from '@/components/onboarding/OnboardingHeader';
 import ResponsibleForm from './responsible-form';
@@ -7,6 +8,7 @@ export const metadata = {
 };
 
 export default async function OnboardingStep1Page() {
+  const brand = await resolveTenantBrandContext().catch(() => null);
   const supabase = await createServerSideClient();
   const {
     data: { user },
@@ -17,10 +19,10 @@ export default async function OnboardingStep1Page() {
 
   const { data: profile } = user
     ? await supabase
-        .from('profiles')
-        .select('name, email')
-        .eq('id', user.id)
-        .maybeSingle()
+      .from('profiles')
+      .select('name, email')
+      .eq('id', user.id)
+      .maybeSingle()
     : { data: null };
 
   return (
@@ -30,9 +32,11 @@ export default async function OnboardingStep1Page() {
 
       <div className="w-full max-w-xl z-10 relative space-y-6">
         <OnboardingHeader
+          logoUrl={brand?.logoUrl ?? null}
+          brandName={brand?.appName ?? null}
           currentStep={1}
           title="1. Sua Conta de Acesso"
-          subtitle="Identifique a pessoa responsável que administrará a conta comercial no Guia."
+          subtitle="Identifique a pessoa responsável que administrará a conta comercial na Plataforma."
         />
 
         <div className="bg-[#2b060d]/90 border border-[#C9A227]/30 rounded-3xl p-6 shadow-2xl backdrop-blur-md">

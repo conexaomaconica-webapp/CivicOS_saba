@@ -1,3 +1,4 @@
+import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import OnboardingHeader from '@/components/onboarding/OnboardingHeader';
@@ -8,6 +9,7 @@ export const metadata = {
 };
 
 export default async function OnboardingStep7Page() {
+  const brand = await resolveTenantBrandContext().catch(() => null);
   const supabase = await createServerSideClient();
   const {
     data: { user },
@@ -53,6 +55,8 @@ export default async function OnboardingStep7Page() {
 
       <div className="w-full max-w-4xl z-10 relative space-y-6">
         <OnboardingHeader
+          logoUrl={brand?.logoUrl ?? null}
+          brandName={brand?.appName ?? null}
           currentStep={7}
           title="7. Termo de Adesão & Assinatura Eletrônica"
           subtitle="Formalização contratual com prova de integridade criptográfica SHA-256."

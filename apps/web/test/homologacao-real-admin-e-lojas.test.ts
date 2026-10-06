@@ -81,7 +81,7 @@ const mockSupabaseClient = {
               if (businessStore[val]) {
                 Object.assign(businessStore[val], payload);
               }
-              return Promise.resolve({ data: businessStore[val], error: null });
+              return withThrowOnError(Promise.resolve({ data: businessStore[val], error: null }));
             },
           };
         },
@@ -116,7 +116,7 @@ const mockSupabaseClient = {
                 Object.assign(existing, payload);
                 organizationsStore.set(val, existing);
               }
-              return Promise.resolve({ data: existing, error: null });
+              return withThrowOnError(Promise.resolve({ data: existing, error: null }));
             },
           };
         },
@@ -169,6 +169,9 @@ import {
   toggleRecognitionAction,
 } from '../src/lib/admin/admin-businesses-service';
 import { updateBusinessDataBeforeApprovalAction } from '../src/lib/admin/admin-approval-service';
+
+// O cliente real expõe .throwOnError() nas gravações; o mock devolve a própria promessa.
+const withThrowOnError = <T extends Promise<unknown>>(promise: T) => Object.assign(promise, { throwOnError: () => promise });
 
 describe('HOMOLOGAÇÃO FUNCIONAL INTEGRADA — ADMIN EMPRESA & PRIMEIRA LOJA MAÇÔNICA', () => {
 

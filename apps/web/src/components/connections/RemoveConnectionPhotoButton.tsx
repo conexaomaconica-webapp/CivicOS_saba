@@ -1,5 +1,6 @@
 'use client';
 
+import { systemConfirm } from '@/components/system/SystemFeedback';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { ImageOff } from 'lucide-react';
@@ -11,8 +12,8 @@ export function RemoveConnectionPhotoButton({ connectionId, onRemoved }: { conne
   const [error, setError] = useState('');
   const [pending, startTransition] = useTransition();
 
-  const handleClick = () => {
-    if (!window.confirm('Remover a foto desta conexão? A conexão continua registrada, apenas sem a imagem.')) return;
+  const handleClick = async () => {
+    if (!(await systemConfirm({ message: 'Remover a foto desta conexão? A conexão continua registrada, apenas sem a imagem.', danger: true, confirmLabel: 'Remover' }))) return;
     setError('');
     startTransition(async () => {
       const res = await removeConnectionPhotoAction(connectionId);

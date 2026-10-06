@@ -1,7 +1,4 @@
-'use client';
-
 import React from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { Check } from 'lucide-react';
 
@@ -10,6 +7,9 @@ export interface OnboardingHeaderProps {
   title: string;
   subtitle: string;
   businessName?: string | null;
+  /** Logomarca do tenant (resolvida na página, no servidor); sem ela usa a oficial da Conexão. */
+  logoUrl?: string | null;
+  brandName?: string | null;
 }
 
 export default function OnboardingHeader({
@@ -17,6 +17,8 @@ export default function OnboardingHeader({
   title,
   subtitle,
   businessName,
+  logoUrl,
+  brandName,
 }: OnboardingHeaderProps) {
   const steps = [
     { num: 1, label: 'Conta', path: '/anunciar/passo-1' },
@@ -27,36 +29,36 @@ export default function OnboardingHeader({
     { num: 6, label: 'Pagamento', path: '/anunciar/passo-6' },
   ];
 
+  // Logomarca do tenant (ou a oficial da Conexão): sem caixa, grande e centralizada no topo.
+  const logoSrc = logoUrl || '/logoconexao_red_vert.png';
+  const logoAlt = brandName || 'Conexão Maçônica';
+
   return (
     <div className="w-full space-y-4">
-      {/* CARD DO LOGO & TÍTULO */}
-      <div className="bg-[#2b060d]/90 border border-[#C9A227]/30 rounded-3xl p-5 shadow-2xl backdrop-blur-md flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
-        <div className="w-12 h-12 rounded-2xl bg-[#3B0B14] border border-[#C9A227]/50 flex items-center justify-center p-2 shadow-lg shrink-0">
-          <Image
-            src="/logoconexao_red_vert.png"
-            alt="Conexão Maçônica"
-            width={36}
-            height={36}
-            className="object-contain"
-            priority
-          />
-        </div>
+      <div className="flex justify-center px-2 pt-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logoSrc}
+          alt={logoAlt}
+          className="h-auto w-full max-w-[460px] object-contain drop-shadow-[0_2px_14px_rgba(0,0,0,0.45)]"
+        />
+      </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
-            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#C9A227]/20 text-[#C9A227] border border-[#C9A227]/40 uppercase tracking-wider">
-              Onboarding Anunciante • Etapa {currentStep} de 6
+      {/* TÍTULO DA ETAPA */}
+      <div className="bg-[#2b060d]/90 border border-[#C9A227]/30 rounded-3xl p-5 shadow-2xl backdrop-blur-md text-center">
+        <div className="flex items-center justify-center gap-2 flex-wrap">
+          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#C9A227]/20 text-[#C9A227] border border-[#C9A227]/40 uppercase tracking-wider">
+            Onboarding Anunciante • Etapa {currentStep} de 6
+          </span>
+          {businessName && (
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-stone-800 text-stone-300 border border-stone-700 truncate max-w-[200px]">
+              {businessName}
             </span>
-            {businessName && (
-              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-stone-800 text-stone-300 border border-stone-700 truncate max-w-[200px]">
-                {businessName}
-              </span>
-            )}
-          </div>
-
-          <h1 className="text-xl font-serif font-bold text-[#FAF7F2] mt-1">{title}</h1>
-          <p className="text-xs text-stone-300 mt-0.5 line-clamp-2">{subtitle}</p>
+          )}
         </div>
+
+        <h1 className="text-xl font-serif font-bold text-[#FAF7F2] mt-2">{title}</h1>
+        <p className="text-xs text-stone-300 mt-0.5">{subtitle}</p>
       </div>
 
       {/* BARRA NAVEGAÇÃO DOS 6 PASSOS */}

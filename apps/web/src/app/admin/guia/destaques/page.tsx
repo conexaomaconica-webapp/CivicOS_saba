@@ -1,5 +1,6 @@
 'use client';
 
+import { systemConfirm, systemNotify } from '@/components/system/SystemFeedback';
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { updateSponsoredSettingsAction } from '@/app/actions/directory-home-settings';
@@ -144,11 +145,11 @@ export default function AdminGuiaDestaquesPage() {
         setSuccessMsg('Configurações da seção de empresas patrocinadas atualizadas com sucesso!');
         setTimeout(() => setSuccessMsg(null), 4000);
       } else {
-        alert(res.error || 'Erro ao atualizar configurações.');
+        systemNotify({ type: 'danger', message: res.error || 'Erro ao atualizar configurações.' });
       }
     } catch (err) {
       console.error('Erro ao salvar formato:', err);
-      alert('Erro inesperado ao salvar formato.');
+      systemNotify({ type: 'danger', message: 'Erro inesperado ao salvar formato.' });
     } finally {
       setUpdatingMode(false);
     }
@@ -205,14 +206,14 @@ export default function AdminGuiaDestaquesPage() {
       fetchData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro ao salvar destaque';
-      alert(msg);
+      systemNotify({ type: 'danger', message: msg });
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Deseja remover este destaque administrativo? (A empresa voltará para a regra comercial padrão do plano)')) return;
+    if (!(await systemConfirm({ message: 'Deseja remover este destaque administrativo? (A empresa voltará para a regra comercial padrão do plano)', danger: true, confirmLabel: 'Remover' }))) return;
     try {
       const supabase = createClient();
       await (supabase as any).from('directory_sponsored_businesses').delete().eq('id', id);

@@ -1,3 +1,4 @@
+import { needsDividerBetween, normalizeHomeSections } from '@/lib/directory/home-sections';
 import React from 'react';
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
@@ -475,6 +476,65 @@ export default async function GuiaPage({ searchParams }: Props) {
   // Opções do filtro "Todas as Categorias": todas as que têm empresas publicadas.
   const filterCategories = await fetchFilterCategories(supabase, host, categories);
 
+  // Seções da home: ordem e visibilidade vêm de /admin/guia/geral (a configuração gravada é completada com as seções reais).
+  const sectionNodes: Record<string, React.ReactNode> = {
+    hero: (
+      <DirectoryHero
+        title={settings.hero_title}
+        subtitle={settings.hero_subtitle}
+        searchPlaceholder={settings.hero_search_placeholder}
+        selectedCity={city}
+        confirmedConnections={confirmedConnections}
+      />
+    ),
+    // Carrossel Destaque da Semana
+    carousel: <DirectoryCarousel banners={banners} />,
+    // Convite em destaque: registrar visita ou negócio com foto e comentário
+    connections_cta: <DirectoryConnectionsCta />,
+    categories: <DirectoryCategories categories={categories} />,
+    sponsored: (
+      <DirectorySponsored
+        items={sponsored}
+        displayMode={sponsoredDisplayMode}
+        speed={sponsoredSpeed}
+        logoStyle={sponsoredLogoStyle}
+      />
+    ),
+    // Mural de Conexões: prova social e convite para registrar uma conexão (fotos opcionais)
+    connections_mural: <DirectoryConnectionsMural items={connectionsFeed} confirmedTotal={confirmedConnections} />,
+    all_businesses: (
+      <DirectoryAllBusinesses
+        items={businessItems}
+        total={searchData.total}
+        page={searchData.page}
+        pageSize={searchData.page_size}
+        totalPages={searchData.total_pages}
+        hasNextPage={searchData.has_next_page}
+        hasPreviousPage={searchData.has_previous_page}
+        availableCities={availableCities}
+        categories={filterCategories}
+        searchQuery={q}
+        selectedCity={city}
+        selectedCategory={cat}
+        verifiedOnly={verified}
+        hasBenefitsOnly={benefits}
+        sortBy={sort}
+      />
+    ),
+    map: <DirectoryMapExplore businesses={businessItems} selectedCity={city} />,
+    lodges: <DirectoryLodgesGuide facets={lodgeFacets} />,
+  };
+
+  const visibleSections = normalizeHomeSections(settings.sections_config).filter(
+    (section) => section.enabled && sectionNodes[section.id],
+  );
+  const renderedSections = visibleSections.map((section, index) => (
+    <React.Fragment key={section.id}>
+      {index > 0 && needsDividerBetween(visibleSections[index - 1]!.id, section.id) && <SectionDivider />}
+      {sectionNodes[section.id]}
+    </React.Fragment>
+  ));
+
   return (
     <FavoritesProvider>
       <div className="min-h-screen bg-[#faf7f2] text-[#1f1914] font-sans antialiased relative">
@@ -495,71 +555,8 @@ export default async function GuiaPage({ searchParams }: Props) {
           availableCities={availableCities}
         />
 
-        {/* Hero Section */}
-        <DirectoryHero
-          title={settings.hero_title}
-          subtitle={settings.hero_subtitle}
-          searchPlaceholder={settings.hero_search_placeholder}
-          selectedCity={city}
-          confirmedConnections={confirmedConnections}
-        />
-
-        {/* Carrossel Destaque da Semana */}
-        <DirectoryCarousel banners={banners} />
-
-        {/* Convite em destaque: registrar visita ou negócio com foto e comentário */}
-        <DirectoryConnectionsCta />
-
-        <SectionDivider />
-
-        {/* Categorias em Destaque */}
-        <DirectoryCategories categories={categories} />
-
-        <SectionDivider />
-
-        {/* Empresas Patrocinadas */}
-        <DirectorySponsored
-          items={sponsored}
-          displayMode={sponsoredDisplayMode}
-          speed={sponsoredSpeed}
-          logoStyle={sponsoredLogoStyle}
-        />
-
-        <SectionDivider />
-
-        {/* Mural de Conexões: prova social e convite para registrar uma conexão (fotos opcionais) */}
-        <DirectoryConnectionsMural items={connectionsFeed} confirmedTotal={confirmedConnections} />
-
-        <SectionDivider />
-
-        {/* Diretório Completo "Todas as Empresas" */}
-        <DirectoryAllBusinesses
-          items={businessItems}
-          total={searchData.total}
-          page={searchData.page}
-          pageSize={searchData.page_size}
-          totalPages={searchData.total_pages}
-          hasNextPage={searchData.has_next_page}
-          hasPreviousPage={searchData.has_previous_page}
-          availableCities={availableCities}
-          categories={filterCategories}
-          searchQuery={q}
-          selectedCity={city}
-          selectedCategory={cat}
-          verifiedOnly={verified}
-          hasBenefitsOnly={benefits}
-          sortBy={sort}
-        />
-
-        <SectionDivider />
-
-        {/* Explore perto de você (Mapa) */}
-        <DirectoryMapExplore businesses={businessItems} selectedCity={city} />
-
-        <SectionDivider />
-
-        {/* Guia de Lojas Maçônicas */}
-        <DirectoryLodgesGuide facets={lodgeFacets} />
+        {/* Seções da home na ordem e com a visibilidade definidas em /admin/guia/geral */}
+        {renderedSections}
 
         {/* Footer */}
         <DirectoryFooter />

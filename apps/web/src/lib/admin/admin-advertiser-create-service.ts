@@ -197,7 +197,7 @@ export async function createAdminAdvertiserAction(
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'tenant_id,business_id,recognition_key' },
-      );
+      ).throwOnError();
     }
 
     await (adminClient as any).from('admin_audit_logs').insert({

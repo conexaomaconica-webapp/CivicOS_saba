@@ -1,8 +1,10 @@
 'use client';
 
+import { systemConfirm, systemNotify } from '@/components/system/SystemFeedback';
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Plus, Trash2, Edit2, Loader2, CheckCircle2, X } from 'lucide-react';
+import { BannerImageField } from '@/components/admin/BannerImageField';
 import { getCanonicalAdminTenantAction } from '@/app/actions/admin-tenant-context';
 
 type Banner = {
@@ -137,14 +139,14 @@ export default function AdminGuiaBannersPage() {
       fetchBanners();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro ao salvar banner';
-      alert(msg);
+      systemNotify({ type: 'danger', message: msg });
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Deseja excluir este banner?')) return;
+    if (!(await systemConfirm({ message: 'Deseja excluir este banner?', danger: true, confirmLabel: 'Excluir' }))) return;
     try {
       const supabase = createClient();
       await (supabase as any).from('directory_banners').delete().eq('id', id);
@@ -278,16 +280,22 @@ export default function AdminGuiaBannersPage() {
 
               </div>}
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">URL Imagem Desktop *</label>
-                <input type="text" value={imageDesktopUrl} onChange={(e) => setImageDesktopUrl(e.target.value)} required className="w-full px-3 py-1.5 border rounded-md text-sm" />
-              </div>
+              <BannerImageField
+                label="Imagem Desktop *"
+                value={imageDesktopUrl}
+                onChange={setImageDesktopUrl}
+                required
+                hint="Imagem larga (ex.: 1920×720). É reduzida automaticamente (WebP, até ~450 KB)."
+              />
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">URL Imagem Mobile (opcional)</label>
-                <input type="text" value={imageMobileUrl} onChange={(e) => setImageMobileUrl(e.target.value)} className="w-full px-3 py-1.5 border rounded-md text-sm" />
-                <p className="mt-1 text-xs text-gray-500">Sem uma imagem mobile, a imagem desktop também será usada no celular.</p>
-              </div>
+              <BannerImageField
+                label="Imagem Mobile (opcional)"
+                value={imageMobileUrl}
+                onChange={setImageMobileUrl}
+                maxDimension={960}
+                maxBytes={220 * 1024}
+                hint="Sem uma imagem mobile, a imagem desktop também será usada no celular."
+              />
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

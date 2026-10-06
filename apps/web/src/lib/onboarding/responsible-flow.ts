@@ -21,6 +21,10 @@ export interface MasonicDraft {
 export interface ResponsibleDraft {
   name: string;
   email: string;
+  /** WhatsApp/telefone do responsável: pré-preenche o telefone da empresa no passo 2 e o contato do contrato. */
+  phone?: string;
+  /** Loja escolhida na lista do cadastro (quando houver); sem ela vale só o nome digitado. */
+  lodgeOrganizationId?: string;
   relationship: ResponsibleRelationship;
   masonic?: MasonicDraft | null;
   savedAt: string;
@@ -79,6 +83,8 @@ export function loadResponsibleDraft(storage: ResponsiveStorage | null = getStor
       return {
         name: parsed.name,
         email: parsed.email,
+        phone: typeof parsed.phone === 'string' ? parsed.phone : '',
+        lodgeOrganizationId: typeof parsed.lodgeOrganizationId === 'string' ? parsed.lodgeOrganizationId : undefined,
         relationship: parsed.relationship,
         masonic: parsed.masonic ? parseMasonic(parsed.masonic) : null,
       } as ResponsibleDraft;

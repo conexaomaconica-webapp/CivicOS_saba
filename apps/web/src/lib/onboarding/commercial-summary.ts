@@ -57,7 +57,7 @@ export function getBillingCycleLabel(cycle: BillingCycle): string {
 
 export const RESPONSIBLE_RELATIONSHIP_SHORT: Record<'owner' | 'representative', string> = {
   owner: 'Proprietário / Sócio Diretor',
-  representative: 'Representante Comercial / Procurador',
+  representative: 'Representante / Procurador',
 };
 
 // Condições contratuais exibidas no resumo (CRIT-VSC-005/006) — texto canonizado

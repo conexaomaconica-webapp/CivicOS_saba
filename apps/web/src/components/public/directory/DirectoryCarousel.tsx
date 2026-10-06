@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export type DirectoryBannerItem = {
@@ -16,6 +17,22 @@ export type DirectoryBannerItem = {
 
 type DirectoryCarouselProps = {
   banners?: DirectoryBannerItem[];
+};
+
+// O otimizador do Next só serve hospedagens liberadas em next.config (Supabase Storage); URLs externas ficam como estão.
+const SUPABASE_HOST = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '').hostname;
+  } catch {
+    return '';
+  }
+})();
+const canOptimize = (url: string) => {
+  try {
+    return Boolean(SUPABASE_HOST) && new URL(url).hostname === SUPABASE_HOST;
+  } catch {
+    return false;
+  }
 };
 
 export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
@@ -42,16 +59,42 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
   const goToPrevious = () => setActiveIndex((currentIndex) => (currentIndex - 1 + banners.length) % banners.length);
   const goToNext = () => setActiveIndex((currentIndex) => (currentIndex + 1) % banners.length);
 
-  const image = (
-    <picture className={imageOnly ? 'absolute inset-0' : 'block h-full'}>
-      {current.image_mobile_url && <source media="(max-width: 640px)" srcSet={current.image_mobile_url} />}
-      <img
-        src={current.image_desktop_url}
-        alt={current.title || 'Banner institucional'}
-        className={`h-full w-full object-cover ${imageOnly ? 'object-center' : ''}`}
-      />
-    </picture>
-  );
+  const alt = current.title || 'Banner institucional';
+  const fit = `object-cover ${imageOnly ? 'object-center' : ''}`;
+  const desktopOptimizable = canOptimize(current.image_desktop_url);
+  const mobileOptimizable = Boolean(current.image_mobile_url) && canOptimize(current.image_mobile_url as string);
+
+  const image =
+    desktopOptimizable && (!current.image_mobile_url || mobileOptimizable) ? (
+      // Imagens do Supabase passam pelo otimizador: tamanho certo para a tela, em WebP/AVIF, com carregamento sob demanda.
+      <div className={imageOnly ? 'absolute inset-0' : 'relative block h-full w-full'}>
+        <Image
+          src={current.image_desktop_url}
+          alt={alt}
+          fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1280px) 100vw, 1280px"
+          quality={72}
+          priority={activeIndex === 0 && !current.image_mobile_url}
+          className={`${fit} ${current.image_mobile_url ? 'max-sm:hidden' : ''}`}
+        />
+        {current.image_mobile_url && (
+          <Image
+            src={current.image_mobile_url}
+            alt={alt}
+            fill
+            sizes="100vw"
+            quality={72}
+            className={`${fit} sm:hidden`}
+          />
+        )}
+      </div>
+    ) : (
+      <picture className={imageOnly ? 'absolute inset-0' : 'block h-full'}>
+        {current.image_mobile_url && <source media="(max-width: 640px)" srcSet={current.image_mobile_url} />}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={current.image_desktop_url} alt={alt} loading="lazy" className={`h-full w-full ${fit}`} />
+      </picture>
+    );
 
   return (
     <section

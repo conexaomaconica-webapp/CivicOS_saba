@@ -1,5 +1,6 @@
 'use client';
 
+import { systemConfirm } from '@/components/system/SystemFeedback';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, AlertTriangle, ShieldCheck, Trash2 } from 'lucide-react';
@@ -43,9 +44,7 @@ export default function LodgeGovernanceControls({ lodgeId, initialStatus }: Lodg
   };
 
   const handleDelete = async () => {
-    const confirmed = window.confirm(
-      'Excluir definitivamente esta Loja Maçônica? Contatos, reuniões e galeria vinculados também serão removidos. Esta ação não pode ser desfeita.'
-    );
+    const confirmed = (await systemConfirm({ message: 'Excluir definitivamente esta Loja Maçônica? Contatos, reuniões e galeria vinculados também serão removidos. Esta ação não pode ser desfeita.', danger: true, confirmLabel: 'Excluir' }));
     if (!confirmed) return;
 
     setDeleting(true);

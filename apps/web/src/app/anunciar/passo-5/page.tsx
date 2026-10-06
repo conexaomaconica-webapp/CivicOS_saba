@@ -1,3 +1,4 @@
+import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import OnboardingHeader from '@/components/onboarding/OnboardingHeader';
@@ -8,6 +9,7 @@ export const metadata = {
 };
 
 export default async function OnboardingStep5Page() {
+  const brand = await resolveTenantBrandContext().catch(() => null);
   const supabase = await createServerSideClient();
   const {
     data: { user },
@@ -46,6 +48,8 @@ export default async function OnboardingStep5Page() {
 
       <div className="w-full max-w-3xl z-10 relative space-y-6">
         <OnboardingHeader
+          logoUrl={brand?.logoUrl ?? null}
+          brandName={brand?.appName ?? null}
           currentStep={5}
           title="5. Revisão da Contratação & Contrato de Adesão"
           subtitle="Confira o resumo comercial e realize a assinatura digital com timestamp confiável e Hash SHA-256."

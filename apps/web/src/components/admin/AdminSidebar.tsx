@@ -87,6 +87,11 @@ export const adminNavSections: NavSection[] = [
         label: 'Empresas (Pós-Aprovação)',
         path: '/admin/empresas',
         icon: Building2,
+        subItems: [
+          { label: 'Todas as Empresas', path: '/admin/empresas' },
+          { label: 'Nova Empresa', path: '/admin/empresas/nova' },
+          { label: 'Convites de Cadastro', path: '/admin/empresas/convites' },
+        ],
       },
       {
         id: 'planos',

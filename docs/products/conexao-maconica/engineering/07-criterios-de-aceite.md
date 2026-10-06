@@ -209,7 +209,7 @@ Cenário: Criação de rascunho de empresa na etapa inicial de cadastro
 
 ```gherkin
 Cenário: Interrupção do cadastro para representante sem autorização anexada
-  Dado que o anunciante declarou ser "Representante Comercial / Procurador"
+  Dado que o anunciante declarou ser "Representante / Procurador"
   E não possui registro de sócio no CNPJ
   Quando tentar avançar para a escolha do plano comercial
   Então o sistema deve interromper o avanço e apresentar o formulário de Autorização Empresarial
