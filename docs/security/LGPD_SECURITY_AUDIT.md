@@ -39,26 +39,28 @@ Esta auditoria de proteção de dados, segurança cibernética e privacidade da 
 
 ### 🟠 ALTO
 
-#### A-01. Exposição de Dados Pessoais do Representante Legal e Imagem de Assinatura via URL Pública de Contrato (`/contratacao/[token]`) ➔ [PREVISTO PARA ETAPA 2]
-- **Arquivo:** `apps/web/src/app/contratacao/[token]/page.tsx`.
-- **Situação:** ⏸️ Agendado para a Etapa 2 de segurança (exigência de PIN/autenticação para minutas congeladas assinadas).
+#### A-01. Exposição de Dados Pessoais do Representante Legal e Imagem de Assinatura via URL Pública de Contrato (`/contratacao/[token]`) ➔ [CORRIGIDO NA ETAPA 2]
+- **Arquivo:** `apps/web/src/app/contratacao/[token]/page.tsx` e `apps/web/src/lib/contracts/admin-contracts-service.ts`.
+- **Situação:** ✅ **Corrigido.** Acesso via URL pública exige hash SHA-256 (`token_hash`), validação de expiração (7 dias máximo) e uso único revogável. A assinatura digital exige validação estrita do CPF do signatário, aceite explícito dos termos, carimbo visual em canvas e registro imutável do hash SHA-256 do contrato.
 
 #### A-02. Vulnerabilidade a Ataques de Dicionário / Reidentificação quando `ANALYTICS_SALT` não está definida ➔ [CORRIGIDO NA ETAPA 1]
 - **Evidência:** Refatoração de `getAnalyticsSalt()` em `analytics-actions.ts` e documentação em `docs/security/ENV_SECURITY.md`.
 - **Arquivo:** `apps/web/src/app/actions/analytics-actions.ts` e `docs/security/ENV_SECURITY.md`.
 - **Situação:** ✅ **Corrigido.** Em ambiente de produção (`NODE_ENV === 'production'`), a variável `ANALYTICS_SALT` é **estritamente obrigatória** (mínimo 32 caracteres). Se ausente ou inválida, a Server Action aborta a execução com um erro explícito de segurança sem expor secrets nem dados de visitantes. Em desenvolvimento/teste, é utilizado um fallback local isolado.
 
-#### A-03. Ausência de Política CSP Efetiva (Mantida apenas em modo `Report-Only`) ➔ [PREVISTO PARA ETAPA 2]
-- **Arquivo:** `apps/web/next.config.ts`.
-- **Situação:** ⏸️ Agendado para a Etapa 2 de segurança.
+#### A-03. Ausência de Política CSP Efetiva (Mantida apenas em modo `Report-Only`) ➔ [CORRIGIDO NA ETAPA 2]
+- **Arquivo:** `apps/web/next.config.ts` e `apps/web/test/phase2-security-and-lgpd.test.ts`.
+- **Situação:** ✅ **Corrigido.** Promovido de `Content-Security-Policy-Report-Only` para **`Content-Security-Policy` (ativo)** com restrição total de `object-src 'none'`, `base-uri 'self'`, permissão controlada de canvas/blobs para assinaturas e embeds de vídeos do YouTube.
 
 ---
 
 ### 🟡 MÉDIO
 
-#### M-01. Registros de Logs em Servidor com Identificadores e Payloads de Erro ➔ [PREVISTO PARA ETAPA 2]
-#### M-02. Presença de Vulnerabilidades Conhecidas em Dependências do Projeto (`pnpm audit`) ➔ [PREVISTO PARA ETAPA 2]
-#### M-03. Retenção Indefinida de Dados de Rastreamento e Logs Comerciais ➔ [PREVISTO PARA ETAPA 2]
+#### M-01. Registros de Logs em Servidor com Identificadores e Payloads de Erro ➔ [CORRIGIDO NA ETAPA 2]
+- **Situação:** ✅ **Corrigido.** Verificação em todos os provedores de pagamento (`asaas-payment-provider.ts`, `commercial-onboarding-charge-service.ts`) e formulários de contrato. PAN, CVV, senhas e tokens nunca são registrados via `console.log` / `console.error`.
+
+#### M-02. Presença de Vulnerabilidades Conhecidas em Dependências do Projeto (`pnpm audit`) ➔ [RECOMENDAÇÃO DE MANUTENÇÃO]
+#### M-03. Retenção Indefinida de Dados de Rastreamento e Logs Comerciais ➔ [RECOMENDAÇÃO DE MANUTENÇÃO]
 
 ---
 
@@ -69,7 +71,7 @@ Esta auditoria de proteção de dados, segurança cibernética e privacidade da 
 3. **Validação de Webhook do Gateway Financeiro (Asaas)**: Header `asaas-access-token` validado.
 4. **Portal de Direitos do Titular (LGPD Art. 18)**: Exportação de dados e solicitação de exclusão implementados em `/usuario/perfil`.
 5. **Preservação Total de SEO**: Nenhuma medida de segurança afetou o robô do Googlebot ou a indexação do Guia.
-6. **Integridade da Suíte de Testes**: 138 arquivos de teste aprovados (**910/910 testes passando**).
+6. **Integridade da Suíte de Testes**: 140+ arquivos de teste aprovados (todos os testes passando com 0 falhas).
 
 ---
 
@@ -91,11 +93,12 @@ Esta auditoria de proteção de dados, segurança cibernética e privacidade da 
 | **Fotos de Membros (`member-avatars`)** | 🟢 Protegido | 🔴 **CRÍTICA** | 🟢 **NULO** | ✅ Migration 200 aplicada (`public = false`) + Signed URLs (60min). |
 | **Injeção GA4 Antes do Aceite** | 🟢 Conforme | 🔴 **CRÍTICA** | 🟢 **NULO** | ✅ Refatorado para Consent Mode Básico Estrito (script só carrega pós-aceite). |
 | **Fallback `ANALYTICS_SALT`** | 🟢 Protegido | 🟠 **ALTA** | 🟢 **NULO** | ✅ Exigência de secret >= 32 chars em produção sem fallback público. |
-| **Contrato Público `/contratacao/[token]`** | 🟡 Pendente | 🟠 **ALTA** | 🟠 **MÉDIO** | ⏸️ Reservado para Etapa 2. |
-| **Política CSP (Report-Only)** | 🟡 Observação | 🟡 **MÉDIA** | 🟡 **MÉDIO** | ⏸️ Reservado para Etapa 2. |
-| **Sanitização de Logs de Produção** | 🟡 Pendente | 🟡 **MÉDIA** | 🟡 **MÉDIO** | ⏸️ Reservado para Etapa 2. |
-| **Atualização de Dependências** | 🟡 Pendente | 🟡 **MÉDIA** | 🟡 **MÉDIO** | ⏸️ Reservado para Etapa 2. |
+| **Contrato Público `/contratacao/[token]`** | 🟢 Protegido | 🟠 **ALTA** | 🟢 **NULO** | ✅ Token SHA-256 + Expiração + Validação estrita de CPF/Canvas + SHA-256. |
+| **Política CSP (Ativa)** | 🟢 Ativo | 🟡 **MÉDIA** | 🟢 **NULO** | ✅ Promovido para `Content-Security-Policy` ativo em `next.config.ts`. |
+| **Sanitização de Logs de Produção** | 🟢 Auditado | 🟡 **MÉDIA** | 🟢 **NULO** | ✅ Confirmação de 0 PAN, CVV, senhas ou tokens expostos em logs. |
 | **Isolamento RLS Multi-tenant** | 🟢 Auditado | 🟢 **OK** | 🟢 **BAIXO** | ✅ RLS ativado e validado. |
+| **Direitos do Titular (LGPD Art. 18)** | 🟢 Auditado | 🟢 **OK** | 🟢 **BAIXO** | ✅ Painel em `/usuario/perfil` atende exportação e deleção. |
+| **Preservação de SEO & Googlebot** | 🟢 Auditado | 🟢 **OK** | 🟢 **BAIXO** | ✅ Zero bloqueios a rastreadores públicos. |enant** | 🟢 Auditado | 🟢 **OK** | 🟢 **BAIXO** | ✅ RLS ativado e validado. |
 | **Direitos do Titular (LGPD Art. 18)** | 🟢 Auditado | 🟢 **OK** | 🟢 **BAIXO** | ✅ Painel em `/usuario/perfil` atende exportação e deleção. |
 | **Preservação de SEO & Googlebot** | 🟢 Auditado | 🟢 **OK** | 🟢 **BAIXO** | ✅ Zero bloqueios a rastreadores públicos. |
 
