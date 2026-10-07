@@ -192,3 +192,15 @@ describe('eventos do Google Analytics', () => {
     expect(classifyLinkClick('https://wa.me/55', host, null)).toBeNull();
   });
 });
+
+describe('chaves das pendências de SEO', () => {
+  it('cada pendência tem uma chave estável para a tela levar ao lugar certo', () => {
+    const res = scoreBusinessSeo({
+      name: 'X', category: null, description: null, slug: 'x', city: null, state: null, address: null, hasCoordinates: false, hoursCount: 0,
+      phone: null, whatsapp: null, website: null, instagram: null, logoUrl: null, coverUrl: null, galleryCount: 0, servicesCount: 0, seoIndexable: true,
+    });
+    const keys = res.issues.map((i) => i.key);
+    expect(keys).toEqual(expect.arrayContaining(['category', 'city_state', 'description', 'phone', 'whatsapp', 'services_1', 'logo', 'cover', 'hours']));
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+});

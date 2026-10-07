@@ -24,7 +24,8 @@ export type SeoScoreInput = {
   seoIndexable: boolean;
 };
 
-export type SeoIssue = { label: string; points: number };
+/** key identifica o item (para a tela levar ao lugar certo de edição); label é o texto mostrado. */
+export type SeoIssue = { key: string; label: string; points: number };
 
 export type SeoScoreResult = {
   score: number;
@@ -48,47 +49,47 @@ export function scoreBusinessSeo(input: SeoScoreInput): SeoScoreResult {
   const issues: SeoIssue[] = [];
   const groups: SeoScoreResult['groups'] = [];
 
-  const group = (key: string, label: string, checks: Array<[boolean, number, string]>) => {
+  const group = (key: string, label: string, checks: Array<[boolean, number, string, string]>) => {
     let earned = 0;
     let max = 0;
-    for (const [ok, points, missing] of checks) {
+    for (const [ok, points, missing, issueKey] of checks) {
       max += points;
       if (ok) earned += points;
-      else issues.push({ label: missing, points });
+      else issues.push({ key: issueKey, label: missing, points });
     }
     groups.push({ key, label, earned, max });
   };
 
   group('cadastro', 'Cadastro', [
-    [has(input.name), 5, 'Informar o nome da empresa'],
-    [has(input.category), 5, 'Escolher a categoria'],
-    [has(input.city) && has(input.state), 5, 'Informar cidade e estado'],
-    [has(input.description, 50), 5, 'Escrever uma descrição (mínimo 50 caracteres)'],
+    [has(input.name), 5, 'Informar o nome da empresa', 'name'],
+    [has(input.category), 5, 'Escolher a categoria', 'category'],
+    [has(input.city) && has(input.state), 5, 'Informar cidade e estado', 'city_state'],
+    [has(input.description, 50), 5, 'Escrever uma descrição (mínimo 50 caracteres)', 'description'],
   ]);
   group('contato', 'Contato', [
-    [has(input.phone), 5, 'Informar o telefone'],
-    [has(input.whatsapp), 5, 'Informar o WhatsApp'],
-    [has(input.website) || has(input.instagram), 5, 'Informar o site ou o Instagram'],
+    [has(input.phone), 5, 'Informar o telefone', 'phone'],
+    [has(input.whatsapp), 5, 'Informar o WhatsApp', 'whatsapp'],
+    [has(input.website) || has(input.instagram), 5, 'Informar o site ou o Instagram', 'website_or_instagram'],
   ]);
   group('conteudo', 'Conteúdo', [
-    [has(input.description, 150), 10, 'Aprofundar a descrição (150 caracteres ou mais)'],
-    [input.servicesCount >= 1, 8, 'Cadastrar ao menos um serviço'],
-    [input.servicesCount >= 3, 7, 'Cadastrar três ou mais serviços'],
+    [has(input.description, 150), 10, 'Aprofundar a descrição (150 caracteres ou mais)', 'description_long'],
+    [input.servicesCount >= 1, 8, 'Cadastrar ao menos um serviço', 'services_1'],
+    [input.servicesCount >= 3, 7, 'Cadastrar três ou mais serviços', 'services_3'],
   ]);
   group('imagens', 'Imagens', [
-    [has(input.logoUrl), 5, 'Enviar o logo'],
-    [has(input.coverUrl), 5, 'Enviar a imagem de capa'],
-    [input.galleryCount >= 3, 5, 'Adicionar três ou mais fotos na galeria'],
+    [has(input.logoUrl), 5, 'Enviar o logo', 'logo'],
+    [has(input.coverUrl), 5, 'Enviar a imagem de capa', 'cover'],
+    [input.galleryCount >= 3, 5, 'Adicionar três ou mais fotos na galeria', 'gallery'],
   ]);
   group('local', 'Local', [
-    [has(input.address), 6, 'Informar o endereço completo'],
-    [input.hoursCount >= 1, 5, 'Informar o horário de atendimento'],
-    [input.hasCoordinates, 4, 'Confirmar a localização no mapa'],
+    [has(input.address), 6, 'Informar o endereço completo', 'address'],
+    [input.hoursCount >= 1, 5, 'Informar o horário de atendimento', 'hours'],
+    [input.hasCoordinates, 4, 'Confirmar a localização no mapa', 'coordinates'],
   ]);
   group('tecnico', 'Técnico', [
-    [has(input.slug), 4, 'Gerar o endereço (slug) da página'],
-    [input.seoIndexable, 3, 'Liberar a página para o Google (hoje está como noindex)'],
-    [has(input.name) && has(input.category) && has(input.city), 3, 'Preencher nome, categoria e cidade para gerar título e descrição automáticos'],
+    [has(input.slug), 4, 'Gerar o endereço (slug) da página', 'slug'],
+    [input.seoIndexable, 3, 'Liberar a página para o Google (hoje está como noindex)', 'indexable'],
+    [has(input.name) && has(input.category) && has(input.city), 3, 'Preencher nome, categoria e cidade para gerar título e descrição automáticos', 'auto_fields'],
   ]);
 
   const score = groups.reduce((sum, g) => sum + g.earned, 0);

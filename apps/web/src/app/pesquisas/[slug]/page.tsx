@@ -24,6 +24,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${survey.title} · Conexão Maçônica`,
     description: survey.description || 'Pesquisa institucional e mapeamento de negócios da comunidade maçônica.',
+    // Pesquisa institucional com coleta de dados: funciona por link, mas não deve ser indexada.
+    robots: { index: false, follow: true },
     openGraph: {
       title: `${survey.title} · Conexão Maçônica`,
       description: survey.description || 'Pesquisa institucional e mapeamento de negócios.',

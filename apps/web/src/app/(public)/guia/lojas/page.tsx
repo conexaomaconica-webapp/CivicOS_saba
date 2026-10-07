@@ -2,6 +2,7 @@ import { resolvePortalTheme } from '@/lib/tenant/portal-theme';
 import { getLodgeFacetRows } from '@/lib/lodges/lodge-facets';
 import React from 'react';
 import type { Metadata } from 'next';
+import { appUrl } from '@/lib/seo/app-url';
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { ChevronRight, Search, Landmark, Sparkles } from 'lucide-react';
@@ -20,9 +21,6 @@ import { canonicalPotencyCode, KNOWN_POTENCY_NAMES } from '@/lib/lodges/potency'
 import { interpretLodgeQueryByRules, describeInterpretation } from '@/lib/lodges/smart-search';
 import '@/styles/directory-home.css';
 
-function appUrl(path: string) {
-  return `https://conexaomaconica.com.br${path}`;
-}
 
 type Props = {
   searchParams: Promise<{

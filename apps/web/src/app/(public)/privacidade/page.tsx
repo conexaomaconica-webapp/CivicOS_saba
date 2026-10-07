@@ -248,6 +248,56 @@ export default function PrivacidadePage() {
               </div>
             </section>
 
+            {/* Section 8 */}
+            <section className="space-y-4">
+              <h2 className="text-xl font-bold text-[#C9A227] flex items-center gap-2 border-b border-stone-800 pb-2">
+                <Eye className="w-5 h-5 shrink-0" />
+                <span>8. Google Analytics (GA4), Cookies e Gestão de Consentimento</span>
+              </h2>
+              <p className="text-stone-300 leading-relaxed">
+                Utilizamos a ferramenta <strong className="text-white">Google Analytics 4 (GA4)</strong>, disponibilizada pela Google LLC, para compreender o perfil de uso e aprimorar continuamente a experiência de navegação em nossa plataforma.
+              </p>
+
+              <div className="space-y-3 pt-1">
+                <div className="bg-[#1f0509] p-4 rounded-xl border border-stone-800 space-y-1.5">
+                  <h3 className="font-bold text-[#C9A227] text-xs uppercase">A. Dados Coletados pelo Google Analytics</h3>
+                  <p className="text-xs text-stone-400 leading-relaxed">
+                    São coletadas informações estatísticas e pseudonimizadas, tais como: páginas visualizadas, tempo de navegação, origem do tráfego, tipo de navegador, sistema operacional, resolução de tela e interações com anúncios do Guia Comercial. Os endereços IP são obrigatoriamente anonimizados (<code className="text-amber-300 font-mono">anonymize_ip: true</code>) e o rastreamento individualizado cruzado (Google Signals) permanece desativado.
+                  </p>
+                </div>
+
+                <div className="bg-[#1f0509] p-4 rounded-xl border border-stone-800 space-y-1.5">
+                  <h3 className="font-bold text-[#C9A227] text-xs uppercase">B. Categorias de Cookies Utilizados</h3>
+                  <ul className="list-disc pl-5 text-xs text-stone-400 space-y-1">
+                    <li><strong className="text-stone-200">Cookies Necessários (Primários):</strong> Essenciais para a segurança, autenticação de sessão e navegação funcional (ex: cookies de sessão Supabase, preferências de localização aproximada).</li>
+                    <li><strong className="text-stone-200">Cookies de Desempenho e Analytics (Terceiros):</strong> Definidos pelo Google Analytics (ex: <code className="text-amber-300 font-mono">_ga</code>, <code className="text-amber-300 font-mono">_ga_*</code>) para distinguir visitantes de forma anônima e compilar dados estatísticos.</li>
+                  </ul>
+                </div>
+
+                <div className="bg-[#1f0509] p-4 rounded-xl border border-stone-800 space-y-1.5">
+                  <h3 className="font-bold text-[#C9A227] text-xs uppercase">C. Finalidade do Tratamento</h3>
+                  <p className="text-xs text-stone-400 leading-relaxed">
+                    A mensuração de audiência destina-se exclusivamente ao diagnóstico técnico de desempenho, prevenção a fraudes, otimização de velocidade de carregamento e apresentação de relatórios consolidados de alcance aos anunciantes.
+                  </p>
+                </div>
+
+                <div className="bg-[#1f0509] p-4 rounded-xl border border-stone-800 space-y-1.5">
+                  <h3 className="font-bold text-[#C9A227] text-xs uppercase">D. Mecanismo de Consentimento e Como Recusar</h3>
+                  <p className="text-xs text-stone-400 leading-relaxed">
+                    Em conformidade com as diretrizes de Consent Mode v2, a medição por cookies de analytics inicia-se por padrão bloqueada. O visitante pode autorizar ou recusar a coleta a qualquer momento através do banner de cookies na plataforma. Adicionalmente, é possível gerenciar ou desativar os cookies diretamente nas configurações do seu navegador ou instalando o{' '}
+                    <a
+                      href="https://tools.google.com/dlpage/gaoptout"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#C9A227] underline hover:text-amber-300"
+                    >
+                      Add-on de Opt-out do Google Analytics
+                    </a>.
+                  </p>
+                </div>
+              </div>
+            </section>
+
             <footer className="pt-6 border-t border-stone-800 text-xs text-stone-500 italic text-center">
               Esta Política de Privacidade poderá ser atualizada periodicamente para refletir melhorias na plataforma ou alterações regulatórias. Notificaremos os usuários cadastrados sobre alterações relevantes.
             </footer>

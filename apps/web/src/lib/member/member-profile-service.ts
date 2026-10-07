@@ -12,12 +12,52 @@ function isSupportedImage(bytes: Uint8Array) {
     || (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46);
 }
 
+export function extractMemberAvatarStoragePath(urlOrPath: string | null | undefined): string | null {
+  if (!urlOrPath) return null;
+  const publicMarker = '/storage/v1/object/public/member-avatars/';
+  const signMarker = '/storage/v1/object/sign/member-avatars/';
+
+  if (urlOrPath.includes(publicMarker)) {
+    const idx = urlOrPath.indexOf(publicMarker);
+    const pathWithQuery = urlOrPath.slice(idx + publicMarker.length);
+    return decodeURIComponent(pathWithQuery.split('?')[0] || '');
+  }
+  if (urlOrPath.includes(signMarker)) {
+    const idx = urlOrPath.indexOf(signMarker);
+    const pathWithQuery = urlOrPath.slice(idx + signMarker.length);
+    return decodeURIComponent(pathWithQuery.split('?')[0] || '');
+  }
+  if (!urlOrPath.startsWith('http://') && !urlOrPath.startsWith('https://')) {
+    return urlOrPath.startsWith('member-avatars/') ? urlOrPath.slice('member-avatars/'.length) : urlOrPath;
+  }
+  return null;
+}
+
+export async function getSignedMemberAvatarUrl(
+  urlOrPath: string | null | undefined,
+  supabaseClient?: any,
+  expiresInSeconds = 3600
+): Promise<string | null> {
+  if (!urlOrPath) return null;
+  const path = extractMemberAvatarStoragePath(urlOrPath);
+  if (!path) return urlOrPath;
+
+  try {
+    const supabase = supabaseClient || (await createServerSideClient());
+    const { data, error } = await supabase.storage.from('member-avatars').createSignedUrl(path, expiresInSeconds);
+    if (error || !data?.signedUrl) {
+      return urlOrPath;
+    }
+    return data.signedUrl;
+  } catch {
+    return urlOrPath;
+  }
+}
+
 function memberAvatarPath(publicUrl: string | null | undefined, userId: string): string | null {
   if (!publicUrl) return null;
-  const marker = '/storage/v1/object/public/member-avatars/';
-  const markerIndex = publicUrl.indexOf(marker);
-  if (markerIndex < 0) return null;
-  const path = decodeURIComponent(publicUrl.slice(markerIndex + marker.length));
+  const path = extractMemberAvatarStoragePath(publicUrl);
+  if (!path) return null;
   return path.startsWith(`${userId}/`) ? path : null;
 }
 
@@ -36,8 +76,6 @@ export async function updateMemberProfileAction(formData: FormData): Promise<{ s
     if (!STATES.has(state)) return { success: false, error: 'Informe uma UF válida.' };
     if (phone && validatePhone(phone)) return { success: false, error: 'Informe um telefone válido.' };
 
-    // Cidade só vale se for oficial do estado (evita grafias diferentes para a mesma cidade).
-    // Se a base de referência estiver indisponível, não bloqueia o salvamento.
     const { data: stateRow, error: stateError } = await (supabase as any).from('brazilian_states').select('ibge_code').eq('uf', state).maybeSingle();
     if (!stateError && stateRow) {
       const { data: cityRow, error: cityError } = await (supabase as any)
@@ -66,10 +104,11 @@ export async function updateMemberProfileAction(formData: FormData): Promise<{ s
       const path = `${user.id}/avatar/${crypto.randomUUID()}.${extension}`;
       const { error: uploadError } = await supabase.storage.from('member-avatars').upload(path, bytes, { contentType: avatar.type, upsert: false });
       if (uploadError) return { success: false, error: `Falha ao enviar foto: ${uploadError.message}` };
-      avatarUrl = supabase.storage.from('member-avatars').getPublicUrl(path).data.publicUrl;
+      
+      const { data: signedData } = await supabase.storage.from('member-avatars').createSignedUrl(path, 3600);
+      avatarUrl = signedData?.signedUrl || supabase.storage.from('member-avatars').getPublicUrl(path).data.publicUrl;
     }
 
-    // Whitelist intencional: id, role e tenant_id nunca entram nesta mutação.
     const patch: { name: string; phone: string | null; city: string; state: string; avatar_url?: string } = {
       name,
       phone: phone || null,

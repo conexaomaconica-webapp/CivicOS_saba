@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getSeoCenterDataAction } from '@/app/actions/admin-seo-center';
 import { MIN_BUSINESSES_CITY_CATEGORY_INDEXABLE, MIN_BUSINESSES_CITY_INDEXABLE } from '@/lib/seo/directory-seo';
 import { seoStatusFor } from '@/lib/seo/seo-score';
+import RemindButton from './remind-button';
 
 export const metadata = {
   title: 'SEO Center · Admin CM',
@@ -29,8 +30,9 @@ function Card({ label, value, hint, tone }: { label: string; value: React.ReactN
   );
 }
 
-export default async function AdminSeoCenterPage() {
+export default async function AdminSeoCenterPage({ searchParams }: { searchParams?: Promise<{ pendencia?: string }> }) {
   const result = await getSeoCenterDataAction();
+  const filterKey = ((await searchParams)?.pendencia ?? '').trim();
 
   if (!result.success) {
     return (
@@ -44,6 +46,19 @@ export default async function AdminSeoCenterPage() {
   const { data } = result;
   const t = data.totals;
   const overall = seoStatusFor(data.averageScore);
+
+  // Filtro por tipo de pendência: contagem de empresas por item que falta (os técnicos ficam de fora).
+  const pendencias = new Map<string, { label: string; count: number }>();
+  for (const business of data.businesses) {
+    for (const issue of business.score.issues) {
+      const entry = pendencias.get(issue.key) ?? { label: issue.label, count: 0 };
+      entry.count += 1;
+      pendencias.set(issue.key, entry);
+    }
+  }
+  const pendenciaList = Array.from(pendencias.entries()).sort((a, b) => b[1].count - a[1].count);
+  const visibleBusinesses = filterKey ? data.businesses.filter((b) => b.score.issues.some((i) => i.key === filterKey)) : data.businesses;
+  const activeFilterLabel = filterKey ? pendencias.get(filterKey)?.label : null;
 
   return (
     <div className="space-y-6">
@@ -94,12 +109,32 @@ export default async function AdminSeoCenterPage() {
       <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
         <div className="border-b border-stone-200 px-5 py-3">
           <h2 className="text-base font-bold text-stone-900">Empresas, da menor para a maior pontuação</h2>
+          {pendenciaList.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2" aria-label="Filtrar por pendência">
+              <Link
+                href="/admin/seo"
+                className={`rounded-full px-3 py-1 text-xs font-bold ${!filterKey ? 'bg-[#5d1523] text-white' : 'border border-stone-300 text-stone-700 hover:border-stone-500'}`}
+              >
+                Todas ({data.businesses.length})
+              </Link>
+              {pendenciaList.map(([key, entry]) => (
+                <Link
+                  key={key}
+                  href={`/admin/seo?pendencia=${encodeURIComponent(key)}`}
+                  className={`rounded-full px-3 py-1 text-xs font-bold ${filterKey === key ? 'bg-[#5d1523] text-white' : 'border border-stone-300 text-stone-700 hover:border-stone-500'}`}
+                >
+                  {entry.label} ({entry.count})
+                </Link>
+              ))}
+            </div>
+          ) : null}
+          {filterKey && !activeFilterLabel ? <p className="mt-2 text-xs text-stone-500">Nenhuma empresa com essa pendência.</p> : null}
         </div>
-        {data.businesses.length === 0 ? (
-          <p className="p-6 text-sm text-stone-500">Nenhuma empresa publicada ainda.</p>
+        {visibleBusinesses.length === 0 ? (
+          <p className="p-6 text-sm text-stone-500">{filterKey ? 'Nenhuma empresa com essa pendência.' : 'Nenhuma empresa publicada ainda.'}</p>
         ) : (
           <ul className="divide-y divide-stone-100">
-            {data.businesses.map((business) => (
+            {visibleBusinesses.map((business) => (
               <li key={business.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-stone-900">{business.name}</p>
@@ -123,6 +158,7 @@ export default async function AdminSeoCenterPage() {
                   <Link href={`/admin/empresas/${business.id}`} className="text-sm font-bold text-[#5d1523] hover:underline">
                     Melhorar perfil
                   </Link>
+                  {business.score.issues.length > 0 ? <RemindButton businessId={business.id} businessName={business.name} /> : null}
                 </div>
               </li>
             ))}

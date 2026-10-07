@@ -7,10 +7,11 @@ import { businessSlugFromPath, classifyLinkClick, trackGaEvent } from '@/lib/ana
 
 const CONSENT_KEY = 'cm_analytics_consent';
 
-type Consent = 'granted' | 'denied' | null;
+export type ConsentState = 'granted' | 'denied' | null;
 
-function readConsent(): Consent {
+export function readConsent(): ConsentState {
   try {
+    if (typeof window === 'undefined') return null;
     const value = window.localStorage.getItem(CONSENT_KEY);
     return value === 'granted' || value === 'denied' ? value : null;
   } catch {
@@ -18,32 +19,46 @@ function readConsent(): Consent {
   }
 }
 
-function updateGoogleConsent(value: 'granted' | 'denied') {
-  (window as unknown as { gtag?: (...a: unknown[]) => void }).gtag?.('consent', 'update', { analytics_storage: value });
+export function clearGaCookies() {
+  try {
+    if (typeof document === 'undefined') return;
+    const cookies = document.cookie.split(';');
+    for (const c of cookies) {
+      const name = c.split('=')[0]?.trim();
+      if (name && (name === '_ga' || name.startsWith('_ga_'))) {
+        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname}`;
+        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      }
+    }
+  } catch {
+    // ignora exceções no ambiente de teste/SSR
+  }
 }
 
 /**
- * Google Analytics 4 das páginas públicas. Só carrega se NEXT_PUBLIC_GA_MEASUREMENT_ID estiver configurada.
- * Começa com o armazenamento negado (Consent Mode): os cookies de medição só são usados depois do "Aceitar".
- * Os cliques em WhatsApp, telefone, rota, Instagram e site da empresa são capturados por um único listener.
+ * Google Analytics 4 das páginas públicas com Consent Mode Básico Estrito.
+ * Nenhuma tag do Google (gtag.js) é baixada nem executada antes do "Aceitar".
+ * Nenhum cookie _ga é criado antes da escolha ativa do visitante.
  */
 export function GoogleAnalytics({ measurementId }: { measurementId: string }) {
   const pathname = usePathname();
-  const [consent, setConsent] = useState<Consent>('denied'); // 'denied' no primeiro render evita piscar o aviso
+  const [mounted, setMounted] = useState(false);
+  const [consent, setConsent] = useState<ConsentState>(null);
 
   useEffect(() => {
-    const stored = readConsent();
-    setConsent(stored);
-    if (stored === 'granted') updateGoogleConsent('granted');
+    setMounted(true);
+    setConsent(readConsent());
   }, []);
 
-  // view_business a cada navegação para uma página de empresa.
+  // Evento view_business a cada navegação se o consentimento tiver sido concedido
   useEffect(() => {
+    if (consent !== 'granted') return;
     const slug = businessSlugFromPath(pathname);
     if (slug) trackGaEvent({ name: 'view_business', params: { business_slug: slug } });
-  }, [pathname]);
+  }, [pathname, consent]);
 
   useEffect(() => {
+    if (consent !== 'granted') return;
     const onClick = (event: MouseEvent) => {
       const anchor = (event.target as HTMLElement | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
       if (!anchor) return;
@@ -52,27 +67,40 @@ export function GoogleAnalytics({ measurementId }: { measurementId: string }) {
     };
     document.addEventListener('click', onClick, { capture: true });
     return () => document.removeEventListener('click', onClick, { capture: true });
-  }, []);
+  }, [consent]);
 
   const choose = (value: 'granted' | 'denied') => {
     try {
       window.localStorage.setItem(CONSENT_KEY, value);
     } catch {
-      // sem storage: a escolha vale só nesta visita
+      // sem storage: a escolha vale na sessão do componente
     }
-    updateGoogleConsent(value);
+    if (value === 'denied') {
+      clearGaCookies();
+    }
     setConsent(value);
   };
 
+  // Evita hydration mismatch no Next.js (SSR não renderiza elementos dependentes do localStorage)
+  if (!mounted) {
+    return null;
+  }
+
   return (
     <>
-      <Script id="ga4-init" strategy="afterInteractive">
-        {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}window.gtag=gtag;
-gtag('consent','default',{analytics_storage:'denied',ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied'});
+      {/* SOMENTE INJETA E EXECUTA GTAG.JS SE O CONSENTIMENTO FOI CONCEDIDO ('granted') */}
+      {consent === 'granted' ? (
+        <>
+          <Script id="ga4-init" strategy="afterInteractive">
+            {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}window.gtag=gtag;
+gtag('consent','default',{analytics_storage:'granted',ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied'});
 gtag('js',new Date());gtag('config','${measurementId}',{anonymize_ip:true,allow_google_signals:false});`}
-      </Script>
-      <Script src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`} strategy="afterInteractive" />
+          </Script>
+          <Script src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`} strategy="afterInteractive" />
+        </>
+      ) : null}
 
+      {/* BANNER DE CONSENTIMENTO: EXIBIDO QUANDO NÃO HOUVER DECISÃO REGISTRADA (consent === null) */}
       {consent === null ? (
         <div
           role="dialog"

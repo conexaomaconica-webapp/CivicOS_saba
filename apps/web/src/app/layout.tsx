@@ -1,6 +1,7 @@
 import { Inter } from 'next/font/google';
 import { Providers } from './Providers';
 import { getBootData } from '../runtime/server-kernel';
+import { toClientBootData } from '../runtime/client-boot-data';
 import { generateRootMetadata } from '@/lib/seo/root-metadata';
 import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import '@saas/ui/tokens.css';
@@ -19,7 +20,8 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const bootData = await getBootData();
+  // Só a parte segura do boot vai para o navegador (sem o diagnóstico interno do kernel).
+  const bootData = toClientBootData(await getBootData());
   const brand = await resolveTenantBrandContext();
 
   return (

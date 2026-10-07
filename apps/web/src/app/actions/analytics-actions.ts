@@ -7,7 +7,18 @@ import { recordAnalyticsEventSchema, RecordAnalyticsEventInput } from '@saas/cor
 import { checkRateLimit } from '@/lib/security/rate-limiter';
 
 const ANALYTICS_COOKIE_NAME = 'ca_analytics_sid';
-const ANALYTICS_SALT = process.env.ANALYTICS_SALT || 'civicos_analytics_salt_v1_secure';
+const DEV_FALLBACK_SALT = 'dev_only_analytics_salt_do_not_use_in_production_1234567890';
+
+function getAnalyticsSalt(): string {
+  const envSalt = process.env.ANALYTICS_SALT?.trim();
+  if (process.env.NODE_ENV === 'production') {
+    if (!envSalt || envSalt.length < 32) {
+      throw new Error('[SECURITY ERROR] Variável ANALYTICS_SALT ausente ou com tamanho insuficiente (mínimo 32 caracteres) no ambiente de produção.');
+    }
+    return envSalt;
+  }
+  return envSalt || DEV_FALLBACK_SALT;
+}
 
 async function getOrCreateVisitorSessionId(): Promise<string> {
   const cookieStore = await cookies();
@@ -37,13 +48,14 @@ export async function recordBusinessAnalyticsEventAction(
   input: RecordAnalyticsEventInput
 ): Promise<AnalyticsActionResult> {
   try {
+    const salt = getAnalyticsSalt();
     const parsed = recordAnalyticsEventSchema.parse(input);
     const tenantId = await resolveTenantIdServer();
     const sessionId = await getOrCreateVisitorSessionId();
 
     // Calculate HMAC-SHA256 of visitor session ID using server-side salt
     const visitorHmac = crypto
-      .createHmac('sha256', ANALYTICS_SALT)
+      .createHmac('sha256', salt)
       .update(`${tenantId}:${sessionId}`)
       .digest('hex');
 

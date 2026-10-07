@@ -8,9 +8,15 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createMiddlewareSideClient } from '@/lib/supabase/middleware';
 import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
+import { isNoIndexFollowPath } from '@/lib/seo/noindex-paths';
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
+
+  // Funil de cadastro e pesquisas: funcionam, mas ficam fora do Google (vale também para respostas de redirect).
+  if (isNoIndexFollowPath(request.nextUrl.pathname)) {
+    response.headers.set('X-Robots-Tag', 'noindex, follow');
+  }
 
   // ---------------------------------------------------------------------------
   // 1. Tenant Resolution

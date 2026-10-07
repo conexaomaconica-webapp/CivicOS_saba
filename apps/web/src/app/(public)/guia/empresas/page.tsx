@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
+import { appUrl } from '@/lib/seo/app-url';
 import Link from 'next/link';
 import { cookies, headers } from 'next/headers';
 import { ChevronRight, Search, Sparkles } from 'lucide-react';
@@ -24,9 +25,6 @@ import {
 } from '@/lib/directory/business-filters';
 import '@/styles/directory-home.css';
 
-function appUrl(path: string) {
-  return `https://conexaomaconica.com.br${path}`;
-}
 
 type Props = {
   searchParams: Promise<{

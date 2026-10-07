@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
+import { getSignedMemberAvatarUrl } from '@/lib/member/member-profile-service';
 import ProfileTabs from '@/app/minha-conta/perfil/profile-tabs';
 
 export const dynamic = 'force-dynamic';
@@ -27,6 +28,7 @@ export default async function AdvertiserAccountPage({ searchParams }: { searchPa
 
   const providers: string[] = Array.isArray(user.app_metadata?.providers) ? user.app_metadata.providers : [];
   const canChangePassword = providers.length === 0 || providers.includes('email');
+  const avatarUrl = await getSignedMemberAvatarUrl(profile?.avatar_url || user.user_metadata?.avatar_url, supabase);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 text-left">
@@ -47,7 +49,7 @@ export default async function AdvertiserAccountPage({ searchParams }: { searchPa
           phone: profile?.phone || '',
           city: profile?.city || '',
           state: profile?.state || '',
-          avatarUrl: profile?.avatar_url || user.user_metadata?.avatar_url || null,
+          avatarUrl,
         }}
       />
     </div>

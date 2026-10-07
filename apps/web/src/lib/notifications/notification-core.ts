@@ -19,7 +19,8 @@ export type NotificationEventType =
   | 'masonic_link_verified'
   | 'subscription_expiring'
   | 'quota_reached'
-  | 'survey_response_received';
+  | 'survey_response_received'
+  | 'profile_improvement';
 
 export interface OperationalNotificationItem {
   id: string;

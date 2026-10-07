@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { appUrl } from '@/lib/seo/app-url';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
@@ -14,9 +15,6 @@ import { LodgeLogoZoom } from '@/components/public/directory/LodgeLogoZoom';
 import { LodgeGallery } from '@/components/public/directory/LodgeGallery';
 import '@/styles/directory-home.css';
 
-function appUrl(path: string) {
-  return `https://conexaomaconica.com.br${path}`;
-}
 
 function contactHref(type: string, value: string): string | null {
   if (type === 'email') return `mailto:${value}`;
