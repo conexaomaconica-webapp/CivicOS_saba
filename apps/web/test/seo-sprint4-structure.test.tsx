@@ -40,6 +40,14 @@ describe('slug de categoria', () => {
     expect(categorySlug(null)).toBe('');
   });
 
+  it('resolveSearchQuery traduz "ótica" e "otica" para "optica" na busca', async () => {
+    const { resolveSearchQuery } = await import('../src/lib/directory/normalize-search');
+    expect(resolveSearchQuery('ótica')).toBe('optica');
+    expect(resolveSearchQuery('otica')).toBe('optica');
+    expect(resolveSearchQuery('ÓTICAS')).toBe('optica');
+  });
+
+
   it('empresas cadastradas como "Ótica" e "Óptica" ficam no mesmo grupo do índice (não dividem a página)', () => {
     const merged = buildDirectoryIndex([row('a', 'Ótica'), row('b', 'Óptica')]);
     const city = findCity(merged, 'bahia', 'feira-de-santana')!;

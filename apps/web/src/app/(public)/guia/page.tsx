@@ -25,6 +25,7 @@ import { DirectoryConnectionsCta } from '@/components/public/directory/Directory
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
 import { DirectoryFavoritesModal } from '@/components/public/directory/DirectoryFavoritesModal';
+import { resolveSearchQuery } from '@/lib/directory/normalize-search';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -80,6 +81,7 @@ function SectionDivider() {
 export default async function GuiaPage({ searchParams }: Props) {
   const params = await searchParams;
   const q = params.q || '';
+  const searchQuery = resolveSearchQuery(q);
   const city = params.city || params.cidade || '';
   const cat = params.cat || '';
   const verified = params.verified === 'true';
@@ -117,7 +119,7 @@ export default async function GuiaPage({ searchParams }: Props) {
     }),
     (supabase as any).rpc('public_businesses_search', {
       p_host: host,
-      p_query: q || null,
+      p_query: searchQuery || null,
       p_city: city || null,
       p_category_slug: cat || null,
       p_verified: verified || null,
@@ -126,6 +128,7 @@ export default async function GuiaPage({ searchParams }: Props) {
       p_page: page,
       p_page_size: configuredPageSize,
     }),
+
     // Opções reais dos filtros da seção "Guia de Lojas" (a lista de lojas só carrega depois de filtrar).
     fetchLodgeGuideFacets(supabase),
     // Mural de Conexões: total de negócios confirmados pelas empresas (aparece no hero quando maior que zero).

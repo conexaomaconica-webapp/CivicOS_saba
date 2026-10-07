@@ -23,9 +23,11 @@ import {
   GEO_COOKIE,
   parseGeoCookie,
 } from '@/lib/directory/business-filters';
+import { resolveSearchQuery } from '@/lib/directory/normalize-search';
 import { TrackEvent } from '@/components/analytics/TrackEvent';
 import { sanitizeSearchTerm } from '@/lib/analytics/events';
 import '@/styles/directory-home.css';
+
 
 
 type Props = {
@@ -143,11 +145,13 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
 
 
 
+  const searchQuery = resolveSearchQuery(q);
+
   // 2. Execute Business Search Query RPC with fallback for 055/056 schema compatibility
   let searchDataRaw: any = null;
   const { data: res056, error: err056 } = await (supabase as any).rpc('public_businesses_search', {
     p_host: host,
-    p_query: q || null,
+    p_query: searchQuery || null,
     p_state: stateParam || null,
     p_city: city || null,
     p_category_slug: cat || null,
@@ -171,7 +175,7 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
   } else {
     const { data: res055 } = await (supabase as any).rpc('public_businesses_search', {
       p_host: host,
-      p_query: q || null,
+      p_query: searchQuery || null,
       p_city: city || null,
       p_category_slug: cat || null,
       p_verified: verified || null,
