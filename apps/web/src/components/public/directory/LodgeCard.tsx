@@ -56,7 +56,13 @@ export function LodgeCard({ data, variant: _variant = 'compact' }: LodgeCardProp
       <div className="relative">
         <div className="relative h-28 w-full bg-gradient-to-r from-[#3b0b14] via-[#5d1523] to-[#2b060d] rounded-t-2xl overflow-hidden">
           {data.cover_url ? (
-            <img src={data.cover_url} alt={data.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-80" />
+            <img
+              src={data.cover_url}
+              alt={data.name}
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-80"
+            />
           ) : (
             <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fef3c7_1px,transparent_1px)] [background-size:12px_12px]" />
           )}

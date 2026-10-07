@@ -232,8 +232,19 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
     meetingDay: day,
   };
 
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Início', item: appUrl('/') },
+      { '@type': 'ListItem', position: 2, name: 'Guia', item: appUrl('/guia') },
+      { '@type': 'ListItem', position: 3, name: 'Lojas Maçônicas', item: appUrl('/guia/lojas') },
+    ],
+  };
+
   return (
     <FavoritesProvider>
+      <StructuredData schema={breadcrumbSchema} />
       <div className="min-h-screen bg-[#faf7f2] text-[#1f1914] font-sans antialiased relative" style={resolvePortalTheme({ name: tenantBrand?.appName || 'Conexão Maçônica', logoUrl: null, primaryColor: tenantBrand?.primaryColor ?? null }).vars as React.CSSProperties}>
         <StructuredData
           schema={{
@@ -243,6 +254,7 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
             url: appUrl('/guia/lojas'),
           }}
         />
+
 
         {/* Top Header */}
         <DirectoryHeader

@@ -7,6 +7,7 @@ import { createServerSideClient } from '@/lib/supabase/server';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { DirectoryFavoritesModal } from '@/components/public/directory/DirectoryFavoritesModal';
+import { StructuredData } from '@/components/seo/StructuredData';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
 import '@/styles/directory-home.css';
 
@@ -59,9 +60,38 @@ export default async function PublicEventsDirectoryPage({ searchParams }: Props)
     return true;
   });
 
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Início', item: appUrl('/') },
+      { '@type': 'ListItem', position: 2, name: 'Guia', item: appUrl('/guia') },
+      { '@type': 'ListItem', position: 3, name: 'Eventos & Comunicados', item: appUrl('/guia/eventos') },
+    ],
+  };
+
+  const listSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'Agenda de Eventos e Comunicados | Conexão Maçônica',
+    url: appUrl('/guia/eventos'),
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: items.slice(0, 50).map((item: any, index: number) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: item.title,
+        url: item.slug ? appUrl(`/eventos/${item.slug}`) : appUrl('/guia/eventos'),
+      })),
+    },
+  };
+
   return (
     <FavoritesProvider>
+      <StructuredData schema={breadcrumbSchema} />
+      <StructuredData schema={listSchema} />
       <div className="min-h-screen bg-[#faf7f2] text-[#1f1914] font-sans antialiased relative">
+
         <DirectoryHeader selectedCity={selectedCity} />
 
         {/* Sub-Hero Header com Paleta Bordô & Dourada do Sistema */}

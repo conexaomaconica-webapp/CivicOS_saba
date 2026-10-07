@@ -264,17 +264,38 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
     maxDistanceKm: maxDist,
   };
 
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Início', item: appUrl('/') },
+      { '@type': 'ListItem', position: 2, name: 'Guia', item: appUrl('/guia') },
+      { '@type': 'ListItem', position: 3, name: activeCategory ? `Empresas > ${activeCategory.name}` : 'Empresas', item: appUrl('/guia/empresas') },
+    ],
+  };
+
+  const listSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: activeCategory ? `Empresas em ${activeCategory.name} | Conexão Maçônica` : 'Diretório Completo de Empresas | Conexão Maçônica',
+    url: appUrl('/guia/empresas'),
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: businessItems.slice(0, 50).map((b: any, index: number) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: b.name,
+        url: appUrl(`/guia/${b.slug}`),
+      })),
+    },
+  };
+
   return (
     <FavoritesProvider>
+      <StructuredData schema={breadcrumbSchema} />
+      <StructuredData schema={listSchema} />
       <div className="min-h-screen bg-[#faf7f2] text-[#1f1914] font-sans antialiased relative">
-        <StructuredData
-          schema={{
-            '@context': 'https://schema.org',
-            '@type': 'WebPage',
-            name: 'Diretório Completo de Empresas | Conexão Maçônica',
-            url: appUrl('/guia/empresas'),
-          }}
-        />
+
 
         {/* Top Header */}
         <DirectoryHeader

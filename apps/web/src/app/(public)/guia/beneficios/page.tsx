@@ -7,6 +7,7 @@ import { createServerSideClient } from '@/lib/supabase/server';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { DirectoryFavoritesModal } from '@/components/public/directory/DirectoryFavoritesModal';
+import { StructuredData } from '@/components/seo/StructuredData';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
 import '@/styles/directory-home.css';
 
@@ -29,9 +30,38 @@ export default async function PublicBenefitsDirectoryPage() {
 
   const items = (searchRes as any)?.items || [];
 
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Início', item: appUrl('/') },
+      { '@type': 'ListItem', position: 2, name: 'Guia', item: appUrl('/guia') },
+      { '@type': 'ListItem', position: 3, name: 'Clube de Benefícios', item: appUrl('/guia/beneficios') },
+    ],
+  };
+
+  const listSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'Clube de Benefícios & Ofertas | Conexão Maçônica',
+    url: appUrl('/guia/beneficios'),
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: items.slice(0, 50).map((biz: any, index: number) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: biz.business_name || biz.name,
+        url: appUrl(`/guia/${biz.business_slug || biz.slug}`),
+      })),
+    },
+  };
+
   return (
     <FavoritesProvider>
+      <StructuredData schema={breadcrumbSchema} />
+      <StructuredData schema={listSchema} />
       <div className="min-h-screen bg-[#faf7f2] text-[#1f1914] font-sans antialiased relative">
+
         <DirectoryHeader />
 
         {/* Sub-Hero Header com Paleta Bordô & Dourada do Sistema */}

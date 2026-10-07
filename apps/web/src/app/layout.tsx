@@ -26,6 +26,14 @@ export default async function RootLayout({
   const brand = await resolveTenantBrandContext();
   const gaMeasurementId = (process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? '').trim();
 
+  const supabaseOrigin = (() => {
+    try {
+      return process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin : null;
+    } catch {
+      return null;
+    }
+  })();
+
   return (
     <html
       lang="pt-BR"
@@ -36,6 +44,12 @@ export default async function RootLayout({
       <head>
         <link rel="icon" href="/icone.png" type="image/png" />
         <link rel="apple-touch-icon" href="/icone.png" />
+        {supabaseOrigin ? (
+          <>
+            <link rel="preconnect" href={supabaseOrigin} />
+            <link rel="dns-prefetch" href={supabaseOrigin} />
+          </>
+        ) : null}
         {brand.css ? (
           <style id="tenant-brand" data-tenant={brand.tenantSlug ?? undefined}>
             {brand.css}

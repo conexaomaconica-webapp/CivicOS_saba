@@ -439,6 +439,10 @@ export function BusinessCard({
               <img
                 src={planSealSrc}
                 alt={PLAN_HORIZONTAL_SEALS[normalizedPlan].alt}
+                width={135}
+                height={36}
+                loading="lazy"
+                decoding="async"
                 onError={handlePlanSealError}
                 className="max-w-[125px] sm:max-w-[135px] h-8 sm:h-9 object-contain"
               />

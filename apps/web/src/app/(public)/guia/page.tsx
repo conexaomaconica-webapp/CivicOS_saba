@@ -542,8 +542,18 @@ export default async function GuiaPage({ searchParams }: Props) {
     </React.Fragment>
   ));
 
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Início', item: appUrl('/') },
+      { '@type': 'ListItem', position: 2, name: 'Guia', item: appUrl('/guia') },
+    ],
+  };
+
   return (
     <FavoritesProvider>
+      <StructuredData schema={breadcrumbSchema} />
       <div className="min-h-screen bg-[#faf7f2] text-[#1f1914] font-sans antialiased relative">
         <StructuredData
           schema={{
@@ -553,6 +563,7 @@ export default async function GuiaPage({ searchParams }: Props) {
             url: appUrl('/guia'),
           }}
         />
+
 
         {/* Top Navigation Header */}
         <DirectoryHeader

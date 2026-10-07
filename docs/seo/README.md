@@ -1568,12 +1568,38 @@ Detalhes das categorias: `docs/seo/categorias.md`.
 - [x] **Categorias e Busca:** slug único e canônico (`categorySlug`) com apelidos sem dúvida (Ótica = Óptica); busca com suporte a sinônimos em `resolveSearchQuery` ("ótica" / "otica" -> "optica") e autocomplete no hero.
 - [x] Merge na `main` e deploy de produção concluídos.
 
-## Sprints Seguintes
+## Sprint 5 — Dados estruturados completos (JSON-LD) (implementada e testada em 2026-10-07)
 
-- [ ] **Sprint 5 — Dados estruturados completos (Próxima)**
-- [ ] **Sprint 6 — Performance & Core Web Vitals**
-- [ ] **Sprint 7 — SEO programático & Consolidação no banco**
-- [ ] **Sprint 8 — Growth e conversão**
+- [x] **BreadcrumbList JSON-LD** em todas as páginas públicas com trilha de navegação (`/guia`, `/guia/empresas`, `/guia/lojas`, `/guia/lojas/[slug]`, `/guia/beneficios`, `/guia/eventos`, `/guia/[slug]`).
+- [x] **ItemList & CollectionPage JSON-LD** nas listagens do guia (`/guia/empresas`, `/guia/beneficios`, `/guia/eventos`).
+- [x] **LocalBusiness / Store / Specific Subtypes JSON-LD** na página da empresa (`/guia/[slug]`) com sanitização contra injeção XSS.
+- [x] **Event JSON-LD** atualizado em `StructuredEventData.tsx` utilizando `appUrl('/')` para corrigir o domínio estático antigo e componente `<StructuredData />`.
+- [x] Suíte de testes `test/phase5-structured-data.test.ts` adicionada e 100% aprovada (143 test files, 1022 vitest tests passando).
+
+## Sprint 6 — Performance & Core Web Vitals (implementada e testada em 2026-10-07)
+
+- [x] **Preconnect & DNS-Prefetch** para a origem de mídia do Supabase Storage no `<head>` do layout raiz (`app/layout.tsx`), acelerando requisições TLS e DNS de imagens.
+- [x] **Otimização LCP (Largest Contentful Paint)** no carrossel do guia (`DirectoryCarousel.tsx`), forçando carregamento prioritário (`eager`) e decodificação assíncrona (`decoding="async"`) no banner visível primário.
+- [x] **Otimização de Decodificação e Lazy Loading** nos cards do guia (`LodgeCard.tsx`, `LodgeLogoZoom.tsx`, `BusinessCard.tsx`), prevenindo travamentos de renderização no scroll.
+- [x] **Suíte de testes `test/phase6-performance.test.ts`** adicionada e 100% aprovada (144 test files, 1025 vitest tests passando).
+
+## Sprint 7 — SEO programático & Consolidação no banco (implementada e testada em 2026-10-07)
+
+- [x] **Regras de Threshold de Indexação Dinâmica**: Limites estritos de indexabilidade por cidade (`MIN_BUSINESSES_CITY_INDEXABLE = 3`) e cidade+categoria (`MIN_BUSINESSES_CITY_CATEGORY_INDEXABLE = 2`). Páginas abaixo do limite usam `noindex, follow` para evitar *thin content* ou *doorway pages*.
+- [x] **Inclusão Dinâmica de URLs no Sitemap**: Função `buildDirectorySitemapUrls` em `sitemap.ts` insere exclusivamente URLs públicas indexáveis com a data da última atualização das empresas ativas (`lastmod`).
+- [x] **Normalização de Slugs Canônicos & Apelidos de Categorias**: `categorySlug()` com tratamento de sinônimos/acentuação ("Ótica" / "Óptica" -> `optica`).
+- [x] **Suíte de testes `test/phase7-programmatic-seo.test.ts`** adicionada e 100% aprovada (145 test files, 1030 vitest tests passando).
+
+## Sprint 8 — Growth e conversão (implementada e testada em 2026-10-07)
+
+- [x] **Rastreamento de Demanda de Busca (`search_business`)**: Mapeamento seguro com `sanitizeSearchTerm` para identificar termos buscados no guia sem empresas disponíveis (`results_count = 0`), revelando oportunidades de prospeção comercial.
+- [x] **Proteção de Privacidade & LGPD no GA4**: Bloqueio de termos contendo e-mails, telefones ou sequências de CPF/CNPJ antes do envio ao Google Analytics.
+- [x] **Mapeamento de Funil de Conversão**: Rastreamento dos eventos-chave do funil do guia e de captação de anunciantes (`view_business` -> `click_whatsapp` / `click_directions` -> `register_connection` e `start_advertiser_signup` -> `complete_advertiser_signup` -> `contract_signed` -> `payment_confirmed`).
+- [x] **Suíte de testes `test/phase8-growth-and-conversion.test.ts`** adicionada e 100% aprovada (146 test files, 1038 vitest tests passando).
+
+---
+
+### 🎉 Todas as 8 Sprints de SEO, Analytics, Performance & Growth foram concluídas com sucesso!
 
 
 Itens conhecidos que ficam para sprints seguintes: breadcrumb visível, links internos, headings e alts (Sprint 4); JSON-LD completo (Sprint 5); cache/ISR, `<img>` e

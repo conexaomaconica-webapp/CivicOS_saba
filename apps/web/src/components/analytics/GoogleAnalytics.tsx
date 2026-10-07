@@ -98,9 +98,9 @@ gtag('js',new Date());gtag('config','${measurementId}',{anonymize_ip:true,allow_
           className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-xl rounded-2xl border border-stone-200 bg-white p-4 shadow-2xl print:hidden sm:bottom-5"
         >
           <p className="text-sm leading-snug text-stone-700">
-            Usamos o Google Analytics para entender como a Plataforma é usada para melhorar a experiência. Nenhum dado pessoal é enviado.{' '}
+            Usamos cookies e o Google Analytics para entender como a plataforma é utilizada e melhorar sua experiência. Os dados são analisados de forma agregada e não utilizamos o Analytics para identificar você diretamente.{' '}
             <a href="/privacidade" className="font-semibold text-[#5d1523] underline">
-              Política de Privacidade
+              Consulte nossa Política de Privacidade.
             </a>
           </p>
           <div className="mt-3 flex justify-end gap-2">

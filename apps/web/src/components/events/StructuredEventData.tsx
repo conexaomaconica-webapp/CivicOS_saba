@@ -1,5 +1,7 @@
 import React from 'react';
 import type { PlatformEvent } from '@/app/actions/platform-events';
+import { StructuredData } from '@/components/seo/StructuredData';
+import { appUrl } from '@/lib/seo/app-url';
 
 interface StructuredEventDataProps {
   event: PlatformEvent;
@@ -40,16 +42,11 @@ export function StructuredEventData({ event, pageUrl }: StructuredEventDataProps
     organizer: {
       '@type': 'Organization',
       name: 'Conexão Maçônica',
-      url: typeof pageUrl === 'string' ? pageUrl.split('/eventos')[0] : 'https://conexaomasonica.com.br',
+      url: appUrl('/'),
     },
     url: pageUrl,
     ...(event.cover_image_url ? { image: event.cover_image_url } : {}),
   };
 
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
-    />
-  );
+  return <StructuredData schema={schema} />;
 }

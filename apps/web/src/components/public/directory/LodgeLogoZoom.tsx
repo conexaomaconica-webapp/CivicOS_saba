@@ -51,10 +51,11 @@ export function LodgeLogoZoom({
         aria-label={`Ampliar o brasão — ${lodgeName}`}
         className={`${className} group/logo relative shrink-0 flex items-center justify-center overflow-hidden cursor-zoom-in origin-top-left transition-all duration-200 ease-out hover:scale-[1.3] hover:z-40 hover:shadow-2xl focus-visible:scale-[1.3] focus-visible:z-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500`}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={shownSrc}
           alt={altText}
+          loading="lazy"
+          decoding="async"
           className="max-w-full max-h-full object-contain object-center"
           onError={logoUrl ? undefined : () => setGenericFailed(true)}
         />

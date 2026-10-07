@@ -151,8 +151,20 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
       ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(exactQuery)}`
       : null;
 
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Início', item: appUrl('/') },
+      { '@type': 'ListItem', position: 2, name: 'Guia', item: appUrl('/guia') },
+      { '@type': 'ListItem', position: 3, name: 'Lojas Maçônicas', item: appUrl('/guia/lojas') },
+      { '@type': 'ListItem', position: 4, name: lodge.name, item: appUrl(`/guia/lojas/${lodge.slug}`) },
+    ],
+  };
+
   return (
     <div className="min-h-screen bg-[#faf7f2] text-[#1f1914] font-sans antialiased relative">
+      <StructuredData schema={breadcrumbSchema} />
       <StructuredData
         schema={{
           '@context': 'https://schema.org',
@@ -168,6 +180,7 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
           url: appUrl(`/guia/lojas/${lodge.slug}`),
         }}
       />
+
 
       <DirectoryHeader
         appName={tenantBrand?.appName || 'Conexão Maçônica'}

@@ -106,7 +106,7 @@ const SCHEMA_TYPE_BY_KEYWORD: Array<[RegExp, string]> = [
   [/academia|fitness|crossfit/i, 'ExerciseGym'],
   [/hotel|pousada/i, 'LodgingBusiness'],
   [/sal[ãa]o|barbearia|est[ée]tica|beleza/i, 'BeautySalon'],
-  [/[óo]tica/i, 'Store'],
+  [/[óo]p?tica/i, 'Store'],
   [/loja|com[ée]rcio|mercado|supermercado/i, 'Store'],
   [/cl[íi]nica|m[ée]dic|psic[óo]log|fisioterap|sa[úu]de/i, 'MedicalBusiness'],
   [/engenharia|arquitet|consultoria|marketing|tecnologia|servi[çc]os?/i, 'ProfessionalService'],
