@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
+import { appUrl } from '@/lib/seo/app-url';
 import Link from 'next/link';
 import { ShieldCheck, Lock, Eye, FileText, UserCheck, Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
@@ -7,10 +8,11 @@ import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { StructuredData } from '@/components/seo/StructuredData';
 
 export const metadata: Metadata = {
-  title: 'Política de Privacidade e Proteção de Dados (LGPD) | Conexão Maçônica',
+  title: { absolute: 'Política de Privacidade (LGPD) | Conexão Maçônica' },
+  alternates: { canonical: appUrl('/privacidade') },
   description: 'Diretrizes oficiais de privacidade, tratamento de dados pessoais (LGPD - Lei 13.709/2018) e governança da informação da plataforma Conexão Maçônica.',
   openGraph: {
-    title: 'Política de Privacidade e Proteção de Dados (LGPD) | Conexão Maçônica',
+    title: 'Política de Privacidade (LGPD) | Conexão Maçônica',
     description: 'Diretrizes oficiais de privacidade, tratamento de dados pessoais (LGPD - Lei 13.709/2018) e governança da informação da plataforma Conexão Maçônica.',
   },
 };

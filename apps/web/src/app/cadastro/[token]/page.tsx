@@ -8,7 +8,7 @@ import SignupInviteForm from './signup-invite-form';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Cadastro da empresa | Conexão Maçônica',
+  title: { absolute: 'Cadastro da empresa | Conexão Maçônica' },
   robots: { index: false, follow: false },
 };
 

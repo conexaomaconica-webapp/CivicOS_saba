@@ -7,7 +7,7 @@ describe('ETAPA 2 — Testes de Segurança, CSP Efetiva e Proteção de Contrato
     it('next.config.ts define o cabeçalho Content-Security-Policy em modo ativo (não apenas Report-Only)', async () => {
       const headersConfig = typeof nextConfig.headers === 'function' ? await nextConfig.headers() : [];
       const globalHeaders = headersConfig.find((h) => h.source === '/:path*')?.headers || [];
-      
+
       const cspHeader = globalHeaders.find((h) => h.key === 'Content-Security-Policy');
       expect(cspHeader).toBeDefined();
       expect(cspHeader?.key).toBe('Content-Security-Policy');
@@ -20,7 +20,7 @@ describe('ETAPA 2 — Testes de Segurança, CSP Efetiva e Proteção de Contrato
     it('next.config.ts não mantém Content-Security-Policy-Report-Only ativo por padrão em produção', async () => {
       const headersConfig = typeof nextConfig.headers === 'function' ? await nextConfig.headers() : [];
       const globalHeaders = headersConfig.find((h) => h.source === '/:path*')?.headers || [];
-      
+
       const cspReportOnly = globalHeaders.find((h) => h.key === 'Content-Security-Policy-Report-Only');
       expect(cspReportOnly).toBeUndefined();
     });
@@ -29,7 +29,7 @@ describe('ETAPA 2 — Testes de Segurança, CSP Efetiva e Proteção de Contrato
   describe('2. Reforço e Validação da Rota de Contrato /contratacao/[token]', () => {
     it('getPublicContractByTokenAction rejeita tokens curtos, nulos ou malformados com erro amigável', async () => {
       const { getPublicContractByTokenAction } = await import('../src/lib/contracts/admin-contracts-service');
-      
+
       const emptyRes = await getPublicContractByTokenAction('');
       expect(emptyRes.success).toBe(false);
       expect(emptyRes.error).toContain('Token de acesso inválido');

@@ -3,10 +3,18 @@
 > Guia comercial online da comunidade maçônica: empresas, profissionais e serviços de maçons, cunhadas, sobrinhos e familiares, com busca por cidade e categoria.
 
 ## Páginas principais
-- [Início e planos de anúncio](https://conexaomaconica.com.br/): como anunciar, planos Esquadro, Compasso e Acácia, e o reconhecimento Pedra Fundamental.
-- [Guia de empresas](https://conexaomaconica.com.br/guia): busca de empresas e serviços por cidade e categoria.
-- [Cadastrar minha empresa](https://conexaomaconica.com.br/anunciar/passo-1): início do cadastro de anunciante.
+- [Início e planos de anúncio](https://www.conexaomaconica.com.br/): como anunciar, planos Esquadro, Compasso e Acácia, e o reconhecimento Pedra Fundamental.
+- [Guia de empresas](https://www.conexaomaconica.com.br/guia): diretório de empresas e serviços da comunidade.
+- [Empresas por cidade](https://www.conexaomaconica.com.br/guia/bahia/feira-de-santana): empresas publicadas em Feira de Santana - BA.
+- [Lojas maçônicas](https://www.conexaomaconica.com.br/guia/lojas): diretório de lojas, potências e ritos.
+- [Eventos](https://www.conexaomaconica.com.br/guia/eventos): agenda de eventos e comunicados.
+- [Benefícios](https://www.conexaomaconica.com.br/guia/beneficios): vantagens e descontos oferecidos pelas empresas.
+
+## Institucional
+- [Termos de uso](https://www.conexaomaconica.com.br/termos)
+- [Política de privacidade (LGPD)](https://www.conexaomaconica.com.br/privacidade)
 
 ## Observações
 - Planos anuais, pagamento por Pix ou cartão.
 - A Pedra Fundamental é um reconhecimento institucional dos primeiros anunciantes, separado dos planos comerciais.
+- Cada empresa tem página própria em /guia/{nome-da-empresa}.

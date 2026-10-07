@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
+import { appUrl } from '@/lib/seo/app-url';
 import Link from 'next/link';
 import { FileText, ShieldCheck, Scale, AlertCircle, ArrowLeft, Building2, HelpCircle } from 'lucide-react';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
@@ -7,10 +8,11 @@ import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { StructuredData } from '@/components/seo/StructuredData';
 
 export const metadata: Metadata = {
-  title: 'Termos de Uso da Plataforma | Conexão Maçônica',
+  title: { absolute: 'Termos de Uso | Conexão Maçônica' },
   description: 'Termos de Uso e Condições Gerais de Prestação de Serviços da plataforma Conexão Maçônica.',
+  alternates: { canonical: appUrl('/termos') },
   openGraph: {
-    title: 'Termos de Uso da Plataforma | Conexão Maçônica',
+    title: 'Termos de Uso | Conexão Maçônica',
     description: 'Termos de Uso e Condições Gerais de Prestação de Serviços da plataforma Conexão Maçônica.',
   },
 };

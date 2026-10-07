@@ -3,7 +3,7 @@ import SignupInvitePage from '@/app/cadastro/[token]/page';
 // Configuração de rota declarada aqui (o Next não lê `dynamic` quando é apenas reexportado).
 export const dynamic = 'force-dynamic';
 export const metadata = {
-  title: 'Cadastro da empresa | Conexão Maçônica',
+  title: { absolute: 'Cadastro da empresa | Conexão Maçônica' },
   robots: { index: false, follow: false },
 };
 

@@ -44,12 +44,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 
   if (!lodge) {
-    return { title: 'Loja Maçônica Não Encontrada | Conexão Maçônica' };
+    return { title: { absolute: 'Loja Maçônica não encontrada | Conexão Maçônica' }, robots: { index: false, follow: false } };
   }
 
+  const lodgeTitle = `${lodge.name}${lodge.code_number ? ` nº ${lodge.code_number}` : ''}`.replace(/\s+/g, ' ').trim();
   return {
-    title: `${lodge.name} ${lodge.code_number ? `nº ${lodge.code_number}` : ''} | Conexão Maçônica`,
+    title: { absolute: `${lodgeTitle} | Conexão Maçônica` },
     description: `Informações institucionais, potências, ritos, endereço e reuniões da ${lodge.name} em ${lodge.city || ''} - ${lodge.state || ''}.`,
+    alternates: { canonical: appUrl(`/guia/lojas/${slug}`) },
+    // Política da Sprint 2: as páginas de loja só entram no Google quando tiverem conteúdo próprio (hoje ~120 palavras).
+    robots: { index: false, follow: true },
   };
 }
 

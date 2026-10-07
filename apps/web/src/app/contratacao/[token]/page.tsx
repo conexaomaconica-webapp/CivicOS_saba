@@ -15,7 +15,7 @@ import { ContractPrintButton } from '@/components/contracts/ContractPrintButton'
 import { ContractSignatureClient } from './contract-signature-client';
 
 export const metadata: Metadata = {
-  title: 'Contrato de Adesão | Conexão Maçônica',
+  title: { absolute: 'Contrato de Adesão | Conexão Maçônica' },
   description: 'Conferência e assinatura eletrônica do contrato de adesão ao Guia Conexão Maçônica.',
   robots: {
     index: false,

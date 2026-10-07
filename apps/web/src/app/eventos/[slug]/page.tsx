@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!result.success || !result.data) {
     return {
-      title: 'Evento não encontrado · Conexão Maçônica',
+      title: { absolute: 'Evento não encontrado | Conexão Maçônica' },
       robots: { index: false, follow: false },
     };
   }
@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   });
 
   return {
-    title: `${event.title} · Confirme sua presença`,
+    title: { absolute: `${event.title} · Confirme sua presença` },
     description:
       event.subtitle ??
       event.description ??

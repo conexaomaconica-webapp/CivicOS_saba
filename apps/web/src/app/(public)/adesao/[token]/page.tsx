@@ -13,13 +13,13 @@ export async function generateMetadata({ params }: PageProps) {
 
   if (!session) {
     return {
-      title: 'Link de Adesão Inválido | Conexão Maçônica',
+      title: { absolute: 'Link de Adesão Inválido | Conexão Maçônica' },
       robots: { index: false, follow: false },
     };
   }
 
   return {
-    title: `Adesão Empresarial — ${session.businessName} | Conexão Maçônica`,
+    title: { absolute: `Adesão Empresarial — ${session.businessName} | Conexão Maçônica` },
     description: `Revisão de contrato e checkout da empresa ${session.businessName} no Guia Maçônico.`,
     robots: { index: false, follow: false },
   };

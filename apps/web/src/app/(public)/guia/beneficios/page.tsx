@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
+import { appUrl } from '@/lib/seo/app-url';
 import Link from 'next/link';
 import { ChevronRight, Award, Tag, Sparkles, ArrowRight, Store } from 'lucide-react';
 import { createServerSideClient } from '@/lib/supabase/server';
@@ -10,8 +11,9 @@ import { FavoritesProvider } from '@/lib/directory/favorites-context';
 import '@/styles/directory-home.css';
 
 export const metadata: Metadata = {
-  title: 'Clube de Benefícios e Vantagens · Conexão Maçônica',
+  title: { absolute: 'Clube de Benefícios e Vantagens | Conexão Maçônica' },
   description: 'Confira vantagens exclusivas, descontos e benefícios oferecidos por empresas da rede Conexão Maçônica.',
+  alternates: { canonical: appUrl('/guia/beneficios') },
 };
 
 export default async function PublicBenefitsDirectoryPage() {

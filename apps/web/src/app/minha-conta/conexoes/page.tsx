@@ -8,7 +8,7 @@ import { RemoveConnectionPhotoButton } from '@/components/connections/RemoveConn
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: 'Minhas conexões | Conexão Maçônica',
+  title: { absolute: 'Minhas conexões | Conexão Maçônica' },
   robots: { index: false, follow: false },
 };
 

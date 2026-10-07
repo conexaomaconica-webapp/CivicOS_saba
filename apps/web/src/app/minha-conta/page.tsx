@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Gift, Heart, MessageSquareText, UserRound } from 'lucide-react';
 import { createServerSideClient } from '@/lib/supabase/server';
 
-export const metadata = { title: 'Minha Conta | Conexão Maçônica' };
+export const metadata = { title: { absolute: 'Minha Conta | Conexão Maçônica' } };
 
 export default async function MemberDashboardPage() {
   const supabase = await createServerSideClient();

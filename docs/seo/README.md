@@ -1507,7 +1507,7 @@ Legenda: [x] concluído · [ ] pendente.
 
 [x] Executada em 2026-10-07. Relatório: `docs/seo/auditorias/2026-10-07-diagnostico-inicial.md`.
 
-## Sprint 1 — Correções críticas (implementada em 2026-10-07; aguardando deploy)
+## Sprint 1 — Correções críticas (implementada e validada em produção em 2026-10-07)
 
 Escopo exato: `/diagnostics`, `/health`, `/anunciar*`, `/pesquisa`, sitemap e canonicals pendentes.
 
@@ -1518,21 +1518,43 @@ Escopo exato: `/diagnostics`, `/health`, `/anunciar*`, `/pesquisa`, sitemap e ca
 - [x] `/pesquisa` (redirect) e `/pesquisas/{slug}` (página final): `noindex, follow`.
 - [x] Sitemap: removido `/anunciar/passo-1`. Não há onboarding, pesquisa, áreas privadas nem rotas técnicas.
 - [x] Canonical: `/guia/empresas`, `/guia/lojas` e `/guia/lojas/{slug}` passam a usar `appUrl()` (www). Padrão de `lib/seo/app-url.ts` agora é `https://www.conexaomaconica.com.br`.
-- [ ] Validação em produção após o deploy (checklist na seção 48).
+- [x] Validação em produção (checklist da seção 48): `/diagnostics` deslogado 404, `/health` `{"ok":true}`, sem "Kernel Boot Started" em home/login, `noindex, follow` com `X-Robots-Tag` em `/anunciar*` e `/pesquisa*`, sitemap sem onboarding, canonical com www.
 
-## Sprint 2 em diante
+## Decisões registradas em 2026-10-07
 
-[ ] Sprint 2 — Indexação e rastreamento (não iniciada)
-[ ] Sprint 3 — Analytics
+- `docs/SABA-seo.md` foi **deixado de lado** por decisão do responsável: a execução segue os sprints deste README
+  (SEO e Growth). Páginas-pilar densas, rota `/solucoes/...` e `SoftwareApplication` ficam fora do plano até nova
+  decisão. (O `AGENTS.md` ainda cita `docs/SABA-seo.md`; ajustar lá é decisão separada.)
+- Correção do diagnóstico da Fase 0, item 16: `/presenca` **não** é página duplicada; é um redirect (307) para
+  `/eventos/conexao-empresarial-2026`. Nada a unificar.
+
+## Sprint 2 — Indexação e rastreamento (implementada em 2026-10-07; aguardando deploy e migration 201)
+
+- [x] Canonical (via `appUrl()`, domínio com www) em `/guia/eventos`, `/guia/beneficios`, `/termos`, `/privacidade` e `/guia/lojas/{slug}`.
+- [x] Títulos sem a marca duplicada (`title.absolute`) em eventos, benefícios, termos, privacidade, lojas, evento, pesquisas, cadastro, contratação, adesão, QR, 404, login e área logada. `/register`, `/forgot-password` e `/update-password` ganharam título próprio (`/register` se chamava "Entrar").
+- [x] `/guia/eventos` com filtros: `noindex, follow` e canonical da lista limpa.
+- [x] `robots.txt`: bloqueia `/anunciante/`, `/minha-conta/`, `/usuario/`, `/master/`, `/platform/`, `/auth/`, `/c/`, `/cadastro/`, `/contratacao/` e `/adesao/` (além dos anteriores). `/anunciar` e `/pesquisa*` **não** são bloqueados de propósito, para o Google ler o `noindex`.
+- [x] Sitemap: sem `lastmod` artificial (páginas fixas só têm data quando há dado real: `/guia` e `/guia/empresas` usam a última edição de empresa); inclui `/guia/eventos`, `/guia/beneficios` e eventos publicados (`/eventos/{slug}`).
+- [x] Lojas (`/guia/lojas/{slug}`): `noindex, follow` + canonical, até terem conteúdo próprio. Seguem fora do sitemap.
+- [x] `/guia/OpticaCirculo` (maiúsculas) redireciona de forma permanente para a forma minúscula.
+- [x] `llms.txt` atualizado, com o domínio com www e as páginas reais.
+- [ ] Migration `201_public_seo_events.sql` precisa ser aplicada para os eventos entrarem no sitemap (sem ela, o sitemap funciona, só sem eventos).
+- [ ] Ajuste do redirect `http://conexaomaconica.com.br` -> `https://www...` em um salto (configuração do domínio na Vercel, manual).
+- [ ] Validação em produção (seção 49).
+
+## Sprint 3 em diante
+
+[ ] Sprint 3 — Analytics (não iniciada)
 [ ] Sprint 4 — Metadata e SEO técnico
 [ ] Sprint 5 — Dados estruturados
 [ ] Sprint 6 — Performance
 [ ] Sprint 7 — SEO programático
 [ ] Sprint 8 — Growth e conversão
 
-Itens conhecidos que ficam para a Sprint 2 (não fazem parte da Sprint 1): canonical ausente em `/guia/eventos`,
-`/guia/beneficios`, `/termos`, `/privacidade` e `/guia/lojas/{slug}`; títulos com a marca duplicada; `robots.txt`
-mais completo; `lastmod` real no sitemap; política para as páginas de loja.
+Itens conhecidos que ficam para sprints seguintes: GA4 fora do layout público e eventos faltantes (Sprint 3);
+breadcrumb visível, links internos, headings e alts (Sprint 4); JSON-LD completo (Sprint 5); cache/ISR, `<img>` e
+JavaScript do cliente (Sprint 6); normalização de categorias e política de lojas/eventos/ofertas em larga escala
+(Sprint 7).
 
 ---
 
@@ -1549,5 +1571,22 @@ mais completo; `lastmod` real no sitemap; política para as páginas de loja.
 [ ] canonical de /guia/empresas     -> https://www.conexaomaconica.com.br/guia/empresas
 [ ] canonical de /guia/lojas        -> https://www.conexaomaconica.com.br/guia/lojas
 [ ] Search Console                  -> reenviar o sitemap
+```
+
+---
+
+# 49. Checklist de validação da Sprint 2 (após o deploy e a migration 201)
+
+```text
+[ ] /sitemap.xml                 -> inclui /guia/eventos, /guia/beneficios e /eventos/conexao-empresarial-2026
+[ ] /sitemap.xml                 -> páginas fixas sem <lastmod> (exceto /guia, /guia/empresas e /guia/eventos)
+[ ] /robots.txt                  -> Disallow de /anunciante/, /minha-conta/, /auth/, /c/ ...; /anunciar NÃO bloqueado
+[ ] /guia/eventos                -> título "Agenda de Eventos e Comunicados | Conexão Maçônica" e canonical
+[ ] /guia/eventos?type=lojas     -> noindex, follow e canonical sem parâmetro
+[ ] /guia/beneficios, /termos, /privacidade -> título sem marca duplicada e canonical com www
+[ ] /guia/lojas/{slug}           -> noindex, follow e canonical
+[ ] /register                    -> título "Criar conta | Conexão Maçônica"
+[ ] /guia/OpticaCirculo          -> 308 para /guia/opticacirculo
+[ ] /llms.txt                    -> links com www
 ```
 

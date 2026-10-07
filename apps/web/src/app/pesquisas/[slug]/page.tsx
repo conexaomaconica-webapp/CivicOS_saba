@@ -16,13 +16,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!survey) {
     return {
-      title: 'Pesquisa Não Encontrada · Conexão Maçônica',
+      title: { absolute: 'Pesquisa não encontrada | Conexão Maçônica' },
       robots: { index: false, follow: false },
     };
   }
 
   return {
-    title: `${survey.title} · Conexão Maçônica`,
+    title: { absolute: `${survey.title} | Conexão Maçônica` },
     description: survey.description || 'Pesquisa institucional e mapeamento de negócios da comunidade maçônica.',
     // Pesquisa institucional com coleta de dados: funciona por link, mas não deve ser indexada.
     robots: { index: false, follow: true },

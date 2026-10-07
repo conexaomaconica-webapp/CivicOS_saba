@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
+import { appUrl } from '@/lib/seo/app-url';
 import Link from 'next/link';
 import { ChevronRight, Calendar, Sparkles, MapPin, Search, Store, Landmark, Filter, ArrowRight } from 'lucide-react';
 import { createServerSideClient } from '@/lib/supabase/server';
@@ -9,11 +10,16 @@ import { DirectoryFavoritesModal } from '@/components/public/directory/Directory
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
 import '@/styles/directory-home.css';
 
-export const metadata: Metadata = {
-  title: 'Agenda de Eventos e Comunicados · Conexão Maçônica',
-  description:
-    'Acompanhe eventos, palestras, sessões abertas de Lojas Maçônicas e comunicados de empresas da rede Conexão Maçônica.',
-};
+export async function generateMetadata({ searchParams }: { searchParams?: Promise<Record<string, unknown>> }): Promise<Metadata> {
+  const hasFilters = Object.keys((await searchParams) ?? {}).length > 0;
+  return {
+    title: { absolute: 'Agenda de Eventos e Comunicados | Conexão Maçônica' },
+    description:
+      'Acompanhe eventos, palestras, sessões abertas de Lojas Maçônicas e comunicados de empresas da rede Conexão Maçônica.',
+    alternates: { canonical: appUrl('/guia/eventos') },
+    robots: hasFilters ? { index: false, follow: true } : undefined,
+  };
+}
 
 type Props = {
   searchParams: Promise<{

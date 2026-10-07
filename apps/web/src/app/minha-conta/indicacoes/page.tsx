@@ -7,7 +7,7 @@ import { getMyReferralSummaryAction } from '@/app/actions/referrals';
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: 'Minhas indicações | Conexão Maçônica',
+  title: { absolute: 'Minhas indicações | Conexão Maçônica' },
   robots: { index: false, follow: false },
 };
 

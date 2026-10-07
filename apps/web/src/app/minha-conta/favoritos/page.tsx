@@ -8,7 +8,7 @@ import FavoritesList from './favorites-list';
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: 'Meus favoritos | Conexão Maçônica',
+  title: { absolute: 'Meus favoritos | Conexão Maçônica' },
   robots: { index: false, follow: false },
 };
 

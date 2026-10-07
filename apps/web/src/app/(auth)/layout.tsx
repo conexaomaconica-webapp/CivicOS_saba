@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 
 export const metadata: Metadata = {
-  title: 'Entrar · Conexão Maçônica',
+  title: { absolute: 'Entrar | Conexão Maçônica' },
   robots: { index: false, follow: false },
 };
 

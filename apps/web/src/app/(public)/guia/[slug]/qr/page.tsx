@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 // Página de entrada do QR físico: rota de ação, não indexável.
 export const metadata: Metadata = {
-  title: 'Conexão Maçônica · Registrar experiência',
+  title: { absolute: 'Registrar experiência | Conexão Maçônica' },
   robots: { index: false, follow: false },
 };
 

@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { Compass, Home, Landmark, Store, Search } from 'lucide-react';
 
 export const metadata = {
-  title: 'Página Não Encontrada (404) · Conexão Maçônica',
+  title: { absolute: 'Página não encontrada | Conexão Maçônica' },
   robots: { index: false, follow: false },
 };
 

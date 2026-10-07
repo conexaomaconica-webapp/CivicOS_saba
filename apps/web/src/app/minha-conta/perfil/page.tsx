@@ -3,7 +3,7 @@ import { createServerSideClient } from '@/lib/supabase/server';
 import { getSignedMemberAvatarUrl } from '@/lib/member/member-profile-service';
 import ProfileTabs from './profile-tabs';
 
-export const metadata = { title: 'Meu Perfil | Conexão Maçônica' };
+export const metadata = { title: { absolute: 'Meu Perfil | Conexão Maçônica' } };
 
 export default async function MemberProfilePage({ searchParams }: { searchParams: Promise<{ aba?: string }> }) {
   const { aba } = await searchParams;

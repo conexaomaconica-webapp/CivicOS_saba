@@ -7,6 +7,7 @@ import { BusinessContactTracker } from '@/components/public/business/BusinessCon
 import { StructuredData } from '@/components/seo/StructuredData';
 import { toPublicBusinessPresentation } from '@/lib/business/public-business-presentation';
 import { appUrl } from '@/lib/seo/app-url';
+import { buildLowercaseSlugRedirect } from '@/lib/seo/slug-redirect';
 import {
   buildBusinessDescription,
   buildBusinessTitle,
@@ -488,6 +489,10 @@ export default async function CompanyDetailsPage(props: Props & { searchParams?:
       notFound();
     }
   }
+
+  // Endereço com maiúsculas (ex.: /guia/OpticaCirculo) é a mesma página: redireciona de forma permanente para a forma minúscula.
+  const lowercaseTarget = buildLowercaseSlugRedirect(slug, props.searchParams ? await props.searchParams : null);
+  if (lowercaseTarget) permanentRedirect(lowercaseTarget);
 
   const business = await getPublicBusiness(slug);
   if (!business) {

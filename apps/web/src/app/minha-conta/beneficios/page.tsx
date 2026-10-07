@@ -5,7 +5,7 @@ import { createServerSideClient } from '@/lib/supabase/server';
 import { getUserRedemptionsAction } from '@/lib/business/benefit-redemption-service';
 
 export const metadata = {
-  title: 'Meus benefícios | Conexão Maçônica',
+  title: { absolute: 'Meus benefícios | Conexão Maçônica' },
   robots: { index: false, follow: false },
 };
 

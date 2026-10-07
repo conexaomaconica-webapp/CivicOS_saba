@@ -45,7 +45,7 @@ de API; não há dados de campo/CrUX ainda), hydration e INP (exigem navegador),
 13. Perfil da empresa com `BreadcrumbList` em JSON-LD sem breadcrumb visível e sem links para cidade/categoria.
 14. Sitemap: `lastModified: now` nas estáticas; sem eventos, benefícios e lojas; sem sitemap index.
 15. `robots.txt` bloqueia só `/admin/`, `/dashboard/`, `/api/`, `/diagnostics/`.
-16. Duplicação: `/presenca` x `/eventos/conexao-empresarial-2026`; `/guia` x `/guia/empresas`.
+16. Duplicação: `/guia` x `/guia/empresas`. **Correção (2026-10-07):** `/presenca` NÃO duplica `/eventos/conexao-empresarial-2026`; é só um redirect 307 para ele (o rastreador seguia o redirect e media a página final).
 17. Páginas finas: `/guia/eventos`, `/guia/beneficios` (~100 palavras), `/guia/empresas` sem filtro (197 palavras).
 18. `/pesquisa` (redirect para `/pesquisas/perfil-e-negocios`) indexável.
 19. 227 de 400 arquivos `.tsx` são `'use client'` (53 de 76 em `components/public`).
