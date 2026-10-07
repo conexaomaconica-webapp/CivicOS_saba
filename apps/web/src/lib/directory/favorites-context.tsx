@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { trackGa } from '@/lib/analytics/ga';
 
 type FavoritesContextType = {
   favoriteSlugs: string[];
@@ -93,6 +94,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
   const toggleFavorite = (slug: string) => {
     if (!slug) return;
     const exists = favoriteSlugs.includes(slug);
+    if (!exists) trackGa('favorite_business', { business_slug: slug, source_page: 'favorites' });
     setFavoriteSlugs(exists ? favoriteSlugs.filter((item) => item !== slug) : [...favoriteSlugs, slug]);
     pushToAccount((supabase) =>
       supabase.rpc('set_my_favorite', { p_host: window.location.host, p_slug: slug, p_favorite: !exists })

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { CalendarDays, Check, Download, Loader2, Sparkles, Tag, X } from 'lucide-react';
 import type { PublicBusinessBenefit } from '@/lib/business/public-business-presentation';
 import { redeemBenefitAction } from '@/lib/business/benefit-redemption-service';
+import { useBusinessAnalytics } from '@/components/public/business/BusinessContactTracker';
 
 type BusinessBenefitsProps = {
   benefits: PublicBusinessBenefit[];
@@ -26,11 +27,13 @@ export function BusinessBenefits({ benefits, businessName, className = '' }: Bus
   const [redeemingId, setRedeemingId] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, { code?: string; error?: string }>>({});
   const [card, setCard] = useState<RedemptionCard | null>(null);
+  const analytics = useBusinessAnalytics();
 
   if (!benefits?.length) return null;
 
   const handleRedeem = async (benefit: PublicBusinessBenefit) => {
     if (!benefit.id) return;
+    analytics?.track('view_offer', { offer_id: benefit.id });
     setRedeemingId(benefit.id);
     const result = await redeemBenefitAction(benefit.id, crypto.randomUUID());
     if (!result.success && result.code === 'UNAUTHORIZED') {

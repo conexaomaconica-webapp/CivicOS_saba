@@ -2,14 +2,14 @@
 
 import { Heart, Share2 } from 'lucide-react';
 import { useState } from 'react';
-import { businessSlugFromPath, trackGaEvent } from '@/lib/analytics/ga-events';
+import { useBusinessAnalytics } from '@/components/public/business/BusinessContactTracker';
 
 export function BusinessShareActions({ businessName }: { businessName: string }) {
   const [copied, setCopied] = useState(false);
+  const analytics = useBusinessAnalytics();
 
   async function share() {
-    const slug = businessSlugFromPath(window.location.pathname);
-    if (slug) trackGaEvent({ name: 'share_business', params: { business_slug: slug } });
+    analytics?.track('share_business');
     const data = { title: businessName, url: window.location.href };
     if (navigator.share) {
       await navigator.share(data);

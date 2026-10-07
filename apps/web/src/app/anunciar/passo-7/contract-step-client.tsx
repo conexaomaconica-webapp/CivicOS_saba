@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ShieldCheck, CheckCircle2, Printer, ArrowRight, Loader2, AlertCircle, RefreshCw, Eye, FileText } from 'lucide-react';
 import { saveAndAcceptContractSnapshotAction } from '@/app/actions/contract-actions';
 import { CANONICAL_PLAN_PAYMENT_RULES } from '@/lib/payment/payment-rules-types';
+import { trackGaOnce } from '@/lib/analytics/ga';
 
 export interface ContractStepClientProps {
   userEmail: string;
@@ -221,6 +222,7 @@ E, por manifestação eletrônica de vontade, o ANUNCIANTE declara que teve aces
       });
 
       if (res.success) {
+        trackGaOnce('contract_signed', 'contract_signed', { plan: planCode, source_page: 'anunciar_passo_7' });
         setSigned(true);
         setSha256Hash(res.sha256Hash);
         setSignedAtDate(res.signedAt ? new Date(res.signedAt).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR'));

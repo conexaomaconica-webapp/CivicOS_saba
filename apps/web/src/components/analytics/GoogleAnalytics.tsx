@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import Script from 'next/script';
 import { usePathname } from 'next/navigation';
-import { businessSlugFromPath, classifyLinkClick, trackGaEvent } from '@/lib/analytics/ga-events';
+import { CONSENT_STORAGE_KEY, markGaReady, resetGa } from '@/lib/analytics/ga';
+import { isAnalyticsExcludedPath } from '@/lib/analytics/ga-paths';
 
-const CONSENT_KEY = 'cm_analytics_consent';
+const CONSENT_KEY = CONSENT_STORAGE_KEY;
 
 export type ConsentState = 'granted' | 'denied' | null;
 
@@ -50,24 +51,12 @@ export function GoogleAnalytics({ measurementId }: { measurementId: string }) {
     setConsent(readConsent());
   }, []);
 
-  // Evento view_business a cada navegação se o consentimento tiver sido concedido
+  // Áreas internas e rotas com token na URL ficam fora do GA: nada é enviado e o aviso de cookies nem aparece.
+  const excluded = isAnalyticsExcludedPath(pathname);
   useEffect(() => {
-    if (consent !== 'granted') return;
-    const slug = businessSlugFromPath(pathname);
-    if (slug) trackGaEvent({ name: 'view_business', params: { business_slug: slug } });
-  }, [pathname, consent]);
-
-  useEffect(() => {
-    if (consent !== 'granted') return;
-    const onClick = (event: MouseEvent) => {
-      const anchor = (event.target as HTMLElement | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
-      if (!anchor) return;
-      const found = classifyLinkClick(anchor.getAttribute('href'), window.location.host, businessSlugFromPath(window.location.pathname));
-      if (found) trackGaEvent(found);
-    };
-    document.addEventListener('click', onClick, { capture: true });
-    return () => document.removeEventListener('click', onClick, { capture: true });
-  }, [consent]);
+    // Mesmo com o script já carregado (navegação do site público para uma área interna), desliga a coleta.
+    (window as unknown as Record<string, boolean>)[`ga-disable-${measurementId}`] = excluded;
+  }, [excluded, measurementId]);
 
   const choose = (value: 'granted' | 'denied') => {
     try {
@@ -77,12 +66,13 @@ export function GoogleAnalytics({ measurementId }: { measurementId: string }) {
     }
     if (value === 'denied') {
       clearGaCookies();
+      resetGa();
     }
     setConsent(value);
   };
 
   // Evita hydration mismatch no Next.js (SSR não renderiza elementos dependentes do localStorage)
-  if (!mounted) {
+  if (!mounted || excluded) {
     return null;
   }
 
@@ -91,7 +81,7 @@ export function GoogleAnalytics({ measurementId }: { measurementId: string }) {
       {/* SOMENTE INJETA E EXECUTA GTAG.JS SE O CONSENTIMENTO FOI CONCEDIDO ('granted') */}
       {consent === 'granted' ? (
         <>
-          <Script id="ga4-init" strategy="afterInteractive">
+          <Script id="ga4-init" strategy="afterInteractive" onReady={markGaReady}>
             {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}window.gtag=gtag;
 gtag('consent','default',{analytics_storage:'granted',ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied'});
 gtag('js',new Date());gtag('config','${measurementId}',{anonymize_ip:true,allow_google_signals:false});`}

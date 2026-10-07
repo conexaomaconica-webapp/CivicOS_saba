@@ -131,7 +131,6 @@ describe('validação dos campos de SEO do admin', () => {
 });
 
 import { findDuplicateDescriptions, scoreBusinessSeo, seoStatusFor } from '../src/lib/seo/seo-score';
-import { businessSlugFromPath, classifyLinkClick } from '../src/lib/analytics/ga-events';
 
 describe('pontuação de SEO', () => {
   const full = {
@@ -170,26 +169,6 @@ describe('pontuação de SEO', () => {
       { slug: 'a', description: text }, { slug: 'b', description: `  ${text.toUpperCase()}  ` }, { slug: 'c', description: 'curta' }, { slug: 'd', description: 'curta' },
     ]);
     expect([...dup].sort()).toEqual(['a', 'b']);
-  });
-});
-
-describe('eventos do Google Analytics', () => {
-  it('só considera página de empresa', () => {
-    expect(businessSlugFromPath('/guia/otica-exemplo')).toBe('otica-exemplo');
-    expect(businessSlugFromPath('/guia/empresas')).toBeNull();
-    expect(businessSlugFromPath('/guia/bahia/feira-de-santana')).toBeNull();
-    expect(businessSlugFromPath('/')).toBeNull();
-  });
-
-  it('classifica os cliques de contato', () => {
-    const host = 'conexaomaconica.com.br';
-    expect(classifyLinkClick('https://wa.me/5575999998888?text=oi', host, 'a')?.name).toBe('click_whatsapp');
-    expect(classifyLinkClick('tel:+5575999998888', host, 'a')?.name).toBe('click_phone');
-    expect(classifyLinkClick('https://www.instagram.com/exemplo', host, 'a')?.name).toBe('click_instagram');
-    expect(classifyLinkClick('https://www.google.com/maps/dir/?api=1&destination=x', host, 'a')?.name).toBe('click_directions');
-    expect(classifyLinkClick('https://exemplo.com.br', host, 'a')?.name).toBe('click_website');
-    expect(classifyLinkClick('/guia/outra', host, 'a')).toBeNull();
-    expect(classifyLinkClick('https://wa.me/55', host, null)).toBeNull();
   });
 });
 

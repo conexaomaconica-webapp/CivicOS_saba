@@ -2,6 +2,7 @@ import { Inter } from 'next/font/google';
 import { Providers } from './Providers';
 import { getBootData } from '../runtime/server-kernel';
 import { toClientBootData } from '../runtime/client-boot-data';
+import { GoogleAnalytics } from '@/components/analytics/GoogleAnalytics';
 import { generateRootMetadata } from '@/lib/seo/root-metadata';
 import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import '@saas/ui/tokens.css';
@@ -23,6 +24,7 @@ export default async function RootLayout({
   // Só a parte segura do boot vai para o navegador (sem o diagnóstico interno do kernel).
   const bootData = toClientBootData(await getBootData());
   const brand = await resolveTenantBrandContext();
+  const gaMeasurementId = (process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? '').trim();
 
   return (
     <html
@@ -49,6 +51,8 @@ export default async function RootLayout({
       </head>
       <body className="min-h-screen font-sans antialiased">
         <Providers bootData={bootData}>{children}</Providers>
+        {/* GA4 em todo o site público e no funil de cadastro; as áreas internas e as URLs com token ficam de fora (ga-paths). */}
+        {/^G-[A-Z0-9]+$/i.test(gaMeasurementId) ? <GoogleAnalytics measurementId={gaMeasurementId} /> : null}
       </body>
     </html>
   );

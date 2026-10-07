@@ -539,7 +539,18 @@ export default async function CompanyDetailsPage(props: Props & { searchParams?:
         selectedCity={business.location?.city || ''}
         availableCities={business.location?.city ? [business.location.city] : []}
       />
-      <BusinessContactTracker businessId={business.identity.id}>
+      <BusinessContactTracker
+        business={{
+          id: business.identity.id,
+          slug: business.identity.slug,
+          name: business.identity.name,
+          category: business.identity.category,
+          city: business.location?.city ?? null,
+          state: business.location?.state ?? null,
+          plan: business.plan.commercialPlan,
+          isPedraFundamental: business.recognition.pedraFundamental,
+        }}
+      >
         <BusinessProfileRenderer business={business} />
       </BusinessContactTracker>
       <DirectoryFavoritesModal />

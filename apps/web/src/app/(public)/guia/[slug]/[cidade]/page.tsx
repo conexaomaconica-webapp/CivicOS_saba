@@ -8,6 +8,7 @@ import { FavoritesProvider } from '@/lib/directory/favorites-context';
 import { appUrl } from '@/lib/seo/app-url';
 import { categoryPath, cityPath, findCity, isCityIndexable } from '@/lib/seo/directory-seo';
 import { getDirectoryIndex } from '@/lib/seo/directory-seo-server';
+import { TrackEvent } from '@/components/analytics/TrackEvent';
 import '@/styles/directory-home.css';
 
 type Props = { params: Promise<{ slug: string; cidade: string }> };
@@ -83,6 +84,7 @@ export default async function CityDirectoryPage({ params }: Props) {
       <StructuredData schema={breadcrumbSchema} />
       <StructuredData schema={listSchema} />
       <DirectoryHeader selectedCity={city.cityName} availableCities={[city.cityName]} />
+      <TrackEvent name="view_city" params={{ city: city.cityName, state: city.uf, results_count: city.businesses.length, source_page: 'city_page' }} />
       <DirectorySeoPage
         crumbs={crumbs}
         title={`Empresas em ${place}`}
