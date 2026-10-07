@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
 import {
+  Search,
   LayoutDashboard,
   CheckSquare,
   Building2,
@@ -190,6 +191,12 @@ export const adminNavSections: NavSection[] = [
           { label: 'Termos de Uso', path: '/admin/juridico/contratos?tipo=termos' },
           { label: 'Política de Privacidade', path: '/admin/juridico/contratos?tipo=privacidade' },
         ],
+      },
+      {
+        id: 'seo',
+        label: 'SEO Center',
+        path: '/admin/seo',
+        icon: Search,
       },
       {
         id: 'auditoria',

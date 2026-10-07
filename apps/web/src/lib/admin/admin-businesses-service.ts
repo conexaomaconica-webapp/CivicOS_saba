@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePublicSeo } from '@/lib/seo/revalidate-public-seo';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { parseLegacyAddress } from '@/lib/admin/legacy-address';
 import { pickResponsibleName } from '@/lib/contracts/responsible-name';
@@ -1612,6 +1613,7 @@ export async function togglePublicationStatusAction(
     revalidatePath(`/admin/empresas/${businessId}`);
     revalidatePath('/guia');
     revalidatePath('/guia/empresas');
+    revalidatePublicSeo();
 
     return { success: true };
   } catch (err) {

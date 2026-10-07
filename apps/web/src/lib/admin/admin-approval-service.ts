@@ -3,6 +3,7 @@
 import { isInApprovalQueue } from '@/lib/admin/approval-queue';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { revalidatePublicSeo } from '@/lib/seo/revalidate-public-seo';
 import { dispatchNotification as dispatchNotificationAction } from '@/lib/notifications/notification-core';
 import { getCommercialPlanName } from '@/lib/admin/approval-display';
 import { evaluateBusinessProfileReadiness } from '@/lib/admin/admin-commercial-dossier-readiness';
@@ -922,6 +923,7 @@ export async function finalizeApprovalDecisionAction(
     revalidatePath(`/admin/aprovacoes`);
     revalidatePath(`/admin/aprovacoes/${businessId}`);
     revalidatePath(`/admin/empresas`);
+    revalidatePublicSeo();
 
     return { success: true };
   } catch (err: any) {

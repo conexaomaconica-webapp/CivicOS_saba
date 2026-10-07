@@ -1,17 +1,25 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
-import { notFound, redirect } from 'next/navigation';
+import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { BusinessProfileRenderer } from '@/components/public/business/BusinessProfileRenderer';
 import { StructuredData } from '@/components/seo/StructuredData';
 import { toPublicBusinessPresentation } from '@/lib/business/public-business-presentation';
 import { appUrl } from '@/lib/seo/app-url';
+import {
+  buildBusinessDescription,
+  buildBusinessTitle,
+  buildLocalBusinessSchema,
+  businessCanonicalUrl,
+  isBusinessIndexable,
+  type BusinessSeoOverrides,
+} from '@/lib/seo/business-seo';
 import { createServerSideClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database.types';
 
 import { getInstitutionalRecognitionsAction } from '@/app/actions/institutional-recognitions';
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = { params: Promise<{ slug: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> };
 type DetailRow = Database['public']['Functions']['public_business_detail']['Returns'][number];
 type ReviewRow = Database['public']['Functions']['public_business_reviews']['Returns'][number];
 
@@ -361,38 +369,89 @@ const getPublicBusiness = cache(async (slug: string) => {
   }
 });
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+/** Personalização de SEO gravada pelo admin. Se a migration 196 ainda não foi aplicada, a consulta falha e usamos o automático. */
+const getBusinessSeoOverrides = cache(async (slug: string): Promise<BusinessSeoOverrides | null> => {
+  try {
+    const supabase = await createServerSideClient();
+    const { data, error } = await (supabase as any)
+      .from('businesses')
+      .select('seo_title, seo_description, seo_og_image_url, seo_indexable')
+      .eq('slug', slug)
+      .maybeSingle();
+    return error ? null : (data ?? null);
+  } catch {
+    return null;
+  }
+});
+
+/** Slug antigo -> slug atual (empresa que mudou de endereço). Devolve null quando não há histórico. */
+async function resolveRenamedBusinessSlug(slug: string): Promise<string | null> {
+  try {
+    const supabase = await createServerSideClient();
+    const { data, error } = await (supabase as any)
+      .from('business_slug_history')
+      .select('businesses(slug)')
+      .eq('old_slug', slug)
+      .limit(1)
+      .maybeSingle();
+    const current = error ? null : data?.businesses?.slug;
+    return typeof current === 'string' && current && current !== slug ? current : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { slug } = await params;
+  const hasFilters = Object.keys((await searchParams) ?? {}).length > 0;
   if (slug === 'empresas') {
     return {
       title: 'Empresas e Serviços Maçônicos | Conexão Maçônica',
       description: 'Diretório completo de empresas, profissionais e serviços de confiança dentro da rede Conexão Maçônica.',
+      alternates: { canonical: appUrl('/guia/empresas') },
+      robots: hasFilters ? { index: false, follow: true } : undefined,
     };
   }
   if (slug === 'lojas') {
     return {
       title: 'Lojas Maçônicas | Conexão Maçônica',
       description: 'Diretório completo de Lojas Maçônicas, horários de reunião e informações institucionais.',
+      alternates: { canonical: appUrl('/guia/lojas') },
+      robots: hasFilters ? { index: false, follow: true } : undefined,
     };
   }
   const business = await getPublicBusiness(slug);
   if (!business) return { title: 'Empresa não encontrada', robots: { index: false, follow: false } };
 
-  const title = `${business.identity.name} | Guia de Empresas`;
-  const description = business.identity.description?.slice(0, 155)
-    ?? `Conheça ${business.identity.name}, contatos, localização e avaliações públicas no Guia de Empresas.`;
-  const canonical = appUrl(`/guia/${business.identity.slug}`);
+  const overrides = await getBusinessSeoOverrides(slug);
+  const seoInput = {
+    slug: business.identity.slug,
+    name: business.identity.name,
+    category: business.identity.category,
+    description: business.identity.description,
+    city: business.location?.city ?? null,
+    state: business.location?.state ?? null,
+  };
+  const title = buildBusinessTitle(seoInput, overrides);
+  const description = buildBusinessDescription(seoInput, overrides);
+  const canonical = businessCanonicalUrl(business.identity.slug);
+  const image = overrides?.seo_og_image_url || business.media.cover?.url || business.identity.logo?.url;
+  const imageAlt = business.media.cover?.alt || business.identity.logo?.alt || business.identity.name;
   return {
-    title,
+    title: { absolute: title },
     description,
     alternates: { canonical },
+    robots: isBusinessIndexable(overrides) ? undefined : { index: false, follow: true },
     openGraph: {
       title,
       description,
       type: 'website',
       url: canonical,
-      images: business.identity.logo ? [{ url: business.identity.logo.url, alt: business.identity.logo.alt }] : [],
+      siteName: 'Conexão Maçônica',
+      locale: 'pt_BR',
+      images: image ? [{ url: image, alt: imageAlt }] : [],
     },
+    twitter: { card: image ? 'summary_large_image' : 'summary', title, description, images: image ? [image] : [] },
   };
 }
 
@@ -431,7 +490,12 @@ export default async function CompanyDetailsPage(props: Props & { searchParams?:
   }
 
   const business = await getPublicBusiness(slug);
-  if (!business) notFound();
+  if (!business) {
+    // Empresa que mudou de endereço: redirect permanente para o slug atual.
+    const renamedTo = await resolveRenamedBusinessSlug(slug);
+    if (renamedTo) permanentRedirect(`/guia/${renamedTo}`);
+    notFound();
+  }
 
   const breadcrumbSchema = {
     '@context': 'https://schema.org',
@@ -439,24 +503,28 @@ export default async function CompanyDetailsPage(props: Props & { searchParams?:
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Início', item: appUrl('/') },
       { '@type': 'ListItem', position: 2, name: 'Guia', item: appUrl('/guia') },
-      { '@type': 'ListItem', position: 3, name: business.identity.name },
+      { '@type': 'ListItem', position: 3, name: business.identity.name, item: businessCanonicalUrl(business.identity.slug) },
     ],
   };
-  const businessSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'LocalBusiness',
+  const businessSchema = buildLocalBusinessSchema({
+    slug: business.identity.slug,
     name: business.identity.name,
-    description: business.identity.description || undefined,
-    image: business.identity.logo?.url,
-    telephone: business.contacts.phone || undefined,
-    address: business.location?.address,
-    aggregateRating: business.reviews.average != null ? {
-      '@type': 'AggregateRating',
-      ratingValue: business.reviews.average,
-      reviewCount: business.reviews.count,
-    } : undefined,
-    url: appUrl(`/guia/${business.identity.slug}`),
-  };
+    category: business.identity.category,
+    description: business.identity.description,
+    city: business.location?.city ?? null,
+    state: business.location?.state ?? null,
+    imageUrls: [business.media.cover?.url, business.identity.logo?.url].filter((u): u is string => Boolean(u)),
+    phone: business.contacts.phone,
+    email: business.contacts.email,
+    website: business.contacts.website,
+    socialUrls: [business.contacts.instagram, business.contacts.facebook, business.contacts.linkedin, business.contacts.youtube],
+    address: business.location?.address ?? null,
+    latitude: business.location?.latitude ?? null,
+    longitude: business.location?.longitude ?? null,
+    hours: business.hours,
+    ratingAverage: business.reviews.average,
+    ratingCount: business.reviews.count,
+  });
 
   return (
     <FavoritesProvider>

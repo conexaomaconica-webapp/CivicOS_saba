@@ -44,18 +44,22 @@ type Props = {
   }>;
 };
 
-export const metadata: Metadata = {
-  title: 'Guia Comercial e Maçônico — Conexão Maçônica',
-  description:
-    'Encontre empresas, serviços, benefícios e Lojas Maçônicas de irmãos verificados dentro de uma rede de credibilidade.',
-  alternates: { canonical: '/guia' },
-  openGraph: {
+export async function generateMetadata({ searchParams }: { searchParams?: Promise<Record<string, unknown>> }): Promise<Metadata> {
+  const hasFilters = Object.keys((await searchParams) ?? {}).length > 0;
+  return {
     title: 'Guia Comercial e Maçônico — Conexão Maçônica',
-    description: 'Busque empresas, serviços e Lojas Maçônicas na rede Conexão Maçônica.',
-    url: appUrl('/guia'),
-    type: 'website',
-  },
-};
+    description:
+      'Encontre empresas, serviços, benefícios e Lojas Maçônicas de irmãos verificados dentro de uma rede de credibilidade.',
+    alternates: { canonical: appUrl('/guia') },
+    robots: hasFilters ? { index: false, follow: true } : undefined,
+    openGraph: {
+      title: 'Guia Comercial e Maçônico — Conexão Maçônica',
+      description: 'Busque empresas, serviços e Lojas Maçônicas na rede Conexão Maçônica.',
+      url: appUrl('/guia'),
+      type: 'website',
+    },
+  };
+}
 
 // Localização de exibição: a sede (is_headquarters) tem prioridade sobre as demais.
 function pickHeadquarters(

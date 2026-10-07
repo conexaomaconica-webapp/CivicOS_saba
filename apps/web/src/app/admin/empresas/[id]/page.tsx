@@ -1,7 +1,9 @@
 import React from 'react';
 import { notFound } from 'next/navigation';
 import { getAdminBusiness360Action } from '@/lib/admin/admin-businesses-service';
+import { getAdminBusinessSeoAction } from '@/app/actions/admin-business-seo';
 import Company360Client from './company-360-client';
+import BusinessSeoPanel from './seo-panel';
 
 type AdminEmpresa360PageProps = {
   params: Promise<{
@@ -27,7 +29,17 @@ export default async function AdminEmpresa360Page({ params }: AdminEmpresa360Pag
     if (!dto) {
       notFound();
     }
-    return <Company360Client initialData={dto} />;
+    const seo = await getAdminBusinessSeoAction(id);
+    return (
+      <>
+        <Company360Client initialData={dto} />
+        {seo ? (
+          <div className="px-4 pb-10">
+            <BusinessSeoPanel data={seo} />
+          </div>
+        ) : null}
+      </>
+    );
   } catch (_err) {
     notFound();
   }

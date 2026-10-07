@@ -26,7 +26,8 @@ export function PublicShell({
   const pathname = usePathname();
   const isGuiaOrLegal = pathname?.startsWith('/guia') || pathname === '/privacidade' || pathname === '/termos';
 
-  const renderHeader = showHeader && !isGuiaOrLegal;
+  // A home (/) traz o próprio cabeçalho com logo e botão Entrar.
+  const renderHeader = showHeader && !isGuiaOrLegal && pathname !== '/';
   const renderFooter = showFooter && !isGuiaOrLegal;
 
   return (
