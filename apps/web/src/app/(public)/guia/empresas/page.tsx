@@ -333,6 +333,9 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
 
         {/* Conteúdo Principal com Interatividade Client-Side */}
         <main className="dh-container py-8">
+          <h2 className="sr-only">
+            {activeCategory ? `Empresas de ${activeCategory.name}` : 'Empresas e profissionais da rede'} ({searchData.total})
+          </h2>
           <BusinessDirectoryClient
             initialFilters={initialFilters}
             initialViewMode={viewMode}

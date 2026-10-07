@@ -271,7 +271,7 @@ export function BusinessCard({
         {data.cover_url ? (
           <img
             src={data.cover_url}
-            alt=""
+            alt={`Capa de ${data.name}`}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (

@@ -1,5 +1,5 @@
 import { appUrl } from '@/lib/seo/app-url';
-import { resolveState, slugify, stateFromSlug } from '@/lib/seo/geo-slugs';
+import { categorySlug, resolveState, slugify, stateFromSlug } from '@/lib/seo/geo-slugs';
 
 /**
  * Páginas de cidade e de cidade + categoria do guia. Só existem quando há empresas publicadas de verdade, e só são
@@ -67,7 +67,7 @@ export function buildDirectoryIndex(rows: DirectoryRow[]): CityGroup[] {
       slug,
       name,
       category,
-      categorySlug: category ? slugify(category) || null : null,
+      categorySlug: category ? categorySlug(category) || null : null,
       description: row.description?.trim() || null,
       logoUrl: row.logo_url ?? null,
       updatedAt: row.updated_at ?? null,

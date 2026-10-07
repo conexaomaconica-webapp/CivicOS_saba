@@ -52,17 +52,17 @@ describe('índice de cidades e categorias', () => {
     const salvador = findCity(index, 'bahia', 'salvador')!;
     expect(isCityIndexable(feira)).toBe(true);
     expect(isCityIndexable(salvador)).toBe(false);
-    expect(isCategoryIndexable(findCategory(feira, 'otica')!)).toBe(true);
+    expect(isCategoryIndexable(findCategory(feira, 'optica')!)).toBe(true);
     expect(isCategoryIndexable(findCategory(feira, 'advogados')!)).toBe(false);
   });
 
   it('empresa com seo_indexable falso não conta para o critério', () => {
     const idx = buildDirectoryIndex([biz('a', 'Ótica'), biz('b', 'Ótica', 'Feira de Santana', 'BA', { seo_indexable: false })]);
-    expect(isCategoryIndexable(findCategory(idx[0]!, 'otica')!)).toBe(false);
+    expect(isCategoryIndexable(findCategory(idx[0]!, 'optica')!)).toBe(false);
   });
 
   it('o sitemap só recebe cidade e categoria indexáveis', () => {
     const urls = buildDirectorySitemapUrls(index).map((u) => u.url.replace(/^https?:\/\/[^/]+/, ''));
-    expect(urls).toEqual(['/guia/bahia/feira-de-santana', '/guia/bahia/feira-de-santana/otica']);
+    expect(urls).toEqual(['/guia/bahia/feira-de-santana', '/guia/bahia/feira-de-santana/optica']);
   });
 });

@@ -36,3 +36,19 @@ export function resolveState(raw: string | null | undefined): StateInfo | null {
 export function stateFromSlug(slug: string): StateInfo | null {
   return STATE_BY_SLUG.get(slug) ?? null;
 }
+
+/**
+ * Variantes de grafia que são a MESMA categoria e devem cair na mesma página. Só entram aqui equivalências sem dúvida
+ * (ex.: "Ótica" e "Óptica" são a mesma loja); mesclar categorias de significado parecido é decisão de negócio
+ * (ver docs/seo/categorias.md). Chave e valor já em formato de slug.
+ */
+const CATEGORY_SLUG_ALIASES: Readonly<Record<string, string>> = {
+  otica: 'optica',
+  oticas: 'optica',
+};
+
+/** Slug da categoria usado nas URLs /guia/{estado}/{cidade}/{categoria}. Acentos, caixa e apelidos conhecidos se juntam. */
+export function categorySlug(name: string | null | undefined): string {
+  const slug = slugify(name);
+  return CATEGORY_SLUG_ALIASES[slug] ?? slug;
+}

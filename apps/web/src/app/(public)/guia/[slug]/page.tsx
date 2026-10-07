@@ -8,6 +8,9 @@ import { StructuredData } from '@/components/seo/StructuredData';
 import { toPublicBusinessPresentation } from '@/lib/business/public-business-presentation';
 import { appUrl } from '@/lib/seo/app-url';
 import { buildLowercaseSlugRedirect } from '@/lib/seo/slug-redirect';
+import { BusinessBreadcrumb } from '@/components/public/business/BusinessBreadcrumb';
+import { breadcrumbJsonLd, buildBusinessBreadcrumb } from '@/lib/seo/business-breadcrumb';
+import { getDirectoryIndex } from '@/lib/seo/directory-seo-server';
 import {
   buildBusinessDescription,
   buildBusinessTitle,
@@ -502,15 +505,19 @@ export default async function CompanyDetailsPage(props: Props & { searchParams?:
     notFound();
   }
 
-  const breadcrumbSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Início', item: appUrl('/') },
-      { '@type': 'ListItem', position: 2, name: 'Guia', item: appUrl('/guia') },
-      { '@type': 'ListItem', position: 3, name: business.identity.name, item: businessCanonicalUrl(business.identity.slug) },
-    ],
-  };
+  // Caminho visível e JSON-LD saem da mesma lista: Início > Guia > Cidade > Categoria > Empresa (cidade e categoria só
+  // quando essas páginas existem). Falha ao ler o índice do guia nunca derruba a página: cai para Início > Guia > Empresa.
+  const breadcrumbItems = buildBusinessBreadcrumb(
+    {
+      name: business.identity.name,
+      slug: business.identity.slug,
+      city: business.location?.city ?? null,
+      state: business.location?.state ?? null,
+      category: business.identity.category,
+    },
+    await getDirectoryIndex().catch(() => []),
+  );
+  const breadcrumbSchema = breadcrumbJsonLd(breadcrumbItems, business.identity.slug);
   const businessSchema = buildLocalBusinessSchema({
     slug: business.identity.slug,
     name: business.identity.name,
@@ -539,6 +546,7 @@ export default async function CompanyDetailsPage(props: Props & { searchParams?:
         selectedCity={business.location?.city || ''}
         availableCities={business.location?.city ? [business.location.city] : []}
       />
+      <BusinessBreadcrumb items={breadcrumbItems} />
       <BusinessContactTracker
         business={{
           id: business.identity.id,

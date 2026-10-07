@@ -152,6 +152,18 @@ export default async function PublicEventsDirectoryPage({ searchParams }: Props)
             </Link>
           </div>
 
+          {/* Título da lista: dá estrutura à página (H1 > H2 > H3 dos cards) e informa quantos itens há */}
+          <section aria-labelledby="eventos-lista-titulo">
+            <h2 id="eventos-lista-titulo" className="font-serif text-xl font-bold text-[#1f1914]">
+              Eventos e comunicados da rede
+            </h2>
+            <p className="mt-1 text-xs text-[#6b625b]">
+              {items.length === 0
+                ? 'Nenhum item neste filtro.'
+                : `${items.length} ${items.length === 1 ? 'item' : 'itens'} de empresas parceiras e Lojas Maçônicas.`}
+            </p>
+          </section>
+
           {/* Lista de Eventos */}
           {items.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

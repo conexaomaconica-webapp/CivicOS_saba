@@ -1543,7 +1543,7 @@ Escopo exato: `/diagnostics`, `/health`, `/anunciar*`, `/pesquisa`, sitemap e ca
 - [ ] Ajuste do redirect `http://conexaomaconica.com.br` -> `https://www...` em um salto (configuração do domínio na Vercel, manual).
 - [x] Validação em produção (seção 49): `validate-sprint2.ps1` terminou com "SPRINT 2 VALIDADA".
 
-## Sprint 3 — Analytics (implementada em 2026-10-08; aguardando deploy e validação no GA4)
+## Sprint 3 — Analytics (implementada e em produção desde 2026-10-08)
 
 Detalhes: `docs/seo/eventos-ga4.md`.
 
@@ -1554,14 +1554,27 @@ Detalhes: `docs/seo/eventos-ga4.md`.
 - [x] Eventos de contato e `view_business` agora levam os dados da empresa (id, nome, categoria, cidade, estado, plano); sem listener global duplicado.
 - [x] `click_directions` mantido (já é evento-chave no GA4); `click_route` do README é alias.
 - [ ] `payment_confirmed` por Pix, `business_published` e `profile_completed` (exigem medição por servidor ou decisão de produto; ver pendências em `eventos-ga4.md`).
-- [ ] Validação no GA4 (DebugView) e marcação dos novos eventos-chave após o deploy.
+- [x] Compartilhamentos (botão Compartilhar e modal Indicar) também na medição própria do painel do anunciante, sem contar em dobro.
+- [ ] No GA4 (ação do administrador): cadastrar as dimensões personalizadas e marcar os novos eventos-chave (lista em `eventos-ga4.md`).
 
-## Sprint 4 em diante
+## Sprint 4 — Metadata e SEO técnico (implementada em 2026-10-08, branch seo/sprint-4; aguardando revisão visual e deploy)
+
+Detalhes das categorias: `docs/seo/categorias.md`.
+
+- [x] **Breadcrumb visível** na página da empresa (Início > Guia > Cidade > Categoria > Empresa). Cidade e categoria só entram quando a página existe (link nunca leva a 404). O JSON-LD `BreadcrumbList` usa a **mesma lista** de itens (antes tinha só Início > Guia > Empresa, sem breadcrumb na tela).
+- [x] **Links internos** empresa => cidade e empresa => categoria (pelo breadcrumb).
+- [x] **Estrutura de títulos (H2)** em `/guia/eventos`, `/guia/beneficios` e `/guia/empresas`; `/guia/beneficios` ganhou a seção "Como resgatar um benefício" (passos reais do fluxo) e contagem real de ofertas.
+- [x] **Alt** descritivo nas capas dos cards do guia (`Capa de {empresa}`); não há mais imagem de card com alt vazio em `/guia` e `/guia/empresas`.
+- [x] **Categorias:** slug único e canônico (`categorySlug`) com apelidos sem dúvida (Ótica = Óptica); levantamento das 49 categorias e proposta em `categorias.md`.
+- [ ] **Decisão sua:** lista final de categorias e correção de acentos (a mudança no banco só depois da decisão).
+- [ ] Revisão visual do breadcrumb na página da empresa (layouts bronze, prata e ouro) e deploy.
+- Fora desta sprint (anotado): o evento de lançamento (`/eventos/conexao-empresarial-2026`) não é linkado de `/guia/eventos`; a agenda lista só eventos de empresas e lojas. Home destacar categorias e cidades fica para a Sprint 7.
+
+## Sprint 5 em diante
 
 
 
-[ ] Sprint 4 — Metadata e SEO técnico (próxima)
-[ ] Sprint 5 — Dados estruturados
+[ ] Sprint 5 — Dados estruturados (próxima)
 [ ] Sprint 6 — Performance
 [ ] Sprint 7 — SEO programático
 [ ] Sprint 8 — Growth e conversão

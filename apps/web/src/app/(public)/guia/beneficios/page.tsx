@@ -61,6 +61,17 @@ export default async function PublicBenefitsDirectoryPage() {
         </section>
 
         <main className="dh-container space-y-8 py-7 sm:py-10">
+          <section aria-labelledby="beneficios-lista-titulo">
+            <h2 id="beneficios-lista-titulo" className="font-serif text-xl font-bold text-[#1f1914]">
+              Ofertas ativas na rede
+            </h2>
+            <p className="mt-1 text-xs text-[#6b625b]">
+              {items.length === 0
+                ? 'Novas ofertas aparecem aqui assim que as empresas as publicarem.'
+                : `${items.length} ${items.length === 1 ? 'empresa oferece' : 'empresas oferecem'} benefício para a comunidade.`}
+            </p>
+          </section>
+
           {/* Grid de Ofertas */}
           {items.length > 0 ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3 xl:gap-6">
@@ -116,6 +127,16 @@ export default async function PublicBenefitsDirectoryPage() {
               </p>
             </div>
           )}
+          <section aria-labelledby="beneficios-como-resgatar" className="rounded-2xl border border-[#e8e2d9] bg-white p-6 shadow-sm">
+            <h2 id="beneficios-como-resgatar" className="font-serif text-xl font-bold text-[#1f1914]">
+              Como resgatar um benefício
+            </h2>
+            <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-[#6b625b]">
+              <li>Escolha a oferta e abra o perfil da empresa.</li>
+              <li>Entre na sua conta (o cadastro é gratuito) e use o botão para resgatar.</li>
+              <li>Apresente o código recebido à empresa, que confirma o uso do benefício.</li>
+            </ol>
+          </section>
         </main>
 
         <DirectoryFooter />
