@@ -1528,7 +1528,7 @@ Escopo exato: `/diagnostics`, `/health`, `/anunciar*`, `/pesquisa`, sitemap e ca
 - Correção do diagnóstico da Fase 0, item 16: `/presenca` **não** é página duplicada; é um redirect (307) para
   `/eventos/conexao-empresarial-2026`. Nada a unificar.
 
-## Sprint 2 — Indexação e rastreamento (implementada em 2026-10-07; aguardando deploy e migration 201)
+## Sprint 2 — Indexação e rastreamento (implementada e validada em produção em 2026-10-07)
 
 - [x] Canonical (via `appUrl()`, domínio com www) em `/guia/eventos`, `/guia/beneficios`, `/termos`, `/privacidade` e `/guia/lojas/{slug}`.
 - [x] Títulos sem a marca duplicada (`title.absolute`) em eventos, benefícios, termos, privacidade, lojas, evento, pesquisas, cadastro, contratação, adesão, QR, 404, login e área logada. `/register`, `/forgot-password` e `/update-password` ganharam título próprio (`/register` se chamava "Entrar").
@@ -1538,21 +1538,35 @@ Escopo exato: `/diagnostics`, `/health`, `/anunciar*`, `/pesquisa`, sitemap e ca
 - [x] Lojas (`/guia/lojas/{slug}`): `noindex, follow` + canonical, até terem conteúdo próprio. Seguem fora do sitemap.
 - [x] `/guia/OpticaCirculo` (maiúsculas) redireciona de forma permanente para a forma minúscula.
 - [x] `llms.txt` atualizado, com o domínio com www e as páginas reais.
-- [ ] Migration `201_public_seo_events.sql` precisa ser aplicada para os eventos entrarem no sitemap (sem ela, o sitemap funciona, só sem eventos).
+- [x] Migration `201_public_seo_events.sql` aplicada: eventos publicados entram no sitemap.
+- [x] Migration `202_move_launch_event_to_conexao_tenant.sql` aplicada: o evento de lançamento e as 6 inscrições estavam no tenant da "Loja Luz do Oriente" (seed antigo com `LIMIT 1` sem `ORDER BY`) e foram para o tenant da Conexão.
 - [ ] Ajuste do redirect `http://conexaomaconica.com.br` -> `https://www...` em um salto (configuração do domínio na Vercel, manual).
-- [ ] Validação em produção (seção 49).
+- [x] Validação em produção (seção 49): `validate-sprint2.ps1` terminou com "SPRINT 2 VALIDADA".
 
-## Sprint 3 em diante
+## Sprint 3 — Analytics (implementada em 2026-10-08; aguardando deploy e validação no GA4)
 
-[ ] Sprint 3 — Analytics (não iniciada)
-[ ] Sprint 4 — Metadata e SEO técnico
+Detalhes: `docs/seo/eventos-ga4.md`.
+
+- [x] GA4 no **layout raiz** (antes só no layout público): o funil `/anunciar/*`, `/login` e `/register` passam a ser medidos. Áreas internas e rotas com token na URL ficam fora (`lib/analytics/ga-paths.ts`).
+- [x] Consentimento estrito preservado (nenhum script do Google antes do "Aceitar"); fila de eventos até o GA ficar pronto (o `view_business` da primeira página não se perde mais).
+- [x] Dicionário único de eventos e parâmetros (`lib/analytics/{types,events,ga}.ts`) com lista permitida de parâmetros e higienização do termo de busca.
+- [x] Eventos novos: `search_business`, `select_category`, `select_city`, `view_city`, `view_category`, `favorite_business`, `view_offer`, `register_visit`, `register_connection`, `generate_lead`, `start_advertiser_signup`, `complete_advertiser_signup`, `contract_signed`, `payment_confirmed` (cartão).
+- [x] Eventos de contato e `view_business` agora levam os dados da empresa (id, nome, categoria, cidade, estado, plano); sem listener global duplicado.
+- [x] `click_directions` mantido (já é evento-chave no GA4); `click_route` do README é alias.
+- [ ] `payment_confirmed` por Pix, `business_published` e `profile_completed` (exigem medição por servidor ou decisão de produto; ver pendências em `eventos-ga4.md`).
+- [ ] Validação no GA4 (DebugView) e marcação dos novos eventos-chave após o deploy.
+
+## Sprint 4 em diante
+
+
+
+[ ] Sprint 4 — Metadata e SEO técnico (próxima)
 [ ] Sprint 5 — Dados estruturados
 [ ] Sprint 6 — Performance
 [ ] Sprint 7 — SEO programático
 [ ] Sprint 8 — Growth e conversão
 
-Itens conhecidos que ficam para sprints seguintes: GA4 fora do layout público e eventos faltantes (Sprint 3);
-breadcrumb visível, links internos, headings e alts (Sprint 4); JSON-LD completo (Sprint 5); cache/ISR, `<img>` e
+Itens conhecidos que ficam para sprints seguintes: breadcrumb visível, links internos, headings e alts (Sprint 4); JSON-LD completo (Sprint 5); cache/ISR, `<img>` e
 JavaScript do cliente (Sprint 6); normalização de categorias e política de lojas/eventos/ofertas em larga escala
 (Sprint 7).
 

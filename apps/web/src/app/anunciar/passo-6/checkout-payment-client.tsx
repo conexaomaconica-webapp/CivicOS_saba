@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CreditCard, QrCode, CheckCircle2, ShieldCheck, Copy, AlertCircle, Lock, ArrowRight } from 'lucide-react';
 import { processPixCheckoutAction, processCreditCardCheckoutAction, getPlanPaymentRulesAction, PlanPaymentRules } from '@/lib/payment/payment-service';
+import { trackGaOnce } from '@/lib/analytics/ga';
 
 type CheckoutPaymentProps = {
   userEmail: string;
@@ -112,6 +113,7 @@ export default function CheckoutPaymentClient({
       });
 
       if (res.success) {
+        trackGaOnce('payment_confirmed', 'payment_confirmed', { plan: planCode, payment_method: 'credit_card', source_page: 'anunciar_passo_6' });
         setStatusMsg(`Transação autorizada com sucesso em ${res.installmentCount}x! Redirecionando para seu painel...`);
         setTimeout(() => {
           router.push('/anunciante');

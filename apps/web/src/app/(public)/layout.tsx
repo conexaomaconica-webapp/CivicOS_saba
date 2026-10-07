@@ -6,12 +6,10 @@ import { getPublicSupportContact } from '@/lib/directory/support-contact-server'
 import { getPedraFundamentalCardConfigAction } from '@/app/actions/institutional-recognitions';
 import { PedraCardDisplayProvider } from '@/lib/directory/pedra-card-display-context';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
-import { GoogleAnalytics } from '@/components/analytics/GoogleAnalytics';
 import { VisitOriginCapture } from '@/components/analytics/VisitOriginCapture';
 import '@/styles/public-experience.css';
 
 export default async function PublicLayout({ children }: { children: ReactNode }) {
-  const gaMeasurementId = (process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? '').trim();
   const [brand, pedraCardConfig, support] = await Promise.all([
     resolveTenantBrandContext(),
     getPedraFundamentalCardConfigAction(),
@@ -27,7 +25,6 @@ export default async function PublicLayout({ children }: { children: ReactNode }
         <PublicShell productName={brand.appName} logoUrl={brand.logoUrl}>
           <VisitOriginCapture />
           {children}
-          {/^G-[A-Z0-9]+$/i.test(gaMeasurementId) ? <GoogleAnalytics measurementId={gaMeasurementId} /> : null}
           <FloatingWhatsApp whatsapp={support.whatsapp} email={support.email} />
         </PublicShell>
       </FavoritesProvider>

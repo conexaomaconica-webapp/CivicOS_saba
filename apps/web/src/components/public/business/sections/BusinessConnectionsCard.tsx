@@ -3,6 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { BadgeCheck, Camera, Handshake, Loader2, MapPin, ShoppingBag, Wrench, X, CheckCircle2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useBusinessAnalytics } from '@/components/public/business/BusinessContactTracker';
+import { gaNameForConnection } from '@/lib/analytics/events';
+import { trackGa } from '@/lib/analytics/ga';
 import { optimizeImageForUpload } from '@/lib/media/optimize-image';
 import { ConnectionLikeButton } from './ConnectionLikeButton';
 import { getPublicReferralCountAction } from '@/app/actions/referrals';
@@ -164,6 +167,7 @@ export function RegisterConnectionModal({
   defaultType?: ConnectionType;
   defaultOrigin?: ConnectionOrigin | '';
 }) {
+  const analytics = useBusinessAnalytics();
   const [type, setType] = useState<ConnectionType>(defaultType);
   const [item, setItem] = useState('');
   const [message, setMessage] = useState('');
@@ -236,6 +240,9 @@ export function RegisterConnectionModal({
       }
       setDoneShared(shareOnMural);
       setDone(res.businessName || 'a empresa');
+      const gaName = gaNameForConnection(type);
+      if (analytics) analytics.track(gaName, { connection_type: type });
+      else trackGa(gaName, { business_slug: businessSlug, connection_type: type, source_page: 'connection_modal' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível registrar a conexão.');
     } finally {

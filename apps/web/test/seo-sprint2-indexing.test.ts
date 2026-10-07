@@ -197,3 +197,24 @@ describe('llms.txt e migration de eventos', () => {
     expect(sql).toContain('REVOKE ALL ON FUNCTION public.public_seo_events(text) FROM PUBLIC');
   });
 });
+
+describe('migration 202: evento de lançamento no tenant da Conexão', () => {
+  const sql = () => read('../../supabase/migrations/202_move_launch_event_to_conexao_tenant.sql');
+
+  it('só altera tenant_id do evento e das inscrições, para o tenant da Conexão', () => {
+    const text = sql();
+    expect(text).toContain("'00000000-0000-0000-0000-000000000000'");
+    expect(text).toContain("slug = 'conexao-maconica'");
+    expect(text).toContain('UPDATE public.event_registrations SET tenant_id = v_target WHERE event_id = v_event_id');
+    expect(text).toContain('UPDATE public.platform_events SET tenant_id = v_target WHERE id = v_event_id');
+    // nada de DELETE, DROP ou TRUNCATE
+    expect(text.replace(/--.*$/gm, '')).not.toMatch(/\b(DELETE|DROP|TRUNCATE|ALTER)\b/i);
+  });
+
+  it('é idempotente e aborta sem alterar quando o destino já tem o evento ou o tenant não existe', () => {
+    const text = sql();
+    expect(text).toContain('e.tenant_id <> v_target');
+    expect(text).toContain('RAISE EXCEPTION');
+    expect(text).toMatch(/nada a fazer/);
+  });
+});

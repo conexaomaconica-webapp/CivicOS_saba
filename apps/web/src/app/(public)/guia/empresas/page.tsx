@@ -23,6 +23,8 @@ import {
   GEO_COOKIE,
   parseGeoCookie,
 } from '@/lib/directory/business-filters';
+import { TrackEvent } from '@/components/analytics/TrackEvent';
+import { sanitizeSearchTerm } from '@/lib/analytics/events';
 import '@/styles/directory-home.css';
 
 
@@ -318,6 +320,16 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
             </form>
           </div>
         </section>
+
+        {/* Medição de busca e filtros (GA4). O termo é higienizado: e-mail, telefone e documentos nunca são enviados. */}
+        {sanitizeSearchTerm(q) ? (
+          <TrackEvent
+            name="search_business"
+            params={{ search_term: q, city, category_name: activeCategory?.name ?? cat, results_count: searchData.total, source_page: 'guia_empresas' }}
+          />
+        ) : null}
+        {city ? <TrackEvent name="select_city" params={{ city, results_count: searchData.total, source_page: 'guia_empresas' }} /> : null}
+        {cat ? <TrackEvent name="select_category" params={{ category_name: activeCategory?.name ?? cat, results_count: searchData.total, source_page: 'guia_empresas' }} /> : null}
 
         {/* Conteúdo Principal com Interatividade Client-Side */}
         <main className="dh-container py-8">

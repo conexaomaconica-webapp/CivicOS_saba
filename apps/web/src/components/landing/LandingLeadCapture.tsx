@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { createLeadCaptureAction } from '@/app/actions/lead-capture';
+import { trackGa } from '@/lib/analytics/ga';
 
 const INPUT =
   'w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder-stone-400 focus:border-[#5d1523] focus:outline-none focus:ring-2 focus:ring-[#5d1523]/15';
@@ -32,6 +33,8 @@ export function LandingLeadCapture({ planOptions = DEFAULT_PLAN_OPTIONS }: { pla
     const res = await createLeadCaptureAction({ fullName, companyName, phone, cityState, lodgeName, interestedPlan });
     setLoading(false);
     if (res.success) {
+      // Só o plano de interesse (nenhum dado da pessoa) vai para o GA.
+      trackGa('generate_lead', { lead_type: 'advertiser_interest', plan_interest: interestedPlan, source_page: 'home' });
       setStatus({ type: 'success', text: 'Recebemos seus dados! Nossa equipe entrará em contato em breve.' });
       setFullName('');
       setCompanyName('');

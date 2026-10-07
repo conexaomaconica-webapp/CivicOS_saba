@@ -5,6 +5,7 @@ import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileCheck, CheckCircle2, AlertCircle, Printer, Download, ShieldCheck, FileText } from 'lucide-react';
 import { saveAndAcceptContractSnapshotAction } from '@/app/actions/contract-actions';
+import { trackGaOnce } from '@/lib/analytics/ga';
 
 type ContractSigningProps = {
   userEmail: string;
@@ -101,6 +102,7 @@ Hash de Integridade do Contrato: [PENDENTE DE ASSINATURA]
       });
 
       if (res.success) {
+        trackGaOnce('contract_signed', 'contract_signed', { plan: planName, source_page: 'anunciar_passo_5' });
         setSignedState({
           sha256Hash: res.sha256Hash,
           signedAt: res.signedAt,

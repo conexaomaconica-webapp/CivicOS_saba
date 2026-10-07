@@ -14,6 +14,7 @@ import { loadResponsibleDraft, clearResponsibleDraft } from '@/lib/onboarding/re
 import { upsertMasonicAffiliation } from '@/lib/masonic/masonic-affiliation-service';
 import { MASONIC_STATUS_LABELS } from '@/lib/masonic/masonic-affiliation';
 import { MasonicLinkAuthorizationModal } from '@/components/onboarding/MasonicLinkAuthorizationModal';
+import { trackGa } from '@/lib/analytics/ga';
 
 const FIELD_ERROR_STYLE = {
   marginTop: 'var(--space-1)',
@@ -150,6 +151,7 @@ export default function BusinessForm({ categories, tenantId }: BusinessFormProps
         });
       }
       clearResponsibleDraft();
+      trackGa('complete_advertiser_signup', { source_page: 'anunciar_passo_2' });
       router.push('/anunciar/passo-3');
     } else {
       setErrorMsg(result.error ?? 'Erro ao salvar a empresa.');

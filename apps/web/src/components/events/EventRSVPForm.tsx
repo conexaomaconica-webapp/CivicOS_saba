@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
 import { upsertEventRegistrationAction } from '@/app/actions/platform-events';
 import { EventSuccessScreen } from './EventSuccessScreen';
+import { trackGa } from '@/lib/analytics/ga';
 import { normalizeWhatsApp, validateWhatsApp, sanitizeUTMParams } from '@/lib/events/events-service';
 import type { PlatformEvent, RSVPResult } from '@/app/actions/platform-events';
 import type { AttendeeType, AttendanceStatus } from '@/types/database-extensions';
@@ -115,6 +116,10 @@ export function EventRSVPForm({ event }: EventRSVPFormProps) {
     if (result.success && result.data) {
       setSuccessResult(result.data);
       setFormState('success');
+      // Só presença confirmada conta como lead; quem recusa não entra na medição de leads.
+      if (formData.attendanceStatus === 'confirmed') {
+        trackGa('generate_lead', { lead_type: 'event_rsvp', event_id: event.id, source_page: 'event' });
+      }
     } else {
       setErrorMessage(result.error ?? 'Ocorreu um erro. Tente novamente.');
       setFormState('error');
