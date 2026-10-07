@@ -3,6 +3,7 @@
 import { resolveCanonicalAdminTenant } from '@/lib/admin/admin-tenant-context';
 import { buildDirectoryIndex, isCategoryIndexable, isCityIndexable, type DirectoryRow } from '@/lib/seo/directory-seo';
 import { findDuplicateDescriptions, scoreBusinessSeo, type SeoScoreResult } from '@/lib/seo/seo-score';
+import { SEO_BUSINESS_SELECT, buildSeoRowFacts } from '@/lib/seo/seo-score-input';
 
 export type SeoCenterBusiness = {
   id: string;
@@ -37,14 +38,6 @@ export type SeoCenterData = {
   seoColumnsAvailable: boolean;
 };
 
-const SELECT_BASE =
-  'id, slug, name, category, description, logo_url, phone, website, ' +
-  'business_locations(city, state, street, number, latitude, longitude, is_headquarters), ' +
-  'business_contacts(type, value, is_public), business_services(id), business_media(media_type, url), business_hours(is_closed)';
-
-const contactValue = (contacts: any[], type: string): string | null =>
-  contacts.find((c) => c?.type === type && c?.value)?.value ?? null;
-
 /**
  * Painel SEO Center: saúde de SEO de todas as empresas publicadas do tenant. Calculado na hora a partir do cadastro:
  * não há resultado gravado que possa ficar desatualizado.
@@ -64,11 +57,11 @@ export async function getSeoCenterDataAction(): Promise<{ success: true; data: S
         .limit(5000);
 
     let seoColumnsAvailable = true;
-    let { data, error } = await query(`${SELECT_BASE}, seo_indexable`);
+    let { data, error } = await query(`${SEO_BUSINESS_SELECT}, seo_indexable`);
     if (error) {
       // Migration 196 ainda não aplicada.
       seoColumnsAvailable = false;
-      ({ data, error } = await query(SELECT_BASE));
+      ({ data, error } = await query(SEO_BUSINESS_SELECT));
     }
     if (error) return { success: false, error: `Não foi possível carregar as empresas: ${error.message}` };
 
@@ -76,46 +69,17 @@ export async function getSeoCenterDataAction(): Promise<{ success: true; data: S
     const duplicates = findDuplicateDescriptions(rows.map((r) => ({ slug: r.slug ?? r.id, description: r.description })));
 
     const businesses: SeoCenterBusiness[] = rows.map((row) => {
-      const locations: any[] = row.business_locations ?? [];
-      const loc = locations.find((l) => l?.is_headquarters) ?? locations[0] ?? null;
-      const contacts: any[] = row.business_contacts ?? [];
-      const media: any[] = row.business_media ?? [];
-      const address = loc ? [loc.street, loc.number].filter(Boolean).join(', ') : '';
-      const indexable = row.seo_indexable !== false;
-      const cover = media.find((m) => m?.media_type === 'cover' || m?.media_type === 'banner')?.url ?? null;
-      const gallery = media.filter((m) => m?.media_type === 'photo' || m?.media_type === 'gallery' || m?.media_type === 'image');
-
-      const score = scoreBusinessSeo({
-        name: row.name,
-        category: row.category,
-        description: row.description,
-        slug: row.slug,
-        city: loc?.city ?? null,
-        state: loc?.state ?? null,
-        address,
-        hasCoordinates: loc?.latitude != null && loc?.longitude != null,
-        hoursCount: (row.business_hours ?? []).filter((h: any) => !h?.is_closed).length,
-        phone: row.phone || contactValue(contacts, 'phone'),
-        whatsapp: contactValue(contacts, 'whatsapp'),
-        website: row.website || contactValue(contacts, 'website'),
-        instagram: contactValue(contacts, 'instagram'),
-        logoUrl: row.logo_url,
-        coverUrl: cover,
-        galleryCount: gallery.length,
-        servicesCount: (row.business_services ?? []).length,
-        seoIndexable: indexable,
-      });
-
+      const { scoreInput } = buildSeoRowFacts(row);
       return {
         id: row.id,
         slug: row.slug,
         name: row.name,
         category: row.category,
-        city: loc?.city ?? null,
-        state: loc?.state ?? null,
-        indexable,
+        city: scoreInput.city,
+        state: scoreInput.state,
+        indexable: scoreInput.seoIndexable,
         duplicateDescription: duplicates.has(row.slug ?? row.id),
-        score,
+        score: scoreBusinessSeo(scoreInput),
       };
     });
 

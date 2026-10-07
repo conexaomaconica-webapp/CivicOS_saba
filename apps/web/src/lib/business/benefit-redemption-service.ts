@@ -2,10 +2,14 @@
 
 import { createServerSideClient } from '@/lib/supabase/server';
 import { markBenefitReferral } from '@/lib/referrals/attribution';
+import { splitErrorCode } from '@/lib/errors/split-error-code';
 
 export interface BenefitRedemptionResult {
   success: boolean;
+  /** Mensagem em português para exibir ao usuário. */
   error?: string;
+  /** Código técnico (ex.: USER_LIMIT_EXCEEDED), só para a lógica da tela. */
+  code?: string;
   redemption?: {
     id: string;
     public_code: string;
@@ -29,11 +33,11 @@ export async function redeemBenefitAction(
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return { success: false, error: 'UNAUTHORIZED: Usuário não autenticado.' };
+      return { success: false, code: 'UNAUTHORIZED', error: 'Usuário não autenticado.' };
     }
 
     if (!idempotencyKey) {
-      return { success: false, error: 'INVALID_IDEMPOTENCY_KEY: Chave de idempotência é obrigatória.' };
+      return { success: false, code: 'INVALID_IDEMPOTENCY_KEY', error: 'Chave de idempotência é obrigatória.' };
     }
 
     const { data, error } = await (supabase as any).rpc('redeem_business_benefit', {
@@ -42,7 +46,8 @@ export async function redeemBenefitAction(
     });
 
     if (error) {
-      return { success: false, error: error.message };
+      const { code, message } = splitErrorCode(error.message, 'Não foi possível resgatar este benefício.');
+      return { success: false, ...(code ? { code } : {}), error: message };
     }
 
     // Funil de indicações: a pessoa indicada resgatou um benefício desta empresa.
@@ -53,10 +58,8 @@ export async function redeemBenefitAction(
       redemption: data,
     };
   } catch (err: any) {
-    return {
-      success: false,
-      error: err.message || 'Erro ao processar resgate do benefício.',
-    };
+    const { code, message } = splitErrorCode(err, 'Erro ao processar resgate do benefício.');
+    return { success: false, ...(code ? { code } : {}), error: message };
   }
 }
 

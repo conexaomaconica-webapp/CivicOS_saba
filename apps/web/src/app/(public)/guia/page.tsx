@@ -47,7 +47,7 @@ type Props = {
 export async function generateMetadata({ searchParams }: { searchParams?: Promise<Record<string, unknown>> }): Promise<Metadata> {
   const hasFilters = Object.keys((await searchParams) ?? {}).length > 0;
   return {
-    title: 'Guia Comercial e Maçônico — Conexão Maçônica',
+    title: { absolute: 'Guia Comercial e Maçônico — Conexão Maçônica' },
     description:
       'Encontre empresas, serviços, benefícios e Lojas Maçônicas de irmãos verificados dentro de uma rede de credibilidade.',
     alternates: { canonical: appUrl('/guia') },

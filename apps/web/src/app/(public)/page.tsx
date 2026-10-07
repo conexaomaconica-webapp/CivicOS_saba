@@ -19,7 +19,7 @@ import {
 import { LandingLeadCapture } from '@/components/landing/LandingLeadCapture';
 
 export const metadata: Metadata = {
-  title: 'Conexão Maçônica | Guia de Empresas e Anúncios Maçônicos',
+  title: { absolute: 'Conexão Maçônica | Guia de Empresas e Anúncios Maçônicos' },
   description:
     'Guia de empresas da comunidade maçônica: encontre serviços e anuncie seu negócio. Planos anuais no Pix ou cartão para maçons, cunhadas e familiares.',
   keywords: [

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isVisitOrigin } from '@/lib/analytics/visit-origin';
 import { trackDirectoryEventAction, trackSearchImpressionsAction, type AllowedEventType } from '@/lib/analytics/analytics-service';
 
 // Endpoint para sendBeacon/fetch keepalive: sobrevive à troca de página (Server Actions não sobrevivem).
@@ -34,11 +35,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 
-  const { businessId, businessIds, eventType, source } = (body ?? {}) as {
+  const { businessId, businessIds, eventType, source, origin } = (body ?? {}) as {
     businessId?: unknown;
     businessIds?: unknown;
     eventType?: unknown;
     source?: unknown;
+    origin?: unknown;
   };
 
   // Aparições na busca chegam em lote (até 50 empresas).
@@ -56,6 +58,7 @@ export async function POST(request: Request) {
     businessId,
     eventType: eventType as AllowedEventType,
     source: typeof source === 'string' ? source.slice(0, 60) : undefined,
+    origin: isVisitOrigin(origin) ? origin : undefined,
   });
   // Telemetria nunca devolve erro detalhado ao navegador.
   return NextResponse.json({ ok: Boolean((result as { ok?: boolean }).ok) }, { status: 200 });

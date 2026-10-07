@@ -138,7 +138,8 @@ describe('BENEFITS-004 — Validação e Utilização de Resgates', () => {
   it('3. Reconfirmação de benefício já utilizado retorna erro ALREADY_USED', async () => {
     const res = await confirmRedemptionUseAction('CM-111111');
     expect(res.success).toBe(false);
-    expect(res.error).toContain('ALREADY_USED');
+    expect(res.code).toBe('ALREADY_USED');
+    expect(res.error).not.toContain('ALREADY_USED');
   });
 
   it('4. Resgate com status=redeemed porém expires_at no passado é tratado como REDEMPTION_EXPIRED', async () => {
@@ -150,17 +151,20 @@ describe('BENEFITS-004 — Validação e Utilização de Resgates', () => {
     // Confirmação rejeita resgate expirado
     const confirmRes = await confirmRedemptionUseAction('CM-999999');
     expect(confirmRes.success).toBe(false);
-    expect(confirmRes.error).toContain('REDEMPTION_EXPIRED');
+    expect(confirmRes.code).toBe('REDEMPTION_EXPIRED');
+    expect(confirmRes.error).not.toContain('REDEMPTION_EXPIRED');
   });
 
   it('5. Consulta ou confirmação de código inexistente retorna REDEMPTION_NOT_FOUND', async () => {
     const lookupRes = await lookupRedemptionByCodeAction('CM-000000');
     expect(lookupRes.success).toBe(false);
-    expect(lookupRes.error).toContain('REDEMPTION_NOT_FOUND');
+    expect(lookupRes.code).toBe('REDEMPTION_NOT_FOUND');
+    expect(lookupRes.error).not.toContain('REDEMPTION_NOT_FOUND');
 
     const confirmRes = await confirmRedemptionUseAction('CM-000000');
     expect(confirmRes.success).toBe(false);
-    expect(confirmRes.error).toContain('REDEMPTION_NOT_FOUND');
+    expect(confirmRes.code).toBe('REDEMPTION_NOT_FOUND');
+    expect(confirmRes.error).not.toContain('REDEMPTION_NOT_FOUND');
   });
 
   it('6. Usuário sem permissão da empresa é bloqueado com FORBIDDEN', async () => {
@@ -170,11 +174,13 @@ describe('BENEFITS-004 — Validação e Utilização de Resgates', () => {
 
     const lookupRes = await lookupRedemptionByCodeAction('CM-483921');
     expect(lookupRes.success).toBe(false);
-    expect(lookupRes.error).toContain('FORBIDDEN');
+    expect(lookupRes.code).toBe('FORBIDDEN');
+    expect(lookupRes.error).not.toContain('FORBIDDEN');
 
     const confirmRes = await confirmRedemptionUseAction('CM-483921');
     expect(confirmRes.success).toBe(false);
-    expect(confirmRes.error).toContain('FORBIDDEN');
+    expect(confirmRes.code).toBe('FORBIDDEN');
+    expect(confirmRes.error).not.toContain('FORBIDDEN');
 
     // Restaura usuário membro
     client.auth.__setMockUser({ id: 'usr_advertiser_member', role: 'member' });

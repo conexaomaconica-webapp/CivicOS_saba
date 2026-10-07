@@ -113,7 +113,8 @@ describe('BENEFITS-003 — Redemption Engine & Contract Tests', () => {
 
     const res = await redeemBenefitAction(validBenefitId, '22222222-2222-2222-2222-222222222222');
     expect(res.success).toBe(false);
-    expect(res.error).toContain('UNAUTHORIZED');
+    expect(res.code).toBe('UNAUTHORIZED');
+    expect(res.error).not.toMatch(/UNAUTHORIZED/);
 
     // Restaura usuário autenticado para os próximos testes
     client.auth.__setMockUser({ id: 'usr_authenticated_001' });
@@ -125,7 +126,8 @@ describe('BENEFITS-003 — Redemption Engine & Contract Tests', () => {
   ])('3. Benefício inativo/expirado não resgata (Cenário: $benefitId)', async ({ benefitId, expectedError }) => {
     const res = await redeemBenefitAction(benefitId, '33333333-3333-3333-3333-333333333333');
     expect(res.success).toBe(false);
-    expect(res.error).toContain(expectedError);
+    expect(res.code).toBe(expectedError);
+    expect(res.error).not.toContain(expectedError);
   });
 
   it('4. Limite de resgates por usuário (max_redemptions_per_user) é respeitado', async () => {
@@ -139,7 +141,8 @@ describe('BENEFITS-003 — Redemption Engine & Contract Tests', () => {
     // Segundo resgate excede limite por usuário
     const res2 = await redeemBenefitAction('ben_limit_reached_001', key2);
     expect(res2.success).toBe(false);
-    expect(res2.error).toContain('USER_LIMIT_EXCEEDED');
+    expect(res2.code).toBe('USER_LIMIT_EXCEEDED');
+    expect(res2.error).toBe('Você já atingiu o limite de resgates para este benefício.');
   });
 
   it('5. Idempotência: reenvio com mesma chave não cria dois resgates e retorna resgate prévio', async () => {

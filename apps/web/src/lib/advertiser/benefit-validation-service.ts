@@ -1,10 +1,18 @@
 'use server';
 
+import { splitErrorCode } from '@/lib/errors/split-error-code';
 import { createServerSideClient } from '@/lib/supabase/server';
+
+function splitCatch(err: unknown, fallback: string): { code?: string; error: string } {
+  const { code, message } = splitErrorCode(err, fallback);
+  return { ...(code ? { code } : {}), error: message };
+}
 
 export interface BenefitLookupResult {
   success: boolean;
   error?: string;
+  /** Código técnico (ex.: ALREADY_USED), só para a lógica da tela; o usuário vê apenas `error`. */
+  code?: string;
   redemption?: {
     id: string;
     public_code: string;
@@ -22,6 +30,8 @@ export interface BenefitLookupResult {
 export interface BenefitConfirmResult {
   success: boolean;
   error?: string;
+  /** Código técnico (ex.: ALREADY_USED), só para a lógica da tela; o usuário vê apenas `error`. */
+  code?: string;
   redemption?: Record<string, any>;
 }
 
@@ -37,11 +47,11 @@ export async function lookupRedemptionByCodeAction(
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return { success: false, error: 'UNAUTHORIZED: Usuário não autenticado.' };
+      return { success: false, code: 'UNAUTHORIZED', error: 'Usuário não autenticado.' };
     }
 
     if (!publicCode || !publicCode.trim()) {
-      return { success: false, error: 'INVALID_CODE: Código público é obrigatório.' };
+      return { success: false, code: 'INVALID_CODE', error: 'Código público é obrigatório.' };
     }
 
     const { data, error } = await (supabase as any).rpc('get_business_benefit_redemption_by_code', {
@@ -49,7 +59,8 @@ export async function lookupRedemptionByCodeAction(
     });
 
     if (error) {
-      return { success: false, error: error.message };
+      const { code, message } = splitErrorCode(error.message, 'Não foi possível concluir a operação.');
+      return { success: false, ...(code ? { code } : {}), error: message };
     }
 
     return {
@@ -59,7 +70,7 @@ export async function lookupRedemptionByCodeAction(
   } catch (err: any) {
     return {
       success: false,
-      error: err.message || 'Erro ao consultar código de resgate.',
+      ...splitCatch(err, 'Erro ao consultar código de resgate.'),
     };
   }
 }
@@ -77,15 +88,15 @@ export async function confirmRedemptionUseAction(
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return { success: false, error: 'UNAUTHORIZED: Usuário não autenticado.' };
+      return { success: false, code: 'UNAUTHORIZED', error: 'Usuário não autenticado.' };
     }
 
     if (!publicCode || !publicCode.trim()) {
-      return { success: false, error: 'INVALID_CODE: Código público é obrigatório.' };
+      return { success: false, code: 'INVALID_CODE', error: 'Código público é obrigatório.' };
     }
 
     if (saleAmount !== undefined && saleAmount !== null && saleAmount < 0) {
-      return { success: false, error: 'INVALID_SALE_AMOUNT: Valor da venda não pode ser negativo.' };
+      return { success: false, code: 'INVALID_SALE_AMOUNT', error: 'Valor da venda não pode ser negativo.' };
     }
 
     const { data, error } = await (supabase as any).rpc('confirm_business_benefit_redemption', {
@@ -94,7 +105,8 @@ export async function confirmRedemptionUseAction(
     });
 
     if (error) {
-      return { success: false, error: error.message };
+      const { code, message } = splitErrorCode(error.message, 'Não foi possível concluir a operação.');
+      return { success: false, ...(code ? { code } : {}), error: message };
     }
 
     return {
@@ -104,7 +116,7 @@ export async function confirmRedemptionUseAction(
   } catch (err: any) {
     return {
       success: false,
-      error: err.message || 'Erro ao confirmar utilização do benefício.',
+      ...splitCatch(err, 'Erro ao confirmar utilização do benefício.'),
     };
   }
 }

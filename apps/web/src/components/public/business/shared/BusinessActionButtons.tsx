@@ -84,6 +84,7 @@ export function QuickActionBar({
           <a
             href={whatsappUrl}
             onClick={() => track('whatsapp_click', 'business_profile')}
+            data-cm-tracked
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-emerald-50 text-stone-800 transition-colors"
@@ -102,6 +103,7 @@ export function QuickActionBar({
           <a
             href={phoneUrl}
             onClick={() => track('phone_click', 'business_profile')}
+            data-cm-tracked
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-amber-50 text-stone-800 transition-colors"
           >
             <span className="w-7 h-7 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-[#C9A227] shrink-0">
@@ -117,6 +119,7 @@ export function QuickActionBar({
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => track('website_click', 'business_profile')}
+            data-cm-tracked
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-blue-50 text-stone-800 transition-colors"
           >
             <span className="w-7 h-7 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700 shrink-0">
@@ -144,6 +147,7 @@ export function QuickActionBar({
           <a
             href={mapsUrl}
             onClick={() => track('directions_click', 'business_profile')}
+            data-cm-tracked
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-amber-50 text-stone-800 transition-colors"

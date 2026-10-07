@@ -1,4 +1,4 @@
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 
 /**
  * Chamar quando uma empresa é publicada, suspensa, reprovada ou muda de slug: o sitemap e as listagens públicas
@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
  */
 export function revalidatePublicSeo(slug?: string | null): void {
   try {
+    revalidateTag('public-seo');
     revalidatePath('/sitemap.xml');
     revalidatePath('/guia');
     revalidatePath('/guia/empresas');

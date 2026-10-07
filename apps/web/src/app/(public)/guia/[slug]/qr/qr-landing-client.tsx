@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Gift, Handshake, MapPin, ShoppingBag, Store } from 'lucide-react';
 import { trackQrScanAction } from '@/lib/analytics/analytics-service';
+import { captureVisitOrigin } from '@/lib/analytics/visit-origin';
 import { createClient } from '@/lib/supabase/client';
 import { RegisterConnectionModal } from '@/components/public/business/sections/BusinessConnectionsCard';
 import type { ConnectionType } from '@/app/actions/connections';
@@ -12,6 +13,7 @@ export function QrLandingClient({ slug, name }: { slug: string; name: string }) 
   const [modalType, setModalType] = useState<ConnectionType | null>(null);
 
   useEffect(() => {
+    captureVisitOrigin('qr');
     void trackQrScanAction(slug);
   }, [slug]);
 

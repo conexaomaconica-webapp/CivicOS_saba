@@ -33,7 +33,7 @@ export function BusinessBenefits({ benefits, businessName, className = '' }: Bus
     if (!benefit.id) return;
     setRedeemingId(benefit.id);
     const result = await redeemBenefitAction(benefit.id, crypto.randomUUID());
-    if (!result.success && result.error?.startsWith('UNAUTHORIZED')) {
+    if (!result.success && result.code === 'UNAUTHORIZED') {
       window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
       return;
     }

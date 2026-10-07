@@ -4,8 +4,9 @@ import { buildSitemapBusinessEntries } from '@/lib/seo/sitemap-businesses';
 import { buildDirectoryIndex, buildDirectorySitemapUrls } from '@/lib/seo/directory-seo';
 import { loadPublishedDirectoryRows } from '@/lib/seo/directory-seo-server';
 
-// Sitemap relido a cada hora (e na hora, quando uma empresa é publicada ou suspensa).
-export const revalidate = 3600;
+// Sempre dinâmico: precisa do domínio da requisição para saber de qual tenant listar as empresas. A lista em si fica em
+// cache de 5 minutos (e é invalidada na hora quando uma empresa é publicada ou suspensa).
+export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();

@@ -42,7 +42,7 @@ type Props = {
 export async function generateMetadata({ searchParams }: { searchParams?: Promise<Record<string, unknown>> }): Promise<Metadata> {
   const hasFilters = Object.keys((await searchParams) ?? {}).length > 0;
   return {
-    title: 'Lojas Maçônicas | Conexão Maçônica',
+    title: { absolute: 'Lojas Maçônicas | Conexão Maçônica' },
     description:
       'Diretório completo de Lojas Maçônicas. Pesquise por nome, número, cidade, potência, rito e dia de reunião para visitas institucionais.',
     alternates: { canonical: appUrl('/guia/lojas') },

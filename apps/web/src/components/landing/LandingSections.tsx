@@ -120,7 +120,7 @@ export function LandingLaunchSection() {
     <section id="lancamento" className="scroll-mt-24 bg-[#2a0a10] py-14 text-white sm:py-20">
       <div className={`${SECTION} grid items-center gap-8 lg:grid-cols-[1.2fr_0.8fr]`}>
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C9A227]">Convite · Lançamento oficial</p>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C9A227]">Lançamento oficial</p>
           <h2 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Uma noite de relacionamentos, oportunidades e negócios</h2>
           <p className="mt-4 max-w-2xl leading-relaxed text-white/80">
             A Conexão Maçônica convida você para uma noite especial de relacionamentos, oportunidades e fortalecimento de negócios.
@@ -140,7 +140,7 @@ export function LandingLaunchSection() {
           <p className="mt-1 text-sm text-stone-600">Centro de Convenções de Feira de Santana</p>
           <p className="text-sm text-stone-600">Feira de Santana — BA</p>
           <a href="#captacao-lead" className={`${CTA_PRIMARY} mt-6 w-full`}>
-            Quero participar
+            Quero anunciar e participar
           </a>
         </div>
       </div>

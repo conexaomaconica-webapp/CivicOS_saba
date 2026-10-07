@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { BusinessProfileRenderer } from '@/components/public/business/BusinessProfileRenderer';
+import { BusinessContactTracker } from '@/components/public/business/BusinessContactTracker';
 import { StructuredData } from '@/components/seo/StructuredData';
 import { toPublicBusinessPresentation } from '@/lib/business/public-business-presentation';
 import { appUrl } from '@/lib/seo/app-url';
@@ -369,16 +370,21 @@ const getPublicBusiness = cache(async (slug: string) => {
   }
 });
 
-/** Personalização de SEO gravada pelo admin. Se a migration 196 ainda não foi aplicada, a consulta falha e usamos o automático. */
+async function requestHost(): Promise<string> {
+  const raw = (await headers()).get('host') ?? 'localhost';
+  return raw.split(':')[0] || 'localhost';
+}
+
+/**
+ * Personalização de SEO gravada pelo admin, lida pela função pública do banco (o visitante anônimo não lê a tabela).
+ * Se a função ainda não existe ou falha, usamos o SEO automático.
+ */
 const getBusinessSeoOverrides = cache(async (slug: string): Promise<BusinessSeoOverrides | null> => {
   try {
     const supabase = await createServerSideClient();
-    const { data, error } = await (supabase as any)
-      .from('businesses')
-      .select('seo_title, seo_description, seo_og_image_url, seo_indexable')
-      .eq('slug', slug)
-      .maybeSingle();
-    return error ? null : (data ?? null);
+    const { data, error } = await (supabase as any).rpc('public_business_seo_overrides', { p_host: await requestHost(), p_slug: slug });
+    if (error) return null;
+    return (Array.isArray(data) ? data[0] : data) ?? null;
   } catch {
     return null;
   }
@@ -388,14 +394,8 @@ const getBusinessSeoOverrides = cache(async (slug: string): Promise<BusinessSeoO
 async function resolveRenamedBusinessSlug(slug: string): Promise<string | null> {
   try {
     const supabase = await createServerSideClient();
-    const { data, error } = await (supabase as any)
-      .from('business_slug_history')
-      .select('businesses(slug)')
-      .eq('old_slug', slug)
-      .limit(1)
-      .maybeSingle();
-    const current = error ? null : data?.businesses?.slug;
-    return typeof current === 'string' && current && current !== slug ? current : null;
+    const { data, error } = await (supabase as any).rpc('public_business_slug_redirect', { p_host: await requestHost(), p_slug: slug });
+    return !error && typeof data === 'string' && data && data !== slug ? data : null;
   } catch {
     return null;
   }
@@ -534,7 +534,9 @@ export default async function CompanyDetailsPage(props: Props & { searchParams?:
         selectedCity={business.location?.city || ''}
         availableCities={business.location?.city ? [business.location.city] : []}
       />
-      <BusinessProfileRenderer business={business} />
+      <BusinessContactTracker businessId={business.identity.id}>
+        <BusinessProfileRenderer business={business} />
+      </BusinessContactTracker>
       <DirectoryFavoritesModal />
       <DirectoryFooter />
     </FavoritesProvider>

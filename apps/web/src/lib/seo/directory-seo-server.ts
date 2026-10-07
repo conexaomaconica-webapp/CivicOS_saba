@@ -1,46 +1,59 @@
 import { cache } from 'react';
 import { headers } from 'next/headers';
-import { createServerSideClient } from '@/lib/supabase/server';
+import { unstable_cache } from 'next/cache';
+import { createClient } from '@supabase/supabase-js';
 import { buildDirectoryIndex, type CityGroup, type DirectoryRow } from '@/lib/seo/directory-seo';
 
-const PAGE_SIZE = 1000;
-const MAX_ROWS = 20000;
+export const PUBLIC_SEO_CACHE_TAG = 'public-seo';
 
-async function fetchPage(supabase: any, tenantId: string, columns: string, from: number) {
-  return supabase
-    .from('businesses')
-    .select(columns)
-    .eq('tenant_id', tenantId)
-    .eq('publication_status', 'published')
-    .eq('is_active', true)
-    .order('slug')
-    .range(from, from + PAGE_SIZE - 1);
-}
+type DirectoryRpcRow = {
+  slug: string | null;
+  name: string | null;
+  category: string | null;
+  description: string | null;
+  logo_url: string | null;
+  updated_at: string | null;
+  seo_indexable: boolean | null;
+  city: string | null;
+  state: string | null;
+};
 
 /**
- * Empresas publicadas do tenant do domínio, com cidade/estado e categoria. Se a migration 196 ainda não foi aplicada,
- * repete a consulta sem seo_indexable. Qualquer falha devolve lista vazia (as páginas viram 404, o sitemap só as fixas).
+ * Lista pública das empresas publicadas, via função do banco (public_seo_directory). O visitante anônimo e o Googlebot
+ * não leem a tabela businesses diretamente. Usa um cliente sem cookies para o resultado poder ficar em cache
+ * (5 minutos, e invalidado quando uma empresa é publicada, suspensa ou editada no SEO).
  */
+const fetchDirectoryRows = unstable_cache(
+  async (host: string): Promise<DirectoryRpcRow[]> => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) throw new Error('Supabase não configurado');
+    const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data, error } = await client.rpc('public_seo_directory' as never, { p_host: host } as never);
+    // Lança para NÃO guardar falha no cache.
+    if (error) throw new Error(error.message);
+    return (data ?? []) as DirectoryRpcRow[];
+  },
+  ['public-seo-directory'],
+  { revalidate: 300, tags: [PUBLIC_SEO_CACHE_TAG] }
+);
+
+/** Falha de leitura devolve lista vazia: o sitemap só traz as páginas fixas e as páginas de cidade dão 404. */
 export async function loadPublishedDirectoryRows(): Promise<DirectoryRow[]> {
   try {
-    const supabase = await createServerSideClient();
-    const host = (await headers()).get('host') ?? 'localhost:3000';
-    const { data: tenantId } = await (supabase as any).rpc('_resolve_public_tenant_id', { p_host: host });
-    if (!tenantId) return [];
-
-    const rows: DirectoryRow[] = [];
-    let columns = 'slug, name, category, description, logo_url, updated_at, seo_indexable, business_locations(city, state)';
-    for (let from = 0; from < MAX_ROWS; from += PAGE_SIZE) {
-      let result = await fetchPage(supabase, tenantId, columns, from);
-      if (result.error && columns.includes('seo_indexable')) {
-        columns = columns.replace(' seo_indexable,', '');
-        result = await fetchPage(supabase, tenantId, columns, from);
-      }
-      if (result.error || !result.data?.length) break;
-      rows.push(...result.data);
-      if (result.data.length < PAGE_SIZE) break;
-    }
-    return rows;
+    const rawHost = (await headers()).get('host') ?? 'localhost:3000';
+    const host = rawHost.split(':')[0]!.toLowerCase();
+    const rows = await fetchDirectoryRows(host);
+    return rows.map((row) => ({
+      slug: row.slug,
+      name: row.name,
+      category: row.category,
+      description: row.description,
+      logo_url: row.logo_url,
+      updated_at: row.updated_at,
+      seo_indexable: row.seo_indexable,
+      business_locations: [{ city: row.city, state: row.state }],
+    }));
   } catch {
     return [];
   }

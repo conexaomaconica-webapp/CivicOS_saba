@@ -60,6 +60,8 @@ export async function trackDirectoryEventAction(payload: {
   city?: string;
   state?: string;
   source?: string;
+  /** Origem da visita (organic_google, qr, share...). Validada na rota; opcional. */
+  origin?: string;
 }) {
   const allowedEvents: AllowedEventType[] = [
     'view',
@@ -121,6 +123,7 @@ export async function trackDirectoryEventAction(payload: {
         city: payload.city || null,
         state: payload.state || null,
         source: payload.source || 'direct',
+        origin: payload.origin || null,
       },
     });
     if (error) return { ok: false, error: error.message };

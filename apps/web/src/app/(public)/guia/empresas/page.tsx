@@ -53,7 +53,7 @@ type Props = {
 export async function generateMetadata({ searchParams }: { searchParams?: Promise<Record<string, unknown>> }): Promise<Metadata> {
   const hasFilters = Object.keys((await searchParams) ?? {}).length > 0;
   return {
-    title: 'Empresas e Serviços Maçônicos | Conexão Maçônica',
+    title: { absolute: 'Empresas e Serviços Maçônicos | Conexão Maçônica' },
     description:
       'Diretório completo de empresas, profissionais e serviços de confiança dentro da rede Conexão Maçônica. Pesquise por categoria, cidade, vínculo e distâncias.',
     alternates: { canonical: appUrl('/guia/empresas') },
