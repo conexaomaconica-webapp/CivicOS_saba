@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Check, Copy, Loader2, MessageCircle, Share2, Users, X } from 'lucide-react';
 import { getMyReferralLinkAction } from '@/app/actions/referrals';
+import { useBusinessAnalytics } from '@/components/public/business/BusinessContactTracker';
+import { trackGa } from '@/lib/analytics/ga';
 
 type Props = {
   businessName: string;
@@ -22,6 +24,15 @@ export function ReferBusinessModal({ businessName, businessSlug, onClose, onShar
   const [needsLogin, setNeedsLogin] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
+  const analytics = useBusinessAnalytics();
+
+  // Compartilhar (copiar link, WhatsApp ou menu do aparelho): vai ao GA4 (com os dados da empresa quando a página é de empresa,
+  // só com o slug quando vem de um card do guia) e, se houver, à medição própria.
+  const notifyShared = () => {
+    if (analytics) analytics.track('share_business');
+    else trackGa('share_business', { business_slug: businessSlug, source_page: 'directory_card' });
+    onShared?.();
+  };
 
   const plainUrl = typeof window !== 'undefined' ? `${window.location.origin}/guia/${encodeURIComponent(businessSlug)}` : '';
   const url = trackedUrl || plainUrl;
@@ -50,7 +61,7 @@ export function ReferBusinessModal({ businessName, businessSlug, onClose, onShar
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(url);
-      onShared?.();
+      notifyShared();
       setCopied(true);
       setTimeout(() => setCopied(false), 2200);
     } catch {
@@ -61,7 +72,7 @@ export function ReferBusinessModal({ businessName, businessSlug, onClose, onShar
   const nativeShare = async () => {
     try {
       await navigator.share({ title: businessName, text: `Conheça ${businessName} na Conexão Maçônica.`, url });
-      onShared?.();
+      notifyShared();
     } catch {}
   };
 
@@ -114,7 +125,7 @@ export function ReferBusinessModal({ businessName, businessSlug, onClose, onShar
                 href={`https://wa.me/?text=${encodeURIComponent(message)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => onShared?.()}
+                onClick={() => notifyShared()}
                 className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2.5 text-xs font-bold text-white"
               >
                 <MessageCircle className="h-4 w-4" /> WhatsApp

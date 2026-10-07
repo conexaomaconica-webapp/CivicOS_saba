@@ -300,3 +300,44 @@ describe('integração (leitura do código)', () => {
     for (const call of [leadCall, rsvpCall]) expect(call).not.toMatch(/fullName|email|phone|whatsapp|companyName/i);
   });
 });
+
+describe('compartilhar pelo modal "Indicar esta empresa"', () => {
+  async function setupModal() {
+    vi.resetModules();
+    // Os componentes do Next usam o JSX automático (sem importar React); o Vitest, aqui, precisa do React global.
+    (globalThis as unknown as { React: typeof React }).React = React;
+    const trackGa = vi.fn();
+    vi.doMock('../src/lib/analytics/ga', () => ({ trackGa, trackGaOnce: vi.fn(), CONSENT_STORAGE_KEY: 'cm_analytics_consent' }));
+    vi.doMock('../src/lib/analytics/track-client', () => ({ trackEvent: vi.fn() }));
+    vi.doMock('../src/app/actions/referrals', () => ({
+      getMyReferralLinkAction: vi.fn().mockResolvedValue({ success: true, url: 'https://www.conexaomaconica.com.br/guia/otica-exemplo?ref=abc' }),
+    }));
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    const { ReferBusinessModal } = await import('../src/components/public/business/sections/ReferBusinessModal');
+    const { BusinessContactTracker } = await import('../src/components/public/business/BusinessContactTracker');
+    return { trackGa, ReferBusinessModal, BusinessContactTracker };
+  }
+
+  const business = { id: 'uuid-1', slug: 'otica-exemplo', name: 'Ótica Exemplo', category: 'Ótica', city: 'Feira de Santana', state: 'BA', plan: 'prata' };
+
+  it('copiar o link na página da empresa envia share_business com os dados da empresa (inclusive no layout prata)', async () => {
+    const { trackGa, ReferBusinessModal, BusinessContactTracker } = await setupModal();
+    const { findByText } = render(
+      <BusinessContactTracker business={business}>
+        <ReferBusinessModal businessName="Ótica Exemplo" businessSlug="otica-exemplo" onClose={() => undefined} />
+      </BusinessContactTracker>
+    );
+    trackGa.mockClear();
+    fireEvent.click(await findByText('Copiar'));
+    await vi.waitFor(() => expect(trackGa).toHaveBeenCalledWith('share_business', expect.objectContaining({ business_slug: 'otica-exemplo', business_name: 'Ótica Exemplo', plan: 'prata' })));
+  });
+
+  it('fora da página da empresa (card do guia) envia share_business só com o slug e chama o onShared existente', async () => {
+    const { trackGa, ReferBusinessModal } = await setupModal();
+    const onShared = vi.fn();
+    const { findByText } = render(<ReferBusinessModal businessName="Ótica Exemplo" businessSlug="otica-exemplo" onClose={() => undefined} onShared={onShared} />);
+    fireEvent.click(await findByText('Copiar'));
+    await vi.waitFor(() => expect(trackGa).toHaveBeenCalledWith('share_business', { business_slug: 'otica-exemplo', source_page: 'directory_card' }));
+    expect(onShared).toHaveBeenCalledTimes(1);
+  });
+});

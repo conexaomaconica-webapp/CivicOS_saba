@@ -30,7 +30,7 @@ Atualizado na Sprint 3 (2026-10-08). Fonte única dos nomes e parâmetros: `apps
 | `click_instagram` | `BusinessContactTracker.tsx` | Clique em link do Instagram | (mesmos da empresa) | Implementado |
 | `click_website` | `BusinessContactTracker.tsx` | Clique em link externo (site) | (mesmos da empresa) | Implementado |
 | `click_directions` | `BusinessContactTracker.tsx` | Clique em rota/mapa | (mesmos da empresa) | Implementado. Nome mantido porque já é evento-chave no GA4; `click_route` do README é só alias |
-| `share_business` | `components/public/business/BusinessShareActions.tsx` | Botão Compartilhar | (mesmos da empresa) | Implementado |
+| `share_business` | `components/public/business/BusinessShareActions.tsx` e `sections/ReferBusinessModal.tsx` | Botão Compartilhar (layout bronze) e, em qualquer layout, copiar link / WhatsApp / menu do aparelho no modal "Indicar" (também nos cards do guia, só com o slug) | (mesmos da empresa) | Implementado |
 | `favorite_business` | `lib/directory/favorites-context.tsx` | Adicionar aos favoritos (só ao adicionar) | business_slug, source_page | Implementado |
 | `view_offer` | `components/public/business/sections/BusinessBenefits.tsx` | Clicar para ver/resgatar um benefício | business_*, offer_id, source_page | Implementado |
 | `register_visit` | `components/public/business/sections/BusinessConnectionsCard.tsx` | Conexão do tipo visita registrada | business_*, connection_type, source_page | Implementado |
@@ -68,6 +68,14 @@ Os passos do funil (`/anunciar/passo-1` a `passo-7`) aparecem como `page_view`, 
    `category_name`, `city`, `state`, `plan`, `source_page`, `search_term`, `results_count`, `lead_type`, `plan_interest`,
    `connection_type`, `payment_method`. (O GA4 permite 50 dimensões de evento.)
 3. **Medição otimizada:** manter ligada "Visualizações de página" e "Mudanças de página com base em eventos do histórico".
+
+## Por que um parâmetro "não aparece" nos relatórios do GA4
+
+O GA4 só lista nos relatórios e no Tempo real os parâmetros **cadastrados como dimensão personalizada** (Administrador >
+Definições personalizadas). Parâmetro não cadastrado **é enviado e coletado**, mas fica invisível na interface. Para
+conferir o que realmente sai do navegador, abra as Ferramentas do Desenvolvedor (F12) > Network, filtre por `collect`
+e olhe o Payload: cada parâmetro vai como `ep.nome` (texto) ou `epn.nome` (número), por exemplo `ep.category_name=Óptica`.
+Para ver nos relatórios, cadastre as dimensões da lista acima (escopo Evento).
 
 ## Como validar
 
