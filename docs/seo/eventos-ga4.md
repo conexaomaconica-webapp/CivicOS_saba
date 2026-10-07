@@ -18,7 +18,7 @@ Atualizado na Sprint 3 (2026-10-08). Fonte única dos nomes e parâmetros: `apps
 - **page_view** (inclusive navegação sem recarregar a página) vem da Medição otimizada do GA4 ("Mudanças de página com base
   em eventos do histórico do navegador"). O código **não** envia `page_view` manual, para não duplicar. Conferir que essa
   opção está ligada no fluxo de dados.
-- A medição própria (`analytics_events`, usada no painel do anunciante) continua separada e não foi alterada.
+- A medição própria (`analytics_events`, usada no painel do anunciante) continua separada. Os dois caminhos de compartilhar da página da empresa (botão Compartilhar e modal Indicar: copiar link, WhatsApp, menu do aparelho) agora também gravam o evento `share` nela, uma vez por ação, ao lado do `share_business` do GA4.
 
 ## Eventos
 

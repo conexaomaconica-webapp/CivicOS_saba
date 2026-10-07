@@ -3,13 +3,17 @@
 import { Heart, Share2 } from 'lucide-react';
 import { useState } from 'react';
 import { useBusinessAnalytics } from '@/components/public/business/BusinessContactTracker';
+import { trackEvent } from '@/lib/analytics/track-client';
 
 export function BusinessShareActions({ businessName }: { businessName: string }) {
   const [copied, setCopied] = useState(false);
   const analytics = useBusinessAnalytics();
 
   async function share() {
-    analytics?.track('share_business');
+    if (analytics) {
+      analytics.track('share_business');
+      trackEvent({ businessId: analytics.business.id, eventType: 'share', source: 'business_profile' });
+    }
     const data = { title: businessName, url: window.location.href };
     if (navigator.share) {
       await navigator.share(data);

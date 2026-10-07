@@ -301,27 +301,31 @@ describe('integração (leitura do código)', () => {
   });
 });
 
-describe('compartilhar pelo modal "Indicar esta empresa"', () => {
-  async function setupModal() {
+describe('compartilhar: GA4 e medição própria, sem contar em dobro', () => {
+  async function setupShare() {
     vi.resetModules();
     // Os componentes do Next usam o JSX automático (sem importar React); o Vitest, aqui, precisa do React global.
     (globalThis as unknown as { React: typeof React }).React = React;
     const trackGa = vi.fn();
+    const trackEvent = vi.fn();
     vi.doMock('../src/lib/analytics/ga', () => ({ trackGa, trackGaOnce: vi.fn(), CONSENT_STORAGE_KEY: 'cm_analytics_consent' }));
-    vi.doMock('../src/lib/analytics/track-client', () => ({ trackEvent: vi.fn() }));
+    vi.doMock('../src/lib/analytics/track-client', () => ({ trackEvent }));
     vi.doMock('../src/app/actions/referrals', () => ({
       getMyReferralLinkAction: vi.fn().mockResolvedValue({ success: true, url: 'https://www.conexaomaconica.com.br/guia/otica-exemplo?ref=abc' }),
     }));
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
     const { ReferBusinessModal } = await import('../src/components/public/business/sections/ReferBusinessModal');
+    const { BusinessShareActions } = await import('../src/components/public/business/BusinessShareActions');
     const { BusinessContactTracker } = await import('../src/components/public/business/BusinessContactTracker');
-    return { trackGa, ReferBusinessModal, BusinessContactTracker };
+    return { trackGa, trackEvent, ReferBusinessModal, BusinessShareActions, BusinessContactTracker };
   }
 
   const business = { id: 'uuid-1', slug: 'otica-exemplo', name: 'Ótica Exemplo', category: 'Ótica', city: 'Feira de Santana', state: 'BA', plan: 'prata' };
+  const SHARE_FIRST_PARTY = { businessId: 'uuid-1', eventType: 'share', source: 'business_profile' };
+  const sharesOf = (mock: ReturnType<typeof vi.fn>) => mock.mock.calls.filter(([arg]) => (arg as { eventType?: string })?.eventType === 'share');
 
-  it('copiar o link na página da empresa envia share_business com os dados da empresa (inclusive no layout prata)', async () => {
-    const { trackGa, ReferBusinessModal, BusinessContactTracker } = await setupModal();
+  it('modal na página da empresa (layout prata): copiar o link vai ao GA4 com os dados da empresa e à medição própria, uma vez', async () => {
+    const { trackGa, trackEvent, ReferBusinessModal, BusinessContactTracker } = await setupShare();
     const { findByText } = render(
       <BusinessContactTracker business={business}>
         <ReferBusinessModal businessName="Ótica Exemplo" businessSlug="otica-exemplo" onClose={() => undefined} />
@@ -330,14 +334,47 @@ describe('compartilhar pelo modal "Indicar esta empresa"', () => {
     trackGa.mockClear();
     fireEvent.click(await findByText('Copiar'));
     await vi.waitFor(() => expect(trackGa).toHaveBeenCalledWith('share_business', expect.objectContaining({ business_slug: 'otica-exemplo', business_name: 'Ótica Exemplo', plan: 'prata' })));
+    expect(trackGa.mock.calls.filter(([name]) => name === 'share_business')).toHaveLength(1);
+    expect(sharesOf(trackEvent)).toEqual([[SHARE_FIRST_PARTY]]);
   });
 
-  it('fora da página da empresa (card do guia) envia share_business só com o slug e chama o onShared existente', async () => {
-    const { trackGa, ReferBusinessModal } = await setupModal();
+  it('link de WhatsApp do modal: conta uma única vez em cada medição (o rastreador da página não repete)', async () => {
+    const { trackGa, trackEvent, ReferBusinessModal, BusinessContactTracker } = await setupShare();
+    const { findByText } = render(
+      <BusinessContactTracker business={business}>
+        <ReferBusinessModal businessName="Ótica Exemplo" businessSlug="otica-exemplo" onClose={() => undefined} />
+      </BusinessContactTracker>
+    );
+    const whatsapp = (await findByText('WhatsApp')).closest('a') as HTMLAnchorElement;
+    whatsapp.addEventListener('click', (event) => event.preventDefault());
+    trackGa.mockClear();
+    fireEvent.click(whatsapp);
+    expect(trackGa.mock.calls.filter(([name]) => name === 'share_business')).toHaveLength(1);
+    expect(sharesOf(trackEvent)).toHaveLength(1);
+    expect(trackGa.mock.calls.some(([name]) => name === 'click_whatsapp')).toBe(false); // wa.me sem número é compartilhamento, não contato
+  });
+
+  it('botão Compartilhar (layout bronze): GA4 e medição própria, uma vez cada', async () => {
+    const { trackGa, trackEvent, BusinessShareActions, BusinessContactTracker } = await setupShare();
+    const { findByText } = render(
+      <BusinessContactTracker business={business}>
+        <BusinessShareActions businessName="Ótica Exemplo" />
+      </BusinessContactTracker>
+    );
+    trackGa.mockClear();
+    fireEvent.click(await findByText('Compartilhar'));
+    await vi.waitFor(() => expect(trackGa).toHaveBeenCalledWith('share_business', expect.objectContaining({ business_slug: 'otica-exemplo' })));
+    expect(trackGa.mock.calls.filter(([name]) => name === 'share_business')).toHaveLength(1);
+    expect(sharesOf(trackEvent)).toEqual([[SHARE_FIRST_PARTY]]);
+  });
+
+  it('card do guia (sem contexto de empresa, com onShared): GA4 só com o slug e a medição própria vem do onShared, sem repetir', async () => {
+    const { trackGa, trackEvent, ReferBusinessModal } = await setupShare();
     const onShared = vi.fn();
     const { findByText } = render(<ReferBusinessModal businessName="Ótica Exemplo" businessSlug="otica-exemplo" onClose={() => undefined} onShared={onShared} />);
     fireEvent.click(await findByText('Copiar'));
     await vi.waitFor(() => expect(trackGa).toHaveBeenCalledWith('share_business', { business_slug: 'otica-exemplo', source_page: 'directory_card' }));
     expect(onShared).toHaveBeenCalledTimes(1);
+    expect(sharesOf(trackEvent)).toHaveLength(0);
   });
 });

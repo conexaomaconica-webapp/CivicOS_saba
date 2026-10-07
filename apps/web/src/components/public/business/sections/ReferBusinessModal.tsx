@@ -5,6 +5,7 @@ import { Check, Copy, Loader2, MessageCircle, Share2, Users, X } from 'lucide-re
 import { getMyReferralLinkAction } from '@/app/actions/referrals';
 import { useBusinessAnalytics } from '@/components/public/business/BusinessContactTracker';
 import { trackGa } from '@/lib/analytics/ga';
+import { trackEvent } from '@/lib/analytics/track-client';
 
 type Props = {
   businessName: string;
@@ -27,10 +28,15 @@ export function ReferBusinessModal({ businessName, businessSlug, onClose, onShar
   const analytics = useBusinessAnalytics();
 
   // Compartilhar (copiar link, WhatsApp ou menu do aparelho): vai ao GA4 (com os dados da empresa quando a página é de empresa,
-  // só com o slug quando vem de um card do guia) e, se houver, à medição própria.
+  // só com o slug quando vem de um card do guia) e à medição própria do painel do anunciante.
+  // Na página da empresa não há onShared: o modal registra o compartilhamento. Nos cards do guia, quem registra é o onShared.
   const notifyShared = () => {
-    if (analytics) analytics.track('share_business');
-    else trackGa('share_business', { business_slug: businessSlug, source_page: 'directory_card' });
+    if (analytics) {
+      analytics.track('share_business');
+      if (!onShared) trackEvent({ businessId: analytics.business.id, eventType: 'share', source: 'business_profile' });
+    } else {
+      trackGa('share_business', { business_slug: businessSlug, source_page: 'directory_card' });
+    }
     onShared?.();
   };
 
@@ -126,6 +132,7 @@ export function ReferBusinessModal({ businessName, businessSlug, onClose, onShar
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => notifyShared()}
+                data-cm-tracked
                 className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2.5 text-xs font-bold text-white"
               >
                 <MessageCircle className="h-4 w-4" /> WhatsApp
