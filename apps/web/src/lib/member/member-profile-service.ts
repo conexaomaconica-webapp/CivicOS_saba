@@ -12,7 +12,7 @@ function isSupportedImage(bytes: Uint8Array) {
     || (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46);
 }
 
-export function extractMemberAvatarStoragePath(urlOrPath: string | null | undefined): string | null {
+export async function extractMemberAvatarStoragePath(urlOrPath: string | null | undefined): Promise<string | null> {
   if (!urlOrPath) return null;
   const publicMarker = '/storage/v1/object/public/member-avatars/';
   const signMarker = '/storage/v1/object/sign/member-avatars/';
@@ -39,7 +39,7 @@ export async function getSignedMemberAvatarUrl(
   expiresInSeconds = 3600
 ): Promise<string | null> {
   if (!urlOrPath) return null;
-  const path = extractMemberAvatarStoragePath(urlOrPath);
+  const path = await extractMemberAvatarStoragePath(urlOrPath);
   if (!path) return urlOrPath;
 
   try {
@@ -54,9 +54,9 @@ export async function getSignedMemberAvatarUrl(
   }
 }
 
-function memberAvatarPath(publicUrl: string | null | undefined, userId: string): string | null {
+async function memberAvatarPath(publicUrl: string | null | undefined, userId: string): Promise<string | null> {
   if (!publicUrl) return null;
-  const path = extractMemberAvatarStoragePath(publicUrl);
+  const path = await extractMemberAvatarStoragePath(publicUrl);
   if (!path) return null;
   return path.startsWith(`${userId}/`) ? path : null;
 }
@@ -92,7 +92,7 @@ export async function updateMemberProfileAction(formData: FormData): Promise<{ s
       .select('avatar_url')
       .eq('id', user.id)
       .maybeSingle();
-    const previousAvatarPath = memberAvatarPath(currentProfile?.avatar_url, user.id);
+    const previousAvatarPath = await memberAvatarPath(currentProfile?.avatar_url, user.id);
 
     let avatarUrl: string | undefined;
     const avatar = formData.get('avatar');
@@ -118,7 +118,7 @@ export async function updateMemberProfileAction(formData: FormData): Promise<{ s
     if (avatarUrl) patch.avatar_url = avatarUrl;
     const { error } = await (supabase as any).from('profiles').update(patch).eq('id', user.id);
     if (error) {
-      const uploadedPath = memberAvatarPath(avatarUrl, user.id);
+      const uploadedPath = await memberAvatarPath(avatarUrl, user.id);
       if (uploadedPath) await supabase.storage.from('member-avatars').remove([uploadedPath]);
       return { success: false, error: error.message };
     }
@@ -126,7 +126,8 @@ export async function updateMemberProfileAction(formData: FormData): Promise<{ s
     if (authError) return { success: false, error: authError.message };
 
     if (avatarUrl && previousAvatarPath) {
-      await supabase.storage.from('member-avatars').remove([previousAvatarPath]);
+      const prevPath = await previousAvatarPath;
+      if (prevPath) await supabase.storage.from('member-avatars').remove([prevPath]);
     }
 
     revalidatePath('/minha-conta', 'layout');

@@ -62,15 +62,15 @@ describe('ETAPA 1 — Testes de Segurança, LGPD e Privacidade', () => {
   });
 
   describe('2. Storage — Member Avatars Privado & Signed URLs', () => {
-    it('extractMemberAvatarStoragePath extrai o caminho relativo correto de URLs públicas antigas ou relativas', () => {
+    it('extractMemberAvatarStoragePath extrai o caminho relativo correto de URLs públicas antigas ou relativas', async () => {
       const publicUrl = 'https://rwvztwsjcjljphqttiws.supabase.co/storage/v1/object/public/member-avatars/user-123/avatar/abc.png';
-      expect(extractMemberAvatarStoragePath(publicUrl)).toBe('user-123/avatar/abc.png');
+      expect(await extractMemberAvatarStoragePath(publicUrl)).toBe('user-123/avatar/abc.png');
 
       const signedUrl = 'https://rwvztwsjcjljphqttiws.supabase.co/storage/v1/object/sign/member-avatars/user-123/avatar/abc.png?token=xyz';
-      expect(extractMemberAvatarStoragePath(signedUrl)).toBe('user-123/avatar/abc.png');
+      expect(await extractMemberAvatarStoragePath(signedUrl)).toBe('user-123/avatar/abc.png');
 
       const relativePath = 'user-123/avatar/abc.png';
-      expect(extractMemberAvatarStoragePath(relativePath)).toBe('user-123/avatar/abc.png');
+      expect(await extractMemberAvatarStoragePath(relativePath)).toBe('user-123/avatar/abc.png');
     });
 
     it('getSignedMemberAvatarUrl gera Signed URL usando o cliente Supabase', async () => {
