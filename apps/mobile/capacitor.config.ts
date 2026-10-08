@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.saas.platform',
-  appName: 'SaaS Platform',
+  appId: 'com.conexaomaconica.app',
+  appName: 'Conexão Maçônica',
   webDir: '../web/out', // Next.js static export output
   server: {
     // During development, point to the Next.js dev server

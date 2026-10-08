@@ -7,18 +7,24 @@
     "sync": "npx cap sync",
     "open:android": "npx cap open android",
     "open:ios": "npx cap open ios",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "build": "echo \"Mobile builds via Capacitor CLI\""
   },
   "dependencies": {
-    "@capacitor/core": "^7.0.0",
-    "@capacitor/preferences": "^7.0.0",
+    "@capacitor/android": "^7.0.0",
     "@capacitor/camera": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
     "@capacitor/geolocation": "^7.0.0",
+    "@capacitor/haptics": "^7.0.0",
+    "@capacitor/ios": "^7.0.0",
+    "@capacitor/preferences": "^7.0.0",
     "@capacitor/push-notifications": "^7.0.0",
-    "@capacitor/haptics": "^7.0.0"
+    "@saas/core": "workspace:*"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
   }
 }
