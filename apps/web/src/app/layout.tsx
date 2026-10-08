@@ -5,6 +5,7 @@ import { toClientBootData } from '../runtime/client-boot-data';
 import { GoogleAnalytics } from '@/components/analytics/GoogleAnalytics';
 import { generateRootMetadata } from '@/lib/seo/root-metadata';
 import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
+import { PwaRegister } from '@/components/mobile/PwaRegister';
 import '@saas/ui/tokens.css';
 import './globals.css';
 
@@ -42,6 +43,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <meta name="theme-color" content="#4B161B" />
         <link rel="icon" href="/icone.png" type="image/png" />
         <link rel="apple-touch-icon" href="/icone.png" />
         {supabaseOrigin ? (
@@ -64,7 +66,10 @@ export default async function RootLayout({
         ) : null}
       </head>
       <body className="min-h-screen font-sans antialiased">
-        <Providers bootData={bootData}>{children}</Providers>
+        <Providers bootData={bootData}>
+          <PwaRegister />
+          {children}
+        </Providers>
         {/* GA4 em todo o site público e no funil de cadastro; as áreas internas e as URLs com token ficam de fora (ga-paths). */}
         {/^G-[A-Z0-9]+$/i.test(gaMeasurementId) ? <GoogleAnalytics measurementId={gaMeasurementId} /> : null}
       </body>
