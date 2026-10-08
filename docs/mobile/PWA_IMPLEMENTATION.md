@@ -1,9 +1,9 @@
 # Documento de Implementação PWA — Conexão Maçônica (CivicOS SABA)
 
 > **Documento Canônico — Fase Mobile 1 (PWA)**  
-> **Status:** APROVADA PARA PREVIEW (Validação de Service Worker em Staging/Vercel Preview antes de Produção)  
+> **Status:** HOMOLOGADO EM PREVIEW (GO PARA MERGE NA MAIN)  
 > **Data:** 07/10/2026  
-> **Escopo:** Infraestrutura de PWA leve, instalabilidade em Android/iOS, Service Worker seguro e preservação total de SEO.
+> **Escopo:** Infraestrutura de PWA leve, instalabilidade em Android/iOS/Desktop, Service Worker seguro e preservação total de SEO.
 
 ---
 
