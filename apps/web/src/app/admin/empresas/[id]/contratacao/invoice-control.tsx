@@ -78,13 +78,25 @@ export default function InvoiceControl({ businessId }: { businessId: string }) {
           )}
 
           {state.required && state.issued_at && (
-            <div className="flex flex-wrap items-center gap-3 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
               <span className="font-semibold text-emerald-700">
                 Nota emitida{state.number ? ` nº ${state.number}` : ''} em {new Date(state.issued_at).toLocaleDateString('pt-BR')} — pagamento liberado.
               </span>
-              <button type="button" disabled={pending} onClick={() => save(true, false)} className="text-xs text-stone-600 underline">
-                Desfazer
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById('payment-onboarding-section') || document.getElementById('signed-contract-card');
+                    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}
+                  className="rounded-lg bg-[#3B0B14] px-3 py-1 text-xs font-bold text-[#C9A227] hover:bg-[#2b080f] transition shadow-2xs"
+                >
+                  Abrir link de pagamento →
+                </button>
+                <button type="button" disabled={pending} onClick={() => save(true, false)} className="text-xs text-stone-600 underline">
+                  Desfazer
+                </button>
+              </div>
             </div>
           )}
         </>

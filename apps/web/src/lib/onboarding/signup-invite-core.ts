@@ -40,6 +40,10 @@ export interface SignupSubmission {
   lodgeOrganizationId: string;
   potency: string;
   consent: boolean;
+  /** Plano comercial de interesse escolhido pelo cliente no convite. */
+  planInterest?: string;
+  /** Forma de pagamento preferida: 'pix' | 'credit_card'. */
+  paymentPreference?: string;
 }
 
 export const INVITE_TTL_DAYS_DEFAULT = 15;
@@ -104,6 +108,8 @@ export function normalizeSubmission(raw: Record<string, unknown>): SignupSubmiss
     lodgeOrganizationId: /^[0-9a-f-]{36}$/i.test(String(raw.lodgeOrganizationId ?? '')) ? String(raw.lodgeOrganizationId) : '',
     potency: clean(raw.potency, 80),
     consent: raw.consent === true || raw.consent === 'true' || raw.consent === 'on',
+    planInterest: clean(raw.planInterest, 60) || 'acacia_pedra_fundamental',
+    paymentPreference: clean(raw.paymentPreference, 40) || 'pix',
   };
 }
 

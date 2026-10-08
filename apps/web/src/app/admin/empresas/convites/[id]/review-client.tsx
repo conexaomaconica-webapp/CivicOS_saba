@@ -19,6 +19,7 @@ const PLANS = [
   { code: 'esquadro', label: 'Plano Esquadro' },
   { code: 'compasso', label: 'Plano Compasso' },
   { code: 'acacia', label: 'Plano Acácia' },
+  { code: 'acacia_pedra_fundamental', label: '⭐ Plano Acácia — 2 anos — Pedra Fundamental' },
 ];
 
 const inputClass = 'w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3B0B14] focus:ring-2 focus:ring-[#3B0B14]/10';
@@ -56,7 +57,7 @@ export default function ReviewClient({
   const [creatingCategory, setCreatingCategory] = useState(false);
   // Se o cliente escolheu a Loja na lista, já vem identificada (a equipe pode trocar abaixo).
   const [organizationId, setOrganizationId] = useState<string | undefined>(submitted?.lodgeOrganizationId || undefined);
-  const [planCode, setPlanCode] = useState('esquadro');
+  const [planCode, setPlanCode] = useState(submitted?.planInterest || 'acacia_pedra_fundamental');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -206,6 +207,28 @@ export default function ReviewClient({
 
       <section className="space-y-4 rounded-2xl border border-stone-300 bg-white p-5 shadow-xs">
         <h2 className="font-serif text-lg font-bold text-stone-900">Plano e acesso (definidos pela equipe)</h2>
+
+        {/* Preferências declaradas pelo cliente no formulário de convite */}
+        <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-4 text-xs space-y-1.5">
+          <p className="font-bold text-amber-950 uppercase tracking-wider text-[11px]">
+            Preferências declaradas pelo cliente no convite:
+          </p>
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-stone-800">
+            <span>
+              • <strong>Plano de interesse:</strong>{' '}
+              <span className="font-semibold text-[#3B0B14]">
+                {PLANS.find((p) => p.code === submitted?.planInterest)?.label || submitted?.planInterest || 'Não informado'}
+              </span>
+            </span>
+            <span>
+              • <strong>Forma de pagamento preferida:</strong>{' '}
+              <span className="font-semibold text-emerald-800">
+                {submitted?.paymentPreference === 'credit_card' ? 'Cartão de Crédito' : submitted?.paymentPreference === 'pix' ? 'Pix' : 'Não informado'}
+              </span>
+            </span>
+          </div>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Plano">
             <select className={inputClass} value={planCode} onChange={(e) => setPlanCode(e.target.value)}>

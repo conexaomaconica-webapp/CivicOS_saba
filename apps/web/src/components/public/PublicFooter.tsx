@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import { CookiePreferencesButton } from '@/components/analytics/CookiePreferencesButton';
 
 export function PublicFooter() {
   return (
@@ -26,13 +27,14 @@ export function PublicFooter() {
         </div>
 
         {/* Links Legais */}
-        <div className="flex items-center gap-6 text-sm font-medium">
+        <div className="flex flex-wrap items-center justify-center md:justify-start gap-5 text-sm font-medium">
           <Link href="/termos" className="text-slate-300 hover:text-[#C9A227] transition-colors duration-200">
             Termos de Uso
           </Link>
           <Link href="/privacidade" className="text-slate-300 hover:text-[#C9A227] transition-colors duration-200">
             Privacidade e LGPD
           </Link>
+          <CookiePreferencesButton />
         </div>
 
         {/* Assinatura Saba Studio */}

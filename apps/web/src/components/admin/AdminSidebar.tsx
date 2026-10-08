@@ -333,8 +333,8 @@ export function AdminSidebar({ isMobileOpen = false, onMobileClose, userRole = '
                       )}
                     </Link>
 
-                    {/* Sub-itens para Lojas e Guia se ativo */}
-                    {active && item.subItems && (
+                    {/* Sub-itens: em 'empresas' já vem expandido por padrão; nos demais, se ativo */}
+                    {(active || item.id === 'empresas') && item.subItems && (
                       <div className="pl-7 pr-1 py-1 space-y-1 border-l border-[#C9A227]/40 ml-4 my-1">
                         {item.subItems.map((sub) => {
                           const subActive = pathname === sub.path;

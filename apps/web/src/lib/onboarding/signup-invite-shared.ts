@@ -14,7 +14,7 @@ export const MASONIC_RELATION_LABEL: Record<MasonicRelation, string> = {
 /** Mensagem pronta (WhatsApp, e-mail ou qualquer conversa) com o link do convite. */
 export function buildInviteShareMessage(params: { name?: string | null; link: string; daysLeft: number }): string {
   const greeting = params.name?.trim() ? `Olá, ${params.name.trim()}!` : 'Olá!';
-  const validity = params.daysLeft <= 1 ? 'vale até amanhã' : `vale por mais ${params.daysLeft} dias`;
+  const validity = params.daysLeft <= 1 ? 'válido até amanhã' : `válido por ${params.daysLeft} dias`;
   return `${greeting} Aqui é da equipe da Conexão Maçônica. Para cadastrar a sua empresa no Guia, preencha seus dados neste link (leva poucos minutos):
 
 ${params.link}

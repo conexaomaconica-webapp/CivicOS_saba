@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ShieldCheck, Lock, CheckCircle2 } from 'lucide-react';
+import { CookiePreferencesButton } from '@/components/analytics/CookiePreferencesButton';
 
 export function DirectoryFooter() {
   return (
@@ -62,6 +63,7 @@ export function DirectoryFooter() {
             <Link href="/privacidade" className="text-gray-300 hover:text-amber-400 transition-colors">
               Privacidade e LGPD
             </Link>
+            <CookiePreferencesButton className="text-gray-300 hover:text-amber-400 transition-colors cursor-pointer" />
           </div>
 
           {/* Signature */}

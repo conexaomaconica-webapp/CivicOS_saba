@@ -45,6 +45,10 @@ export interface InviteListItem {
   email_sent_at: string | null;
   /** O link pode ser reaberto (copiar/WhatsApp): convite criado com código cifrado. */
   has_link: boolean;
+  /** Nome fantasia ou razão social da empresa informado no preenchimento. */
+  company_name?: string | null;
+  /** Nome do responsável legal informado no preenchimento. */
+  responsible_name?: string | null;
 }
 
 export type InviteEmailStatus = 'sent' | 'not_configured' | 'failed' | 'skipped';
@@ -160,16 +164,21 @@ export async function listSignupInvitesAction(): Promise<{ success: boolean; ite
     if (!db) return { success: false, items: [], error: 'Configuração segura do Supabase indisponível no servidor.' };
     const { data, error } = await db
       .from('business_signup_invites')
-      .select('id, invited_name, invited_email, note, status, expires_at, created_at, submitted_at, business_id, email_sent_at, encrypted_code')
+      .select('id, invited_name, invited_email, note, status, expires_at, created_at, submitted_at, business_id, email_sent_at, encrypted_code, submitted_data')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
-      .limit(200);
+      .limit(300);
     if (error) return { success: false, items: [], error: 'Não foi possível ler os convites (a migration 194 foi aplicada?).' };
-    const items: InviteListItem[] = (data || []).map(({ encrypted_code, ...row }: any) => ({
-      ...row,
-      has_link: Boolean(encrypted_code),
-      expired: row.status === 'sent' && new Date(row.expires_at).getTime() <= Date.now(),
-    }));
+    const items: InviteListItem[] = (data || []).map(({ encrypted_code, submitted_data, ...row }: any) => {
+      const sub = submitted_data && typeof submitted_data === 'object' ? submitted_data : null;
+      return {
+        ...row,
+        has_link: Boolean(encrypted_code),
+        expired: row.status === 'sent' && new Date(row.expires_at).getTime() <= Date.now(),
+        company_name: sub?.tradingName || sub?.legalName || null,
+        responsible_name: sub?.responsibleName || null,
+      };
+    });
     return { success: true, items };
   } catch (err: any) {
     return { success: false, items: [], error: err?.message || 'Erro ao listar convites.' };
@@ -569,3 +578,27 @@ export async function submitSignupInviteAction(
     return { success: false, error: 'Não foi possível enviar agora. Tente novamente em instantes.' };
   }
 }
+
+export async function getCitiesByStateAction(uf: string): Promise<string[]> {
+  try {
+    const cleanUf = (uf || '').trim().toUpperCase();
+    if (!cleanUf || cleanUf.length !== 2) return [];
+    const db = service();
+    if (!db) return [];
+    const { data: stateRow } = await db
+      .from('brazilian_states')
+      .select('ibge_code')
+      .eq('uf', cleanUf)
+      .maybeSingle();
+    if (!stateRow) return [];
+    const { data: cities } = await db
+      .from('brazilian_cities')
+      .select('name')
+      .eq('state_ibge_code', stateRow.ibge_code)
+      .order('name');
+    return (cities || []).map((c: any) => c.name);
+  } catch {
+    return [];
+  }
+}
+

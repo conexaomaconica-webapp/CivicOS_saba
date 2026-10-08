@@ -803,7 +803,10 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
   const handleOpenWhatsAppShare = () => {
     if (!signatureTokenData?.public_url) return;
     const name = signatureTokenData.responsavel_nome || business.name;
-    const message = `Olá, ${name}.\n\nSeu contrato da Conexão Maçônica está disponível para conferência e assinatura:\n\n${signatureTokenData.public_url}\n\nApós a assinatura, você poderá prosseguir para a etapa de pagamento.`;
+    const isSigned = isContractSigned || commercialStatus === 'contrato_assinado' || commercialStatus === 'aguardando_pagamento';
+    const message = isSigned
+      ? `Olá, ${name}.\n\nSeu contrato da Conexão Maçônica já foi assinado com sucesso!\n\nPara efetuar o pagamento da adesão ao plano (Pix ou Cartão), acesse o link seguro abaixo:\n\n${signatureTokenData.public_url}`
+      : `Olá, ${name}.\n\nSeu contrato da Conexão Maçônica está disponível para conferência e assinatura:\n\n${signatureTokenData.public_url}\n\nApós a assinatura, você poderá prosseguir para a etapa de pagamento.`;
     const rawPhone = signatureTokenData.responsavel_whatsapp || owner.whatsapp || business.whatsapp || business.phone || '';
     const cleanPhone = rawPhone.replace(/\D/g, '');
     const internationalPhone = cleanPhone.startsWith('55') ? cleanPhone : cleanPhone ? `55${cleanPhone}` : '';
@@ -816,8 +819,13 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
   const handleOpenEmailShare = () => {
     if (!signatureTokenData?.public_url) return;
     const name = signatureTokenData.responsavel_nome || business.name;
-    const subject = `Contrato de Adesão — ${business.name} | Conexão Maçônica`;
-    const body = `Olá, ${name}.\n\nSeu contrato da Conexão Maçônica está disponível para conferência e assinatura eletrônica:\n\n${signatureTokenData.public_url}\n\nO link possui validade de 7 dias.\n\nAtenciosamente,\nEquipe Conexão Maçônica`;
+    const isSigned = isContractSigned || commercialStatus === 'contrato_assinado' || commercialStatus === 'aguardando_pagamento';
+    const subject = isSigned
+      ? `Link de Pagamento — ${business.name} | Conexão Maçônica`
+      : `Contrato de Adesão — ${business.name} | Conexão Maçônica`;
+    const body = isSigned
+      ? `Olá, ${name}.\n\nSeu contrato da Conexão Maçônica já foi assinado com sucesso!\n\nPara efetuar o pagamento da adesão ao plano (Pix ou Cartão), acesse o link seguro abaixo:\n\n${signatureTokenData.public_url}\n\nAtenciosamente,\nEquipe Conexão Maçônica`
+      : `Olá, ${name}.\n\nSeu contrato da Conexão Maçônica está disponível para conferência e assinatura eletrônica:\n\n${signatureTokenData.public_url}\n\nO link possui validade de 7 dias.\n\nAtenciosamente,\nEquipe Conexão Maçônica`;
     const mailtoUrl = `mailto:${owner.email || business.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailtoUrl;
   };
@@ -872,6 +880,42 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
       setFeedback({ type: 'error', message: err?.message || 'Erro inesperado ao publicar a empresa.' });
     } finally {
       setIsPublishing(false);
+    }
+  };
+
+  const handleStepClick = (stepNumber: number) => {
+    if (stepNumber === 6) {
+      const el = document.getElementById('payment-onboarding-section') || document.getElementById('signed-contract-card');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      if (!signatureTokenData?.public_url && (isContractSigned || commercialStatus === 'contrato_assinado' || commercialStatus === 'aguardando_pagamento')) {
+        void handleRenewPublicAccessLink();
+      }
+      return;
+    }
+    if (stepNumber === 5) {
+      const el = document.getElementById('signature-sharing-card') || document.getElementById('signed-contract-card') || document.getElementById('contrato-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    if (stepNumber === 4) {
+      const el = document.getElementById('comercial-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    if (stepNumber === 3) {
+      const el = document.getElementById('vinculo-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    if (stepNumber === 2) {
+      router.push(`/admin/empresas/${business.id}/vinculo-maconico`);
+      return;
+    }
+    if (stepNumber >= 7) {
+      router.push(`/admin/empresas/${business.id}`);
+      return;
     }
   };
 
@@ -945,14 +989,13 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
               <li key={s.step}>
                 <button
                   type="button"
-                  disabled={s.step !== 3}
-                  onClick={() => document.getElementById('responsible-cpf-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                  title={s.step === 3 ? 'Ir para os dados comerciais e CPF do responsável' : undefined}
-                  className={`w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-medium transition text-left ${s.step === 3 ? 'cursor-pointer hover:ring-2 hover:ring-[#C9A227]/40' : 'cursor-default'} ${isCurrent
+                  onClick={() => handleStepClick(s.step)}
+                  title={`Ir para etapa ${s.step}: ${s.name}`}
+                  className={`w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-medium transition text-left cursor-pointer hover:ring-2 hover:ring-[#C9A227]/40 ${isCurrent
                     ? 'bg-[#3B0B14]/10 text-[#3B0B14] font-bold border border-[#3B0B14]/20'
                     : isCompleted
                       ? 'text-emerald-700 bg-emerald-50/70 border border-emerald-200'
-                      : 'text-stone-400'
+                      : 'text-stone-500 hover:text-stone-800'
                     }`}
                 >
                   {isCompleted ? (
@@ -1241,7 +1284,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
         </section>
 
         {/* Card 2: Vínculo Maçônico Verificado */}
-        <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs space-y-4">
+        <section id="vinculo-section" className="scroll-mt-24 rounded-2xl border border-stone-200 bg-white p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-stone-100 pb-3">
             <h2 className="flex items-center gap-2 font-serif text-base font-bold text-stone-900">
               <ShieldCheck className="h-5 w-5 text-emerald-600" />
@@ -1529,7 +1572,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
       </section>
 
       {/* Card 3: Painel de Conferência Comercial Interativo (Microetapa 3.2) */}
-      <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs space-y-6">
+      <section id="comercial-section" className="scroll-mt-24 rounded-2xl border border-stone-200 bg-white p-6 shadow-xs space-y-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-stone-100 pb-4">
           <div className="flex items-center gap-2.5">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-800 border border-amber-200">
@@ -1824,7 +1867,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
       </section>
 
       {/* Card 4: Checklist de Prontidão para Contrato */}
-      <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-xs space-y-4">
+      <section id="contrato-section" className="scroll-mt-24 rounded-2xl border border-stone-200 bg-white p-6 shadow-xs space-y-4">
         <h2 className="flex items-center gap-2 font-serif text-base font-bold text-stone-900 border-b border-stone-100 pb-3">
           <FileCheck2 className="h-5 w-5 text-[#3B0B14]" />
           Checklist de Prontidão do Onboarding
@@ -2081,6 +2124,20 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
             <button
               type="button"
               onClick={() => {
+                const el = document.getElementById('payment-onboarding-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (!signatureTokenData?.public_url) {
+                  void handleRenewPublicAccessLink();
+                }
+              }}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#3B0B14] hover:bg-[#2b080f] text-[#C9A227] px-4 py-2 text-xs font-bold transition shadow-xs cursor-pointer"
+            >
+              <CreditCard className="h-4 w-4" />
+              Link de Pagamento
+            </button>
+            <button
+              type="button"
+              onClick={() => {
                 setInvalidationReason('Anulação administrativa do contrato assinado para emissão de uma nova versão.');
                 setShowInvalidateModal(true);
               }}
@@ -2150,6 +2207,131 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
           </div>
         </section>
       )}
+
+      {/* Seção Exclusiva: Etapa 6 — Pagamento da Contratação */}
+      {(isContractSigned || commercialStatus === 'contrato_assinado' || commercialStatus === 'aguardando_pagamento') && (
+        <section id="payment-onboarding-section" className="scroll-mt-24 rounded-2xl border-2 border-[#C9A227]/60 bg-white p-6 shadow-xs space-y-4 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-stone-100 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#3B0B14] text-[#C9A227] shadow-xs">
+                <CreditCard className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-serif font-bold text-base text-stone-900">
+                    Etapa 6: Pagamento da Contratação
+                  </h3>
+                  <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-900 border border-amber-300">
+                    {commercialStatus === 'pagamento_confirmado' ? 'Quitado' : 'Aguardando Pagamento'}
+                  </span>
+                </div>
+                <p className="text-xs text-stone-600">
+                  O contrato já foi assinado pelo anunciante. Utilize o link exclusivo abaixo para efetuar o pagamento ou enviá-lo ao cliente.
+                </p>
+              </div>
+            </div>
+
+            {!signatureTokenData?.public_url && commercialStatus !== 'pagamento_confirmado' && (
+              <button
+                type="button"
+                disabled={isSendingForSignature}
+                onClick={handleRenewPublicAccessLink}
+                className="inline-flex items-center gap-2 rounded-xl bg-[#3B0B14] hover:bg-[#2b080f] text-[#C9A227] px-4 py-2 text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-60 shrink-0"
+              >
+                <CreditCard className="h-4 w-4" />
+                {isSendingForSignature ? 'Gerando link...' : 'Gerar / Obter Link de Pagamento'}
+              </button>
+            )}
+          </div>
+
+          {/* Se o link já foi gerado */}
+          {signatureTokenData?.public_url ? (
+            <div className="space-y-3 bg-[#FAF7F2] p-4 rounded-xl border border-stone-200">
+              <span className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block">
+                Link de Pagamento Seguro do Anunciante
+              </span>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  readOnly
+                  value={signatureTokenData.public_url}
+                  className="flex-1 rounded-xl border border-stone-300 bg-white px-3 py-2 text-xs font-mono text-stone-900 select-all"
+                />
+                <button
+                  type="button"
+                  onClick={handleCopySignatureLink}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white px-4 py-2 text-xs font-bold transition shadow-xs cursor-pointer shrink-0"
+                >
+                  {copiedLinkFeedback ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-emerald-400 stroke-[3]" />
+                      <span>Copiado ✓</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      <span>Copiar link</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Botões de Ação Direta */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <a
+                  href={signatureTokenData.public_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3.5 py-2 text-xs font-semibold text-emerald-900 hover:bg-emerald-100/60 transition shadow-2xs"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Abrir página de pagamento
+                </a>
+                <button
+                  type="button"
+                  onClick={handleOpenWhatsAppShare}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3.5 py-2 text-xs font-semibold text-emerald-900 hover:bg-emerald-100/60 transition shadow-2xs cursor-pointer"
+                >
+                  <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
+                  Enviar pelo WhatsApp
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenEmailShare}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3.5 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition shadow-2xs cursor-pointer"
+                >
+                  <Mail className="h-3.5 w-3.5 text-stone-600" />
+                  Enviar por e-mail
+                </button>
+                <button
+                  type="button"
+                  disabled={isSendingForSignature}
+                  onClick={handleRenewPublicAccessLink}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 transition shadow-2xs cursor-pointer disabled:opacity-60"
+                >
+                  <RotateCcw className={`h-3.5 w-3.5 ${isSendingForSignature ? 'animate-spin' : ''}`} />
+                  Renovar link
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-stone-50 p-4 rounded-xl border border-stone-200 text-xs">
+              <span className="text-stone-600 font-medium">
+                Clique no botão ao lado para gerar ou reabrir o link de pagamento exclusivo do anunciante.
+              </span>
+              <button
+                type="button"
+                disabled={isSendingForSignature}
+                onClick={handleRenewPublicAccessLink}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-60 shrink-0"
+              >
+                <CreditCard className="h-4 w-4" />
+                {isSendingForSignature ? 'Gerando...' : 'Obter Link de Pagamento'}
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
 
       {/* Card 5: Histórico de Versões e Snapshots da Empresa (Fase 4: Microetapas 4.3 e 4.4) */}
       {(snapshotHistory.length > 0 || commercialStatus === 'contrato_gerado' || commercialStatus === 'contrato_enviado') && (

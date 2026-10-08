@@ -1,11 +1,25 @@
 'use client';
 
 import { systemConfirm } from '@/components/system/SystemFeedback';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { formatDateBR } from '@/lib/format/datetime-br';
-import { Check, Copy, Loader2, MessageCircle, Send, Trash2 } from 'lucide-react';
+import {
+  Check,
+  Copy,
+  Loader2,
+  MessageCircle,
+  Send,
+  Trash2,
+  Search,
+  Calendar,
+  ArrowUpDown,
+  X,
+  Building2,
+  CheckCircle2,
+  Clock,
+} from 'lucide-react';
 import {
   createSignupInviteAction,
   getSignupInviteLinkAction,
@@ -16,9 +30,9 @@ import {
 import { buildInviteShareMessage } from '@/lib/onboarding/signup-invite-shared';
 
 const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
-  sent: { text: 'Aguardando o cliente', cls: 'bg-amber-100 text-amber-900' },
-  submitted: { text: 'Enviado — conferir', cls: 'bg-sky-100 text-sky-900' },
-  converted: { text: 'Cadastro criado', cls: 'bg-emerald-100 text-emerald-900' },
+  sent: { text: 'Aguardando o cliente', cls: 'bg-amber-100 text-amber-900 border border-amber-300' },
+  submitted: { text: 'Preenchido — conferir', cls: 'bg-blue-100 text-blue-900 border border-blue-300 font-bold' },
+  converted: { text: 'Cadastro criado', cls: 'bg-emerald-100 text-emerald-900 border border-emerald-300' },
   revoked: { text: 'Cancelado', cls: 'bg-stone-200 text-stone-700' },
 };
 
@@ -38,6 +52,144 @@ export default function InvitesClient({ initialItems, emailConfigured }: { initi
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rowFeedback, setRowFeedback] = useState<{ id: string; text: string } | null>(null);
   const [shareOverride, setShareOverride] = useState<string | null>(null);
+
+  // Estados para busca, filtros e ordenação
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'submitted' | 'sent' | 'converted' | 'expired' | 'revoked'>('all');
+  const [dateFilter, setDateFilter] = useState<'all' | '7d' | '15d' | '30d' | 'this_month' | 'custom'>('all');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [sortBy, setSortBy] = useState<'created_desc' | 'created_asc' | 'submitted_desc' | 'name_asc' | 'name_desc'>('created_desc');
+
+  const isFiltered = Boolean(
+    searchQuery.trim() ||
+    statusFilter !== 'all' ||
+    dateFilter !== 'all' ||
+    customStartDate ||
+    customEndDate
+  );
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+    setDateFilter('all');
+    setCustomStartDate('');
+    setCustomEndDate('');
+    setSortBy('created_desc');
+  };
+
+  const statusCounts = useMemo(() => {
+    const counts = {
+      all: initialItems.length,
+      submitted: 0,
+      sent: 0,
+      converted: 0,
+      expired: 0,
+      revoked: 0,
+    };
+    for (const item of initialItems) {
+      if (item.status === 'submitted') counts.submitted++;
+      else if (item.status === 'converted') counts.converted++;
+      else if (item.status === 'revoked') counts.revoked++;
+      else if (item.expired) counts.expired++;
+      else if (item.status === 'sent') counts.sent++;
+    }
+    return counts;
+  }, [initialItems]);
+
+  const filteredItems = useMemo(() => {
+    let result = [...initialItems];
+
+    // 1. Filtro por status
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'submitted') {
+        result = result.filter((i) => i.status === 'submitted');
+      } else if (statusFilter === 'sent') {
+        result = result.filter((i) => i.status === 'sent' && !i.expired);
+      } else if (statusFilter === 'converted') {
+        result = result.filter((i) => i.status === 'converted');
+      } else if (statusFilter === 'expired') {
+        result = result.filter((i) => i.expired || (i.status === 'sent' && new Date(i.expires_at).getTime() <= Date.now()));
+      } else if (statusFilter === 'revoked') {
+        result = result.filter((i) => i.status === 'revoked');
+      }
+    }
+
+    // 2. Filtro por busca textual (empresa, convidado, e-mail, observação)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter((i) => {
+        const company = (i.company_name || '').toLowerCase();
+        const invitedName = (i.invited_name || '').toLowerCase();
+        const responsible = (i.responsible_name || '').toLowerCase();
+        const email = (i.invited_email || '').toLowerCase();
+        const note = (i.note || '').toLowerCase();
+        return (
+          company.includes(q) ||
+          invitedName.includes(q) ||
+          responsible.includes(q) ||
+          email.includes(q) ||
+          note.includes(q)
+        );
+      });
+    }
+
+    // 3. Filtro por data
+    if (dateFilter !== 'all') {
+      const now = Date.now();
+      result = result.filter((i) => {
+        const itemDate = new Date(i.created_at).getTime();
+        if (dateFilter === '7d') return itemDate >= now - 7 * 86_400_000;
+        if (dateFilter === '15d') return itemDate >= now - 15 * 86_400_000;
+        if (dateFilter === '30d') return itemDate >= now - 30 * 86_400_000;
+        if (dateFilter === 'this_month') {
+          const d = new Date(i.created_at);
+          const n = new Date();
+          return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth();
+        }
+        if (dateFilter === 'custom') {
+          if (customStartDate) {
+            const startMs = new Date(`${customStartDate}T00:00:00`).getTime();
+            if (itemDate < startMs) return false;
+          }
+          if (customEndDate) {
+            const endMs = new Date(`${customEndDate}T23:59:59`).getTime();
+            if (itemDate > endMs) return false;
+          }
+          return true;
+        }
+        return true;
+      });
+    }
+
+    // 4. Ordenação
+    result.sort((a, b) => {
+      if (sortBy === 'created_desc') {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+      if (sortBy === 'created_asc') {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      }
+      if (sortBy === 'submitted_desc') {
+        const dateA = a.submitted_at ? new Date(a.submitted_at).getTime() : 0;
+        const dateB = b.submitted_at ? new Date(b.submitted_at).getTime() : 0;
+        return dateB - dateA;
+      }
+      if (sortBy === 'name_asc') {
+        const nameA = (a.company_name || a.invited_name || a.invited_email || '').toLowerCase();
+        const nameB = (b.company_name || b.invited_name || b.invited_email || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      }
+      if (sortBy === 'name_desc') {
+        const nameA = (a.company_name || a.invited_name || a.invited_email || '').toLowerCase();
+        const nameB = (b.company_name || b.invited_name || b.invited_email || '').toLowerCase();
+        return nameB.localeCompare(nameA);
+      }
+      return 0;
+    });
+
+    return result;
+  }, [initialItems, statusFilter, searchQuery, dateFilter, customStartDate, customEndDate, sortBy]);
 
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault();
@@ -248,58 +400,352 @@ export default function InvitesClient({ initialItems, emailConfigured }: { initi
         )}
       </form>
 
+      {/* Barra de Filtros, Busca e Ordenação */}
+      <div className="space-y-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-xs">
+        {/* Linha 1: Campo de Busca & Contador */}
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar por empresa, convidado, e-mail ou observação..."
+              className="w-full rounded-xl border border-stone-300 bg-stone-50/50 pl-10 pr-9 py-2 text-sm text-stone-900 placeholder-stone-400 focus:bg-white focus:border-[#3B0B14] focus:ring-2 focus:ring-[#3B0B14]/10 outline-none transition"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-0.5 cursor-pointer"
+                title="Limpar busca"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-stone-500 shrink-0 font-medium self-end sm:self-center">
+            <span>Exibindo <strong>{filteredItems.length}</strong> de {initialItems.length} convites</span>
+            {isFiltered && (
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                className="ml-1 inline-flex items-center gap-1 text-xs font-semibold text-rose-700 hover:text-rose-900 hover:underline cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" /> Limpar filtros
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Linha 2: Tabs de Filtro por Situação */}
+        <div className="flex flex-wrap gap-1.5 pt-1 border-t border-stone-100">
+          <button
+            type="button"
+            onClick={() => setStatusFilter('all')}
+            className={`rounded-xl px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              statusFilter === 'all'
+                ? 'bg-stone-900 text-white shadow-xs'
+                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+            }`}
+          >
+            Todos
+            <span className={`rounded-full px-1.5 py-0.2 text-[10px] ${statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-stone-200 text-stone-700'}`}>
+              {statusCounts.all}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter('submitted')}
+            className={`rounded-xl px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              statusFilter === 'submitted'
+                ? 'bg-blue-700 text-white shadow-xs'
+                : 'bg-blue-50 text-blue-900 hover:bg-blue-100 border border-blue-200'
+            }`}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5 text-blue-500" />
+            Preenchidos — Conferir
+            <span className={`rounded-full px-1.5 py-0.2 text-[10px] ${statusFilter === 'submitted' ? 'bg-white/20 text-white' : 'bg-blue-200 text-blue-900'}`}>
+              {statusCounts.submitted}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter('sent')}
+            className={`rounded-xl px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              statusFilter === 'sent'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200'
+            }`}
+          >
+            <Clock className="h-3.5 w-3.5 text-amber-500" />
+            Aguardando cliente
+            <span className={`rounded-full px-1.5 py-0.2 text-[10px] ${statusFilter === 'sent' ? 'bg-white/20 text-white' : 'bg-amber-200 text-amber-900'}`}>
+              {statusCounts.sent}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter('converted')}
+            className={`rounded-xl px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              statusFilter === 'converted'
+                ? 'bg-emerald-700 text-white shadow-xs'
+                : 'bg-emerald-50 text-emerald-900 hover:bg-emerald-100 border border-emerald-200'
+            }`}
+          >
+            <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" />
+            Cadastro criado
+            <span className={`rounded-full px-1.5 py-0.2 text-[10px] ${statusFilter === 'converted' ? 'bg-white/20 text-white' : 'bg-emerald-200 text-emerald-900'}`}>
+              {statusCounts.converted}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter('expired')}
+            className={`rounded-xl px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              statusFilter === 'expired'
+                ? 'bg-stone-700 text-white shadow-xs'
+                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+            }`}
+          >
+            Expirados
+            <span className={`rounded-full px-1.5 py-0.2 text-[10px] ${statusFilter === 'expired' ? 'bg-white/20 text-white' : 'bg-stone-200 text-stone-700'}`}>
+              {statusCounts.expired}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter('revoked')}
+            className={`rounded-xl px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              statusFilter === 'revoked'
+                ? 'bg-stone-700 text-white shadow-xs'
+                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+            }`}
+          >
+            Cancelados
+            <span className={`rounded-full px-1.5 py-0.2 text-[10px] ${statusFilter === 'revoked' ? 'bg-white/20 text-white' : 'bg-stone-200 text-stone-700'}`}>
+              {statusCounts.revoked}
+            </span>
+          </button>
+        </div>
+
+        {/* Linha 3: Filtro por Data e Ordenação */}
+        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-stone-100 text-xs">
+          {/* Dropdown de Data */}
+          <div className="flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5 text-stone-500" />
+            <span className="font-semibold text-stone-600">Data:</span>
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value as any)}
+              className="rounded-xl border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-800 outline-none focus:border-[#3B0B14]"
+            >
+              <option value="all">Qualquer período</option>
+              <option value="7d">Últimos 7 dias</option>
+              <option value="15d">Últimos 15 dias</option>
+              <option value="30d">Últimos 30 dias</option>
+              <option value="this_month">Este mês</option>
+              <option value="custom">Período personalizado...</option>
+            </select>
+          </div>
+
+          {dateFilter === 'custom' && (
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="rounded-xl border border-stone-300 bg-white px-2 py-1 text-xs text-stone-800"
+              />
+              <span className="text-stone-400">até</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="rounded-xl border border-stone-300 bg-white px-2 py-1 text-xs text-stone-800"
+              />
+            </div>
+          )}
+
+          {/* Dropdown de Ordenação */}
+          <div className="flex items-center gap-1.5 sm:ml-auto">
+            <ArrowUpDown className="h-3.5 w-3.5 text-stone-500" />
+            <span className="font-semibold text-stone-600">Ordenar por:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="rounded-xl border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-800 outline-none focus:border-[#3B0B14]"
+            >
+              <option value="created_desc">Data (Mais recentes)</option>
+              <option value="created_asc">Data (Mais antigos)</option>
+              <option value="submitted_desc">Preenchimento mais recente</option>
+              <option value="name_asc">Nome / Empresa (A → Z)</option>
+              <option value="name_desc">Nome / Empresa (Z → A)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabela de Convites */}
       <div className="overflow-hidden rounded-2xl border border-stone-300 bg-white shadow-xs">
         <table className="w-full text-left text-sm">
           <thead className="bg-stone-100 text-xs uppercase tracking-wide text-stone-600">
             <tr>
-              <th className="px-4 py-3">Convidado</th>
+              <th className="px-4 py-3">Empresa / Convidado</th>
               <th className="px-4 py-3">Situação</th>
               <th className="hidden px-4 py-3 sm:table-cell">Criado em</th>
               <th className="px-4 py-3 text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-200">
-            {initialItems.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-6 text-center text-stone-500">Nenhum convite ainda.</td></tr>
+            {filteredItems.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-4 py-8 text-center text-stone-500 space-y-2">
+                  <p className="font-medium text-stone-600">
+                    {initialItems.length === 0
+                      ? 'Nenhum convite criado ainda.'
+                      : 'Nenhum convite encontrado com os filtros selecionados.'}
+                  </p>
+                  {isFiltered && (
+                    <button
+                      type="button"
+                      onClick={handleClearFilters}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-[#3B0B14] hover:underline cursor-pointer"
+                    >
+                      <X className="h-3.5 w-3.5" /> Limpar filtros e exibir todos
+                    </button>
+                  )}
+                </td>
+              </tr>
             )}
-            {initialItems.map((item) => {
+            {filteredItems.map((item) => {
               const status = item.expired ? { text: 'Expirado', cls: 'bg-stone-200 text-stone-700' } : STATUS_LABEL[item.status];
               return (
-                <tr key={item.id}>
+                <tr key={item.id} className="hover:bg-stone-50/70 transition">
                   <td className="px-4 py-3">
-                    <span className="block font-semibold text-stone-900">{item.invited_name || 'Sem nome'}</span>
-                    <span className="block text-xs text-stone-500">{item.invited_email || '—'}</span>
-                    {item.note && <span className="block text-xs italic text-stone-500">{item.note}</span>}
+                    {item.company_name ? (
+                      <div>
+                        <span className="inline-flex items-center gap-1.5 font-bold text-stone-900 text-sm">
+                          <Building2 className="h-4 w-4 text-[#3B0B14] shrink-0" />
+                          {item.company_name}
+                        </span>
+                        <div className="flex items-center gap-1.5 text-xs text-stone-500 mt-0.5">
+                          <span>{item.invited_name || item.responsible_name || 'Convidado'}</span>
+                          {item.invited_email && <span>· {item.invited_email}</span>}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <span className="block font-semibold text-stone-900">{item.invited_name || 'Sem nome'}</span>
+                        <span className="block text-xs text-stone-500">{item.invited_email || '—'}</span>
+                      </div>
+                    )}
+                    {item.note && <span className="block text-xs italic text-stone-500 mt-0.5">Obs: {item.note}</span>}
                   </td>
-                  <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${status?.cls}`}>{status?.text}</span>{item.email_sent_at && <span className="mt-1 block text-[11px] text-stone-500">E-mail enviado em {formatDateBR(item.email_sent_at)}</span>}</td>
-                  <td className="hidden px-4 py-3 text-xs text-stone-600 sm:table-cell">{formatDateBR(item.created_at)}</td>
+                  <td className="px-4 py-3">
+                    <div className="space-y-1">
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${status?.cls}`}>
+                        {item.status === 'submitted' && <CheckCircle2 className="h-3 w-3 text-blue-600" />}
+                        {status?.text}
+                      </span>
+                      {item.submitted_at && item.status === 'submitted' && (
+                        <span className="block text-[11px] font-semibold text-blue-800">
+                          Preenchido em {formatDateBR(item.submitted_at)}
+                        </span>
+                      )}
+                      {item.email_sent_at && (
+                        <span className="block text-[11px] text-stone-500">
+                          E-mail enviado em {formatDateBR(item.email_sent_at)}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="hidden px-4 py-3 text-xs text-stone-600 sm:table-cell">
+                    <span className="font-medium text-stone-800">{formatDateBR(item.created_at)}</span>
+                    <span className="block text-[11px] text-stone-400">
+                      {item.expired ? 'Expirou em ' : 'Expira em '}
+                      {formatDateBR(item.expires_at)}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end items-center gap-2">
                       {item.status === 'submitted' && (
-                        <Link href={`/admin/empresas/convites/${item.id}`} className="rounded-lg bg-[#3B0B14] px-3 py-1.5 text-xs font-bold text-[#C9A227]">Conferir</Link>
+                        <Link
+                          href={`/admin/empresas/convites/${item.id}`}
+                          className="inline-flex items-center gap-1 rounded-xl bg-[#3B0B14] hover:bg-[#2b080f] px-3.5 py-1.5 text-xs font-bold text-[#C9A227] shadow-2xs transition"
+                        >
+                          Conferir dados →
+                        </Link>
                       )}
                       {item.status === 'converted' && item.business_id && (
-                        <Link href={`/admin/empresas/${item.business_id}`} className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-bold text-stone-700">Abrir empresa</Link>
+                        <Link
+                          href={`/admin/empresas/${item.business_id}`}
+                          className="rounded-xl border border-stone-300 bg-white hover:bg-stone-50 px-3 py-1.5 text-xs font-bold text-stone-700 shadow-2xs transition"
+                        >
+                          Abrir empresa
+                        </Link>
                       )}
                       {item.status === 'sent' && !item.expired && (
                         <>
-                          <button type="button" onClick={() => rowCopy(item)} disabled={busyId === item.id} className="inline-flex items-center gap-1 rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-bold text-stone-700 disabled:opacity-60">
-                            <Copy className="h-3.5 w-3.5" aria-hidden /> Copiar link
+                          <button
+                            type="button"
+                            onClick={() => rowCopy(item)}
+                            disabled={busyId === item.id}
+                            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition shadow-2xs cursor-pointer ${
+                              rowFeedback?.id === item.id
+                                ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                                : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-50'
+                            }`}
+                          >
+                            {rowFeedback?.id === item.id ? (
+                              <>
+                                <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" />
+                                <span>Copiado ✓</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3.5 w-3.5 text-stone-500" />
+                                <span>Copiar link</span>
+                              </>
+                            )}
                           </button>
-                          <button type="button" onClick={() => rowWhatsapp(item)} disabled={busyId === item.id} className="inline-flex items-center gap-1 rounded-lg bg-[#25D366] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60">
-                            <MessageCircle className="h-3.5 w-3.5" aria-hidden /> WhatsApp
+                          <button
+                            type="button"
+                            onClick={() => rowWhatsapp(item)}
+                            disabled={busyId === item.id}
+                            className="inline-flex items-center gap-1 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] px-3 py-1.5 text-xs font-bold text-white shadow-2xs transition cursor-pointer"
+                          >
+                            <MessageCircle className="h-3.5 w-3.5" />
+                            WhatsApp
                           </button>
                         </>
                       )}
                       {item.status === 'sent' && item.expired && (
-                        <button type="button" onClick={() => rowRenew(item.id)} disabled={busyId === item.id} className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 disabled:opacity-60">
-                          {busyId === item.id ? '…' : 'Gerar novo link'}
+                        <button
+                          type="button"
+                          onClick={() => rowRenew(item.id)}
+                          disabled={busyId === item.id}
+                          className="rounded-xl border border-amber-400 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-2xs transition cursor-pointer"
+                        >
+                          {busyId === item.id ? 'Gerando…' : 'Gerar novo link'}
                         </button>
                       )}
-                      <button type="button" onClick={() => remove(item)} disabled={busyId === item.id} title="Excluir convite" className="inline-flex items-center gap-1 rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-bold text-rose-700 disabled:opacity-60">
-                        <Trash2 className="h-3.5 w-3.5" aria-hidden /> {busyId === item.id ? '…' : 'Excluir'}
+                      <button
+                        type="button"
+                        onClick={() => remove(item)}
+                        disabled={busyId === item.id}
+                        title="Excluir convite"
+                        className="inline-flex items-center gap-1 rounded-xl border border-rose-300 bg-white hover:bg-rose-50 px-2.5 py-1.5 text-xs font-bold text-rose-700 shadow-2xs transition cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        {busyId === item.id ? '…' : 'Excluir'}
                       </button>
-                      {rowFeedback?.id === item.id && <span className="self-center text-[11px] font-semibold text-emerald-700">{rowFeedback.text}</span>}
                     </div>
                   </td>
                 </tr>

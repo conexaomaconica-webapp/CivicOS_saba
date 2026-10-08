@@ -59,6 +59,55 @@ describe('ETAPA 1 — Testes de Segurança, LGPD e Privacidade', () => {
       clearGaCookies();
       expect(readConsent()).toBe('denied');
     });
+
+    it('Expiração: se o consentimento tiver mais de 365 dias, readConsent retorna null para renovação', () => {
+      window.localStorage.setItem('cm_analytics_consent', 'granted');
+      const oldDate = new Date(Date.now() - 366 * 24 * 60 * 60 * 1000).toISOString();
+      window.localStorage.setItem(
+        'cm_analytics_consent_meta',
+        JSON.stringify({ status: 'granted', version: '2026.1', timestamp: oldDate })
+      );
+
+      expect(readConsent()).toBeNull();
+    });
+
+    it('Versão da política: se a versão salva divergir da atual, requer novo consentimento', () => {
+      window.localStorage.setItem('cm_analytics_consent', 'granted');
+      window.localStorage.setItem(
+        'cm_analytics_consent_meta',
+        JSON.stringify({ status: 'granted', version: '2025.1', timestamp: new Date().toISOString() })
+      );
+
+      expect(readConsent()).toBeNull();
+    });
+
+    it('Preservação de cookies essenciais: clearGaCookies apaga apenas cookies _ga, preservando tokens essenciais', () => {
+      document.cookie = '_ga=GA1.1.111; path=/';
+      document.cookie = '_gid=GA1.1.222; path=/';
+      document.cookie = 'sb-auth-token=secret_jwt; path=/';
+      document.cookie = 'session_id=sess_123; path=/';
+
+      clearGaCookies();
+
+      expect(document.cookie).toContain('sb-auth-token=secret_jwt');
+      expect(document.cookie).toContain('session_id=sess_123');
+      expect(document.cookie).not.toContain('_ga=GA1.1.111');
+      expect(document.cookie).not.toContain('_gid=GA1.1.222');
+    });
+
+    it('openCookiePreferences dispara evento CustomEvent("open-cookie-preferences")', () => {
+      let triggered = false;
+      const listener = () => {
+        triggered = true;
+      };
+      window.addEventListener('open-cookie-preferences', listener);
+
+      const { openCookiePreferences } = require('@/components/analytics/GoogleAnalytics');
+      openCookiePreferences();
+
+      expect(triggered).toBe(true);
+      window.removeEventListener('open-cookie-preferences', listener);
+    });
   });
 
   describe('2. Storage — Member Avatars Privado & Signed URLs', () => {
