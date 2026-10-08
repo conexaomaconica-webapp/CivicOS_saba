@@ -15,6 +15,16 @@ export async function generateRootMetadata(): Promise<Metadata> {
     metadataBase: new URL(APP_URL),
     title: { default: appName, template: `%s | ${appName}` },
     description: PLATFORM_DESCRIPTION,
+    applicationName: appName,
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: 'black-translucent',
+      title: 'Conexão',
+    },
+    formatDetection: {
+      telephone: true,
+    },
+    manifest: '/manifest.webmanifest',
     icons: {
       icon: brand.faviconUrl ?? '/icone.png',
       shortcut: brand.faviconUrl ?? '/icone.png',
