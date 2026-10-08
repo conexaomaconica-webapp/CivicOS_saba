@@ -1,7 +1,7 @@
 # Documento de Implementação PWA — Conexão Maçônica (CivicOS SABA)
 
 > **Documento Canônico — Fase Mobile 1 (PWA)**  
-> **Status:** Concluído & Homologado  
+> **Status:** APROVADA PARA PREVIEW (Validação de Service Worker em Staging/Vercel Preview antes de Produção)  
 > **Data:** 07/10/2026  
 > **Escopo:** Infraestrutura de PWA leve, instalabilidade em Android/iOS, Service Worker seguro e preservação total de SEO.
 
@@ -87,7 +87,29 @@ O Service Worker ignora e vai 100% direto para a rede para as seguintes rotas e 
 
 ---
 
-## 6. Checklist de Aceite Final
+## 6. Protocolo de Homologação Obrigatório em Vercel Preview (Pré-Produção)
+
+Antes da promoção da branch `feature/mobile-pwa` para `main` (Produção), a URL do Preview da Vercel DEVE passar pelo seguinte roteiro de validação manual:
+
+1. **Testes de Fluxos Críticos**:
+   - [ ] Cadastro de nova empresa.
+   - [ ] Login, Logout e troca de perfil de usuário.
+   - [ ] Onboarding comercial completo.
+   - [ ] Assinatura de Contrato de anunciante.
+   - [ ] Navegação pelo Painel do Anunciante e Painel Master.
+   - [ ] Upload de logotipos e capas de empresas.
+   - [ ] Busca e filtragem pública no guia.
+   - [ ] Edição de uma empresa e confirmação imediata dos dados atualizados no PWA (sem presas em cache).
+
+2. **Auditoria de DevTools (Service Worker & Cache Storage)**:
+   - [ ] Abrir `DevTools > Application > Service Workers`: Confirmar registro limpo do `sw.js`.
+   - [ ] Abrir `DevTools > Application > Cache Storage`: Confirmar que **NENHUMA** resposta de `/admin`, `/master`, `/minha-conta`, `/anunciante`, `/api` ou `/cadastro` foi gravada em cache.
+   - [ ] Teste de Troca de Versão: Alterar a versão do SW em `sw.js` e verificar se a versão antiga é expurgada automaticamente sem deixar lixo de cache.
+   - [ ] Teste pós-Logout: Efetuar logout e garantir que o navegador não exibe dados do usuário anterior.
+
+---
+
+## 7. Checklist de Aceite Final
 
 - [x] Manifesto PWA gerado com `name: "Conexão Maçônica"`, `short_name: "Conexão"`, `start_url: "/guia"`, `display: "standalone"`.
 - [x] Cores oficiais da marca configuradas (`theme_color: "#4B161B"`, `background_color: "#F3EEDD"`).

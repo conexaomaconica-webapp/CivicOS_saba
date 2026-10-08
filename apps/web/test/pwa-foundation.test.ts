@@ -69,4 +69,18 @@ describe('FASE MOBILE 1 — Fundação PWA (Conexão Maçônica)', () => {
     expect(swContent).toContain("request.mode === 'navigate'");
     expect(swContent).toContain('conexao-pwa-v1');
   });
+
+  it('4. Service Worker possui rotina de expurgo de versão antiga e tratamento de autorização', () => {
+    const swPath = path.join(process.cwd(), 'public', 'sw.js');
+    const swContent = fs.readFileSync(swPath, 'utf-8');
+
+    // Valida expurgo de versões antigas ao ativar (sw update resilience)
+    expect(swContent).toContain("self.addEventListener('activate'");
+    expect(swContent).toContain('caches.delete');
+    expect(swContent).toContain('self.clients.claim()');
+
+    // Valida bypass explícito de autorização/logout
+    expect(swContent).toContain("request.headers.has('Authorization')");
+    expect(swContent).toContain("request.method !== 'GET'");
+  });
 });
