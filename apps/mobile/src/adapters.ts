@@ -7,7 +7,6 @@
 
 import type {
   PlatformCapabilities,
-  PlatformType,
   StorageAdapter,
   CameraAdapter,
   CameraOptions,
@@ -72,12 +71,12 @@ export class CapacitorStorageAdapter implements StorageAdapter {
 
 export class CapacitorCameraAdapter implements CameraAdapter {
   async takePhoto(options?: CameraOptions): Promise<CameraResult> {
-    const { Camera, CameraSource } = await import('@capacitor/camera');
+    const { Camera, CameraSource, CameraResultType } = await import('@capacitor/camera');
     const photo = await Camera.getPhoto({
       quality: options?.quality ?? 90,
       width: options?.width,
       height: options?.height,
-      resultType: this.mapResultType(options?.resultType),
+      resultType: this.mapResultType(options?.resultType, CameraResultType),
       source: CameraSource.Camera,
     });
 
@@ -88,12 +87,12 @@ export class CapacitorCameraAdapter implements CameraAdapter {
   }
 
   async pickFromGallery(options?: CameraOptions): Promise<CameraResult> {
-    const { Camera, CameraSource } = await import('@capacitor/camera');
+    const { Camera, CameraSource, CameraResultType } = await import('@capacitor/camera');
     const photo = await Camera.getPhoto({
       quality: options?.quality ?? 90,
       width: options?.width,
       height: options?.height,
-      resultType: this.mapResultType(options?.resultType),
+      resultType: this.mapResultType(options?.resultType, CameraResultType),
       source: CameraSource.Photos,
     });
 
@@ -115,11 +114,11 @@ export class CapacitorCameraAdapter implements CameraAdapter {
     return (result.camera as PermissionStatus) ?? 'prompt';
   }
 
-  private mapResultType(type?: string) {
+  private mapResultType(type: string | undefined, CameraResultTypeEnum: any) {
     switch (type) {
-      case 'base64': return 'base64' as const;
-      case 'dataUrl': return 'dataUrl' as const;
-      default: return 'uri' as const;
+      case 'base64': return CameraResultTypeEnum.Base64;
+      case 'dataUrl': return CameraResultTypeEnum.DataUrl;
+      default: return CameraResultTypeEnum.Uri;
     }
   }
 }
@@ -204,14 +203,14 @@ export class CapacitorGeolocationAdapter implements GeolocationAdapter {
 // ---------------------------------------------------------------------------
 
 export class CapacitorPushAdapter implements PushAdapter {
-  private lastToken: string | null = null;
+  private lastRegisteredToken: string | null = null;
 
   async register(): Promise<PushToken> {
     const { PushNotifications } = await import('@capacitor/push-notifications');
     await PushNotifications.register();
     return new Promise((resolve, reject) => {
       PushNotifications.addListener('registration', (token) => {
-        this.lastToken = token.value;
+        this.lastRegisteredToken = token.value;
         resolve({ value: token.value });
       });
       PushNotifications.addListener('registrationError', (err) => {
@@ -220,10 +219,14 @@ export class CapacitorPushAdapter implements PushAdapter {
     });
   }
 
+  getLastToken(): string | null {
+    return this.lastRegisteredToken;
+  }
+
   async unregister(): Promise<void> {
     const { PushNotifications } = await import('@capacitor/push-notifications');
     await PushNotifications.removeAllListeners();
-    this.lastToken = null;
+    this.lastRegisteredToken = null;
   }
 
   onNotification(callback: (notification: PushNotification) => void): () => void {

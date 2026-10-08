@@ -41,6 +41,9 @@ importers:
 
   apps/mobile:
     dependencies:
+      '@capacitor/android':
+        specifier: ^7.0.0
+        version: 7.6.9(@capacitor/core@7.6.8)
       '@capacitor/camera':
         specifier: ^7.0.0
         version: 7.0.5(@capacitor/core@7.6.8)
@@ -53,12 +56,18 @@ importers:
       '@capacitor/haptics':
         specifier: ^7.0.0
         version: 7.0.5(@capacitor/core@7.6.8)
+      '@capacitor/ios':
+        specifier: ^7.0.0
+        version: 7.6.9(@capacitor/core@7.6.8)
       '@capacitor/preferences':
         specifier: ^7.0.0
         version: 7.0.4(@capacitor/core@7.6.8)
       '@capacitor/push-notifications':
         specifier: ^7.0.0
         version: 7.0.7(@capacitor/core@7.6.8)
+      '@saas/core':
+        specifier: workspace:*
+        version: link:../../packages/core
     devDependencies:
       '@capacitor/cli':
         specifier: ^7.0.0
@@ -66,6 +75,9 @@ importers:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.20.1)(jsdom@30.1.0)
 
   apps/web:
     dependencies:
@@ -398,6 +410,11 @@ packages:
     resolution: {integrity: sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw==}
     hasBin: true
 
+  '@capacitor/android@7.6.9':
+    resolution: {integrity: sha512-jvfU42aOuj92/KJqRscfDm+5612WzJainFL09xjJgD9oI3OMXN4PBfccn8Ig9i8x7bkVqZv/XNwFshiIRqmggg==}
+    peerDependencies:
+      '@capacitor/core': ^7.6.0
+
   '@capacitor/camera@7.0.5':
     resolution: {integrity: sha512-+53f1xHq8on7O+ULXbgWp00ooWvn3fUkWxTP3p5zHi1nVriCxLbYnY0zTpZQqn52M96vclFKkoABbTVQ3x755w==}
     peerDependencies:
@@ -420,6 +437,11 @@ packages:
     resolution: {integrity: sha512-ujXuUkL8UG1YLhuJo/q+jiHr0K5JmclGZHmV1RttmiUBRG1XpC4Fc4gXUJyEX+6IoyfwWhgtPvJFRUB31HYnRQ==}
     peerDependencies:
       '@capacitor/core': '>=7.0.0'
+
+  '@capacitor/ios@7.6.9':
+    resolution: {integrity: sha512-LANP81TfwuJk1zq9EuF+J5AJK71rKDgXB5XD+VFJQHC7BxSH4Dsma6DSMyrjFT03jtqc/0JTMEfSMBE7go3ZjA==}
+    peerDependencies:
+      '@capacitor/core': ^7.6.0
 
   '@capacitor/preferences@7.0.4':
     resolution: {integrity: sha512-TJhkwaI2RCs/iDC9PjNczZV4h6JM4gUtTuKMeFdy0OwGgFEHf4TrtW2mFMc1TnPDalYQ91p9NT+UKgiJs9/xtg==}
@@ -3126,6 +3148,10 @@ snapshots:
     dependencies:
       css-tree: 3.2.1
 
+  '@capacitor/android@7.6.9(@capacitor/core@7.6.8)':
+    dependencies:
+      '@capacitor/core': 7.6.8
+
   '@capacitor/camera@7.0.5(@capacitor/core@7.6.8)':
     dependencies:
       '@capacitor/core': 7.6.8
@@ -3162,6 +3188,10 @@ snapshots:
       '@capacitor/synapse': 1.0.4
 
   '@capacitor/haptics@7.0.5(@capacitor/core@7.6.8)':
+    dependencies:
+      '@capacitor/core': 7.6.8
+
+  '@capacitor/ios@7.6.9(@capacitor/core@7.6.8)':
     dependencies:
       '@capacitor/core': 7.6.8
 
