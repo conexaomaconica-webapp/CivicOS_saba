@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { PublicFooter } from './PublicFooter';
 import { PublicHeader } from './PublicHeader';
+import { PublicMobileBottomNav } from './PublicMobileBottomNav';
 import type { PublicMediaAsset } from '@/lib/business/public-business-presentation';
 
 type PublicShellProps = {
@@ -33,8 +34,9 @@ export function PublicShell({
   return (
     <div className="cm-public-shell">
       {renderHeader ? <PublicHeader productName={productName || 'Conexão Maçônica'} logoUrl={logoUrl} viewer={viewer} /> : null}
-      <main className="cm-public-main">{children}</main>
+      <main className="cm-public-main pb-20 md:pb-0">{children}</main>
       {renderFooter ? <PublicFooter /> : null}
+      <PublicMobileBottomNav />
     </div>
   );
 }

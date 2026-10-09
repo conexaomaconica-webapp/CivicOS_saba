@@ -78,14 +78,14 @@ export default async function PublicBenefitsDirectoryPage() {
 
             <div className="flex items-center gap-2 text-[#c59b27] text-xs font-bold uppercase tracking-wider mb-2">
               <Award className="w-4 h-4 text-[#c59b27]" />
-              <span>Vantagens Fraternas Exclusivas</span>
+              <span>Vantagens Exclusivas</span>
             </div>
 
             <h1 className="font-serif font-bold text-3xl md:text-4xl text-white">
               Clube de Benefícios & Ofertas
             </h1>
             <p className="text-xs md:text-sm text-amber-100/90 max-w-2xl mt-2 leading-relaxed">
-              Condições diferenciadas, descontos especiais e atendimento exclusivo oferecidos por empresários fraternos cadastrados na rede Conexão Maçônica.
+              Condições diferenciadas, descontos especiais e atendimento exclusivo oferecidos por empresários cadastrados na rede Conexão Maçônica.
             </p>
           </div>
         </section>

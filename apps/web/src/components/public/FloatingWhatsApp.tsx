@@ -36,7 +36,7 @@ export function FloatingWhatsApp({ whatsapp = DEFAULT_SUPPORT_WHATSAPP, email = 
   }, [open]);
 
   const buttonClass =
-    'fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom))] right-3 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-white shadow-2xl transition-all duration-300 hover:bg-green-600 sm:bottom-6 sm:right-6 sm:h-14 sm:w-14 sm:hover:scale-110 print:hidden';
+    'fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-3 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-white shadow-2xl transition-all duration-300 hover:bg-green-600 sm:bottom-6 sm:right-6 sm:h-14 sm:w-14 sm:hover:scale-110 print:hidden';
 
   // Sem e-mail configurado: comportamento de sempre (abre o WhatsApp direto).
   if (!mailUrl) {
@@ -52,7 +52,7 @@ export function FloatingWhatsApp({ whatsapp = DEFAULT_SUPPORT_WHATSAPP, email = 
       {open && (
         <div
           role="menu"
-          className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-3 z-40 w-64 rounded-2xl border border-stone-200 bg-white p-2 shadow-2xl sm:bottom-24 sm:right-6"
+          className="fixed bottom-[calc(8.75rem+env(safe-area-inset-bottom))] right-3 z-40 w-64 rounded-2xl border border-stone-200 bg-white p-2 shadow-2xl sm:bottom-24 sm:right-6"
         >
           <p className="px-3 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-stone-500">Fale com o atendimento</p>
           <a

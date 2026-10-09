@@ -8,7 +8,7 @@ import { CookiePreferencesButton } from '@/components/analytics/CookiePreference
 
 export function DirectoryFooter() {
   return (
-    <footer className="dh-footer">
+    <footer className="dh-footer pb-24 md:pb-6">
       <div className="dh-container">
         {/* Trust Badges Bar */}
         <div className="dh-footer__trust-bar">

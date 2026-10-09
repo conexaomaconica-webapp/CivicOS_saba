@@ -280,7 +280,7 @@ gtag('js',new Date());gtag('config','${measurementId}',{anonymize_ip:true,allow_
         <div
           role="region"
           aria-label="Aviso de privacidade e cookies"
-          className="fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-5 z-[60] mx-auto max-w-xl rounded-2xl border border-stone-200/90 bg-white p-5 shadow-2xl print:hidden animate-in fade-in slide-in-from-bottom-4 duration-300"
+          className="fixed inset-x-3 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] md:bottom-5 z-[60] mx-auto max-w-xl rounded-2xl border border-stone-200/90 bg-white p-5 shadow-2xl print:hidden animate-in fade-in slide-in-from-bottom-4 duration-300"
         >
           <div className="mb-2 flex items-center gap-2">
             <span aria-hidden="true" className="text-[#C9A227] text-lg font-serif">

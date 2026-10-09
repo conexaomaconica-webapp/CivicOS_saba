@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { clearGaCookies, readConsent } from '@/components/analytics/GoogleAnalytics';
+import { clearGaCookies, readConsent, openCookiePreferences } from '@/components/analytics/GoogleAnalytics';
 import { extractMemberAvatarStoragePath, getSignedMemberAvatarUrl } from '@/lib/member/member-profile-service';
 import { recordBusinessAnalyticsEventAction } from '@/app/actions/analytics-actions';
 
@@ -102,7 +102,6 @@ describe('ETAPA 1 — Testes de Segurança, LGPD e Privacidade', () => {
       };
       window.addEventListener('open-cookie-preferences', listener);
 
-      const { openCookiePreferences } = require('@/components/analytics/GoogleAnalytics');
       openCookiePreferences();
 
       expect(triggered).toBe(true);
