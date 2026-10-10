@@ -53,3 +53,4 @@ scratch/
 
 
 .pnpm-store/
+.npmrc
