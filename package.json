@@ -5,14 +5,14 @@
   "description": "Modular SaaS Platform — Core + Plugins Architecture",
   "packageManager": "pnpm@9.15.4",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "scripts": {
     "build": "turbo run build",
     "dev": "pnpm --filter @saas/web dev",
     "dev:web": "pnpm --filter @saas/web dev",
-    "dev:all": "turbo run dev",
-    "lint": "turbo run lint",
+    "lint": "node scripts/lint-incremental.mjs",
+    "lint:all": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test --concurrency=1 && node architecture-tests.js",
     "clean": "rimraf --glob packages/*/dist packages/*/*.tsbuildinfo plugins/*/dist plugins/*/*.tsbuildinfo apps/*/.next apps/*/*.tsbuildinfo",

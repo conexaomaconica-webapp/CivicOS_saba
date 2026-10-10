@@ -1,5 +1,5 @@
 // Verificação de saúde pública e mínima: sem versão, sem linha do tempo de boot, sem configuração ou infraestrutura.
-// O diagnóstico detalhado fica só em /diagnostics, protegido por login de administrador.
+// O diagnóstico detalhado e protegido de prontidão fica em /api/health/ready.
 export const dynamic = 'force-dynamic';
 
 export function GET() {
