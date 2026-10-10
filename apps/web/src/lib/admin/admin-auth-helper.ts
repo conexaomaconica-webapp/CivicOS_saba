@@ -8,7 +8,9 @@ export async function assertPlatformAdminAccess() {
     throw new Error('UNAUTHORIZED: Sessão expirada ou usuário não autenticado.');
   }
 
-  const { data: rpcIsAdmin } = await (supabase as any).rpc('has_platform_admin_access');
+  const { data: rpcIsAdmin } = await (
+    supabase as unknown as { rpc: (fn: string) => Promise<{ data: boolean | null; error: unknown }> }
+  ).rpc('has_platform_admin_access');
   if (!rpcIsAdmin) {
     throw new Error('FORBIDDEN: Requer acesso de admin de plataforma.');
   }

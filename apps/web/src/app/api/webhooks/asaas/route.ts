@@ -29,10 +29,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ received: true, validation_request: true });
     }
 
-    let payload: Record<string, any>;
+    let payload: Record<string, unknown>;
     try {
-      payload = JSON.parse(requestBody);
-    } catch (_parseError) {
+      payload = JSON.parse(requestBody) as Record<string, unknown>;
+    } catch {
       logger.warn('Webhook Asaas com payload mal formatado', {
         route: '/api/webhooks/asaas',
         error_code: 'INVALID_JSON',
@@ -97,7 +97,14 @@ export async function POST(req: Request) {
       });
     }
 
-    const { data: rpcRes, error } = await supabase.rpc('process_canonical_billing_event', {
+    const { data: rpcRes, error } = await (
+      supabase as unknown as {
+        rpc: (
+          fn: string,
+          params: Record<string, unknown>
+        ) => Promise<{ data: unknown; error: { message: string } | null }>;
+      }
+    ).rpc('process_canonical_billing_event', {
       // Tenant não é informado pelo gateway: o RPC deriva o tenant canônico da empresa no banco.
       p_tenant_id: null,
       p_provider: canonicalEvent.provider,
@@ -139,8 +146,9 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ received: true, result: rpcRes });
-  } catch (err: any) {
-    const incidentId = logger.critical('Exceção inesperada no processamento do webhook Asaas', err, {
+  } catch (err: unknown) {
+    const errorInstance = err instanceof Error ? err : new Error(String(err));
+    const incidentId = logger.critical('Exceção inesperada no processamento do webhook Asaas', errorInstance, {
       route: '/api/webhooks/asaas',
     });
 
