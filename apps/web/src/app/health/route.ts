@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 export function GET() {
   return Response.json(
-    { ok: true, timestamp: new Date().toISOString() },
+    { ok: true },
     {
       status: 200,
       headers: {

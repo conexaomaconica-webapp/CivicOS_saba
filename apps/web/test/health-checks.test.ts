@@ -21,7 +21,6 @@ describe('M1.2 — Verificação de Disponibilidade (Health Checks em Duas Camad
 
       const json = await response.json();
       expect(json.ok).toBe(true);
-      expect(typeof json.timestamp).toBe('string');
 
       // Verifica cabeçalhos de segurança contra indexação e cache
       expect(response.headers.get('Cache-Control')).toBe('no-store');
