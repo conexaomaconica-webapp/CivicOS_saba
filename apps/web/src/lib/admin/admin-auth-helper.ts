@@ -15,3 +15,32 @@ export async function assertPlatformAdminAccess() {
 
   return { supabase, user };
 }
+
+export async function assertMasterAdminAccess() {
+  const supabase = await createServerSideClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    throw new Error('UNAUTHORIZED: Sessão expirada ou usuário não autenticado.');
+  }
+
+  // Consulta canônica do perfil para validação estrita do papel 'master'
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (profileError || !profile) {
+    throw new Error('UNAUTHORIZED: Perfil de usuário não localizado.');
+  }
+
+  const role = (profile.role || '').trim().toLowerCase();
+  if (role !== 'master') {
+    throw new Error('FORBIDDEN: Acesso restrito exclusivamente ao perfil Master.');
+  }
+
+  return { supabase, user, role };
+}
+
+

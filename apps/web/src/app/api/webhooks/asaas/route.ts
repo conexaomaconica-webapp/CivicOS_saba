@@ -5,6 +5,7 @@ import {
   reconcileCommercialPaymentWebhook,
   validateAsaasWebhookToken,
 } from '@/lib/payment/commercial-onboarding-webhook-service';
+import { logger } from '@/lib/observability/logger';
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -16,6 +17,10 @@ export async function POST(req: Request) {
   try {
     const accessTokenHeader = req.headers.get('asaas-access-token');
     if (!(await validateAsaasWebhookToken(accessTokenHeader))) {
+      logger.warn('Webhook Asaas rejeitado: token de acesso inválido ou ausente no cabeçalho', {
+        route: '/api/webhooks/asaas',
+        ip: req.headers.get('x-forwarded-for') || 'desconhecido',
+      });
       return NextResponse.json({ error: 'UNAUTHORIZED: Header token do Asaas inválido.' }, { status: 401 });
     }
 
@@ -28,10 +33,18 @@ export async function POST(req: Request) {
     try {
       payload = JSON.parse(requestBody);
     } catch (_parseError) {
+      logger.warn('Webhook Asaas com payload mal formatado', {
+        route: '/api/webhooks/asaas',
+        error_code: 'INVALID_JSON',
+      });
       return NextResponse.json({ error: 'INVALID_PAYLOAD: JSON inválido.' }, { status: 400 });
     }
 
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      logger.warn('Webhook Asaas com estrutura de evento inválida', {
+        route: '/api/webhooks/asaas',
+        error_code: 'INVALID_PAYLOAD_STRUCTURE',
+      });
       return NextResponse.json({ error: 'INVALID_PAYLOAD: Evento do Asaas inválido.' }, { status: 400 });
     }
 
@@ -39,6 +52,11 @@ export async function POST(req: Request) {
     // Localiza internamente pelo Asaas payment ID sem confiar em metadados externos
     const onboardingRes = await reconcileCommercialPaymentWebhook(payload, req.headers.get('asaas-event-id'));
     if (onboardingRes.success && onboardingRes.reconciled) {
+      logger.info('Evento do Asaas reconciliado como Onboarding Comercial', {
+        event_type: payload.event,
+        already_processed: onboardingRes.already_processed || false,
+      });
+
       return NextResponse.json({
         received: true,
         commercial_onboarding: true,
@@ -93,11 +111,42 @@ export async function POST(req: Request) {
     });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      // Registra falha crítica sem vazar dados confidenciais e atualiza o log de erro no evento
+      const incidentId = logger.critical('Falha na execução do RPC process_canonical_billing_event', {
+        route: '/api/webhooks/asaas',
+        provider: canonicalEvent.provider,
+        provider_event_id: canonicalEvent.providerEventId,
+        event_type: canonicalEvent.canonicalEvent,
+        error_message: error.message,
+      });
+
+      try {
+        await supabase
+          .from('payment_provider_events')
+          .update({ error_log: `[${incidentId}] ${error.message}` })
+          .match({ provider_code: canonicalEvent.provider, event_id: canonicalEvent.providerEventId });
+      } catch {
+        // Ignora falha secundária de atualização de auditoria
+      }
+
+      return NextResponse.json({ error: error.message, incident_id: incidentId }, { status: 400 });
     }
+
+    logger.info('Evento financeiro do Asaas processado com sucesso', {
+      provider_event_id: canonicalEvent.providerEventId,
+      event_type: canonicalEvent.canonicalEvent,
+      business_id: canonicalEvent.businessId,
+    });
 
     return NextResponse.json({ received: true, result: rpcRes });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
+    const incidentId = logger.critical('Exceção inesperada no processamento do webhook Asaas', err, {
+      route: '/api/webhooks/asaas',
+    });
+
+    return NextResponse.json(
+      { error: 'Internal Server Error', incident_id: incidentId },
+      { status: 500 }
+    );
   }
 }

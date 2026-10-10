@@ -1,11 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { RefreshCw, Home, Mail, AlertTriangle } from 'lucide-react';
+import { reportClientError } from '@/lib/observability/client-reporter';
 
-export default function Error({ error: _error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    reportClientError(error, 'error-boundary');
+  }, [error]);
+
   return (
     <div className="min-h-screen bg-[#faf7f2] text-[#1f1914] flex flex-col justify-between font-sans antialiased">
       {/* Header */}
