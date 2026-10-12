@@ -159,11 +159,28 @@ export default function SignupInviteForm({ token, invitedName, invitedEmail, cat
     }
   }
 
+  const cleanDoc = values.document.replace(/\D/g, '');
+  const isCpf = cleanDoc.length > 0 && cleanDoc.length <= 11;
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
     setSending(true);
-    const result = await submitSignupInviteAction(token, values);
+
+    const docDigits = values.document.replace(/\D/g, '');
+    const isPessoaFisica = docDigits.length > 0 && docDigits.length <= 11;
+
+    // Se for CPF e razão social não foi preenchida, usa o nome fantasia (ou nome do responsável)
+    const payload = {
+      ...values,
+      legalName: isPessoaFisica && !values.legalName.trim()
+        ? (values.tradingName.trim() || values.responsibleName.trim())
+        : values.legalName,
+      categoryId: otherCategory ? '' : values.categoryId,
+      categoryOther: otherCategory ? values.categoryOther.trim() : '',
+    };
+
+    const result = await submitSignupInviteAction(token, payload);
     setSending(false);
     if (!result.success) {
       setError(result.error || 'Não foi possível enviar.');
@@ -218,37 +235,95 @@ export default function SignupInviteForm({ token, invitedName, invitedEmail, cat
           <h2 className="font-serif text-lg font-bold text-stone-900">Empresa</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Nome fantasia *"><input required className={inputClass} value={values.tradingName} onChange={(e) => set('tradingName', e.target.value)} /></Field>
-            <Field label="Razão social *"><input required className={inputClass} value={values.legalName} onChange={(e) => set('legalName', e.target.value)} /></Field>
-            <Field label="CNPJ ou CPF *"><input required className={inputClass} inputMode="numeric" value={formatCpfCnpj(values.document)} onChange={(e) => set('document', e.target.value.replace(/\D/g, '').slice(0, 14))} /></Field>
+            <Field label="CNPJ ou CPF *" hint={isCpf ? 'Pessoa Física / Autônomo (Razão Social dispensada)' : undefined}>
+              <input
+                required
+                className={inputClass}
+                inputMode="numeric"
+                placeholder="00.000.000/0000-00 ou 000.000.000-00"
+                value={formatCpfCnpj(values.document)}
+                onChange={(e) => set('document', e.target.value.replace(/\D/g, '').slice(0, 14))}
+              />
+            </Field>
+            {!isCpf && (
+              <Field label="Razão social *" hint="Obrigatório para Pessoa Jurídica (CNPJ)">
+                <input
+                  required
+                  className={inputClass}
+                  value={values.legalName}
+                  onChange={(e) => set('legalName', e.target.value)}
+                />
+              </Field>
+            )}
             <Field label="Telefone da empresa"><input className={inputClass} inputMode="tel" value={values.businessPhone} onChange={(e) => set('businessPhone', formatPhone(e.target.value))} placeholder="(00) 00000-0000" /></Field>
             <Field label="E-mail público" hint="Opcional. Aparece na página da empresa."><input type="email" className={inputClass} value={values.publicEmail} onChange={(e) => set('publicEmail', e.target.value)} /></Field>
             <Field label="Site"><input className={inputClass} value={values.website} onChange={(e) => set('website', e.target.value)} placeholder="https://" /></Field>
           </div>
 
-          <Field label="Categoria *" hint="Escolha da lista. Só informe outra se a sua atividade realmente não estiver nela.">
-            <select
-              required
-              className={inputClass}
-              value={otherCategory ? NEW_CATEGORY : values.categoryId}
-              onChange={(e) => {
-                if (e.target.value === NEW_CATEGORY) {
+          <div className="space-y-3 pt-1">
+            <Field label="Categoria *" hint="Escolha da lista ou clique em 'Não encontrei minha categoria' caso sua atividade não conste.">
+              <select
+                required={!otherCategory}
+                className={inputClass}
+                value={otherCategory ? NEW_CATEGORY : values.categoryId}
+                onChange={(e) => {
+                  if (e.target.value === NEW_CATEGORY) {
+                    setOtherCategory(true);
+                    set('categoryId', '');
+                  } else {
+                    setOtherCategory(false);
+                    set('categoryId', e.target.value);
+                    set('categoryOther', '');
+                  }
+                }}
+              >
+                <option value="">Selecione uma categoria</option>
+                <option value={NEW_CATEGORY}>✨ Não encontrei minha categoria...</option>
+                {categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                <option value={NEW_CATEGORY}>✨ Não encontrei minha categoria...</option>
+              </select>
+            </Field>
+
+            {!otherCategory ? (
+              <button
+                type="button"
+                onClick={() => {
                   setOtherCategory(true);
                   set('categoryId', '');
-                } else {
-                  setOtherCategory(false);
-                  set('categoryId', e.target.value);
-                  set('categoryOther', '');
-                }
-              }}
-            >
-              <option value="">Selecione uma categoria</option>
-              {categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-              <option value={NEW_CATEGORY}>Não encontrei minha categoria…</option>
-            </select>
-          </Field>
-          {otherCategory && (
-            <Field label="Qual é a categoria? *"><input required className={inputClass} maxLength={80} value={values.categoryOther} onChange={(e) => set('categoryOther', e.target.value)} /></Field>
-          )}
+                }}
+                className="text-xs font-semibold text-amber-900 hover:text-amber-950 underline inline-flex items-center gap-1 cursor-pointer"
+              >
+                <span>Não encontrou sua categoria na lista? Clique aqui para preencher</span>
+              </button>
+            ) : (
+              <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 transition-all">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-950">Preencher categoria personalizada</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtherCategory(false);
+                      set('categoryOther', '');
+                    }}
+                    className="text-xs text-stone-500 hover:text-stone-800 underline cursor-pointer"
+                  >
+                    Voltar para a lista
+                  </button>
+                </div>
+                <Field label="Qual é a categoria da sua empresa? *" hint="Informe o ramo de atividade ou especialidade do seu negócio">
+                  <input
+                    required
+                    autoFocus
+                    className={inputClass}
+                    maxLength={80}
+                    placeholder="Ex.: Advocacia Tributária, Clínica Veterinária, Mecânica..."
+                    value={values.categoryOther}
+                    onChange={(e) => set('categoryOther', e.target.value)}
+                  />
+                </Field>
+              </div>
+            )}
+          </div>
         </section>
 
         <section className="space-y-4 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">

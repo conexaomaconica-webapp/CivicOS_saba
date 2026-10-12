@@ -60,7 +60,10 @@ import {
   ContractSnapshotHistoryItem,
   SendContractForSignatureResult,
 } from '@/lib/contracts/admin-contracts-service';
-import { sendContractEmailToAdvertiserAction } from '@/lib/contracts/contract-email-service';
+import {
+  sendContractEmailToAdvertiserAction,
+  sendPaymentEmailToAdvertiserAction,
+} from '@/lib/contracts/contract-email-service';
 import { publishAdminBusinessAction, unlockAdminCommercialDossierAction } from '@/lib/admin/admin-commercial-dossier-service';
 
 interface CommercialOnboardingClientProps {
@@ -197,6 +200,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
   const [sendError, setSendError] = useState<string | null>(null);
   const [copiedLinkFeedback, setCopiedLinkFeedback] = useState<boolean>(false);
   const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
+  const [isSendingPaymentEmail, setIsSendingPaymentEmail] = useState<boolean>(false);
   const [emailStatusDetail, setEmailStatusDetail] = useState<{
     status: 'accepted' | 'failed' | 'unknown' | 'already_processing';
     message: string;
@@ -893,6 +897,44 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
       });
     } finally {
       setIsSendingEmail(false);
+    }
+  };
+
+  const handleSendPaymentEmailDirectly = async () => {
+    setIsSendingPaymentEmail(true);
+    try {
+      const res = await sendPaymentEmailToAdvertiserAction(business.id);
+      if (res.success && res.status === 'accepted') {
+        setCommercialStatus('aguardando_pagamento');
+        setFeedback({
+          type: 'success',
+          message: 'E-mail com o link de pagamento enviado com sucesso ao anunciante ✓',
+        });
+        if (res.public_url && signatureTokenData) {
+          setSignatureTokenData({
+            ...signatureTokenData,
+            public_url: res.public_url,
+          });
+        }
+        router.refresh();
+      } else if (res.status === 'already_processing') {
+        setFeedback({
+          type: 'error',
+          message: 'Já existe um envio deste link de pagamento em andamento. Aguarde alguns instantes.',
+        });
+      } else {
+        setFeedback({
+          type: 'error',
+          message: res.error || 'Não foi possível enviar o e-mail com o link de pagamento.',
+        });
+      }
+    } catch (err: any) {
+      setFeedback({
+        type: 'error',
+        message: err?.message || 'Erro inesperado ao enviar e-mail de pagamento.',
+      });
+    } finally {
+      setIsSendingPaymentEmail(false);
     }
   };
 
@@ -2389,11 +2431,21 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
                 </button>
                 <button
                   type="button"
-                  onClick={handleOpenEmailShare}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3.5 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition shadow-2xs cursor-pointer"
+                  disabled={isSendingPaymentEmail}
+                  onClick={handleSendPaymentEmailDirectly}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400 bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2 text-xs font-semibold transition shadow-2xs cursor-pointer disabled:cursor-wait disabled:opacity-60"
                 >
-                  <Mail className="h-3.5 w-3.5 text-stone-600" />
-                  Enviar por e-mail
+                  <Mail className={`h-3.5 w-3.5 ${isSendingPaymentEmail ? 'animate-spin' : ''}`} />
+                  <span>{isSendingPaymentEmail ? 'Enviando e-mail...' : 'Enviar por e-mail'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenEmailShare}
+                  title="Abrir no aplicativo de e-mail local (mailto)"
+                  className="inline-flex items-center gap-1 rounded-xl border border-stone-200 bg-white px-2.5 py-2 text-[11px] font-medium text-stone-600 hover:bg-stone-50 transition shadow-2xs cursor-pointer"
+                >
+                  <Mail className="h-3 w-3 text-stone-400" />
+                  <span>Abrir no App Local</span>
                 </button>
                 <button
                   type="button"

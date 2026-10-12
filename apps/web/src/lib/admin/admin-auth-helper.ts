@@ -2,7 +2,8 @@ import { createServerSideClient } from '@/lib/supabase/server';
 
 export async function assertPlatformAdminAccess() {
   const supabase = await createServerSideClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data, error: authError } = await supabase.auth.getUser();
+  const user = data?.user;
 
   if (authError || !user) {
     throw new Error('UNAUTHORIZED: Sessão expirada ou usuário não autenticado.');
@@ -20,7 +21,8 @@ export async function assertPlatformAdminAccess() {
 
 export async function assertMasterAdminAccess() {
   const supabase = await createServerSideClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data, error: authError } = await supabase.auth.getUser();
+  const user = data?.user;
 
   if (authError || !user) {
     throw new Error('UNAUTHORIZED: Sessão expirada ou usuário não autenticado.');

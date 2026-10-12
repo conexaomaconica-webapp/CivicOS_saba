@@ -237,7 +237,9 @@ E, por manifestação eletrônica de vontade, o ANUNCIANTE declara que teve aces
     { name: '{{responsavel_email}}', desc: 'E-mail autenticado do Responsável Legal' },
     { name: '{{plano_nome}}', desc: 'Nome comercial do plano (ex: Plano Acácia, Plano Compasso)' },
     { name: '{{valor_total}}', desc: 'Valor oficial total do plano contratado' },
-    { name: '{{vigencia}}', desc: 'Período contratual (ex: 12 meses / 1 ano)' },
+    { name: '{{vigencia}}', desc: 'Período contratual numérico (ex: 12 meses ou 24 meses)' },
+    { name: '{{prazo_vigencia}}', desc: 'Prazo por extenso: "dois anos correntes" (Acácia c/ Pedra Fundamental) ou "um ano corrente"' },
+    { name: '{{data_inicio_vigencia}}', desc: 'Data de início da vigência (ex: 12/10/2026 ou data de assinatura)' },
     { name: '{{sha256_hash}}', desc: 'Hash criptográfico gerado no aceite eletrônico' },
   ];
 

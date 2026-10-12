@@ -20,14 +20,26 @@ import {
   Sparkles,
   Lock,
   Mail,
+  Radio,
+  Play,
+  Terminal,
+  Activity,
+  Zap,
 } from 'lucide-react';
 import {
   type AsaasIntegrationOverview,
   type AsaasEnvironmentDetails,
+  type AsaasWebhookDiagnostic,
+  type AsaasRecentWebhookEvent,
   saveAdminAsaasCredentialsAction,
   switchAdminAsaasEnvironmentAction,
   testAdminAsaasConnectionAction,
   configureAdminAsaasWebhookAction,
+  getAdminAsaasWebhookDiagnosticAction,
+  reactivateAdminAsaasWebhookAction,
+  getAdminAsaasRecentWebhookEventsAction,
+  sendAdminAsaasWebhookSmokeTestAction,
+  simulateAdminAsaasSandboxPaymentAction,
 } from '@/lib/payment/asaas-config-service';
 import type { AsaasEnvironment } from '@/lib/payment/asaas-config';
 
@@ -35,9 +47,11 @@ interface Props {
   initialOverview: AsaasIntegrationOverview;
 }
 
+export type AsaasClientTab = AsaasEnvironment | 'teste';
+
 export function AsaasIntegrationClient({ initialOverview }: Props) {
   const [overview, setOverview] = useState<AsaasIntegrationOverview>(initialOverview);
-  const [selectedTab, setSelectedTab] = useState<AsaasEnvironment>(initialOverview.activeEnvironment);
+  const [selectedTab, setSelectedTab] = useState<AsaasClientTab>(initialOverview.activeEnvironment);
 
   // States de Formulário de Credenciais
   const [sandboxApiKey, setSandboxApiKey] = useState('');
@@ -55,6 +69,31 @@ export function AsaasIntegrationClient({ initialOverview }: Props) {
   const [testingConnection, setTestingConnection] = useState(false);
   const [configuringWebhook, setConfiguringWebhook] = useState(false);
   const [switchingEnvironment, setSwitchingEnvironment] = useState(false);
+
+  // States específicos da Aba de Teste & Diagnóstico de Webhook
+  const [testEnv, setTestEnv] = useState<AsaasEnvironment>(initialOverview.activeEnvironment);
+  const [webhookDiag, setWebhookDiag] = useState<AsaasWebhookDiagnostic | null>(null);
+  const [isLoadingDiag, setIsLoadingDiag] = useState(false);
+  const [diagError, setDiagError] = useState<string | null>(null);
+
+  const [recentEvents, setRecentEvents] = useState<AsaasRecentWebhookEvent[]>([]);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+  const [isReactivating, setIsReactivating] = useState(false);
+  const [isSendingSmokeTest, setIsSendingSmokeTest] = useState(false);
+  const [smokeTestResult, setSmokeTestResult] = useState<{
+    success: boolean;
+    message: string;
+    statusCode?: number;
+    error?: string;
+  } | null>(null);
+
+  const [isSimulatingPayment, setIsSimulatingPayment] = useState(false);
+  const [simulationResult, setSimulationResult] = useState<{
+    success: boolean;
+    message: string;
+    paymentId?: string;
+    error?: string;
+  } | null>(null);
 
   const [notification, setNotification] = useState<{
     type: 'success' | 'error' | 'warning';
@@ -268,8 +307,101 @@ export function AsaasIntegrationClient({ initialOverview }: Props) {
     }
   };
 
+  // Handlers da Aba de Teste & Diagnóstico de Webhook
+  const loadWebhookDiagnostic = async (env: AsaasEnvironment) => {
+    setIsLoadingDiag(true);
+    setDiagError(null);
+    try {
+      const res = await getAdminAsaasWebhookDiagnosticAction(env);
+      if (res.success && res.data) {
+        setWebhookDiag(res.data);
+      } else {
+        setDiagError(res.error || 'Falha ao consultar webhook no Asaas.');
+      }
+    } catch (err: any) {
+      setDiagError(err?.message || 'Erro inesperado.');
+    } finally {
+      setIsLoadingDiag(false);
+    }
+  };
+
+  const loadRecentEvents = async () => {
+    setIsLoadingEvents(true);
+    try {
+      const res = await getAdminAsaasRecentWebhookEventsAction(15);
+      if (res.success && res.data) {
+        setRecentEvents(res.data);
+      }
+    } catch (_err) {
+      /* best-effort */
+    } finally {
+      setIsLoadingEvents(false);
+    }
+  };
+
+  const handleReactivateWebhook = async () => {
+    if (!webhookDiag?.webhookId) return;
+    setIsReactivating(true);
+    try {
+      const res = await reactivateAdminAsaasWebhookAction(testEnv, webhookDiag.webhookId);
+      if (res.success) {
+        setNotification({ type: 'success', text: res.message });
+        await loadWebhookDiagnostic(testEnv);
+      } else {
+        setNotification({ type: 'error', text: res.error || res.message });
+      }
+    } catch (err: any) {
+      setNotification({ type: 'error', text: err?.message || 'Erro inesperado.' });
+    } finally {
+      setIsReactivating(false);
+    }
+  };
+
+  const handleSendSmokeTest = async () => {
+    setIsSendingSmokeTest(true);
+    setSmokeTestResult(null);
+    try {
+      const res = await sendAdminAsaasWebhookSmokeTestAction(testEnv);
+      setSmokeTestResult(res);
+      await loadRecentEvents();
+    } catch (err: any) {
+      setSmokeTestResult({
+        success: false,
+        message: 'Falha no disparo do teste.',
+        error: err?.message || 'Erro inesperado.',
+      });
+    } finally {
+      setIsSendingSmokeTest(false);
+    }
+  };
+
+  const handleSimulateSandboxPayment = async () => {
+    setIsSimulatingPayment(true);
+    setSimulationResult(null);
+    try {
+      const res = await simulateAdminAsaasSandboxPaymentAction();
+      setSimulationResult(res);
+      await loadRecentEvents();
+    } catch (err: any) {
+      setSimulationResult({
+        success: false,
+        message: 'Falha na simulação.',
+        error: err?.message || 'Erro inesperado.',
+      });
+    } finally {
+      setIsSimulatingPayment(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (selectedTab === 'teste') {
+      loadWebhookDiagnostic(testEnv);
+      loadRecentEvents();
+    }
+  }, [selectedTab, testEnv]);
+
   const currentTabDetails: AsaasEnvironmentDetails =
-    selectedTab === 'sandbox' ? overview.sandbox : overview.production;
+    selectedTab === 'production' ? overview.production : overview.sandbox;
 
   return (
     <div className="space-y-6 pb-12">
@@ -469,12 +601,405 @@ export function AsaasIntegrationClient({ initialOverview }: Props) {
             </span>
           )}
         </button>
+
+        <button
+          type="button"
+          onClick={() => setSelectedTab('teste')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition cursor-pointer ${
+            selectedTab === 'teste'
+              ? 'border-indigo-700 text-indigo-700'
+              : 'border-transparent text-stone-500 hover:text-stone-800'
+          }`}
+        >
+          <span>⚡ Teste de Webhook & Reconhecimento</span>
+          {webhookDiag?.interrupted ? (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 animate-pulse">
+              Fila Interrompida
+            </span>
+          ) : webhookDiag?.enabled && !webhookDiag?.interrupted ? (
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800">
+              Operacional
+            </span>
+          ) : null}
+        </button>
       </div>
 
       {/* =================================================================== */}
-      {/* DETALHES DO AMBIENTE SELECIONADO                                    */}
+      {/* CONTEÚDO PRINCIPAL (ABA TESTE OU DETALHES DE CREDENCIAIS)           */}
       {/* =================================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {selectedTab === 'teste' ? (
+        <div className="space-y-6">
+          {/* Barra de Ação & Seletor de Ambiente para Teste */}
+          <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
+                <Activity className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-stone-900 text-base">
+                  Diagnóstico e Testes de Webhook
+                </h3>
+                <p className="text-xs text-stone-500">
+                  Monitore a fila do Asaas, destrave webhooks suspensos e simule confirmações de pagamento.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="inline-flex rounded-xl p-1 bg-stone-100 border border-stone-200 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTestEnv('sandbox');
+                    loadWebhookDiagnostic('sandbox');
+                  }}
+                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                    testEnv === 'sandbox'
+                      ? 'bg-white text-stone-900 shadow-xs'
+                      : 'text-stone-500 hover:text-stone-900'
+                  }`}
+                >
+                  🧪 Sandbox
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTestEnv('production');
+                    loadWebhookDiagnostic('production');
+                  }}
+                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                    testEnv === 'production'
+                      ? 'bg-white text-stone-900 shadow-xs'
+                      : 'text-stone-500 hover:text-stone-900'
+                  }`}
+                >
+                  🛡️ Produção
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  loadWebhookDiagnostic(testEnv);
+                  loadRecentEvents();
+                }}
+                disabled={isLoadingDiag || isLoadingEvents}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 transition disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isLoadingDiag || isLoadingEvents ? 'animate-spin' : ''}`} />
+                <span>Atualizar</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Grid Superior: Card 1 (Status da Fila no Asaas) e Card 2 (Ferramentas de Disparo) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* CARD 1: STATUS DA FILA NO ASAAS */}
+            <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Radio className="h-5 w-5 text-indigo-700" />
+                  <h4 className="font-bold text-stone-900 text-sm">
+                    Status da Fila no Asaas ({testEnv.toUpperCase()})
+                  </h4>
+                </div>
+                {isLoadingDiag && (
+                  <span className="text-xs text-stone-400 flex items-center gap-1">
+                    <RefreshCw className="h-3 w-3 animate-spin" /> Verificando...
+                  </span>
+                )}
+              </div>
+
+              {diagError && (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-900 flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
+                  <div>
+                    <strong className="block font-bold">Falha ao consultar fila no Asaas</strong>
+                    <span>{diagError}</span>
+                  </div>
+                </div>
+              )}
+
+              {webhookDiag ? (
+                <div className="space-y-4">
+                  {/* Alerta de Fila Interrompida / Penalizada */}
+                  {webhookDiag.interrupted ? (
+                    <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-950 space-y-3">
+                      <div className="flex items-center gap-2 font-bold text-rose-900 text-sm">
+                        <AlertTriangle className="h-5 w-5 text-rose-600 animate-pulse shrink-0" />
+                        <span>Fila Penalizada e Interrompida pelo Asaas!</span>
+                      </div>
+                      <p className="leading-relaxed">
+                        O Asaas suspendeu temporariamente o envio de webhooks porque seu servidor demorou ou rejeitou requisições anteriores ({webhookDiag.penalizedRequestsCount ?? 0} penalidade(s)).
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleReactivateWebhook}
+                        disabled={isReactivating}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs shadow-sm transition disabled:opacity-50 cursor-pointer"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${isReactivating ? 'animate-spin' : ''}`} />
+                        {isReactivating ? 'Reativando no Asaas...' : 'Destravar e Reativar Fila Agora'}
+                      </button>
+                    </div>
+                  ) : webhookDiag.enabled && !webhookDiag.interrupted ? (
+                    <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 flex items-center gap-2.5">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                      <div>
+                        <strong className="block font-bold text-emerald-900">Fila Saudável & Ativa</strong>
+                        <span>O Asaas está despachando eventos normalmente para o endpoint configurado.</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                      <span>{webhookDiag.configuredInAsaas ? 'Webhook desativado no Asaas.' : 'Nenhum webhook registrado.'}</span>
+                    </div>
+                  )}
+
+                  {/* Detalhes Técnicos do Webhook no Asaas */}
+                  <div className="grid grid-cols-2 gap-3 text-xs bg-stone-50 p-3.5 rounded-xl border border-stone-200">
+                    <div>
+                      <span className="text-stone-400 block text-[10px] uppercase font-bold">ID no Asaas</span>
+                      <span className="font-mono text-stone-800 font-semibold">{webhookDiag.webhookId || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 block text-[10px] uppercase font-bold">Habilitado</span>
+                      <span className="font-semibold text-stone-800">
+                        {webhookDiag.enabled ? '✅ Sim (Ativo)' : '❌ Desativado'}
+                      </span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-stone-400 block text-[10px] uppercase font-bold">URL Cadastrada no Asaas</span>
+                      <span className="font-mono text-stone-800 break-all select-all text-[11px]">
+                        {webhookDiag.url || 'Nenhuma'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 block text-[10px] uppercase font-bold">Token de Autenticação</span>
+                      <span className="font-semibold text-stone-800">
+                        {webhookDiag.hasAuthToken ? '🔒 Configurado' : '⚠️ Ausente'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 block text-[10px] uppercase font-bold">Versão da API</span>
+                      <span className="font-mono text-stone-800 font-semibold">
+                        v{webhookDiag.apiVersion || 3}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-stone-400 text-xs">
+                  Carregando informações da fila...
+                </div>
+              )}
+            </div>
+
+            {/* CARD 2: FERRAMENTAS DE DISPARO DE TESTE */}
+            <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-5">
+              <div className="border-b border-stone-100 pb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-indigo-700" />
+                  <h4 className="font-bold text-stone-900 text-sm">Disparar Testes de Reconhecimento</h4>
+                </div>
+              </div>
+
+              {/* Teste 1: Smoke Test Técnico */}
+              <div className="p-4 rounded-xl border border-stone-200 bg-stone-50/50 space-y-3">
+                <div>
+                  <h5 className="font-bold text-stone-900 text-xs flex items-center gap-1.5">
+                    <Terminal className="h-4 w-4 text-stone-600" />
+                    1. Teste de Rota Webhook (Smoke Test Autenticado)
+                  </h5>
+                  <p className="text-[11px] text-stone-500 mt-1 leading-relaxed">
+                    Envia um payload técnico diretamente para <code>/api/webhooks/asaas</code> com o token configurado. Testa autenticação, resposta 200 OK e auditoria em banco.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSendSmokeTest}
+                  disabled={isSendingSmokeTest}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-stone-800 hover:bg-stone-900 text-white font-bold text-xs shadow-xs transition disabled:opacity-50 cursor-pointer"
+                >
+                  <Play className={`h-3.5 w-3.5 ${isSendingSmokeTest ? 'animate-spin' : ''}`} />
+                  {isSendingSmokeTest ? 'Disparando Teste...' : 'Executar Smoke Test de Rota'}
+                </button>
+
+                {smokeTestResult && (
+                  <div
+                    className={`p-3 rounded-lg text-xs border ${
+                      smokeTestResult.success
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                        : 'bg-rose-50 border-rose-200 text-rose-950'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold">
+                      {smokeTestResult.success ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-rose-600" />
+                      )}
+                      <span>
+                        Status: HTTP {smokeTestResult.statusCode || 200} — {smokeTestResult.message}
+                      </span>
+                    </div>
+                    {smokeTestResult.error && (
+                      <p className="mt-1 text-[11px] text-rose-800">{smokeTestResult.error}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Teste 2: Simulação Real de Pagamento Sandbox */}
+              <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/40 space-y-3">
+                <div>
+                  <h5 className="font-bold text-amber-950 text-xs flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4 text-amber-600" />
+                    2. Simular Pagamento Real no Sandbox (Cobrança + Liquidação)
+                  </h5>
+                  <p className="text-[11px] text-amber-800 mt-1 leading-relaxed">
+                    Cria uma cobrança de teste de R$ 5,00 no Asaas Sandbox e simula a confirmação imediata. O Asaas enviará eventos <code>PAYMENT_CREATED</code> e <code>PAYMENT_RECEIVED</code> via Webhook.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSimulateSandboxPayment}
+                  disabled={isSimulatingPayment}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition disabled:opacity-50 cursor-pointer"
+                >
+                  <Sparkles className={`h-3.5 w-3.5 ${isSimulatingPayment ? 'animate-spin' : ''}`} />
+                  {isSimulatingPayment ? 'Criando e Liquidando Cobrança...' : 'Simular Pagamento no Asaas Sandbox'}
+                </button>
+
+                {simulationResult && (
+                  <div
+                    className={`p-3 rounded-lg text-xs border ${
+                      simulationResult.success
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                        : 'bg-rose-50 border-rose-200 text-rose-950'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold">
+                      {simulationResult.success ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-rose-600" />
+                      )}
+                      <span>{simulationResult.message}</span>
+                    </div>
+                    {simulationResult.paymentId && (
+                      <div className="mt-1 font-mono text-[11px] text-emerald-800">
+                        ID Gerado: <strong>{simulationResult.paymentId}</strong> (Acompanhe na tabela abaixo)
+                      </div>
+                    )}
+                    {simulationResult.error && (
+                      <p className="mt-1 text-[11px] text-rose-800">{simulationResult.error}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* CARD 3: AUDITORIA DE EVENTOS RECENTES EM TEMPO REAL */}
+          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-indigo-700" />
+                <div>
+                  <h4 className="font-bold text-stone-900 text-sm">
+                    Histórico de Eventos Recebidos no Webhook
+                  </h4>
+                  <p className="text-xs text-stone-500">
+                    Últimos registros auditados na tabela <code>payment_provider_events</code> do banco.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={loadRecentEvents}
+                disabled={isLoadingEvents}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-stone-600 hover:bg-stone-100 transition cursor-pointer"
+              >
+                <RefreshCw className={`h-3 w-3 ${isLoadingEvents ? 'animate-spin' : ''}`} />
+                <span>Recarregar</span>
+              </button>
+            </div>
+
+            {recentEvents.length === 0 ? (
+              <div className="text-center py-12 text-stone-400 text-xs space-y-2">
+                <Webhook className="h-8 w-8 mx-auto text-stone-300" />
+                <p>Nenhum evento registrado ainda.</p>
+                <p className="text-[11px]">Dispare um smoke test ou simule um pagamento acima para testar.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-stone-200 text-stone-400 text-[10px] uppercase font-bold">
+                      <th className="py-2.5 px-3">Data / Hora</th>
+                      <th className="py-2.5 px-3">Evento</th>
+                      <th className="py-2.5 px-3">Payment ID</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3">Erro / Observação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100 font-mono">
+                    {recentEvents.map((ev) => (
+                      <tr key={ev.id} className="hover:bg-stone-50/80 transition">
+                        <td className="py-2.5 px-3 whitespace-nowrap text-stone-600 font-sans text-[11px]">
+                          {new Date(ev.created_at).toLocaleString('pt-BR')}
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap font-bold text-stone-900 font-sans">
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] ${
+                              ev.event_type.includes('CONFIRMED') || ev.event_type.includes('RECEIVED')
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : ev.event_type.includes('OVERDUE') || ev.event_type.includes('DELETED')
+                                ? 'bg-rose-100 text-rose-800'
+                                : ev.event_type.includes('SMOKE_TEST')
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-stone-100 text-stone-700'
+                            }`}
+                          >
+                            {ev.event_type}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap text-stone-700 text-[11px]">
+                          {ev.payment_id || '—'}
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap font-sans">
+                          {ev.processed ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-700 text-[11px] font-bold">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Processado
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-amber-700 text-[11px] font-bold">
+                              <AlertTriangle className="h-3.5 w-3.5" /> Pendente
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-stone-500 font-sans text-[11px] max-w-xs truncate" title={ev.error_log || ''}>
+                          {ev.error_log ? (
+                            <span className="text-rose-600 font-medium">{ev.error_log}</span>
+                          ) : (
+                            <span className="text-stone-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Coluna 1 & 2: Configuração de Credenciais & Webhook */}
         <div className="lg:col-span-2 space-y-6">
           {/* Card 1: API Key & URL Fixa */}
@@ -870,6 +1395,7 @@ export function AsaasIntegrationClient({ initialOverview }: Props) {
           </div>
         </div>
       </div>
+      )}
 
       {/* =================================================================== */}
       {/* MODAL DE SEGURANÇA PARA ALTERNAR AMBIENTE                           */}

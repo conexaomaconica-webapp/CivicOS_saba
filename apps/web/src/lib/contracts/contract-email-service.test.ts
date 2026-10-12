@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { HostingerMailProvider } from '@/lib/email/providers/hostinger-mail-provider';
-import { dispatchContractEmail } from './contract-email-service';
+import { dispatchContractEmail, dispatchPaymentLinkEmail } from './contract-email-service';
 
 describe('HostingerMailProvider Unit Tests', () => {
   const originalEnv = { ...process.env };
@@ -185,17 +185,18 @@ describe('dispatchContractEmail Concurrency, Idempotency & Safety', () => {
         }
 
         if (table === 'contracts') {
+          const chain: any = {
+            order: () => ({
+              limit: () => ({
+                maybeSingle: async () => ({ data: dbState.contracts, error: null }),
+              }),
+            }),
+          };
+          chain.in = () => chain;
+          chain.eq = () => chain;
           return {
             select: () => ({
-              eq: () => ({
-                in: () => ({
-                  order: () => ({
-                    limit: () => ({
-                      maybeSingle: async () => ({ data: dbState.contracts, error: null }),
-                    }),
-                  }),
-                }),
-              }),
+              eq: () => chain,
             }),
             update: (updates: any) => ({
               eq: async () => {
@@ -270,13 +271,17 @@ describe('dispatchContractEmail Concurrency, Idempotency & Safety', () => {
                 }),
               };
             },
-            update: (updates: any) => ({
-              eq: async (_col: string, val: any) => {
-                const target = dbState.tokens.find((t) => t.id === val);
-                if (target) Object.assign(target, updates);
-                return { error: null };
-              },
-            }),
+            update: (updates: any) => {
+              const chain: any = {
+                eq: (_col: string, val: any) => {
+                  const target = dbState.tokens.find((t) => t.id === val);
+                  if (target) Object.assign(target, updates);
+                  return chain;
+                },
+                then: (resolve: any) => resolve({ error: null }),
+              };
+              return chain;
+            },
             delete: () => ({
               eq: async (_col: string, val: any) => {
                 const idx = dbState.tokens.findIndex((t) => t.id === val);
@@ -412,5 +417,35 @@ describe('dispatchContractEmail Concurrency, Idempotency & Safety', () => {
     // Garante que o snapshot e o hash nunca foram modificados
     expect(mockDb.dbState.snapshots.sha256_hash).toBe(mockSha256);
     expect(mockDb.dbState.snapshots.id).toBe(mockSnapshotId);
+  });
+
+  it('dispatchPaymentLinkEmail envia link de pagamento para contrato assinado com assunto e texto corretos', async () => {
+    const mockDb = createMockDb();
+    mockDb.dbState.contracts.status = 'signed';
+    mockDb.dbState.businesses.commercial_status = 'contrato_assinado';
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: 'hostinger-payment-ack-789' }),
+    });
+    global.fetch = mockFetch;
+
+    const result = await dispatchPaymentLinkEmail({
+      businessId: mockBusinessId,
+      dbClient: mockDb,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.status).toBe('accepted');
+    expect(result.publicUrl).toBeDefined();
+
+    // Valida que o e-mail continha assunto de Pagamento
+    const callArgs = mockFetch.mock.calls[0];
+    expect(callArgs).toBeDefined();
+    const bodySent = JSON.parse(callArgs![1].body as string);
+    expect(bodySent.subject).toContain('Link de Pagamento');
+    expect(bodySent.html).toContain('Efetuar Pagamento da Contratação');
+    expect(mockDb.dbState.businesses.commercial_status).toBe('aguardando_pagamento');
   });
 });

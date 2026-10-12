@@ -92,4 +92,26 @@ describe('convite de cadastro — dados do cliente', () => {
     expect(validateSubmission(normalizeSubmission({ ...valid, responsibleEmail: 'sem-arroba' }))).toBeTruthy();
     expect(normalizeSubmission({ ...valid, tradingName: 'x'.repeat(500) }).tradingName.length).toBe(120);
   });
+
+  it('aceita CPF sem razao social e preenche legalName com o nome fantasia', () => {
+    const validCpf = {
+      ...valid,
+      document: '52998224725', // CPF válido
+      legalName: '',
+    };
+    const normalized = normalizeSubmission(validCpf);
+    expect(normalized.legalName).toBe(validCpf.tradingName);
+    expect(validateSubmission(normalized)).toBeNull();
+  });
+
+  it('continua exigindo razao social quando o documento for CNPJ', () => {
+    const cnpjSemRazao = {
+      ...valid,
+      document: '11222333000181', // CNPJ
+      legalName: '',
+    };
+    const normalized = normalizeSubmission(cnpjSemRazao);
+    expect(normalized.legalName).toBe('');
+    expect(validateSubmission(normalized)).toMatch(/nome completo/i);
+  });
 });

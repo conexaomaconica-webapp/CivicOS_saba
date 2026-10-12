@@ -33,7 +33,31 @@ export async function middleware(request: NextRequest) {
   const supabase = createMiddlewareSideClient(request, response);
   
   // Retrieve current user and automatically refresh session if stale.
-  const { data: { user } } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (!error && data?.user) {
+      user = data.user;
+    } else if (error) {
+      // Se o token de atualização estiver expirado ou ausente no banco (refresh_token_not_found),
+      // limpa os cookies de sessão corrompidos para evitar disparos repetidos
+      const authErr = error as { code?: string; status?: number; name?: string };
+      if (
+        authErr.code === 'refresh_token_not_found' ||
+        authErr.status === 400 ||
+        authErr.name === 'AuthApiError'
+      ) {
+        request.cookies.getAll().forEach((cookie) => {
+          if (cookie.name.includes('-auth-token') || cookie.name.startsWith('sb-')) {
+            request.cookies.delete(cookie.name);
+            response.cookies.delete(cookie.name);
+          }
+        });
+      }
+    }
+  } catch {
+    user = null;
+  }
 
   const path = request.nextUrl.pathname;
 

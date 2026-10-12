@@ -17,6 +17,7 @@ import {
   renderContractTemplate,
   formatCurrencyBRL,
   formatVigencia,
+  formatPrazoVigenciaExtenso,
   formatSeloPedraFundamental,
   formatDataEmissao,
   formatDataInicioVigencia,
@@ -253,6 +254,10 @@ export async function getAdminContractDraftPreviewAction(
       empresa_telefone: empresaTelefone,
       plano_nome: ctRow.plan_name,
       vigencia: formatVigencia(ctRow.billing_cycle),
+      prazo_vigencia: formatPrazoVigenciaExtenso(
+        ctRow.billing_cycle,
+        Boolean(pedraFundamentalRecognition || ctRow.is_pedra_fundamental)
+      ),
       data_inicio_vigencia: formatDataInicioVigencia(ctRow.contract_start_date ?? null),
       valor_total: formatCurrencyBRL(ctRow.amount_cents),
       forma_pagamento: ctRow.payment_method === 'avista' ? 'À vista' : 'Parcelado',
@@ -570,6 +575,10 @@ export async function generateAdminContractSnapshotAction(
       empresa_telefone: empresaTelefone,
       plano_nome: ctRow.plan_name,
       vigencia: formatVigencia(ctRow.billing_cycle),
+      prazo_vigencia: formatPrazoVigenciaExtenso(
+        ctRow.billing_cycle,
+        Boolean(pedraFundamentalRecognition || ctRow.is_pedra_fundamental)
+      ),
       data_inicio_vigencia: formatDataInicioVigencia(ctRow.contract_start_date ?? null),
       valor_total: formatCurrencyBRL(ctRow.amount_cents),
       forma_pagamento: ctRow.payment_method === 'avista' ? 'À vista' : 'Parcelado',

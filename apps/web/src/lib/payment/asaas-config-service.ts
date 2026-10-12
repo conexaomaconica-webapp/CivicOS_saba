@@ -763,3 +763,437 @@ export async function getAsaasDynamicConfig(
   // Fallback padrão para as variáveis de ambiente
   return getAsaasConfig();
 }
+
+export interface AsaasWebhookDiagnostic {
+  environment: AsaasEnvironment;
+  configuredInAsaas: boolean;
+  webhookId?: string | null;
+  name?: string;
+  url?: string;
+  enabled?: boolean;
+  interrupted?: boolean;
+  penalizedRequestsCount?: number;
+  events?: string[];
+  apiVersion?: number;
+  hasAuthToken?: boolean;
+  rawError?: string;
+}
+
+export interface AsaasRecentWebhookEvent {
+  id: string;
+  created_at: string;
+  event_id: string;
+  event_type: string;
+  processed: boolean;
+  processed_at: string | null;
+  error_log: string | null;
+  payment_id?: string | null;
+  status?: string | null;
+  value?: number | null;
+  customer?: string | null;
+}
+
+/**
+ * Consulta a situação real da fila do webhook diretamente na API do Asaas.
+ */
+export async function getAdminAsaasWebhookDiagnosticAction(
+  environment: AsaasEnvironment
+): Promise<{ success: boolean; data?: AsaasWebhookDiagnostic; error?: string }> {
+  try {
+    const { supabase } = await assertPlatformAdminAccess();
+    const tenantId = await resolveRequestOperationalTenantId(supabase);
+
+    const { data: setting } = await (supabase as any)
+      .from('payment_provider_settings')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('provider', 'asaas')
+      .eq('environment', environment)
+      .maybeSingle();
+
+    let apiKey = setting?.encrypted_api_key ? decryptSecret(setting.encrypted_api_key) : '';
+    if (!apiKey && process.env.ASAAS_ENVIRONMENT === environment) {
+      apiKey = process.env.ASAAS_API_KEY || '';
+    }
+
+    if (!apiKey) {
+      return {
+        success: false,
+        error: `Nenhuma Chave de API configurada para o ambiente ${environment.toUpperCase()}.`,
+      };
+    }
+
+    const baseUrl = CANONICAL_URLS[environment];
+    const res = await fetch(`${baseUrl}/webhooks`, {
+      headers: {
+        access_token: apiKey,
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      return {
+        success: false,
+        error: `Falha na consulta ao Asaas (HTTP ${res.status}): ${errText}`,
+      };
+    }
+
+    const json = await res.json().catch(() => ({}));
+    const list = Array.isArray(json?.data) ? json.data : [];
+    const wh = list[0];
+
+    if (!wh) {
+      return {
+        success: true,
+        data: {
+          environment,
+          configuredInAsaas: false,
+        },
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        environment,
+        configuredInAsaas: true,
+        webhookId: wh.id,
+        name: wh.name,
+        url: wh.url,
+        enabled: Boolean(wh.enabled),
+        interrupted: Boolean(wh.interrupted),
+        penalizedRequestsCount: Number(wh.penalizedRequestsCount || 0),
+        events: Array.isArray(wh.events) ? wh.events : [],
+        apiVersion: wh.apiVersion,
+        hasAuthToken: Boolean(wh.hasAuthToken),
+      },
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Erro inesperado ao consultar diagnóstico de webhook.',
+    };
+  }
+}
+
+/**
+ * Reativa a fila de envio de webhooks no Asaas (desbloqueia se estiver interrupted).
+ */
+export async function reactivateAdminAsaasWebhookAction(
+  environment: AsaasEnvironment,
+  webhookId: string
+): Promise<{ success: boolean; message: string; error?: string }> {
+  try {
+    const { supabase } = await assertPlatformAdminAccess();
+    const tenantId = await resolveRequestOperationalTenantId(supabase);
+
+    const { data: setting } = await (supabase as any)
+      .from('payment_provider_settings')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('provider', 'asaas')
+      .eq('environment', environment)
+      .maybeSingle();
+
+    let apiKey = setting?.encrypted_api_key ? decryptSecret(setting.encrypted_api_key) : '';
+    if (!apiKey && process.env.ASAAS_ENVIRONMENT === environment) {
+      apiKey = process.env.ASAAS_API_KEY || '';
+    }
+
+    if (!apiKey) {
+      return { success: false, error: 'Chave de API não configurada.', message: '' };
+    }
+
+    const baseUrl = CANONICAL_URLS[environment];
+    const updateRes = await fetch(`${baseUrl}/webhooks/${webhookId}`, {
+      method: 'PUT',
+      headers: {
+        access_token: apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        enabled: true,
+        interrupted: false,
+      }),
+    });
+
+    if (!updateRes.ok) {
+      const errText = await updateRes.text().catch(() => '');
+      return {
+        success: false,
+        message: 'Falha ao reativar webhook no Asaas.',
+        error: `Erro HTTP ${updateRes.status}: ${errText}`,
+      };
+    }
+
+    revalidatePath('/admin/configuracoes/integracoes/asaas');
+    return {
+      success: true,
+      message: 'Fila de webhooks destravada e reativada com sucesso no Asaas!',
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: 'Erro ao reativar webhook.',
+      error: err?.message || 'Erro inesperado.',
+    };
+  }
+}
+
+/**
+ * Busca os eventos mais recentes recebidos em payment_provider_events para auditoria em tela.
+ */
+export async function getAdminAsaasRecentWebhookEventsAction(
+  limit: number = 15
+): Promise<{ success: boolean; data?: AsaasRecentWebhookEvent[]; error?: string }> {
+  try {
+    const { supabase } = await assertPlatformAdminAccess();
+
+    const { data: events, error } = await (supabase as any)
+      .from('payment_provider_events')
+      .select('id, created_at, event_id, event_type, processed, processed_at, error_log, payload')
+      .eq('provider_code', 'asaas')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const formatted: AsaasRecentWebhookEvent[] = (events || []).map((e: any) => ({
+      id: e.id,
+      created_at: e.created_at,
+      event_id: e.event_id,
+      event_type: e.event_type || e.payload?.event || 'N/A',
+      processed: Boolean(e.processed),
+      processed_at: e.processed_at,
+      error_log: e.error_log,
+      payment_id: e.payload?.payment?.id || null,
+      status: e.payload?.payment?.status || null,
+      value: e.payload?.payment?.value || null,
+      customer: e.payload?.payment?.customer || null,
+    }));
+
+    return { success: true, data: formatted };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Erro ao carregar histórico de eventos.',
+    };
+  }
+}
+
+/**
+ * Dispara uma requisição de teste técnico autenticado (Smoke Test) diretamente para
+ * a rota interna /api/webhooks/asaas, validando se o token bate e a resposta é 200 OK.
+ */
+export async function sendAdminAsaasWebhookSmokeTestAction(
+  environment: AsaasEnvironment
+): Promise<{
+  success: boolean;
+  message: string;
+  statusCode?: number;
+  eventId?: string;
+  error?: string;
+}> {
+  try {
+    const { supabase } = await assertPlatformAdminAccess();
+    const tenantId = await resolveRequestOperationalTenantId(supabase);
+
+    const { data: setting } = await (supabase as any)
+      .from('payment_provider_settings')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('provider', 'asaas')
+      .eq('environment', environment)
+      .maybeSingle();
+
+    let webhookToken = setting?.encrypted_webhook_token
+      ? decryptSecret(setting.encrypted_webhook_token)
+      : '';
+    if (!webhookToken && process.env.ASAAS_ENVIRONMENT === environment) {
+      webhookToken = process.env.ASAAS_WEBHOOK_AUTH_TOKEN || process.env.ASAAS_WEBHOOK_SECRET || '';
+    }
+
+    if (!webhookToken) {
+      return {
+        success: false,
+        message: 'Token de autenticação do webhook não configurado.',
+        error: 'Defina o Token do Webhook antes de executar o teste de autenticação.',
+      };
+    }
+
+    const appBaseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+      'http://localhost:3000';
+    const cleanAppBase = appBaseUrl.startsWith('http') ? appBaseUrl : `https://${appBaseUrl}`;
+    const webhookUrl = `${cleanAppBase.replace(/\/$/, '')}/api/webhooks/asaas`;
+
+    const smokeEventId = `evt_smoke_${Date.now()}`;
+    const payload = {
+      event: 'TECHNICAL_SMOKE_TEST',
+      isTechnicalSmokeTest: true,
+      dateCreated: new Date().toISOString(),
+      externalReference: `CM_TECHNICAL_SMOKE_${Date.now()}`,
+    };
+
+    const res = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'asaas-access-token': webhookToken,
+        'asaas-event-id': smokeEventId,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+    });
+
+    const resJson = await res.json().catch(() => ({}));
+
+    if (res.ok) {
+      return {
+        success: true,
+        statusCode: res.status,
+        eventId: smokeEventId,
+        message: `Rota /api/webhooks/asaas respondeu HTTP ${res.status} e autenticou com sucesso via asaas-access-token ✓`,
+      };
+    }
+
+    return {
+      success: false,
+      statusCode: res.status,
+      message: `Rota do webhook retornou HTTP ${res.status}.`,
+      error: resJson?.error || `Falha de autenticação ou processamento (HTTP ${res.status}).`,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: 'Falha ao conectar com a rota do webhook.',
+      error: err?.message || 'Erro inesperado.',
+    };
+  }
+}
+
+/**
+ * Cria uma cobrança temporária no Asaas Sandbox e simula a quitação imediata
+ * para provocar o envio de um evento real de liquidação pelo Asaas.
+ */
+export async function simulateAdminAsaasSandboxPaymentAction(): Promise<{
+  success: boolean;
+  message: string;
+  paymentId?: string;
+  error?: string;
+}> {
+  try {
+    const { supabase } = await assertPlatformAdminAccess();
+    const tenantId = await resolveRequestOperationalTenantId(supabase);
+
+    const { data: setting } = await (supabase as any)
+      .from('payment_provider_settings')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('provider', 'asaas')
+      .eq('environment', 'sandbox')
+      .maybeSingle();
+
+    let apiKey = setting?.encrypted_api_key ? decryptSecret(setting.encrypted_api_key) : '';
+    if (!apiKey) {
+      apiKey = process.env.ASAAS_API_KEY || '';
+    }
+
+    if (!apiKey) {
+      return {
+        success: false,
+        message: 'Chave de API do Sandbox não configurada.',
+        error: 'Configure a API Key do Sandbox primeiro.',
+      };
+    }
+
+    const baseUrl = CANONICAL_URLS.sandbox;
+
+    // 1. Cria ou reutiliza cliente de teste no Sandbox
+    const custRes = await fetch(`${baseUrl}/customers`, {
+      method: 'POST',
+      headers: {
+        access_token: apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: 'Teste de Webhook Conexão Maçônica',
+        cpfCnpj: '00000000191',
+        email: 'teste.webhook@conexaomaconica.com.br',
+      }),
+    });
+    const custJson = await custRes.json().catch(() => ({}));
+    const customerId = custJson.id || 'cus_000009430015';
+
+    // 2. Cria cobrança teste no Sandbox
+    const chargeRes = await fetch(`${baseUrl}/payments`, {
+      method: 'POST',
+      headers: {
+        access_token: apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        customer: customerId,
+        billingType: 'PIX',
+        value: 5.0,
+        dueDate: new Date().toISOString().split('T')[0],
+        description: 'Teste de Webhook — CivicOS SABA / Conexão Maçônica',
+        externalReference: `CM_TEST_PROBE_${Date.now()}`,
+      }),
+    });
+
+    if (!chargeRes.ok) {
+      const errText = await chargeRes.text().catch(() => '');
+      return {
+        success: false,
+        message: 'Falha ao criar cobrança de teste no Asaas Sandbox.',
+        error: `Erro HTTP ${chargeRes.status}: ${errText}`,
+      };
+    }
+
+    const chargeJson = await chargeRes.json();
+    const paymentId = chargeJson.id;
+
+    // 3. Simula recebimento imediato no Sandbox (receiveInCash)
+    const payRes = await fetch(`${baseUrl}/payments/${paymentId}/receiveInCash`, {
+      method: 'POST',
+      headers: {
+        access_token: apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        paymentDate: new Date().toISOString().split('T')[0],
+        value: 5.0,
+        notifyCustomer: false,
+      }),
+    });
+
+    if (!payRes.ok) {
+      const payErr = await payRes.text().catch(() => '');
+      return {
+        success: false,
+        paymentId,
+        message: `Cobrança ${paymentId} criada, mas a simulação de quitação retornou HTTP ${payRes.status}.`,
+        error: payErr,
+      };
+    }
+
+    return {
+      success: true,
+      paymentId,
+      message: `Cobrança de teste ${paymentId} gerada e liquidada no Sandbox! O Asaas enviará o webhook PAYMENT_RECEIVED / PAYMENT_CONFIRMED.`,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: 'Erro inesperado ao simular pagamento.',
+      error: err?.message || 'Erro inesperado.',
+    };
+  }
+}
+

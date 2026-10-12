@@ -4,6 +4,7 @@ import {
   assertContractVariablesComplete,
   formatCurrencyBRL,
   formatVigencia,
+  formatPrazoVigenciaExtenso,
   formatSeloPedraFundamental,
   formatDataEmissao,
   appendSignatureImageToContractText,
@@ -192,6 +193,47 @@ Plano: {{plano_nome}} — {{plano_valor}} — {{vigencia}}`;
       expect(formatVigencia('36')).toBe('36 meses');
     });
 
+    it('formatPrazoVigenciaExtenso retorna "dois anos correntes" para bienal ou pedra fundamental e "um ano corrente" para anual', () => {
+      expect(formatPrazoVigenciaExtenso('annual', false)).toBe('um ano corrente');
+      expect(formatPrazoVigenciaExtenso(12, false)).toBe('um ano corrente');
+      expect(formatPrazoVigenciaExtenso('biennial', false)).toBe('dois anos correntes');
+      expect(formatPrazoVigenciaExtenso(24, false)).toBe('dois anos correntes');
+      expect(formatPrazoVigenciaExtenso('annual', true)).toBe('dois anos correntes');
+      expect(formatPrazoVigenciaExtenso(undefined, true)).toBe('dois anos correntes');
+      expect(formatPrazoVigenciaExtenso(undefined, false)).toBe('um ano corrente');
+    });
+
+    it('renderiza dinamicamente a Cláusula 3ª de Vigência com 1 ano para plano normal e 2 anos para Acácia c/ Pedra Fundamental', () => {
+      const templateClausula3 = `CLÁUSULA 3ª — DO PRAZO DE VIGÊNCIA
+3.1. O presente contrato terá início em {{data_inicio_vigencia}} e vigorará durante o período de {{prazo_vigencia}} da contratação, salvo se as partes ajustarem prazo menor ou houver rescisão antecipada nos termos deste instrumento.`;
+
+      // Plano Normal (1 ano)
+      const varsNormal: AdvertiserContractVariables = {
+        ...validVariables,
+        data_inicio_vigencia: '15/10/2026',
+        vigencia: '12 meses',
+        selo_pedra_fundamental: '',
+      };
+      const renderedNormal = renderContractTemplate(templateClausula3, varsNormal);
+      expect(renderedNormal).toContain(
+        '3.1. O presente contrato terá início em 15/10/2026 e vigorará durante o período de um ano corrente da contratação'
+      );
+
+      // Plano Acácia c/ Pedra Fundamental (2 anos)
+      const varsAcaciaPedra: AdvertiserContractVariables = {
+        ...validVariables,
+        plano_nome: 'Plano Acácia (Pedra Fundamental)',
+        data_inicio_vigencia: '15/10/2026',
+        vigencia: '24 meses',
+        prazo_vigencia: 'dois anos correntes',
+        selo_pedra_fundamental: '- **Reconhecimento Especial:** Empresa Fundadora — Pedra Fundamental',
+      };
+      const renderedAcacia = renderContractTemplate(templateClausula3, varsAcaciaPedra);
+      expect(renderedAcacia).toContain(
+        '3.1. O presente contrato terá início em 15/10/2026 e vigorará durante o período de dois anos correntes da contratação'
+      );
+    });
+
     it('formatSeloPedraFundamental retorna texto padronizado ou vazio', () => {
       expect(formatSeloPedraFundamental(true)).toBe(
         '- **Reconhecimento Especial:** Empresa Fundadora — Pedra Fundamental'
@@ -206,3 +248,4 @@ Plano: {{plano_nome}} — {{plano_valor}} — {{vigencia}}`;
     });
   });
 });
+

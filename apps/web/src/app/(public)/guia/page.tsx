@@ -19,6 +19,7 @@ import { DirectoryMapExplore } from '@/components/public/directory/DirectoryMapE
 import { DirectoryLodgesGuide } from '@/components/public/directory/DirectoryLodgesGuide';
 import { fetchLodgeGuideFacets } from '@/lib/lodges/lodge-facets';
 import { fetchFilterCategories } from '@/lib/directory/filter-categories';
+import { resolveHomeCategories } from '@/lib/directory/home-categories';
 import { getConfirmedConnectionsCountAction, getConnectionsFeedAction } from '@/app/actions/connections';
 import { DirectoryConnectionsMural } from '@/components/public/directory/DirectoryConnectionsMural';
 import { DirectoryConnectionsCta } from '@/components/public/directory/DirectoryConnectionsCta';
@@ -292,14 +293,16 @@ export default async function GuiaPage({ searchParams }: Props) {
   let sponsored = (homeData.sponsored as DirectorySponsoredItem[]) || [];
 
   // Respeitar rigorosamente as Categorias em Destaque cadastradas e ativas no painel administrativo
+  let featCategoryEntries: any[] = [];
   try {
     const { data: featCats } = await (supabase as any)
       .from('directory_featured_categories')
-      .select('id, custom_title, icon_name, display_order, categories(id, name, slug, icon)')
+      .select('id, category_id, custom_title, icon_name, display_order, categories(id, name, slug, icon)')
       .eq('is_active', true)
       .order('display_order', { ascending: true });
 
     if (featCats && featCats.length > 0) {
+      featCategoryEntries = featCats;
       const parsedFeat = featCats
         .filter((fc: any) => fc.categories)
         .map((fc: any) => ({
@@ -483,6 +486,19 @@ export default async function GuiaPage({ searchParams }: Props) {
   // Opções do filtro "Todas as Categorias": todas as que têm empresas publicadas.
   const filterCategories = await fetchFilterCategories(supabase, host, categories);
 
+  // Categorias exibidas no grid principal da Home:
+  // Exibe apenas categorias com empresas cadastradas, priorizando a ordem das que estão em destaque no painel e completando com as demais.
+  const homeCategories = resolveHomeCategories({
+    categoriesWithBusinesses: filterCategories,
+    featuredCategories: featCategoryEntries.map((fc: any) => ({
+      category_id: fc.category_id || fc.categories?.id,
+      custom_title: fc.custom_title,
+      icon_name: fc.icon_name,
+      display_order: fc.display_order,
+    })),
+    fallbackCategories: categories,
+  });
+
   // Seções da home: ordem e visibilidade vêm de /admin/guia/geral (a configuração gravada é completada com as seções reais).
   const sectionNodes: Record<string, React.ReactNode> = {
     hero: (
@@ -498,7 +514,7 @@ export default async function GuiaPage({ searchParams }: Props) {
     carousel: <DirectoryCarousel banners={banners} />,
     // Convite em destaque: registrar visita ou negócio com foto e comentário
     connections_cta: <DirectoryConnectionsCta />,
-    categories: <DirectoryCategories categories={categories} />,
+    categories: <DirectoryCategories categories={homeCategories} />,
     sponsored: (
       <DirectorySponsored
         items={sponsored}

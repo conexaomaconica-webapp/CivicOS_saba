@@ -83,13 +83,19 @@ const clean = (value: unknown, max: number): string =>
 /** Texto bruto (formulário/FormData) -> submissão normalizada, com limites de tamanho. */
 export function normalizeSubmission(raw: Record<string, unknown>): SignupSubmission {
   const relation = String(raw.masonicRelation ?? '') as MasonicRelation;
+  const docDigits = sanitizeCnpj(clean(raw.document, 24));
+  const isCpf = docDigits.length > 0 && docDigits.length <= 11;
+  const trading = clean(raw.tradingName, 120);
+  const responsible = clean(raw.responsibleName, 120);
+
   return {
-    responsibleName: clean(raw.responsibleName, 120),
+    responsibleName: responsible,
     responsibleEmail: clean(raw.responsibleEmail, 160).toLowerCase(),
     responsiblePhone: clean(raw.responsiblePhone, 20),
-    tradingName: clean(raw.tradingName, 120),
-    legalName: clean(raw.legalName, 160),
-    document: sanitizeCnpj(clean(raw.document, 24)),
+    tradingName: trading,
+    // Pessoa Física (CPF) não possui Razão Social: utiliza o Nome Fantasia ou Nome do Responsável como fallback
+    legalName: clean(raw.legalName, 160) || (isCpf ? trading || responsible : ''),
+    document: docDigits,
     businessPhone: clean(raw.businessPhone, 20),
     publicEmail: clean(raw.publicEmail, 160).toLowerCase(),
     website: clean(raw.website, 200),
@@ -116,12 +122,15 @@ export function normalizeSubmission(raw: Record<string, unknown>): SignupSubmiss
 /** Primeira mensagem de erro encontrada (pt-BR), ou null se os dados estão completos e válidos. */
 export function validateSubmission(data: SignupSubmission): string | null {
   const phoneError = (value: string) => (value ? validatePhone(value) : null);
+  const docDigits = (data.document || '').replace(/\D/g, '');
+  const isCpf = docDigits.length > 0 && docDigits.length <= 11;
+
   return (
     validateName(data.responsibleName) ??
     validateEmail(data.responsibleEmail) ??
     phoneError(data.responsiblePhone) ??
     validateName(data.tradingName) ??
-    validateName(data.legalName) ??
+    (!isCpf ? validateName(data.legalName) : null) ??
     (data.document ? validateCpfCnpj(data.document) : 'Informe o CNPJ ou CPF.') ??
     phoneError(data.businessPhone) ??
     (data.publicEmail ? validateEmail(data.publicEmail) : null) ??

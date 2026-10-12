@@ -17,6 +17,7 @@ export interface AdvertiserContractVariables {
 
   plano_nome: string;
   vigencia: string;
+  prazo_vigencia?: string;
   data_inicio_vigencia: string;
   valor_total: string;
   forma_pagamento: string;
@@ -90,6 +91,21 @@ export function renderContractTemplate(
   const rendered = template.replace(
     /\{\{([a-zA-Z0-9_]+)\}\}/g,
     (_, rawKey: string) => {
+      if (
+        rawKey === 'prazo_vigencia' ||
+        rawKey === 'prazo_vigencia_extenso' ||
+        rawKey === 'vigencia_extenso'
+      ) {
+        if (variables.prazo_vigencia && String(variables.prazo_vigencia).trim()) {
+          return String(variables.prazo_vigencia);
+        }
+        const hasPedra = Boolean(
+          variables.selo_pedra_fundamental &&
+          variables.selo_pedra_fundamental.includes('Pedra Fundamental')
+        );
+        return formatPrazoVigenciaExtenso(variables.vigencia, hasPedra);
+      }
+
       const key = legacyAliases[rawKey] || (rawKey as keyof AdvertiserContractVariables);
       const value = variables[key];
 
@@ -205,6 +221,33 @@ export function formatVigencia(monthsOrCycle: number | string): string {
   }
 
   return monthsOrCycle || '12 meses';
+}
+
+/**
+ * Formata o prazo de vigência por extenso para utilização em cláusulas contratuais
+ * (ex: "vigorará durante o período de um ano corrente da contratação").
+ * Para o Plano Acácia com Pedra Fundamental (ou bienal / 24 meses), retorna "dois anos correntes".
+ * Para os demais planos (anual / 12 meses), retorna "um ano corrente".
+ */
+export function formatPrazoVigenciaExtenso(
+  monthsOrCycle?: number | string | null,
+  isPedraFundamental?: boolean
+): string {
+  if (isPedraFundamental) {
+    return 'dois anos correntes';
+  }
+  const str = String(monthsOrCycle ?? '').trim().toLowerCase();
+  if (
+    str === 'biennial' ||
+    str === '24' ||
+    str === 'bienal' ||
+    str === '24 meses' ||
+    str.includes('2 ano') ||
+    str.includes('dois ano')
+  ) {
+    return 'dois anos correntes';
+  }
+  return 'um ano corrente';
 }
 
 /**
