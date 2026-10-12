@@ -28,6 +28,97 @@ interface RecentPaymentEvent {
   processed: boolean | null;
   error_log: string | null;
   created_at: string | null;
+  payload: Record<string, unknown> | null;
+}
+
+export type AuditCategoryKey = 'liquidated' | 'pending' | 'administrative' | 'test' | 'incident';
+
+export interface AuditCategoryInfo {
+  key: AuditCategoryKey;
+  label: string;
+  badgeClass: string;
+}
+
+export function resolveAuditCategory(evt: RecentPaymentEvent): AuditCategoryInfo {
+  const type = (evt.event_type || '').toUpperCase();
+  const payload = evt.payload || {};
+  const classification = typeof payload.classification === 'string' ? payload.classification : '';
+  const isSmoke = Boolean(payload.technical_smoke_test) || type.includes('SMOKE') || type === 'PING' || type === 'WH_PING' || type === 'TEST';
+
+  if (isSmoke || classification === 'technical_test') {
+    return {
+      key: 'test',
+      label: 'Teste Técnico',
+      badgeClass: 'bg-purple-50 text-purple-700 border-purple-200',
+    };
+  }
+
+  // Falha real com error_log não informativo
+  const hasRealError = typeof evt.error_log === 'string' && evt.error_log.length > 0 && !evt.error_log.includes('auditado');
+  if (!evt.processed && hasRealError) {
+    return {
+      key: 'incident',
+      label: 'Incidente Real',
+      badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
+    };
+  }
+
+  if (
+    type === 'PAYMENT_RECEIVED' ||
+    type === 'PAYMENT_CONFIRMED' ||
+    type === 'PAYMENT_DUNNING_RECEIVED' ||
+    classification === 'financial_confirmation'
+  ) {
+    return {
+      key: 'liquidated',
+      label: 'Liquidado',
+      badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    };
+  }
+
+  if (
+    type === 'PAYMENT_CREATED' ||
+    type === 'PAYMENT_UPDATED' ||
+    type === 'PAYMENT_BANK_SLIP_VIEWED' ||
+    type === 'PAYMENT_CHECKOUT_VIEWED' ||
+    classification === 'financial_creation'
+  ) {
+    return {
+      key: 'pending',
+      label: 'Aguardando Pagamento',
+      badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
+    };
+  }
+
+  if (
+    type.startsWith('CUSTOMER_') ||
+    type.startsWith('TRANSFER_') ||
+    type.startsWith('INVOICE_') ||
+    type.startsWith('ACCOUNT_') ||
+    type.startsWith('COMMERCIAL_INFO_') ||
+    type.startsWith('SUBSCRIPTION_') ||
+    classification === 'administrative'
+  ) {
+    return {
+      key: 'administrative',
+      label: 'Informativo / Admin',
+      badgeClass: 'bg-sky-50 text-sky-700 border-sky-200',
+    };
+  }
+
+  if (hasRealError) {
+    return {
+      key: 'incident',
+      label: 'Incidente Real',
+      badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
+    };
+  }
+
+  return {
+    key: 'administrative',
+    label: 'Auditado',
+    badgeClass: 'bg-stone-100 text-stone-700 border-stone-200',
+  };
 }
 
 export default async function AdminSaudePage() {
@@ -68,21 +159,31 @@ export default async function AdminSaudePage() {
   // 2. Consulta de Auditoria Real dos Eventos Financeiros (payment_provider_events)
   let recentEvents: RecentPaymentEvent[] = [];
   let totalEventsCount = 0;
-  let failedEventsCount = 0;
-  let successfulEventsCount = 0;
+  let liquidatedCount = 0;
+  let pendingCount = 0;
+  let administrativeCount = 0;
+  let testCount = 0;
+  let incidentCount = 0;
 
   try {
     const { data: eventsData, count } = await supabaseClient
       .from('payment_provider_events')
-      .select('id, provider_code, event_type, event_id, processed, error_log, created_at', { count: 'exact' })
+      .select('id, provider_code, event_type, event_id, processed, error_log, payload, created_at', { count: 'exact' })
       .order('created_at', { ascending: false })
-      .limit(15);
+      .limit(20);
 
     if (eventsData) {
-      recentEvents = eventsData;
+      recentEvents = eventsData as unknown as RecentPaymentEvent[];
       totalEventsCount = count || eventsData.length;
-      failedEventsCount = recentEvents.filter((e) => !e.processed || Boolean(e.error_log)).length;
-      successfulEventsCount = recentEvents.filter((e) => e.processed && !e.error_log).length;
+
+      for (const evt of recentEvents) {
+        const cat = resolveAuditCategory(evt);
+        if (cat.key === 'liquidated') liquidatedCount++;
+        else if (cat.key === 'pending') pendingCount++;
+        else if (cat.key === 'administrative') administrativeCount++;
+        else if (cat.key === 'test') testCount++;
+        else if (cat.key === 'incident') incidentCount++;
+      }
     }
   } catch {
     // Falha silenciosa para não travar a visualização de saúde da web
@@ -181,19 +282,39 @@ export default async function AdminSaudePage() {
               <CreditCard className="h-4 w-4 text-[#C9A227]" />
               Webhooks Asaas
             </span>
-            {failedEventsCount === 0 ? (
+            {incidentCount === 0 ? (
               <CheckCircle2 className="h-5 w-5 text-emerald-500" />
             ) : (
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <AlertTriangle className="h-5 w-5 text-rose-500" />
             )}
           </div>
           <div className="mt-4">
             <p className="text-xl font-bold text-stone-900">
               {totalEventsCount} {totalEventsCount === 1 ? 'evento auditado' : 'eventos auditados'}
             </p>
-            <p className="text-xs text-stone-500 mt-0.5">
-              {failedEventsCount} com pendência ou erro recente
-            </p>
+            <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px]">
+              <span className="inline-flex items-center gap-1 text-emerald-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                {liquidatedCount} Liquidados
+              </span>
+              <span className="inline-flex items-center gap-1 text-amber-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                {pendingCount} Aguardando
+              </span>
+              <span className="inline-flex items-center gap-1 text-sky-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
+                {administrativeCount} Admin/Info
+              </span>
+              <span className="inline-flex items-center gap-1 text-purple-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
+                {testCount} Testes
+              </span>
+            </div>
+            {incidentCount > 0 && (
+              <p className="text-xs font-semibold text-rose-600 mt-2">
+                ⚠ {incidentCount} incidente(s) real(is) detectado(s)
+              </p>
+            )}
           </div>
           <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-xs text-stone-500">
             <span>Idempotência Ativa</span>
@@ -211,17 +332,26 @@ export default async function AdminSaudePage() {
               Auditoria de Eventos de Pagamento Recentes
             </h2>
             <p className="text-xs text-stone-500 mt-0.5">
-              Registros da tabela canônica <code className="text-stone-700 font-mono">payment_provider_events</code>.
+              Classificação auditável e segregada da tabela <code className="text-stone-700 font-mono">payment_provider_events</code>.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
-            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700">
-              {successfulEventsCount} Sucesso
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700 border border-emerald-200">
+              {liquidatedCount} Liquidados
             </span>
-            {failedEventsCount > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-1 text-[11px] font-bold text-rose-700">
-                {failedEventsCount} Pendente/Erro
+            <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700 border border-amber-200">
+              {pendingCount} Aguardando
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-1 text-[11px] font-bold text-sky-700 border border-sky-200">
+              {administrativeCount} Admin/Info
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-1 text-[11px] font-bold text-purple-700 border border-purple-200">
+              {testCount} Testes
+            </span>
+            {incidentCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-1 text-[11px] font-bold text-rose-700 border border-rose-200">
+                {incidentCount} Incidentes Reais
               </span>
             )}
           </div>
@@ -238,14 +368,14 @@ export default async function AdminSaudePage() {
                 <tr className="border-b border-stone-100 bg-stone-50/75 text-[11px] font-bold uppercase tracking-wider text-stone-600">
                   <th className="py-3 px-4">Provedor / ID</th>
                   <th className="py-3 px-4">Tipo do Evento</th>
-                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4">Classificação Auditoria</th>
                   <th className="py-3 px-4">Data / Hora</th>
                   <th className="py-3 px-4">Log de Auditoria</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 text-stone-700">
                 {recentEvents.map((evt) => {
-                  const isProcessed = evt.processed && !evt.error_log;
+                  const cat = resolveAuditCategory(evt);
                   return (
                     <tr key={evt.id} className="hover:bg-stone-50/50 transition-colors">
                       <td className="py-3 px-4 font-mono font-medium text-stone-900">
@@ -255,24 +385,21 @@ export default async function AdminSaudePage() {
                         {evt.event_type}
                       </td>
                       <td className="py-3 px-4">
-                        {isProcessed ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
-                            <CheckCircle2 className="h-3 w-3" />
-                            Processado
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700">
-                            <AlertTriangle className="h-3 w-3" />
-                            Pendente / Erro
-                          </span>
-                        )}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${cat.badgeClass}`}>
+                          {cat.key === 'liquidated' && <CheckCircle2 className="h-3 w-3" />}
+                          {cat.key === 'incident' && <XCircle className="h-3 w-3" />}
+                          {cat.key === 'pending' && <AlertTriangle className="h-3 w-3" />}
+                          {cat.label}
+                        </span>
                       </td>
                       <td className="py-3 px-4 text-stone-500 text-[11px]">
                         {evt.created_at ? new Date(evt.created_at).toLocaleString('pt-BR') : '—'}
                       </td>
                       <td className="py-3 px-4 font-mono text-[11px] text-stone-500 max-w-xs truncate" title={evt.error_log || 'Nenhum erro registrado'}>
                         {evt.error_log ? (
-                          <span className="text-rose-600 font-semibold">{evt.error_log}</span>
+                          <span className={cat.key === 'incident' ? 'text-rose-600 font-semibold' : 'text-stone-500'}>
+                            {evt.error_log}
+                          </span>
                         ) : (
                           <span className="text-stone-400">Sucesso</span>
                         )}
