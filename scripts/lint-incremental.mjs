@@ -175,7 +175,14 @@ function isLintable(relPath) {
     normalized.startsWith('plugins/');
 
   // Arquivos em test/ e e2e/ não fazem parte do parserOptions.project do Next.js e são validados pelo Vitest / Playwright
-  if (normalized.includes('/test/') || normalized.includes('/e2e/')) {
+  if (
+    normalized.includes('/test/') ||
+    normalized.includes('/e2e/') ||
+    normalized.endsWith('.test.ts') ||
+    normalized.endsWith('.test.tsx') ||
+    normalized.endsWith('.spec.ts') ||
+    normalized.endsWith('.spec.tsx')
+  ) {
     return false;
   }
 
@@ -218,10 +225,16 @@ function main() {
   const eslintArgs = ['exec', 'eslint', '--max-warnings=0', ...targetFiles];
 
   console.log('\n⏳ Executando ESLint via pnpm exec...');
+  const envWithHeap = {
+    ...process.env,
+    NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --max-old-space-size=4096`.trim(),
+  };
+
   const result = spawnSync(binName, eslintArgs, {
     cwd: rootDir,
     stdio: 'inherit',
     shell: isWindows,
+    env: envWithHeap,
   });
 
   if (result.error) {
@@ -231,6 +244,7 @@ function main() {
       cwd: rootDir,
       stdio: 'inherit',
       shell: true,
+      env: envWithHeap,
     });
     if (fallbackResult.status !== 0) {
       console.error(`\n❌ Falha no lint incremental: código de erro ${fallbackResult.status} encontrado.`);

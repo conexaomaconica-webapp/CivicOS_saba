@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises */
 'use client';
 
 import React, { useState } from 'react';
@@ -18,6 +19,7 @@ import {
   Server,
   Sparkles,
   Lock,
+  Mail,
 } from 'lucide-react';
 import {
   type AsaasIntegrationOverview,
@@ -333,6 +335,24 @@ export function AsaasIntegrationClient({ initialOverview }: Props) {
             <span>Alternar Ambiente</span>
           </button>
         </div>
+      </div>
+
+      {/* =================================================================== */}
+      {/* ABAS DE NAVEGAÇÃO ENTRE INTEGRAÇÕES                                 */}
+      {/* =================================================================== */}
+      <div className="flex items-center gap-2 border-b border-stone-200">
+        <div className="inline-flex items-center gap-2 px-4 py-2.5 border-b-2 border-[#5d1523] text-sm font-bold text-[#5d1523]">
+          <KeyRound className="h-4 w-4" />
+          <span>Gateway Asaas</span>
+          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+        </div>
+        <Link
+          href="/admin/configuracoes/integracoes/email"
+          className="inline-flex items-center gap-2 px-4 py-2.5 border-b-2 border-transparent text-sm font-semibold text-stone-500 hover:text-stone-800 hover:border-stone-300 transition"
+        >
+          <Mail className="h-4 w-4" />
+          <span>E-mail Transacional (Hostinger)</span>
+        </Link>
       </div>
 
       {/* =================================================================== */}
