@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument */
 'use server';
 
 import crypto from 'crypto';
@@ -10,6 +10,7 @@ import {
   COMMERCIAL_STATUS,
   assertCommercialStatusTransition,
 } from '@/lib/commercial-onboarding-status';
+import { logger } from '@/lib/observability/logger';
 
 import {
   classifyAsaasEvent,
@@ -150,7 +151,7 @@ export async function reconcileCommercialPaymentWebhook(
     // 5. Tratamento de Criação de Cobrança (PAYMENT_CREATED, PAYMENT_UPDATED)
     // NUNCA confirma pagamento! Registra o status de aguardando_pagamento
     if (classification.category === 'financial_creation') {
-      const { data: attempt } = await (dbClient as any)
+      const { data: attempt } = await dbClient
         .from('payment_attempts')
         .select('id, invoice_id, business_id, tenant_id, payload_received')
         .eq('provider_code', 'asaas')
@@ -161,7 +162,7 @@ export async function reconcileCommercialPaymentWebhook(
 
       const businessId = attempt?.business_id;
       if (businessId) {
-        const { data: biz } = await (dbClient as any)
+        const { data: biz } = await dbClient
           .from('businesses')
           .select('id, commercial_status, tenant_id')
           .eq('id', businessId)
@@ -169,7 +170,7 @@ export async function reconcileCommercialPaymentWebhook(
 
         if (biz) {
           if (attempt?.id) {
-            const { error: updateErr } = await (dbClient as any)
+            const { error: updateErr } = await dbClient
               .from('payment_attempts')
               .update({
                 provider_charge_id: asaasPaymentId,
@@ -188,7 +189,7 @@ export async function reconcileCommercialPaymentWebhook(
           }
 
           try {
-            await (dbClient as any).from('admin_audit_logs').insert({
+            await dbClient.from('admin_audit_logs').insert({
               tenant_id: biz.tenant_id,
               actor_id: '00000000-0000-0000-0000-000000000001',
               action: 'ASAAS_PAYMENT_CREATED_AUDITED',
@@ -233,7 +234,7 @@ export async function reconcileCommercialPaymentWebhook(
     // 6. Tratamento de Exclusão de Cobrança (PAYMENT_DELETED)
     // PROTEÇÃO: Impede reversão indevida de pagamentos já liquidados!
     if (rawEvent === 'PAYMENT_DELETED') {
-      const { data: attempt } = await (dbClient as any)
+      const { data: attempt } = await dbClient
         .from('payment_attempts')
         .select('id, invoice_id, business_id, tenant_id')
         .eq('provider_code', 'asaas')
@@ -244,7 +245,7 @@ export async function reconcileCommercialPaymentWebhook(
 
       const businessId = attempt?.business_id;
       if (businessId) {
-        const { data: biz } = await (dbClient as any)
+        const { data: biz } = await dbClient
           .from('businesses')
           .select('id, commercial_status, tenant_id')
           .eq('id', businessId)
@@ -255,7 +256,7 @@ export async function reconcileCommercialPaymentWebhook(
 
           if (isLiquidated) {
             try {
-              await (dbClient as any).from('admin_audit_logs').insert({
+              await dbClient.from('admin_audit_logs').insert({
                 tenant_id: biz.tenant_id,
                 actor_id: '00000000-0000-0000-0000-000000000001',
                 action: 'ASAAS_PAYMENT_DELETED_IGNORED',
@@ -286,7 +287,7 @@ export async function reconcileCommercialPaymentWebhook(
           }
 
           if (attempt?.id) {
-            const { error: cancelErr } = await (dbClient as any)
+            const { error: cancelErr } = await dbClient
               .from('payment_attempts')
               .update({
                 status: 'failed',
@@ -324,7 +325,7 @@ export async function reconcileCommercialPaymentWebhook(
     // 7. Confirmação / Liquidação Financeira (PAYMENT_RECEIVED, PAYMENT_CONFIRMED)
     // Tenta executar via RPC Atômica (Migration 133)
     try {
-      const { data: rpcRes, error: rpcErr } = await (dbClient as any).rpc(
+      const { data: rpcRes, error: rpcErr } = await dbClient.rpc(
         'reconcile_commercial_payment_webhook',
         {
           p_provider_event_id: eventId,
@@ -371,7 +372,7 @@ export async function reconcileCommercialPaymentWebhook(
 
     // 2. Fallback defensivo em TypeScript/Supabase client
     // Localiza payment_attempts pelo Asaas payment ID
-    const { data: attempt } = await (dbClient as any)
+    const { data: attempt } = await dbClient
       .from('payment_attempts')
       .select('id, invoice_id, business_id, tenant_id, payload_received')
       .eq('provider_code', 'asaas')
@@ -386,7 +387,7 @@ export async function reconcileCommercialPaymentWebhook(
 
     if (!businessId) {
       // Fallback por fatura
-      const { data: inv } = await (dbClient as any)
+      const { data: inv } = await dbClient
         .from('invoices')
         .select('id, business_id, tenant_id')
         .ilike('idempotency_key', `%${asaasPaymentId}%`)
@@ -408,7 +409,7 @@ export async function reconcileCommercialPaymentWebhook(
     }
 
     // Busca empresa
-    const { data: biz, error: bizErr } = await (dbClient as any)
+    const { data: biz, error: bizErr } = await dbClient
       .from('businesses')
       .select('id, commercial_status, tenant_id')
       .eq('id', businessId)
@@ -447,7 +448,7 @@ export async function reconcileCommercialPaymentWebhook(
       );
 
       // Atualiza empresa para 'pagamento_confirmado'
-      await (dbClient as any)
+      await dbClient
         .from('businesses')
         .update({
           commercial_status: 'pagamento_confirmado',
@@ -457,7 +458,7 @@ export async function reconcileCommercialPaymentWebhook(
 
       // Atualiza fatura
       if (invoiceId) {
-        await (dbClient as any)
+        await dbClient
           .from('invoices')
           .update({
             status: 'paid',
@@ -470,7 +471,7 @@ export async function reconcileCommercialPaymentWebhook(
 
       // Atualiza tentativa
       if (attempt?.id) {
-        await (dbClient as any)
+        await dbClient
           .from('payment_attempts')
           .update({
             status: 'success',
@@ -488,7 +489,7 @@ export async function reconcileCommercialPaymentWebhook(
 
       // Log de auditoria
       try {
-        await (dbClient as any).from('admin_audit_logs').insert({
+        await dbClient.from('admin_audit_logs').insert({
           tenant_id: tenantId || biz.tenant_id,
           actor_id: '00000000-0000-0000-0000-000000000001',
           action: 'RECONCILE_COMMERCIAL_PAYMENT_WEBHOOK',
@@ -502,7 +503,13 @@ export async function reconcileCommercialPaymentWebhook(
           },
           reason: `Pagamento confirmado via Webhook Asaas (${rawEvent}).`,
         });
-      } catch (_logErr) {}
+      } catch (logErr) {
+        logger.warn('Falha ao registrar auditoria de conciliação Asaas', {
+          businessId,
+          eventType: rawEvent,
+          error: logErr instanceof Error ? logErr.message : String(logErr),
+        });
+      }
 
       return {
         success: true,
@@ -519,7 +526,7 @@ export async function reconcileCommercialPaymentWebhook(
 
     // Outros eventos são registrados sem alterar status para publicado
     try {
-      await (dbClient as any).from('admin_audit_logs').insert({
+      await dbClient.from('admin_audit_logs').insert({
         tenant_id: tenantId || biz.tenant_id,
         actor_id: '00000000-0000-0000-0000-000000000001',
         action: 'ASAAS_WEBHOOK_EVENT_AUDITED',
@@ -529,7 +536,13 @@ export async function reconcileCommercialPaymentWebhook(
         after_value: { event_type: rawEvent, asaas_payment_id: asaasPaymentId },
         reason: 'Evento Asaas auditado sem alteração comercial.',
       });
-    } catch (_logErr) {}
+    } catch (logErr) {
+      logger.warn('Falha ao registrar auditoria de evento Asaas', {
+        businessId,
+        eventType: rawEvent,
+        error: logErr instanceof Error ? logErr.message : String(logErr),
+      });
+    }
 
     return {
       success: true,
