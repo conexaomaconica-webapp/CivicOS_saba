@@ -8,6 +8,60 @@ export type AttendanceStatus = 'confirmed' | 'declined';
 export type EventStatus = 'draft' | 'published' | 'canceled' | 'archived';
 
 export type CustomTables = {
+  contract_email_dispatches: {
+    Row: {
+      id: string;
+      contract_id: string;
+      business_id: string;
+      tenant_id: string;
+      recipient_email: string;
+      recipient_name: string;
+      idempotency_key: string;
+      dispatch_status: 'processing' | 'accepted' | 'failed' | 'unknown';
+      provider: string;
+      provider_message_id: string | null;
+      error_message: string | null;
+      token_id: string | null;
+      created_at: string;
+      updated_at: string;
+      completed_at: string | null;
+    };
+    Insert: {
+      id?: string;
+      contract_id: string;
+      business_id: string;
+      tenant_id: string;
+      recipient_email: string;
+      recipient_name: string;
+      idempotency_key: string;
+      dispatch_status: 'processing' | 'accepted' | 'failed' | 'unknown';
+      provider?: string;
+      provider_message_id?: string | null;
+      error_message?: string | null;
+      token_id?: string | null;
+      created_at?: string;
+      updated_at?: string;
+      completed_at?: string | null;
+    };
+    Update: {
+      id?: string;
+      contract_id?: string;
+      business_id?: string;
+      tenant_id?: string;
+      recipient_email?: string;
+      recipient_name?: string;
+      idempotency_key?: string;
+      dispatch_status?: 'processing' | 'accepted' | 'failed' | 'unknown';
+      provider?: string;
+      provider_message_id?: string | null;
+      error_message?: string | null;
+      token_id?: string | null;
+      created_at?: string;
+      updated_at?: string;
+      completed_at?: string | null;
+    };
+    Relationships: [];
+  };
   business_profiles: {
     Row: {
       id: string;
@@ -301,7 +355,7 @@ export type CustomTables = {
       image_url: string | null;
       valid_from: string | null;
       valid_until: string | null;
-      status: 'draft' | 'scheduled' | 'active' | 'paused' | 'expired' | 'exhausted' | 'archived' | string;
+      status: 'draft' | 'scheduled' | 'active' | 'paused' | 'expired' | 'exhausted' | 'archived';
       is_active: boolean;
       display_order: number;
       archived_at: string | null;
@@ -391,7 +445,7 @@ export type CustomTables = {
       benefit_id: string;
       user_id: string;
       public_code: string;
-      status: 'redeemed' | 'used' | 'expired' | 'cancelled' | string;
+      status: 'redeemed' | 'used' | 'expired' | 'cancelled';
       redeemed_at: string;
       expires_at: string | null;
       used_at: string | null;

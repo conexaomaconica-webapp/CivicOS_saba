@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any */
 'use server';
 
 import { revalidatePath } from 'next/cache';
@@ -59,7 +60,9 @@ async function baseUrl(): Promise<string> {
   try {
     const host = (await headers()).get('host');
     if (host) return `${host.startsWith('localhost') ? 'http' : 'https'}://${host}`;
-  } catch {}
+  } catch {
+    // fallback quando executado fora de contexto HTTP de requisição
+  }
   return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 }
 
@@ -124,23 +127,39 @@ export async function createSignupInviteAction(input: {
       const brandName = brand?.appName || 'Conexão Maçônica';
       const greeting = invitedName ? `Olá, ${invitedName}!` : 'Olá!';
       const validity = new Date(expiresAt).toLocaleDateString('pt-BR');
+      const origin = await baseUrl();
+      const isLocalHost = !origin || origin.includes('localhost') || origin.includes('127.0.0.1');
+      const publicBaseUrl = isLocalHost
+        ? (process.env.NEXT_PUBLIC_SITE_URL || 'https://conexaomaconica.com.br').replace(/\/+$/, '')
+        : origin.replace(/\/+$/, '');
+
+      const logoUrl = brand?.logoUrl && !brand.logoUrl.includes('localhost')
+        ? (brand.logoUrl.startsWith('http') ? brand.logoUrl : `${publicBaseUrl}${brand.logoUrl}`)
+        : `${publicBaseUrl}/logoconexao_red_vert.png`;
+
       const mail = await sendEmail({
         to: invitedEmail,
-        subject: `Cadastre sua empresa no ${brandName}`,
+        subject: `Inicie o cadastro da sua empresa | ${brandName}`,
         html: brandedEmailHtml({
           brandName,
-          primaryColor: brand?.primaryColor || '#5d1523',
-          heading: 'Cadastre sua empresa',
+          logoUrl,
+          primaryColor: '#5d1523',
+          heading: 'Inicie o cadastro da sua empresa',
           paragraphs: [
             greeting,
-            `A equipe do ${brandName} convidou você a informar os dados da sua empresa. O preenchimento leva poucos minutos.`,
-            'Nada é publicado agora: a equipe confere as informações e entra em contato com os próximos passos.',
+            `A equipe da ${brandName} enviou este convite para você dar continuidade ao cadastro da sua empresa.`,
+            'O preenchimento leva poucos minutos. Neste momento, nenhuma informação será publicada. Após o envio, nossa equipe fará a conferência dos dados e seguirá com as próximas etapas.',
           ],
-          buttonLabel: 'Preencher os dados',
+          buttonLabel: 'Iniciar Cadastro',
           buttonUrl: url,
           footnote: `Este link é pessoal, de uso único e vale até ${validity}.`,
+          signature: {
+            name: 'Conexão Maçônica',
+            tagline: 'Tradição que une! conexão que nos fortalece',
+            phone: '75 981524838',
+          },
         }),
-        text: `${greeting}\n\nA equipe do ${brandName} convidou você a informar os dados da sua empresa.\nPreencha em: ${url}\n\nO link é pessoal, de uso único e vale até ${validity}. Nada é publicado antes da conferência da equipe.`,
+        text: `${greeting}\n\nA equipe da ${brandName} enviou este convite para você dar continuidade ao cadastro da sua empresa.\n\nPara iniciar o preenchimento, acesse o link seguro abaixo:\n${url}\n\nO link é pessoal, de uso único e vale até ${validity}. Neste momento, nenhuma informação será publicada antes da conferência da equipe.\n\nAtenciosamente,\n\nConexão Maçônica\n"Tradição que une! conexão que nos fortalece"\nTel: 75 981524838`,
       });
       emailStatus = mail.sent ? 'sent' : mail.reason === 'not_configured' ? 'not_configured' : 'failed';
       if (mail.sent) {

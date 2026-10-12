@@ -31,6 +31,7 @@ import {
   KeyRound,
   Handshake,
   AlertTriangle,
+  Mail,
 } from 'lucide-react';
 import { getApprovalDirectoryListAction } from '@/lib/admin/admin-approval-service';
 
@@ -234,6 +235,12 @@ export const adminNavSections: NavSection[] = [
         icon: KeyRound,
       },
       {
+        id: 'email-integracao',
+        label: 'Integração E-mail (Hostinger)',
+        path: '/admin/configuracoes/integracoes/email',
+        icon: Mail,
+      },
+      {
         id: 'settings',
         label: 'Usuários & Permissões',
         path: '/admin/settings',
@@ -260,11 +267,11 @@ export function AdminSidebar({ isMobileOpen = false, onMobileClose, userRole = '
         if (res.success) {
           setPendingCount(res.counts?.total ?? res.items?.length ?? 0);
         }
-      } catch (_err) {
+      } catch {
         setPendingCount(1);
       }
     }
-    fetchPendingApprovals();
+    void fetchPendingApprovals();
   }, []);
 
   const isLinkActive = (path: string) => {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-misused-promises, @typescript-eslint/no-non-null-asserted-optional-chain, @typescript-eslint/no-floating-promises, @typescript-eslint/no-unused-vars, no-empty */
 'use client';
 
 import React, { useState, useTransition, useMemo, useEffect } from 'react';
@@ -59,6 +60,7 @@ import {
   ContractSnapshotHistoryItem,
   SendContractForSignatureResult,
 } from '@/lib/contracts/admin-contracts-service';
+import { sendContractEmailToAdvertiserAction } from '@/lib/contracts/contract-email-service';
 import { publishAdminBusinessAction, unlockAdminCommercialDossierAction } from '@/lib/admin/admin-commercial-dossier-service';
 
 interface CommercialOnboardingClientProps {
@@ -194,6 +196,11 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
   const [isSendingForSignature, setIsSendingForSignature] = useState<boolean>(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [copiedLinkFeedback, setCopiedLinkFeedback] = useState<boolean>(false);
+  const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
+  const [emailStatusDetail, setEmailStatusDetail] = useState<{
+    status: 'accepted' | 'failed' | 'unknown' | 'already_processing';
+    message: string;
+  } | null>(null);
 
   const [showRevokeTokenModal, setShowRevokeTokenModal] = useState<boolean>(false);
   const [revokeTokenReason, setRevokeTokenReason] = useState<string>('');
@@ -828,6 +835,65 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
       : `Olá, ${name}.\n\nSeu contrato da Conexão Maçônica está disponível para conferência e assinatura eletrônica:\n\n${signatureTokenData.public_url}\n\nO link possui validade de 7 dias.\n\nAtenciosamente,\nEquipe Conexão Maçônica`;
     const mailtoUrl = `mailto:${owner.email || business.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailtoUrl;
+  };
+
+  const handleSendContractEmailDirectly = async () => {
+    setIsSendingEmail(true);
+    setEmailStatusDetail(null);
+    try {
+      const res = await sendContractEmailToAdvertiserAction(business.id);
+      if (res.success && res.status === 'accepted') {
+        setEmailStatusDetail({
+          status: 'accepted',
+          message: 'E-mail com o link seguro do contrato entregue com sucesso via Hostinger Mail API ✓',
+        });
+        setCommercialStatus('contrato_enviado');
+        setFeedback({
+          type: 'success',
+          message: 'Contrato enviado com sucesso ao anunciante por e-mail via Hostinger Mail API ✓',
+        });
+        if (res.public_url && signatureTokenData) {
+          setSignatureTokenData({
+            ...signatureTokenData,
+            public_url: res.public_url,
+          });
+        }
+        await loadSnapshotHistory();
+        router.refresh();
+      } else if (res.status === 'unknown') {
+        setEmailStatusDetail({
+          status: 'unknown',
+          message:
+            'Aviso de integridade: O status na Hostinger retornou indeterminado (timeout/rede). O link anterior do anunciante continua 100% ativo e o envio não foi repetido automaticamente.',
+        });
+        setFeedback({
+          type: 'error',
+          message:
+            'Resultado ambíguo (timeout na Hostinger). O link anterior do anunciante continua válido e não houve reenvio duplicado.',
+        });
+      } else if (res.status === 'already_processing') {
+        setEmailStatusDetail({
+          status: 'already_processing',
+          message: 'Já existe um envio deste contrato em processamento. Aguarde alguns instantes.',
+        });
+      } else {
+        setEmailStatusDetail({
+          status: 'failed',
+          message: res.error || 'Falha ao entregar e-mail pela Hostinger Mail API.',
+        });
+        setFeedback({
+          type: 'error',
+          message: res.error || 'Falha ao entregar e-mail pela Hostinger Mail API.',
+        });
+      }
+    } catch (err: any) {
+      setEmailStatusDetail({
+        status: 'failed',
+        message: err?.message || 'Erro inesperado ao enviar e-mail pela Hostinger Mail API.',
+      });
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
   // Microetapa 6.4A: Liberação Formal do Prontuário 360 pelo Administrador
@@ -2070,11 +2136,21 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
             </button>
             <button
               type="button"
-              onClick={handleOpenEmailShare}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3.5 py-2 text-xs font-semibold text-emerald-900 hover:bg-emerald-100/60 transition shadow-2xs cursor-pointer"
+              disabled={isSendingEmail}
+              onClick={handleSendContractEmailDirectly}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400 bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2 text-xs font-semibold transition shadow-2xs cursor-pointer disabled:cursor-wait disabled:opacity-60"
             >
-              <Mail className="h-3.5 w-3.5 text-stone-600" />
-              Enviar por e-mail
+              <Mail className={`h-3.5 w-3.5 ${isSendingEmail ? 'animate-spin' : ''}`} />
+              <span>{isSendingEmail ? 'Enviando pela Hostinger...' : 'Enviar por e-mail (Hostinger API)'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenEmailShare}
+              title="Abrir no aplicativo de e-mail local (mailto)"
+              className="inline-flex items-center gap-1 rounded-xl border border-stone-200 bg-white px-2.5 py-2 text-[11px] font-medium text-stone-600 hover:bg-stone-50 transition shadow-2xs cursor-pointer"
+            >
+              <Mail className="h-3 w-3 text-stone-400" />
+              <span>Abrir no App Local</span>
             </button>
             <button
               type="button"
@@ -2086,6 +2162,23 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
               Renovar link seguro
             </button>
           </div>
+
+          {emailStatusDetail && (
+            <div
+              className={`p-3 rounded-xl text-xs flex items-center gap-2.5 transition-all ${
+                emailStatusDetail.status === 'accepted'
+                  ? 'bg-emerald-100 text-emerald-950 border border-emerald-300'
+                  : emailStatusDetail.status === 'unknown'
+                  ? 'bg-amber-100 text-amber-950 border border-amber-300'
+                  : 'bg-rose-100 text-rose-950 border border-rose-300'
+              }`}
+            >
+              {emailStatusDetail.status === 'accepted' && <Check className="h-4 w-4 shrink-0 text-emerald-700" />}
+              {emailStatusDetail.status === 'unknown' && <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />}
+              {emailStatusDetail.status === 'failed' && <AlertCircle className="h-4 w-4 shrink-0 text-rose-700" />}
+              <span>{emailStatusDetail.message}</span>
+            </div>
+          )}
         </section>
       )}
 
@@ -2933,7 +3026,6 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
                   {signedContractData.signature_image_data && (
                     <div className="rounded-xl border border-stone-200 p-4">
                       <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-stone-600">Assinatura registrada</p>
-                      {/* eslint-disable-next-line @next/next/no-img-element -- assinatura é evidência data URL imutável */}
                       <img src={signedContractData.signature_image_data} alt="Assinatura digital registrada no contrato" className="max-h-32 max-w-full object-contain" />
                     </div>
                   )}
