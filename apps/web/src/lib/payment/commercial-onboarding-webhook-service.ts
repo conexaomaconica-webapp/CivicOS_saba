@@ -10,6 +10,13 @@ import {
   assertCommercialStatusTransition,
 } from '@/lib/commercial-onboarding-status';
 
+import {
+  classifyAsaasEvent,
+  extractAsaasPaymentId,
+  extractAsaasEventId,
+  type AsaasEventCategory,
+} from './asaas-event-catalog';
+
 function getAdminClient() {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -62,6 +69,8 @@ export interface ReconcileWebhookResult {
   success: boolean;
   reconciled: boolean;
   already_processed?: boolean;
+  category?: AsaasEventCategory;
+  message?: string;
   error?: string;
   data?: {
     business_id?: string;
@@ -69,36 +78,246 @@ export interface ReconcileWebhookResult {
     previous_status?: string;
     new_status?: string;
     event_type?: string;
+    already_liquidated?: boolean;
   };
 }
 
 /**
  * Reconcilia eventos de webhook do Asaas para onboarding comercial.
  * Localiza o registro internamente via payment ID e efetua transição
- * atômica para 'pagamento_confirmado'.
+ * atômica para 'pagamento_confirmado' apenas para eventos de liquidação real.
  */
 export async function reconcileCommercialPaymentWebhook(
   payload: Record<string, unknown>,
-  eventIdHeader?: string | null
+  eventIdHeader?: string | null,
+  customSupabase?: any
 ): Promise<ReconcileWebhookResult> {
   try {
-    const dbClient = getAdminClient();
-
     const rawEvent = (payload.event as string) || '';
-    const payment = (payload.payment as Record<string, unknown>) || payload;
-    const asaasPaymentId = (payment.id as string) || '';
-    const eventId = (payload.id as string) || eventIdHeader || `${rawEvent}_${asaasPaymentId}`;
-    const amountCents = Math.round(((payment.value as number) || 0) * 100);
+    const classification = classifyAsaasEvent(rawEvent);
+    const eventId = extractAsaasEventId(payload, eventIdHeader);
+    const asaasPaymentId = extractAsaasPaymentId(payload);
 
-    if (!asaasPaymentId) {
+    // 1. Eventos Administrativos não devem executar conciliação financeira
+    if (classification.category === 'administrative') {
       return {
-        success: false,
+        success: true,
         reconciled: false,
-        error: 'Payload do webhook não contém identificador Asaas válido (payment.id).',
+        category: 'administrative',
+        message: 'Evento administrativo auditado sem necessidade de conciliação financeira.',
+        data: { event_type: rawEvent },
       };
     }
 
-    // 1. Tenta executar via RPC Atômica (Migration 133)
+    // 2. Eventos Técnicos e Smoke Tests
+    if (classification.category === 'technical_test' || Boolean(payload.isTechnicalSmokeTest)) {
+      return {
+        success: true,
+        reconciled: false,
+        category: 'technical_test',
+        message: 'Teste técnico Asaas auditado sem conciliação financeira.',
+        data: { event_type: rawEvent },
+      };
+    }
+
+    // 3. Eventos Não Reconhecidos (sinalizados para triagem sem falso sucesso)
+    if (classification.category === 'unrecognized') {
+      return {
+        success: false,
+        reconciled: false,
+        category: 'unrecognized',
+        message: `Evento Asaas não reconhecido registrado para triagem: ${rawEvent}.`,
+        error: `Evento Asaas não catalogado para conciliação automática: ${rawEvent}. Requer triagem.`,
+      };
+    }
+
+    // 4. Se for financeiro mas não possuir payment.id válido, audita sem conciliar
+    if (!asaasPaymentId) {
+      return {
+        success: true,
+        reconciled: false,
+        category: classification.category,
+        message: 'Payload sem identificador de cobrança Asaas válido (payment.id). Registrado sem alteração financeira.',
+        error: 'Payload sem identificador de cobrança Asaas válido (payment.id). Registrado sem alteração financeira.',
+      };
+    }
+
+    const dbClient = customSupabase || getAdminClient();
+    const payment = (payload.payment as Record<string, unknown>) || {};
+    const amountCents = Math.round(((payment.value as number) || 0) * 100);
+
+    // 5. Tratamento de Criação de Cobrança (PAYMENT_CREATED, PAYMENT_UPDATED)
+    // NUNCA confirma pagamento! Registra o status de aguardando_pagamento
+    if (classification.category === 'financial_creation') {
+      const { data: attempt } = await (dbClient as any)
+        .from('payment_attempts')
+        .select('id, invoice_id, business_id, tenant_id, payload_received')
+        .eq('provider_code', 'asaas')
+        .or(`provider_charge_id.eq.${asaasPaymentId},payload_received->>payment_id.eq.${asaasPaymentId}`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const businessId = attempt?.business_id;
+      if (businessId) {
+        const { data: biz } = await (dbClient as any)
+          .from('businesses')
+          .select('id, commercial_status, tenant_id')
+          .eq('id', businessId)
+          .single();
+
+        if (biz) {
+          if (attempt?.id) {
+            const { error: updateErr } = await (dbClient as any)
+              .from('payment_attempts')
+              .update({
+                provider_charge_id: asaasPaymentId,
+                response_received: {
+                  ...(attempt.payload_received || {}),
+                  last_event: rawEvent,
+                  event_id: eventId,
+                  updated_at: new Date().toISOString(),
+                },
+              })
+              .eq('id', attempt.id);
+
+            if (updateErr) {
+              console.warn('[ASAAS_WEBHOOK] Erro ao atualizar tentativa com payment_id:', updateErr);
+            }
+          }
+
+          try {
+            await (dbClient as any).from('admin_audit_logs').insert({
+              tenant_id: biz.tenant_id,
+              actor_id: '00000000-0000-0000-0000-000000000001',
+              action: 'ASAAS_PAYMENT_CREATED_AUDITED',
+              entity_type: 'businesses',
+              entity_id: businessId,
+              before_value: { commercial_status: biz.commercial_status },
+              after_value: {
+                commercial_status: biz.commercial_status,
+                event_type: rawEvent,
+                asaas_payment_id: asaasPaymentId,
+              },
+              reason: `Cobrança Asaas gerada/atualizada (${rawEvent}). Aguardando pagamento pelo anunciante.`,
+            });
+          } catch (_auditErr) {}
+
+          return {
+            success: true,
+            reconciled: false,
+            category: 'financial_creation',
+            message: 'Cobrança Asaas gerada/atualizada registrada (aguardando liquidação).',
+            data: {
+              business_id: businessId,
+              previous_status: biz.commercial_status,
+              new_status: biz.commercial_status,
+              event_type: rawEvent,
+            },
+          };
+        }
+      }
+
+      return {
+        success: true,
+        reconciled: false,
+        category: 'financial_creation',
+        message: 'Cobrança Asaas gerada/atualizada registrada (aguardando liquidação).',
+        data: { event_type: rawEvent },
+      };
+    }
+
+    // 6. Tratamento de Exclusão de Cobrança (PAYMENT_DELETED)
+    // PROTEÇÃO: Impede reversão indevida de pagamentos já liquidados!
+    if (rawEvent === 'PAYMENT_DELETED') {
+      const { data: attempt } = await (dbClient as any)
+        .from('payment_attempts')
+        .select('id, invoice_id, business_id, tenant_id')
+        .eq('provider_code', 'asaas')
+        .or(`provider_charge_id.eq.${asaasPaymentId},payload_received->>payment_id.eq.${asaasPaymentId}`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const businessId = attempt?.business_id;
+      if (businessId) {
+        const { data: biz } = await (dbClient as any)
+          .from('businesses')
+          .select('id, commercial_status, tenant_id')
+          .eq('id', businessId)
+          .maybeSingle();
+
+        if (biz) {
+          const isLiquidated = ['pagamento_confirmado', 'prontuario_em_configuracao', 'pronto_para_publicar', 'publicado'].includes(biz.commercial_status);
+
+          if (isLiquidated) {
+            try {
+              await (dbClient as any).from('admin_audit_logs').insert({
+                tenant_id: biz.tenant_id,
+                actor_id: '00000000-0000-0000-0000-000000000001',
+                action: 'ASAAS_PAYMENT_DELETED_IGNORED',
+                entity_type: 'businesses',
+                entity_id: businessId,
+                before_value: { commercial_status: biz.commercial_status },
+                after_value: { commercial_status: biz.commercial_status, event_type: rawEvent, asaas_payment_id: asaasPaymentId },
+                reason: 'Tentativa de exclusão de cobrança no Asaas ignorada: a empresa já possui pagamento confirmado/liquidado.',
+              });
+            } catch (_auditErr) {}
+
+            return {
+              success: true,
+              reconciled: false,
+              already_processed: true,
+              category: 'financial_reversal',
+              message: 'Tentativa de exclusão ignorada: status liquidado/confirmado preservado.',
+              data: {
+                business_id: businessId,
+                previous_status: biz.commercial_status,
+                new_status: biz.commercial_status,
+                event_type: rawEvent,
+                already_liquidated: true,
+              },
+            };
+          }
+
+          if (attempt?.id) {
+            const { error: cancelErr } = await (dbClient as any)
+              .from('payment_attempts')
+              .update({
+                status: 'failed',
+                error_message: 'Cobrança cancelada ou removida no Asaas antes do pagamento.',
+              })
+              .eq('id', attempt.id);
+
+            if (cancelErr) {
+              console.warn('[ASAAS_WEBHOOK] Erro ao marcar tentativa cancelada:', cancelErr);
+            }
+          }
+
+          return {
+            success: true,
+            reconciled: false,
+            category: 'financial_reversal',
+            data: {
+              business_id: businessId,
+              previous_status: biz.commercial_status,
+              new_status: biz.commercial_status,
+              event_type: rawEvent,
+            },
+          };
+        }
+      }
+
+      return {
+        success: true,
+        reconciled: false,
+        category: 'financial_reversal',
+        data: { event_type: rawEvent },
+      };
+    }
+
+    // 7. Confirmação / Liquidação Financeira (PAYMENT_RECEIVED, PAYMENT_CONFIRMED)
+    // Tenta executar via RPC Atômica (Migration 133)
     try {
       const { data: rpcRes, error: rpcErr } = await (dbClient as any).rpc(
         'reconcile_commercial_payment_webhook',
@@ -117,6 +336,7 @@ export async function reconcileCommercialPaymentWebhook(
             success: true,
             reconciled: true,
             already_processed: true,
+            category: 'financial_confirmation',
             data: rpcRes,
           };
         }
@@ -125,6 +345,7 @@ export async function reconcileCommercialPaymentWebhook(
           return {
             success: true,
             reconciled: true,
+            category: 'financial_confirmation',
             data: rpcRes,
           };
         }
@@ -134,6 +355,7 @@ export async function reconcileCommercialPaymentWebhook(
           return {
             success: false,
             reconciled: false,
+            category: 'financial_confirmation',
             error: rpcRes.error || 'Erro na execução da RPC de reconciliação.',
           };
         }
@@ -185,7 +407,7 @@ export async function reconcileCommercialPaymentWebhook(
       .from('businesses')
       .select('id, commercial_status, tenant_id')
       .eq('id', businessId)
-      .single();
+      .maybeSingle();
 
     if (bizErr || !biz) {
       return {

@@ -1,5 +1,7 @@
 export type CanonicalEventType =
   | 'payment_confirmed'
+  | 'payment_created'
+  | 'payment_updated'
   | 'payment_failed'
   | 'subscription_active'
   | 'subscription_past_due'
@@ -24,6 +26,7 @@ export interface CanonicalBillingEvent {
 // ----------------------------------------------------------------------------
 
 import { getAsaasConfig } from '@/lib/payment/asaas-config';
+import { extractAsaasEventId } from '@/lib/payment/asaas-event-catalog';
 
 export class AsaasBillingAdapter {
   static validateSignature(accessTokenHeader: string | null): boolean {
@@ -37,20 +40,33 @@ export class AsaasBillingAdapter {
         return false;
       }
       return accessTokenHeader === config.webhookSecret;
-    } catch (err) {
+    } catch (_err) {
       return false;
     }
   }
 
   static parseEvent(_headers: Headers, payload: Record<string, unknown>): CanonicalBillingEvent {
-    const rawEvent = (payload.event as string) || 'PAYMENT_RECEIVED';
-    const eventId = (payload.id as string) || `asaas_evt_${Date.now()}`;
+    const rawEvent = (payload.event as string) || '';
+    const eventId = extractAsaasEventId(payload, null);
 
     let canonicalEvent: CanonicalEventType = 'payment_confirmed';
-    if (rawEvent === 'PAYMENT_OVERDUE') canonicalEvent = 'payment_failed';
-    else if (rawEvent === 'SUBSCRIPTION_DELETED' || rawEvent === 'SUBSCRIPTION_INACTIVATED') canonicalEvent = 'subscription_canceled';
-    else if (rawEvent === 'PAYMENT_REFUNDED') canonicalEvent = 'payment_refunded';
-    else if (rawEvent === 'PAYMENT_DUNNING_RECEIVED' || rawEvent === 'CHARGEBACK') canonicalEvent = 'payment_chargeback';
+    if (rawEvent === 'PAYMENT_RECEIVED' || rawEvent === 'PAYMENT_CONFIRMED') {
+      canonicalEvent = 'payment_confirmed';
+    } else if (rawEvent === 'PAYMENT_CREATED') {
+      canonicalEvent = 'payment_created';
+    } else if (rawEvent === 'PAYMENT_UPDATED') {
+      canonicalEvent = 'payment_updated';
+    } else if (rawEvent === 'PAYMENT_OVERDUE') {
+      canonicalEvent = 'payment_failed';
+    } else if (rawEvent === 'SUBSCRIPTION_DELETED' || rawEvent === 'SUBSCRIPTION_INACTIVATED') {
+      canonicalEvent = 'subscription_canceled';
+    } else if (rawEvent === 'PAYMENT_REFUNDED' || rawEvent === 'PAYMENT_PARTIALLY_REFUNDED') {
+      canonicalEvent = 'payment_refunded';
+    } else if (rawEvent === 'PAYMENT_DUNNING_RECEIVED' || rawEvent === 'CHARGEBACK' || rawEvent === 'PAYMENT_CHARGEBACK_REQUESTED') {
+      canonicalEvent = 'payment_chargeback';
+    } else {
+      canonicalEvent = 'payment_created';
+    }
 
     const payment = (payload.payment as Record<string, unknown>) || {};
     const externalRef = (payment.externalReference as string) || (payload.externalReference as string) || '00000000-0000-0000-0000-000000000001';

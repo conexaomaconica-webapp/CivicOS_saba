@@ -5,6 +5,10 @@ import {
   reconcileCommercialPaymentWebhook,
   validateAsaasWebhookToken,
 } from '@/lib/payment/commercial-onboarding-webhook-service';
+import {
+  classifyAsaasEvent,
+  extractAsaasEventId,
+} from '@/lib/payment/asaas-event-catalog';
 import { logger } from '@/lib/observability/logger';
 
 function getAdminSupabase() {
@@ -48,54 +52,143 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'INVALID_PAYLOAD: Evento do Asaas inválido.' }, { status: 400 });
     }
 
-    // 1. Tenta reconciliar como Onboarding Comercial (Microetapa 6.3)
-    // Localiza internamente pelo Asaas payment ID sem confiar em metadados externos
-    const onboardingRes = await reconcileCommercialPaymentWebhook(payload, req.headers.get('asaas-event-id'));
-    if (onboardingRes.success && onboardingRes.reconciled) {
-      logger.info('Evento do Asaas reconciliado como Onboarding Comercial', {
-        event_type: payload.event,
-        already_processed: onboardingRes.already_processed || false,
-      });
-
-      return NextResponse.json({
-        received: true,
-        commercial_onboarding: true,
-        already_processed: onboardingRes.already_processed || false,
-        result: onboardingRes.data,
-      });
-    }
-
-    // 2. Se não for onboarding comercial, processa ciclo regular de assinaturas
-    const canonicalEvent = AsaasBillingAdapter.parseEvent(req.headers, payload);
-
-    // Isola cobranças técnicas de smoke test (ex: CM_TECHNICAL_SMOKE_*)
+    const rawEventType = typeof payload.event === 'string' ? payload.event : '';
+    const eventClassification = classifyAsaasEvent(rawEventType);
+    const eventId = extractAsaasEventId(payload, req.headers.get('asaas-event-id'));
     const isTechnicalSmokeTest =
-      canonicalEvent.businessId.startsWith('CM_TECHNICAL_SMOKE_') ||
-      Boolean(payload.isTechnicalSmokeTest);
+      eventClassification.category === 'technical_test' ||
+      Boolean(payload.isTechnicalSmokeTest) ||
+      (typeof payload.externalReference === 'string' && payload.externalReference.startsWith('CM_TECHNICAL_SMOKE_'));
 
     const supabase = getAdminSupabase();
 
+    // 1. Eventos Técnicos e Smoke Tests de Conectividade
     if (isTechnicalSmokeTest) {
-      // Registra no log de auditoria sem alterar assinaturas comerciais ou status no Guia
-      const { error: logErr } = await supabase.from('payment_provider_events').insert({
-        provider_code: canonicalEvent.provider,
-        event_id: canonicalEvent.providerEventId,
-        event_type: canonicalEvent.canonicalEvent,
-        payload: { ...canonicalEvent.rawPayload, technical_smoke_test: true },
+      await supabase.from('payment_provider_events').insert({
+        provider_code: 'asaas',
+        event_id: eventId,
+        event_type: rawEventType || 'TECHNICAL_TEST',
+        payload: { ...payload, classification: 'technical_test', technical_smoke_test: true },
         processed: true,
         processed_at: new Date().toISOString(),
       });
 
-      if (logErr && !logErr.message.includes('duplicate key') && !logErr.message.includes('fetch failed')) {
-        return NextResponse.json({ error: logErr.message }, { status: 400 });
-      }
-
       return NextResponse.json({
         received: true,
         technical_smoke_test: true,
-        message: 'Evento financeiro de smoke test de R$ 5,00 auditado sem alteração comercial.',
+        message: 'Evento técnico de teste do Asaas auditado com sucesso.',
       });
     }
+
+    // 2. Eventos Administrativos (clientes, contas, transferências, notas)
+    // Auditados com sucesso sem tentar conciliar faturas ou alterar saldos
+    if (eventClassification.category === 'administrative') {
+      await supabase.from('payment_provider_events').insert({
+        provider_code: 'asaas',
+        event_id: eventId,
+        event_type: rawEventType,
+        payload: { ...payload, classification: 'administrative' },
+        processed: true,
+        processed_at: new Date().toISOString(),
+      });
+
+      logger.info('Evento administrativo do Asaas auditado', {
+        event_type: rawEventType,
+        event_id: eventId,
+      });
+
+      return NextResponse.json({
+        received: true,
+        administrative: true,
+        event_type: rawEventType,
+        message: 'Evento administrativo auditado sem alteração comercial ou financeira.',
+      });
+    }
+
+    // 3. Eventos Não Reconhecidos / Desconhecidos
+    // Registrados para triagem operacional sem mascaramento de falso sucesso nem 500
+    if (eventClassification.category === 'unrecognized') {
+      const incidentNotice = `[TRIAGEM_OPERACIONAL] Evento Asaas não catalogado: ${rawEventType || 'DESCONHECIDO'}`;
+      await supabase.from('payment_provider_events').insert({
+        provider_code: 'asaas',
+        event_id: eventId,
+        event_type: rawEventType || 'UNRECOGNIZED',
+        payload: { ...payload, classification: 'unrecognized' },
+        processed: false,
+        error_log: incidentNotice,
+      });
+
+      logger.warn('Evento Asaas não reconhecido registrado para triagem operacional', {
+        event_type: rawEventType,
+        event_id: eventId,
+      });
+
+      return NextResponse.json({
+        received: true,
+        unrecognized: true,
+        event_type: rawEventType,
+        message: 'Evento não catalogado registrado para triagem operacional.',
+      });
+    }
+
+    // 4. Tenta reconciliar como Onboarding Comercial (Microetapa 6.3)
+    const onboardingRes = await reconcileCommercialPaymentWebhook(payload, eventId);
+    if (onboardingRes.success) {
+      if (onboardingRes.reconciled) {
+        logger.info('Evento do Asaas reconciliado como Onboarding Comercial', {
+          event_type: rawEventType,
+          already_processed: onboardingRes.already_processed || false,
+        });
+
+        return NextResponse.json({
+          received: true,
+          commercial_onboarding: true,
+          already_processed: onboardingRes.already_processed || false,
+          result: onboardingRes.data,
+        });
+      }
+
+      if (onboardingRes.category === 'financial_creation') {
+        // Grava criação da cobrança em payment_provider_events como aguardando pagamento
+        await supabase.from('payment_provider_events').insert({
+          provider_code: 'asaas',
+          event_id: eventId,
+          event_type: rawEventType,
+          payload: { ...payload, classification: 'financial_creation' },
+          processed: true,
+          processed_at: new Date().toISOString(),
+        });
+
+        return NextResponse.json({
+          received: true,
+          commercial_onboarding: true,
+          financial_creation: true,
+          status: 'aguardando_pagamento',
+          message: 'Cobrança Asaas registrada. Aguardando pagamento pelo cliente.',
+        });
+      }
+
+      if (onboardingRes.category === 'financial_reversal') {
+        await supabase.from('payment_provider_events').insert({
+          provider_code: 'asaas',
+          event_id: eventId,
+          event_type: rawEventType,
+          payload: { ...payload, classification: 'financial_reversal' },
+          processed: true,
+          processed_at: new Date().toISOString(),
+        });
+
+        return NextResponse.json({
+          received: true,
+          commercial_onboarding: true,
+          financial_reversal: true,
+          result: onboardingRes.data,
+        });
+      }
+    }
+
+    // 5. Se não for onboarding comercial, processa ciclo regular de assinaturas
+    const canonicalEvent = AsaasBillingAdapter.parseEvent(req.headers, payload);
 
     const { data: rpcRes, error } = await (
       supabase as unknown as {
