@@ -41,7 +41,7 @@ export interface AuditCategoryInfo {
 
 export function resolveAuditCategory(evt: RecentPaymentEvent): AuditCategoryInfo {
   const type = (evt.event_type || '').toUpperCase();
-  const payload = (evt.payload || {}) as Record<string, unknown>;
+  const payload = evt.payload || {};
   const classification = typeof payload.classification === 'string' ? payload.classification : '';
   const isSmoke = Boolean(payload.technical_smoke_test) || type.includes('SMOKE') || type === 'PING' || type === 'WH_PING' || type === 'TEST';
 

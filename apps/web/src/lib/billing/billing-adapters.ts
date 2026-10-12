@@ -40,7 +40,7 @@ export class AsaasBillingAdapter {
         return false;
       }
       return accessTokenHeader === config.webhookSecret;
-    } catch (_err) {
+    } catch {
       return false;
     }
   }
@@ -49,7 +49,7 @@ export class AsaasBillingAdapter {
     const rawEvent = (payload.event as string) || '';
     const eventId = extractAsaasEventId(payload, null);
 
-    let canonicalEvent: CanonicalEventType = 'payment_confirmed';
+    let canonicalEvent: CanonicalEventType;
     if (rawEvent === 'PAYMENT_RECEIVED' || rawEvent === 'PAYMENT_CONFIRMED') {
       canonicalEvent = 'payment_confirmed';
     } else if (rawEvent === 'PAYMENT_CREATED') {
