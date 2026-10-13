@@ -325,6 +325,73 @@ export default function InvitesClient({ initialItems, emailConfigured }: { initi
     router.refresh();
   }
 
+  const renderInviteActions = (item: InviteListItem, mobile = false) => (
+    <div className={`flex items-center gap-2 ${mobile ? 'w-full flex-wrap' : 'justify-end'}`}>
+      {item.status === 'submitted' && (
+        <Link
+          href={`/admin/empresas/convites/${item.id}`}
+          className={`inline-flex items-center justify-center gap-1 rounded-xl bg-[#3B0B14] px-3.5 py-2 text-xs font-bold text-[#C9A227] shadow-2xs transition hover:bg-[#2b080f] ${mobile ? 'w-full' : ''}`}
+        >
+          Conferir dados →
+        </Link>
+      )}
+      {item.status === 'converted' && item.business_id && (
+        <Link
+          href={`/admin/empresas/${item.business_id}`}
+          className={`rounded-xl border border-stone-300 bg-white px-3 py-2 text-center text-xs font-bold text-stone-700 shadow-2xs transition hover:bg-stone-50 ${mobile ? 'w-full' : ''}`}
+        >
+          Abrir empresa
+        </Link>
+      )}
+      {item.status === 'sent' && !item.expired && (
+        <>
+          <button
+            type="button"
+            onClick={() => rowCopy(item)}
+            disabled={busyId === item.id}
+            className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold shadow-2xs transition cursor-pointer ${mobile ? 'min-w-0 flex-1' : ''} ${
+              rowFeedback?.id === item.id
+                ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-50'
+            }`}
+          >
+            {rowFeedback?.id === item.id ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <Copy className="h-3.5 w-3.5 text-stone-500" />}
+            <span>{rowFeedback?.id === item.id ? 'Copiado ✓' : 'Copiar link'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => rowWhatsapp(item)}
+            disabled={busyId === item.id}
+            className={`inline-flex items-center justify-center gap-1 rounded-xl bg-[#25D366] px-3 py-2 text-xs font-bold text-white shadow-2xs transition hover:bg-[#20bd5a] cursor-pointer ${mobile ? 'min-w-0 flex-1' : ''}`}
+          >
+            <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+          </button>
+        </>
+      )}
+      {item.status === 'sent' && item.expired && (
+        <button
+          type="button"
+          onClick={() => rowRenew(item.id)}
+          disabled={busyId === item.id}
+          className={`rounded-xl border border-amber-400 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900 shadow-2xs transition hover:bg-amber-100 cursor-pointer ${mobile ? 'flex-1' : ''}`}
+        >
+          {busyId === item.id ? 'Gerando…' : 'Gerar novo link'}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => remove(item)}
+        disabled={busyId === item.id}
+        title="Excluir convite"
+        aria-label={`Excluir convite de ${item.company_name || item.invited_name || 'convidado'}`}
+        className={`inline-flex items-center justify-center gap-1 rounded-xl border border-rose-300 bg-white px-2.5 py-2 text-xs font-bold text-rose-700 shadow-2xs transition hover:bg-rose-50 cursor-pointer ${mobile && item.status !== 'sent' ? 'w-full' : ''}`}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        {busyId === item.id ? '…' : 'Excluir'}
+      </button>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <form onSubmit={handleCreate} className="space-y-4 rounded-2xl border border-stone-300 bg-white p-5 shadow-xs">
@@ -592,8 +659,85 @@ export default function InvitesClient({ initialItems, emailConfigured }: { initi
         </div>
       </div>
 
-      {/* Tabela de Convites */}
-      <div className="overflow-hidden rounded-2xl border border-stone-300 bg-white shadow-xs">
+      {/* Cards de convites no mobile */}
+      <div className="space-y-3 md:hidden">
+        {filteredItems.length === 0 && (
+          <div className="space-y-2 rounded-2xl border border-stone-300 bg-white px-4 py-8 text-center text-stone-500 shadow-xs">
+            <p className="font-medium text-stone-600">
+              {initialItems.length === 0
+                ? 'Nenhum convite criado ainda.'
+                : 'Nenhum convite encontrado com os filtros selecionados.'}
+            </p>
+            {isFiltered && (
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                className="inline-flex items-center gap-1 text-xs font-bold text-[#3B0B14] hover:underline cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" /> Limpar filtros e exibir todos
+              </button>
+            )}
+          </div>
+        )}
+
+        {filteredItems.map((item) => {
+          const status = item.expired ? { text: 'Expirado', cls: 'bg-stone-200 text-stone-700' } : STATUS_LABEL[item.status];
+          return (
+            <article key={item.id} className="min-w-0 overflow-hidden rounded-2xl border border-stone-300 bg-white p-4 shadow-xs">
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-1.5 font-bold text-stone-900">
+                    {item.company_name && <Building2 className="h-4 w-4 shrink-0 text-[#3B0B14]" />}
+                    <h3 className="truncate">{item.company_name || item.invited_name || 'Sem nome'}</h3>
+                  </div>
+                  {item.company_name && (
+                    <p className="mt-0.5 truncate text-xs text-stone-600">
+                      {item.invited_name || item.responsible_name || 'Convidado'}
+                    </p>
+                  )}
+                  <p className="truncate text-xs text-stone-500">{item.invited_email || 'E-mail não informado'}</p>
+                </div>
+                <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${status?.cls}`}>
+                  {item.status === 'submitted' && <CheckCircle2 className="h-3 w-3 text-blue-600" />}
+                  {status?.text}
+                </span>
+              </div>
+
+              {item.note && <p className="mt-2 break-words text-xs italic text-stone-500">Obs: {item.note}</p>}
+
+              <dl className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-stone-50 p-3 text-xs">
+                <div>
+                  <dt className="text-stone-500">Criado em</dt>
+                  <dd className="mt-0.5 font-semibold text-stone-800">{formatDateBR(item.created_at)}</dd>
+                </div>
+                <div>
+                  <dt className="text-stone-500">{item.expired ? 'Expirou em' : 'Expira em'}</dt>
+                  <dd className="mt-0.5 font-semibold text-stone-800">{formatDateBR(item.expires_at)}</dd>
+                </div>
+                {item.submitted_at && item.status === 'submitted' && (
+                  <div className="col-span-2">
+                    <dt className="text-blue-700">Preenchido em</dt>
+                    <dd className="mt-0.5 font-semibold text-blue-900">{formatDateBR(item.submitted_at)}</dd>
+                  </div>
+                )}
+                {item.email_sent_at && (
+                  <div className="col-span-2">
+                    <dt className="text-stone-500">E-mail enviado em</dt>
+                    <dd className="mt-0.5 font-semibold text-stone-700">{formatDateBR(item.email_sent_at)}</dd>
+                  </div>
+                )}
+              </dl>
+
+              <div className="mt-3 border-t border-stone-200 pt-3">
+                {renderInviteActions(item, true)}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      {/* Tabela de convites no desktop */}
+      <div className="hidden overflow-hidden rounded-2xl border border-stone-300 bg-white shadow-xs md:block">
         <table className="w-full text-left text-sm">
           <thead className="bg-stone-100 text-xs uppercase tracking-wide text-stone-600">
             <tr>
@@ -674,79 +818,7 @@ export default function InvitesClient({ initialItems, emailConfigured }: { initi
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end items-center gap-2">
-                      {item.status === 'submitted' && (
-                        <Link
-                          href={`/admin/empresas/convites/${item.id}`}
-                          className="inline-flex items-center gap-1 rounded-xl bg-[#3B0B14] hover:bg-[#2b080f] px-3.5 py-1.5 text-xs font-bold text-[#C9A227] shadow-2xs transition"
-                        >
-                          Conferir dados →
-                        </Link>
-                      )}
-                      {item.status === 'converted' && item.business_id && (
-                        <Link
-                          href={`/admin/empresas/${item.business_id}`}
-                          className="rounded-xl border border-stone-300 bg-white hover:bg-stone-50 px-3 py-1.5 text-xs font-bold text-stone-700 shadow-2xs transition"
-                        >
-                          Abrir empresa
-                        </Link>
-                      )}
-                      {item.status === 'sent' && !item.expired && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => rowCopy(item)}
-                            disabled={busyId === item.id}
-                            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition shadow-2xs cursor-pointer ${
-                              rowFeedback?.id === item.id
-                                ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
-                                : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-50'
-                            }`}
-                          >
-                            {rowFeedback?.id === item.id ? (
-                              <>
-                                <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" />
-                                <span>Copiado ✓</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="h-3.5 w-3.5 text-stone-500" />
-                                <span>Copiar link</span>
-                              </>
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => rowWhatsapp(item)}
-                            disabled={busyId === item.id}
-                            className="inline-flex items-center gap-1 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] px-3 py-1.5 text-xs font-bold text-white shadow-2xs transition cursor-pointer"
-                          >
-                            <MessageCircle className="h-3.5 w-3.5" />
-                            WhatsApp
-                          </button>
-                        </>
-                      )}
-                      {item.status === 'sent' && item.expired && (
-                        <button
-                          type="button"
-                          onClick={() => rowRenew(item.id)}
-                          disabled={busyId === item.id}
-                          className="rounded-xl border border-amber-400 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-2xs transition cursor-pointer"
-                        >
-                          {busyId === item.id ? 'Gerando…' : 'Gerar novo link'}
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => remove(item)}
-                        disabled={busyId === item.id}
-                        title="Excluir convite"
-                        className="inline-flex items-center gap-1 rounded-xl border border-rose-300 bg-white hover:bg-rose-50 px-2.5 py-1.5 text-xs font-bold text-rose-700 shadow-2xs transition cursor-pointer"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        {busyId === item.id ? '…' : 'Excluir'}
-                      </button>
-                    </div>
+                    {renderInviteActions(item)}
                   </td>
                 </tr>
               );
