@@ -6,6 +6,10 @@ import { resolveCanonicalAdminTenant } from './admin-tenant-context';
 import { validateEmail, validateName, validatePassword } from '@/lib/auth/validation';
 import { sanitizeCnpj, validatePhone } from '@/lib/onboarding/onboarding-validation';
 import type { Database } from '@/types/database.types';
+import {
+  provisionAuthorizedMembership,
+  type AuthorizedMembershipSource,
+} from './authorized-membership-provisioning';
 
 function validateAdminDocument(document: string): string | null {
   const digits = sanitizeCnpj(document);
@@ -43,6 +47,7 @@ export interface CreateAdminAdvertiserResult {
 
 export async function createAdminAdvertiserAction(
   input: CreateAdminAdvertiserInput,
+  context: { membershipSource?: AuthorizedMembershipSource } = {},
 ): Promise<CreateAdminAdvertiserResult> {
   try {
     const { supabase, user: admin, tenantId } = await resolveCanonicalAdminTenant();
@@ -130,8 +135,6 @@ export async function createAdminAdvertiserAction(
         user_metadata: {
           name: responsibleName,
           full_name: responsibleName,
-          tenant_id: tenantId,
-          role: 'advertiser',
           must_change_password: true,
         },
       });
@@ -174,6 +177,26 @@ export async function createAdminAdvertiserAction(
     if (businessError || !business) {
       if (temporaryPasswordCreated && ownerId) await adminClient.auth.admin.deleteUser(ownerId);
       return { success: false, error: businessError?.message ?? 'Não foi possível criar a empresa.' };
+    }
+
+    try {
+      await provisionAuthorizedMembership(adminClient, {
+        userId: ownerId,
+        tenantId,
+        profileRole: 'anunciante',
+        membershipRole: 'member',
+        source: context.membershipSource ?? 'admin_advertiser_creation',
+        createdBy: admin.id,
+      });
+    } catch (provisioningError) {
+      await (adminClient as any).from('businesses').delete().eq('id', business.id).throwOnError();
+      if (temporaryPasswordCreated) await adminClient.auth.admin.deleteUser(ownerId);
+      return {
+        success: false,
+        error: provisioningError instanceof Error
+          ? provisioningError.message
+          : 'Não foi possível autorizar o acesso do responsável.',
+      };
     }
 
     // Se for a condição promocional de lançamento:

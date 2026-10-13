@@ -7,6 +7,10 @@ import { validateEmail, validateName, validatePassword } from '@/lib/auth/valida
 import type { Database } from '@/types/database.types';
 import { createServerSideClient } from '@/lib/supabase/server';
 import {
+  membershipRoleForAdministrativeProfile,
+  provisionAuthorizedMembership,
+} from './authorized-membership-provisioning';
+import {
   ROLE_PRESET_MODULES,
   type AdminUserListItem,
   type CreateAdminUserInput,
@@ -159,8 +163,6 @@ export async function createAdminUserAction(
       user_metadata: {
         name,
         full_name: name,
-        role,
-        tenant_id: tenantId,
         allowed_modules: allowedModules,
         created_by: currentAdmin.id,
       },
@@ -172,19 +174,29 @@ export async function createAdminUserAction(
 
     const newUserId = createdAuth.user.id;
 
-    // Atualiza ou insere o profile correspondente
-    const { error: profileError } = await adminClient.from('profiles').upsert({
-      id: newUserId,
+    try {
+      await provisionAuthorizedMembership(adminClient, {
+        userId: newUserId,
+        tenantId,
+        profileRole: role,
+        membershipRole: membershipRoleForAdministrativeProfile(role),
+        source: 'admin_user_creation',
+        createdBy: currentAdmin.id,
+      });
+    } catch (provisioningError) {
+      await adminClient.auth.admin.deleteUser(newUserId);
+      throw provisioningError;
+    }
+
+    const { error: profileError } = await adminClient.from('profiles').update({
       name,
       email,
-      role,
       status: 'active',
-      tenant_id: tenantId,
       updated_at: new Date().toISOString(),
-    });
+    }).eq('id', newUserId);
     if (profileError) {
       await adminClient.auth.admin.deleteUser(newUserId);
-      throw new Error(`Falha ao definir o perfil administrativo: ${profileError.message}`);
+      throw new Error(`Falha ao completar o perfil administrativo: ${profileError.message}`);
     }
 
     revalidatePath('/admin/settings');

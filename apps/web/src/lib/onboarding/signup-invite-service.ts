@@ -425,18 +425,21 @@ export async function convertSignupInviteAction(input: {
     if (invalid) return { success: false, error: invalid };
     if (!input.categoryId) return { success: false, error: 'Escolha a categoria no catálogo (ou crie a nova antes de converter).' };
 
-    const created = await createAdminAdvertiserAction({
-      tenantId,
-      responsibleName: merged.responsibleName,
-      responsibleEmail: merged.responsibleEmail,
-      temporaryPassword: input.temporaryPassword,
-      tradingName: merged.tradingName,
-      legalName: merged.legalName,
-      cnpj: merged.document,
-      phone: merged.businessPhone || merged.responsiblePhone,
-      categoryId: input.categoryId,
-      planCode: input.planCode,
-    });
+    const created = await createAdminAdvertiserAction(
+      {
+        tenantId,
+        responsibleName: merged.responsibleName,
+        responsibleEmail: merged.responsibleEmail,
+        temporaryPassword: input.temporaryPassword,
+        tradingName: merged.tradingName,
+        legalName: merged.legalName,
+        cnpj: merged.document,
+        phone: merged.businessPhone || merged.responsiblePhone,
+        categoryId: input.categoryId,
+        planCode: input.planCode,
+      },
+      { membershipSource: 'signup_invite_conversion' },
+    );
     if (!created.success || !created.businessId) {
       return { success: false, error: created.error || 'Não foi possível criar o cadastro.' };
     }

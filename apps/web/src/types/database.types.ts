@@ -4693,22 +4693,31 @@ export type Database = {
       }
       tenant_members: {
         Row: {
+          approved_at: string | null
+          created_by: string | null
           id: string
           joined_at: string
+          membership_source: string
           role: string
           tenant_id: string
           user_id: string
         }
         Insert: {
+          approved_at?: string | null
+          created_by?: string | null
           id?: string
           joined_at?: string
+          membership_source?: string
           role?: string
           tenant_id: string
           user_id: string
         }
         Update: {
+          approved_at?: string | null
+          created_by?: string | null
           id?: string
           joined_at?: string
+          membership_source?: string
           role?: string
           tenant_id?: string
           user_id?: string
@@ -5304,6 +5313,17 @@ export type Database = {
       purge_stale_business_drafts: {
         Args: { p_days?: number }
         Returns: number
+      }
+      provision_authorized_tenant_membership: {
+        Args: {
+          p_created_by: string
+          p_membership_role: string
+          p_profile_role: string
+          p_source: string
+          p_tenant_id: string
+          p_user_id: string
+        }
+        Returns: undefined
       }
       release_expired_founder_reservations: { Args: never; Returns: number }
       request_account_deletion: { Args: never; Returns: undefined }
