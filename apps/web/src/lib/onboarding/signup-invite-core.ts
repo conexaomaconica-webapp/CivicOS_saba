@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { validateEmail, validateName } from '@/lib/auth/validation';
-import { sanitizeCnpj, validateCpfCnpj, validatePhone } from '@/lib/onboarding/onboarding-validation';
+import { sanitizeCnpj, validateCpf, validateCpfCnpj, validatePhone } from '@/lib/onboarding/onboarding-validation';
 
 /**
  * Núcleo do convite de cadastro (sem 'use server'): token, hash e validação dos dados enviados pelo cliente.
@@ -17,6 +17,7 @@ export interface SignupSubmission {
   responsibleName: string;
   responsibleEmail: string;
   responsiblePhone: string;
+  responsibleCpf: string;
   tradingName: string;
   legalName: string;
   document: string;
@@ -92,6 +93,7 @@ export function normalizeSubmission(raw: Record<string, unknown>): SignupSubmiss
     responsibleName: responsible,
     responsibleEmail: clean(raw.responsibleEmail, 160).toLowerCase(),
     responsiblePhone: clean(raw.responsiblePhone, 20),
+    responsibleCpf: clean(raw.responsibleCpf, 20).replace(/\D/g, '').slice(0, 11),
     tradingName: trading,
     // Pessoa Física (CPF) não possui Razão Social: utiliza o Nome Fantasia ou Nome do Responsável como fallback
     legalName: clean(raw.legalName, 160) || (isCpf ? trading || responsible : ''),
@@ -129,6 +131,7 @@ export function validateSubmission(data: SignupSubmission): string | null {
     validateName(data.responsibleName) ??
     validateEmail(data.responsibleEmail) ??
     phoneError(data.responsiblePhone) ??
+    validateCpf(data.responsibleCpf) ??
     validateName(data.tradingName) ??
     (!isCpf ? validateName(data.legalName) : null) ??
     (data.document ? validateCpfCnpj(data.document) : 'Informe o CNPJ ou CPF.') ??

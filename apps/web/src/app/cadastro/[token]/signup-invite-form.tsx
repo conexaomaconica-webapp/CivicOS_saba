@@ -63,6 +63,7 @@ export default function SignupInviteForm({ token, invitedName, invitedEmail, cat
     responsibleName: invitedName || '',
     responsibleEmail: invitedEmail || '',
     responsiblePhone: '',
+    responsibleCpf: '',
     tradingName: '',
     legalName: '',
     document: '',
@@ -228,6 +229,17 @@ export default function SignupInviteForm({ token, invitedName, invitedEmail, cat
             <Field label="Nome completo *"><input required className={inputClass} value={values.responsibleName} onChange={(e) => set('responsibleName', e.target.value)} autoComplete="name" /></Field>
             <Field label="E-mail *" hint="Será o seu acesso ao painel."><input required type="email" className={inputClass} value={values.responsibleEmail} onChange={(e) => set('responsibleEmail', e.target.value)} autoComplete="email" /></Field>
             <Field label="Telefone / WhatsApp"><input className={inputClass} inputMode="tel" value={values.responsiblePhone} onChange={(e) => set('responsiblePhone', formatPhone(e.target.value))} placeholder="(00) 00000-0000" /></Field>
+            <Field label="CPF do responsável *" hint="Necessário para a emissão do contrato.">
+              <input
+                required
+                className={inputClass}
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="000.000.000-00"
+                value={formatCpfCnpj(values.responsibleCpf)}
+                onChange={(e) => set('responsibleCpf', e.target.value.replace(/\D/g, '').slice(0, 11))}
+              />
+            </Field>
           </div>
         </section>
 

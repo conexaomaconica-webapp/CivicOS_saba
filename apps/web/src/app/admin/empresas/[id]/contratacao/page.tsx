@@ -32,6 +32,25 @@ export default async function ContratacaoPage({ params }: ContratacaoPageProps) 
     notFound();
   }
 
+  let initialResponsibleCpf = '';
+  try {
+    const inviteReader: any = createServiceRoleClient();
+    if (inviteReader) {
+      const { data: convertedInvite } = await inviteReader
+        .from('business_signup_invites')
+        .select('submitted_data')
+        .eq('business_id', id)
+        .eq('status', 'converted')
+        .order('converted_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const candidate = String(convertedInvite?.submitted_data?.responsibleCpf || '').replace(/\D/g, '').slice(0, 11);
+      if (candidate && !validateCpfCnpj(candidate)) initialResponsibleCpf = candidate;
+    }
+  } catch {
+    // O pré-preenchimento é auxiliar; a tela continua disponível para preenchimento manual.
+  }
+
   // Pendências que fazem o gateway recusar a cobrança: avisa a equipe ANTES de enviar o link de contratação.
   const business = dto.business as { cnpj_cpf?: string; cnpj?: string; email?: string; phone?: string; whatsapp?: string };
   const document = (business.cnpj_cpf || business.cnpj || '').trim();
@@ -95,7 +114,7 @@ export default async function ContratacaoPage({ params }: ContratacaoPageProps) 
           </ul>
         </div>
       )}
-      <CommercialOnboardingClient dto={dto} />
+      <CommercialOnboardingClient dto={dto} initialResponsibleCpf={initialResponsibleCpf} />
       <InvoiceControl businessId={id} />
     </div>
   );

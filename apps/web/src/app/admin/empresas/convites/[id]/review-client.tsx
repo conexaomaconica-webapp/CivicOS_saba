@@ -139,6 +139,7 @@ export default function ReviewClient({
           <Field label="Nome"><input className={inputClass} value={data.responsibleName} onChange={(e) => set('responsibleName', e.target.value)} /></Field>
           <Field label="E-mail (acesso ao painel)"><input type="email" className={inputClass} value={data.responsibleEmail} onChange={(e) => set('responsibleEmail', e.target.value)} /></Field>
           <Field label="Telefone"><input className={inputClass} value={data.responsiblePhone} onChange={(e) => set('responsiblePhone', formatPhone(e.target.value))} /></Field>
+          <Field label="CPF do responsável"><input inputMode="numeric" className={inputClass} value={formatCpfCnpj(data.responsibleCpf || '')} onChange={(e) => set('responsibleCpf', e.target.value.replace(/\D/g, '').slice(0, 11))} /></Field>
         </div>
       </section>
 

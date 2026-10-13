@@ -68,6 +68,7 @@ import { publishAdminBusinessAction, unlockAdminCommercialDossierAction } from '
 
 interface CommercialOnboardingClientProps {
   dto: AdminBusiness360DTO;
+  initialResponsibleCpf?: string;
 }
 
 const ONBOARDING_STEPS = [
@@ -122,7 +123,7 @@ const PLAN_PRESETS: Record<'bronze' | 'prata' | 'ouro', PlanPreset> = {
   },
 };
 
-export default function CommercialOnboardingClient({ dto }: CommercialOnboardingClientProps) {
+export default function CommercialOnboardingClient({ dto, initialResponsibleCpf = '' }: CommercialOnboardingClientProps) {
   const router = useRouter();
   const { business, owner, masonic_link_detail, commercial_terms: savedTerms } = dto;
   const [isPending, startTransition] = useTransition();
@@ -231,7 +232,7 @@ export default function CommercialOnboardingClient({ dto }: CommercialOnboarding
     savedTerms?.contract_start_date || ''
   );
   const [responsibleCpf, setResponsibleCpf] = useState<string>(() => {
-    const digits = (savedTerms?.responsible_cpf || '').replace(/\D/g, '').slice(0, 11);
+    const digits = (savedTerms?.responsible_cpf || initialResponsibleCpf).replace(/\D/g, '').slice(0, 11);
     return digits.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
   });
 

@@ -12,6 +12,7 @@ const valid = {
   responsibleName: 'Maria da Silva',
   responsibleEmail: 'Maria@Exemplo.com',
   responsiblePhone: '(75) 99999-1234',
+  responsibleCpf: '529.982.247-25',
   tradingName: 'Padaria Pão Nosso',
   legalName: 'Pão Nosso Ltda',
   document: '11.222.333/0001-81',
@@ -64,6 +65,7 @@ describe('convite de cadastro — dados do cliente', () => {
     expect(data.responsibleEmail).toBe('maria@exemplo.com');
     expect(data.state).toBe('BA');
     expect(data.document).toBe('11222333000181');
+    expect(data.responsibleCpf).toBe('52998224725');
     expect(validateSubmission(data)).toBeNull();
   });
 
@@ -89,6 +91,7 @@ describe('convite de cadastro — dados do cliente', () => {
 
   it('rejeita CNPJ/CPF e e-mail inválidos e limita tamanho dos textos', () => {
     expect(validateSubmission(normalizeSubmission({ ...valid, document: '123' }))).toBeTruthy();
+    expect(validateSubmission(normalizeSubmission({ ...valid, responsibleCpf: '123' }))).toMatch(/CPF/i);
     expect(validateSubmission(normalizeSubmission({ ...valid, responsibleEmail: 'sem-arroba' }))).toBeTruthy();
     expect(normalizeSubmission({ ...valid, tradingName: 'x'.repeat(500) }).tradingName.length).toBe(120);
   });

@@ -46,7 +46,7 @@ import { resolveCanonicalAdminTenant } from '../src/lib/admin/admin-tenant-conte
 import { deleteSignupInviteAction, getSignupInviteByTokenAction, getSignupInviteLinkAction, submitSignupInviteAction } from '../src/lib/onboarding/signup-invite-service';
 
 const form = {
-  responsibleName: 'Maria da Silva', responsibleEmail: 'maria@exemplo.com', tradingName: 'Padaria Pão Nosso',
+  responsibleName: 'Maria da Silva', responsibleEmail: 'maria@exemplo.com', responsibleCpf: '52998224725', tradingName: 'Padaria Pão Nosso',
   legalName: 'Pão Nosso Ltda', document: '11222333000181', categoryId: 'c1', city: 'Feira de Santana', state: 'BA',
   masonicRelation: 'mason', referenceMasonName: 'João', lodgeName: 'Loja X', potency: 'GOB', consent: true,
 };
