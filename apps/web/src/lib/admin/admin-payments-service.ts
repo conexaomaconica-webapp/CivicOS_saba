@@ -66,6 +66,24 @@ export interface AdminPaymentsDashboardDTO {
 }
 
 /**
+ * Retorna o cliente administrativo para extração de métricas de pagamentos consolidadas.
+ */
+function getAdminPaymentsClient(ssrClient: any) {
+  if (process.env.VITEST) {
+    return ssrClient;
+  }
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (supabaseUrl && serviceRoleKey) {
+    return createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+  return ssrClient;
+}
+
+/**
  * Retorna os dados do Dashboard Financeiro/Admin.
  * PROTEÇÃO P0: Exige autorização server-side via RPC has_platform_admin_access.
  */
@@ -75,7 +93,8 @@ export async function getAdminPaymentsDashboardAction(params?: {
   methodFilter?: string;
   planFilter?: string;
 }): Promise<AdminPaymentsDashboardDTO> {
-  const { supabase } = await assertPlatformAdminAccess();
+  const { supabase: ssrClient } = await assertPlatformAdminAccess();
+  const db = getAdminPaymentsClient(ssrClient);
 
   const statusFilter = params?.statusFilter || 'todos';
   const methodFilter = params?.methodFilter || 'todos';
@@ -84,12 +103,12 @@ export async function getAdminPaymentsDashboardAction(params?: {
 
   try {
     // 1. Consultar empresas
-    const { data: businesses } = await (supabase as any)
+    const { data: businesses } = await (db as any)
       .from('businesses')
       .select('id, name, owner_id, plan_tier, publication_status, is_active, phone, email');
 
     // 2. Consultar perfis dos donos
-    const { data: profiles } = await (supabase as any)
+    const { data: profiles } = await (db as any)
       .from('profiles')
       .select('id, name, email');
     const profilesMap = new Map((profiles || []).map((p: any) => [p.id, p]));
@@ -97,7 +116,7 @@ export async function getAdminPaymentsDashboardAction(params?: {
     // 3. Consultar assinaturas com Join Canônico de Plano
     let subscriptions: any[] = [];
     try {
-      const { data: subsData } = await (supabase as any)
+      const { data: subsData } = await (db as any)
         .from('subscriptions')
         .select('id, business_id, tenant_id, status, plan_version_id, created_at, plan_versions(id, plan_id, plans(code, name))');
       subscriptions = subsData || [];
@@ -106,7 +125,7 @@ export async function getAdminPaymentsDashboardAction(params?: {
     }
 
     // 4. Consultar faturas
-    let invoicesQuery = (supabase as any)
+    let invoicesQuery = (db as any)
       .from('invoices')
       .select('*');
 
@@ -122,7 +141,7 @@ export async function getAdminPaymentsDashboardAction(params?: {
     const invoiceList = invoicesData || [];
     let providerEvents: any[] = [];
     try {
-      let eventsQuery = (supabase as any).from('payment_provider_events').select('*');
+      let eventsQuery = (db as any).from('payment_provider_events').select('*');
       if (eventsQuery && typeof eventsQuery.order === 'function') {
         eventsQuery = eventsQuery.order('created_at', { ascending: false });
       }
