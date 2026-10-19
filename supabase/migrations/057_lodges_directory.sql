@@ -139,7 +139,7 @@ CREATE POLICY "tenant_admin can manage media" ON public.organization_media FOR A
 -- 8. Seed Default Potencies & Rites for Default Tenant
 DO $$
 DECLARE
-  v_tenant_id UUID := '00000000-0000-0000-0000-000000000010';
+  v_tenant_id UUID := '00000000-0000-0000-0000-000000000000';
 BEGIN
   INSERT INTO public.masonic_potencies (tenant_id, name, abbreviation, slug)
   VALUES 

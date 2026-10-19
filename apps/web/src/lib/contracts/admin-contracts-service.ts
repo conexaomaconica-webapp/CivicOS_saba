@@ -24,6 +24,7 @@ import {
   appendSignatureImageToContractText,
 } from './contract-template-renderer';
 import { pickResponsibleName } from '@/lib/contracts/responsible-name';
+import { getInternalProfileDTO } from '@/lib/member/profile-access-service';
 import { generatePublicLinkToken, MIN_PUBLIC_LINK_TOKEN_LENGTH } from '@/lib/security/public-link-token';
 import {
   CANONICAL_ADVERTISER_CONTRACT_CODE,
@@ -143,12 +144,7 @@ export async function getAdminContractDraftPreviewAction(
 
     let ownerProfile: any = null;
     if (biz.owner_id) {
-      const { data: prof } = await (supabase as any)
-        .from('profiles')
-        .select('name, email')
-        .eq('id', biz.owner_id)
-        .maybeSingle();
-      ownerProfile = prof;
+      ownerProfile = await getInternalProfileDTO(supabase, biz.owner_id);
     }
 
     // 4. Busca endereço da empresa
@@ -505,12 +501,7 @@ export async function generateAdminContractSnapshotAction(
 
     let ownerProfile: any = null;
     if (biz.owner_id) {
-      const { data: prof } = await (supabase as any)
-        .from('profiles')
-        .select('name, email')
-        .eq('id', biz.owner_id)
-        .maybeSingle();
-      ownerProfile = prof;
+      ownerProfile = await getInternalProfileDTO(supabase, biz.owner_id);
     }
 
     // 7. Consulta endereço da empresa
@@ -1393,11 +1384,7 @@ export async function sendAdminContractForSignatureAction(
 
     let responsavelNome = pickResponsibleName(resp?.name);
     if (!responsavelNome && biz.owner_id) {
-      const { data: prof } = await (dbClient as any)
-        .from('profiles')
-        .select('name')
-        .eq('id', biz.owner_id)
-        .maybeSingle();
+      const prof = await getInternalProfileDTO(dbClient, biz.owner_id);
       responsavelNome = pickResponsibleName(prof?.name);
     }
     responsavelNome = responsavelNome || biz.name;
@@ -1953,14 +1940,10 @@ export async function getPublicContractByTokenAction(
     let responsavelEmail = biz.email;
 
     if (biz.owner_id) {
-      const { data: prof } = await (dbClient as any)
-        .from('profiles')
-        .select('name, email, document_number')
-        .eq('id', biz.owner_id)
-        .maybeSingle();
+      const prof = await getInternalProfileDTO(dbClient, biz.owner_id);
       if (prof) {
         if (!responsavelNome) responsavelNome = pickResponsibleName(prof.name);
-        if (!responsavelCpf) responsavelCpf = prof.document_number;
+        if (!responsavelCpf) responsavelCpf = prof.document_number ?? undefined;
         if (prof.email) responsavelEmail = prof.email;
       }
     }
@@ -2288,11 +2271,7 @@ export async function signPublicContractAction(
         .maybeSingle();
       representativeName = pickResponsibleName(respRow?.name);
       if (!representativeName && biz.owner_id) {
-        const { data: ownerProfile } = await (dbClient as any)
-          .from('profiles')
-          .select('name')
-          .eq('id', biz.owner_id)
-          .maybeSingle();
+        const ownerProfile = await getInternalProfileDTO(dbClient, biz.owner_id);
         representativeName = pickResponsibleName(ownerProfile?.name);
       }
     } catch (_respErr) {}

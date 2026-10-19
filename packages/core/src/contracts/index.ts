@@ -13,6 +13,26 @@ export type {
   AuthEvent,
 } from './auth.contract';
 
+export {
+  ADMIN_PROFILE_COLUMNS,
+  PROFILE_AUTHORIZATION_COLUMNS,
+  PROFILE_SELF_COLUMNS,
+  INTERNAL_PROFILE_COLUMNS,
+  PROFILE_ADMIN_UPDATE_FIELDS,
+  adminProfileDTOSchema,
+  profileAuthorizationDTOSchema,
+  profileSelfDTOSchema,
+  publicMemberDTOSchema,
+  internalProfileDTOSchema,
+} from './profile.contract';
+export type {
+  AdminProfileDTO,
+  ProfileAuthorizationDTO,
+  ProfileSelfDTO,
+  PublicMemberDTO,
+  InternalProfileDTO,
+} from './profile.contract';
+
 export type {
   FileObject,
   UploadOptions,

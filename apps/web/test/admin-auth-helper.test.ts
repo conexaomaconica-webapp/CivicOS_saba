@@ -42,7 +42,7 @@ describe('Admin Auth Helpers — RBAC e Proteção Master', () => {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn().mockResolvedValue({
-              data: { role: 'master' },
+              data: { id: '00000000-0000-0000-0000-000000000001', role: 'master', tenant_id: '00000000-0000-0000-0000-000000000010', status: 'active' },
               error: null,
             }),
           }),
@@ -64,7 +64,7 @@ describe('Admin Auth Helpers — RBAC e Proteção Master', () => {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn().mockResolvedValue({
-              data: { role: 'admin' },
+              data: { id: '00000000-0000-0000-0000-000000000002', role: 'admin', tenant_id: '00000000-0000-0000-0000-000000000010', status: 'active' },
               error: null,
             }),
           }),
@@ -84,7 +84,7 @@ describe('Admin Auth Helpers — RBAC e Proteção Master', () => {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn().mockResolvedValue({
-              data: { role: 'socio_admin' },
+              data: { id: '00000000-0000-0000-0000-000000000003', role: 'socio_admin', tenant_id: '00000000-0000-0000-0000-000000000010', status: 'active' },
               error: null,
             }),
           }),
@@ -104,7 +104,7 @@ describe('Admin Auth Helpers — RBAC e Proteção Master', () => {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn().mockResolvedValue({
-              data: { role: 'member' },
+              data: { id: '00000000-0000-0000-0000-000000000004', role: 'member', tenant_id: '00000000-0000-0000-0000-000000000010', status: 'active' },
               error: null,
             }),
           }),

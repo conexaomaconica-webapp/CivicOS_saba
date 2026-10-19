@@ -3,6 +3,7 @@
 import { isInApprovalQueue } from '@/lib/admin/approval-queue';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
+import { getOwnProfileDTO, listInternalProfileDTOs } from '@/lib/member/profile-access-service';
 
 export interface RecentApplicationDTO {
   id: string;
@@ -163,14 +164,10 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
       try {
         const { data: authData } = await ssrClient.auth.getUser();
         if (authData?.user && typeof dbClient.from === 'function') {
-          const { data: profile } = await (dbClient as any)
-            .from('profiles')
-            .select('full_name, email')
-            .eq('id', authData.user.id)
-            .maybeSingle();
+          const profile = await getOwnProfileDTO(ssrClient, authData.user.id);
 
-          if (profile?.full_name?.trim()) {
-            const parts = profile.full_name.trim().split(' ');
+          if (profile?.name?.trim()) {
+            const parts = profile.name.trim().split(' ');
             adminName = parts.length > 1 ? `${parts[0]} ${parts[1]}` : parts[0]!;
           } else if (profile?.email) {
             adminName = profile.email.split('@')[0]!;
@@ -474,16 +471,10 @@ export async function getAdminDashboardMetricsAction(): Promise<AdminDashboardDT
 
     if (ownerIds.length > 0) {
       try {
-        const { data: ownersData } = await (dbClient as any)
-          .from('profiles')
-          .select('id, name, email')
-          .in('id', ownerIds);
-
-        if (ownersData) {
-          ownersData.forEach((p: any) => {
-            profilesMap.set(p.id, { name: p.name, email: p.email });
-          });
-        }
+        const ownersData = await listInternalProfileDTOs(dbClient, ownerIds, { allowedUserIds: ownerIds });
+        ownersData.forEach((p) => {
+          profilesMap.set(p.id, { name: p.name || '', email: p.email || '' });
+        });
       } catch {
         // Ignora erro se não conseguir ler profiles
       }

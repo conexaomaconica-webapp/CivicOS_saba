@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(6);
+SELECT extensions.plan(6);
 
 SELECT is(
   (SELECT count(*)::BIGINT FROM pg_policies WHERE schemaname = 'public' AND tablename = 'businesses' AND policyname IN ('Public can read active businesses', 'Anyone can view businesses within active tenant')),

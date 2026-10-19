@@ -10,6 +10,7 @@ import { evaluateBusinessProfileReadiness } from '@/lib/admin/admin-commercial-d
 import { resolveCanonicalApprovalFlags } from '@/lib/admin/approval-canonical-status';
 import { resolveSignedBusinessContract } from '@/lib/contracts/contract-signature-status';
 import { assertOperationalTenantId } from '@/lib/tenant/tenant-policy';
+import { listPublicMemberDTOs } from '@/lib/member/profile-access-service';
 
 export interface ApprovalRequirement {
   id: string;
@@ -323,12 +324,9 @@ export async function getApprovalDirectoryListAction(statusFilter: string = 'tod
           )
         );
         if (ownerIds.length > 0) {
-          const { data: profiles } = await (supabase as any)
-            .from('profiles')
-            .select('id, name, email')
-            .in('id', ownerIds);
-          for (const profile of profiles || []) {
-            ownerProfileMap[profile.id] = { name: profile.name, email: profile.email };
+          const profiles = await listPublicMemberDTOs(supabase, ownerIds);
+          for (const profile of profiles) {
+            ownerProfileMap[profile.public_id] = { name: profile.display_name, email: null };
           }
         }
       } catch (_error) { }

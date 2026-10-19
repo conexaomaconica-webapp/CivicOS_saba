@@ -30,6 +30,7 @@ import {
   type CommercialStatus,
 } from '@/lib/commercial-onboarding-status';
 import { evaluateBusinessProfileReadiness } from './admin-commercial-dossier-readiness';
+import { getInternalProfileDTO } from '@/lib/member/profile-access-service';
 
 function normalizeMasonicStatus(status: string | null | undefined): 'pending' | 'verified' | 'rejected' {
   if (status === 'verified' || status === 'approved' || status === 'active') return 'verified';
@@ -2653,7 +2654,7 @@ export async function upsertAdminMasonicLinkAction(
         // Nome real do responsável (perfil do dono da conta); nunca um nome genérico: ele iria para o contrato.
         let responsibleName = '';
         if (biz.owner_id) {
-          const { data: ownerProfile } = await (supabase as any).from('profiles').select('name').eq('id', biz.owner_id).maybeSingle();
+          const ownerProfile = await getInternalProfileDTO(supabase, biz.owner_id);
           responsibleName = pickResponsibleName(ownerProfile?.name);
         }
         finishPromises.push(

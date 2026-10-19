@@ -3,6 +3,7 @@ import { createServerSideClient } from '@/lib/supabase/server';
 import OnboardingHeader from '@/components/onboarding/OnboardingHeader';
 import ResponsibleForm from './responsible-form';
 import { TrackEvent } from '@/components/analytics/TrackEvent';
+import { getOwnProfileDTO } from '@/lib/member/profile-access-service';
 
 export const metadata = {
   title: 'Onboarding Anunciante · Passo 1 de 6 — Sua Conta',
@@ -18,13 +19,7 @@ export default async function OnboardingStep1Page() {
   const metadata = (user?.user_metadata ?? {}) as Record<string, unknown>;
   const metadataName = typeof metadata.name === 'string' ? metadata.name : '';
 
-  const { data: profile } = user
-    ? await supabase
-      .from('profiles')
-      .select('name, email')
-      .eq('id', user.id)
-      .maybeSingle()
-    : { data: null };
+  const profile = user ? await getOwnProfileDTO(supabase, user.id) : null;
 
   return (
     <main className="min-h-screen w-full bg-[#1f0509] text-white flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">

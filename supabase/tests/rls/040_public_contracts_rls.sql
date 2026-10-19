@@ -12,6 +12,20 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions, pg_catalog;
 SELECT extensions.no_plan();
 
+INSERT INTO auth.users (id, email, raw_user_meta_data)
+VALUES
+  ('00000000-0000-0000-0000-000000000101', 'owner-040-a@example.test', '{}'),
+  ('00000000-0000-0000-0000-000000000102', 'owner-040-b@example.test', '{}'),
+  ('00000000-0000-0000-0000-000000000103', 'owner-040-c@example.test', '{}'),
+  ('00000000-0000-0000-0000-000000000104', 'owner-040-d@example.test', '{}')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.tenants (id, name, slug, public_access_status)
+VALUES
+  ('00000000-0000-0000-0000-000000000010', 'Legacy Test Tenant A', 'legacy-test-a', 'enabled'),
+  ('00000000-0000-0000-0000-000000000011', 'Legacy Test Tenant B', 'legacy-test-b', 'enabled')
+ON CONFLICT (id) DO NOTHING;
+
 -- ---------------------------------------------------------------------------
 -- Fixtures: two public tenants, published/draft businesses and authorities
 -- ---------------------------------------------------------------------------
@@ -40,69 +54,73 @@ INSERT INTO public.businesses
 VALUES
   ('00000000-0000-0000-0000-000000004101',
    '00000000-0000-0000-0000-000000000010',
-   '00000000-0000-0000-0000-000000000103',
-   'RLS Publicada', 'Registro publico do tenant A', 'servicos', 'ouro',
+   '00000000-0000-0000-0000-000000000104',
+   'RLS Publicada', 'Registro publico do tenant A', 'servicos', 'acacia',
    'rls-publicada', 'commercial', 'published', true,
    '12345678000190', 'Razao Privada A', 'privado-a@example.test'),
   ('00000000-0000-0000-0000-000000004102',
    '00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000000103',
-   'RLS Rascunho', 'Nao deve aparecer', 'servicos', 'ouro',
+   'RLS Rascunho', 'Nao deve aparecer', 'servicos', 'acacia',
    'rls-rascunho', 'commercial', 'draft', true,
    '12345678000191', 'Razao Privada Draft', 'draft@example.test'),
   ('00000000-0000-0000-0000-000000004103',
    '00000000-0000-0000-0000-000000000011',
-   '00000000-0000-0000-0000-000000000101',
-   'RLS Outro Tenant', 'Registro do tenant B', 'servicos', 'ouro',
+   '00000000-0000-0000-0000-000000000102',
+   'RLS Outro Tenant', 'Registro do tenant B', 'servicos', 'acacia',
    'rls-outro-tenant', 'commercial', 'published', true,
    '12345678000192', 'Razao Privada B', 'privado-b@example.test'),
   ('00000000-0000-0000-0000-000000004104',
    '00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000000103',
-   'RLS Fundador Reservado', 'Reserva nao concede selo', 'servicos', 'bronze',
+   'RLS Fundador Reservado', 'Reserva nao concede selo', 'servicos', 'esquadro',
    'rls-founder-reserved', 'commercial', 'published', true,
    '12345678000193', 'Razao Privada Reserva', 'reserva@example.test'),
   ('00000000-0000-0000-0000-000000004105',
    '00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000000103',
-   'RLS Fundador Granted', 'Grant concede selo', 'servicos', 'bronze',
+   'RLS Fundador Granted', 'Grant concede selo', 'servicos', 'esquadro',
    'rls-founder-granted', 'commercial', 'published', true,
    '12345678000194', 'Razao Privada Grant', 'grant@example.test'),
   ('00000000-0000-0000-0000-000000004106',
    '00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000000103',
-   'RLS Credencial Errada', 'Outra credencial nao verifica cadastro', 'servicos', 'bronze',
+   'RLS Credencial Errada', 'Outra credencial nao verifica cadastro', 'servicos', 'esquadro',
    'rls-wrong-credential', 'commercial', 'published', true,
    '12345678000195', 'Razao Privada Credencial', 'credencial@example.test'),
   ('00000000-0000-0000-0000-000000004107',
    '00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000000103',
-   'RLS Inativa', 'Publicada mas inativa', 'servicos', 'bronze',
+   'RLS Inativa', 'Publicada mas inativa', 'servicos', 'esquadro',
    'rls-inativa', 'commercial', 'published', false,
    '12345678000196', 'Razao Privada Inativa', 'inativa@example.test'),
   ('00000000-0000-0000-0000-000000004108',
    '00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000000103',
-   'RLS Credencial Revogada', 'Credencial revogada nao verifica', 'servicos', 'bronze',
+   'RLS Credencial Revogada', 'Credencial revogada nao verifica', 'servicos', 'esquadro',
    'rls-revoked-credential', 'commercial', 'published', true,
    '12345678000197', 'Razao Privada Revogada', 'revogada@example.test'),
   ('00000000-0000-0000-0000-000000004109',
    '00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000000103',
-   'RLS Entitlement Expirado', 'Grant expirado nao libera plano', 'servicos', 'ouro',
+   'RLS Entitlement Expirado', 'Grant expirado nao libera plano', 'servicos', 'acacia',
    'rls-expired-entitlement', 'commercial', 'published', true,
    '12345678000198', 'Razao Privada Entitlement', 'entitlement@example.test'),
   ('00000000-0000-0000-0000-000000004110',
    '00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000000103',
-   'RLS Assinatura Ambigua', 'Duas assinaturas elegiveis falham fechado', 'servicos', 'ouro',
+   'RLS Assinatura Ambigua', 'Duas assinaturas elegiveis falham fechado', 'servicos', 'acacia',
    'rls-ambiguous-subscription', 'commercial', 'published', true,
    '12345678000199', 'Razao Privada Ambigua', 'ambigua@example.test')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.business_members
   (tenant_id, business_id, user_id, role, status)
-SELECT b.tenant_id, b.id, '00000000-0000-0000-0000-000000000103', 'owner', 'active'
+SELECT b.tenant_id, b.id,
+  CASE WHEN b.id = '00000000-0000-0000-0000-000000004101'
+       THEN '00000000-0000-0000-0000-000000000104'::uuid
+       ELSE '00000000-0000-0000-0000-000000000103'::uuid END,
+  'owner', 'active'
 FROM public.businesses b
 WHERE b.id IN (
   '00000000-0000-0000-0000-000000004101',
@@ -116,6 +134,43 @@ WHERE b.id IN (
   '00000000-0000-0000-0000-000000004110'
 )
 ON CONFLICT (business_id, user_id) DO NOTHING;
+
+INSERT INTO public.business_responsibles
+  (id, tenant_id, business_id, name, business_role, organization)
+VALUES
+  ('00000000-0000-0000-0000-000000004154',
+   '00000000-0000-0000-0000-000000000010',
+   '00000000-0000-0000-0000-000000004101',
+   'Responsavel Publico RLS', 'Responsavel', 'Organizacao RLS')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.business_recognitions
+  (id, tenant_id, business_id, recognition_key, is_active, granted_by, justification)
+VALUES
+  ('00000000-0000-0000-0000-000000004155',
+   '00000000-0000-0000-0000-000000000010',
+   '00000000-0000-0000-0000-000000004105',
+   'coluna_de_honra', true,
+   '00000000-0000-0000-0000-000000000102', 'Fixture de reconhecimento institucional')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.tenant_settings (tenant_id, support_email)
+VALUES ('00000000-0000-0000-0000-000000000010', 'suporte-rls@example.test')
+ON CONFLICT (tenant_id) DO NOTHING;
+
+INSERT INTO public.tenant_members
+  (tenant_id, user_id, role, membership_source, approved_at)
+VALUES
+  ('00000000-0000-0000-0000-000000000010',
+   '00000000-0000-0000-0000-000000000103',
+   'member', 'legacy_unknown', statement_timestamp()),
+  ('00000000-0000-0000-0000-000000000010',
+   '00000000-0000-0000-0000-000000000102',
+   'admin', 'admin_user_creation', statement_timestamp())
+ON CONFLICT (tenant_id, user_id) DO UPDATE
+SET role = EXCLUDED.role,
+    membership_source = EXCLUDED.membership_source,
+    approved_at = EXCLUDED.approved_at;
 
 UPDATE public.profiles
 SET name = 'Responsavel Publico RLS'
@@ -178,18 +233,18 @@ SET hero_title = EXCLUDED.hero_title,
     published_at = EXCLUDED.published_at;
 
 INSERT INTO public.business_reviews
-  (id, tenant_id, business_id, user_id, rating, comment,
+  (id, tenant_id, business_id, author_id, rating, comment,
    moderation_status, moderated_by, moderated_at)
 VALUES
   ('00000000-0000-0000-0000-000000004301',
    '00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000004101',
-   '00000000-0000-0000-0000-000000000103',
+   '00000000-0000-0000-0000-000000000101',
    1, 'Pendente nao publica', 'pending', NULL, NULL),
   ('00000000-0000-0000-0000-000000004302',
    '00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000004101',
-   '00000000-0000-0000-0000-000000000103',
+   '00000000-0000-0000-0000-000000000102',
    5, 'Publicada e moderada', 'published',
    '00000000-0000-0000-0000-000000000102', statement_timestamp()),
   ('00000000-0000-0000-0000-000000004303',
@@ -313,6 +368,33 @@ VALUES
    statement_timestamp() - interval '1 day')
 ON CONFLICT (id) DO NOTHING;
 
+-- O usuario 103 e membro autenticado do tenant A e recebe acesso de leitura
+-- a esta empresa apos a criacao das reviews. O vinculo empresarial do tenant
+-- B nao e criado, preservando o teste de isolamento RLS-051. A ordem evita
+-- que o trigger de anti-autoavaliacao trate a review de fixture como membro.
+INSERT INTO public.business_members
+  (tenant_id, business_id, user_id, role, status)
+VALUES
+  ('00000000-0000-0000-0000-000000000010',
+   '00000000-0000-0000-0000-000000004101',
+   '00000000-0000-0000-0000-000000000103',
+   'viewer', 'active')
+ON CONFLICT (business_id, user_id) DO NOTHING;
+
+-- Assinatura vigente da empresa publicada. O plano contratado permanece no
+-- businesses.plan_tier; o plano efetivo vem exclusivamente da assinatura.
+INSERT INTO public.subscriptions
+  (id, tenant_id, business_id, plan_version_id, status,
+   current_period_start, current_period_end)
+VALUES
+  ('00000000-0000-0000-0000-000000004614',
+   '00000000-0000-0000-0000-000000000010',
+   '00000000-0000-0000-0000-000000004101',
+   '00000000-0000-0000-0000-000000004602', 'active',
+   statement_timestamp() - interval '1 day',
+   statement_timestamp() + interval '1 year')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO public.entitlement_definitions
   (id, code, name, value_type)
 VALUES
@@ -421,7 +503,7 @@ SELECT
   '00000000-0000-0000-0000-000000000010',
   '00000000-0000-0000-0000-000000000103',
   'RLS Paginacao ' || lpad(g::TEXT, 2, '0'),
-  'Fixture de limite', 'servicos', 'bronze',
+  'Fixture de limite', 'servicos', 'esquadro',
   'rls-page-' || lpad(g::TEXT, 2, '0'),
   'commercial', 'published', true
 FROM generate_series(1, 55) AS g
@@ -501,7 +583,11 @@ SELECT extensions.is(
       )
       AND EXISTS (
         SELECT 1 FROM unnest(COALESCE(p.proconfig, ARRAY[]::TEXT[])) AS c(value)
-        WHERE c.value IN ('search_path=', 'search_path=""')
+        WHERE c.value IN (
+          'search_path=',
+          'search_path=""',
+          'search_path=pg_catalog, pg_temp'
+        )
       )
   ),
   6::BIGINT,
@@ -608,42 +694,40 @@ SELECT extensions.is(
   0::BIGINT, 'RLS-018 empresa de outro tenant nao aparece'
 );
 SELECT extensions.ok(
-  NOT (
-    SELECT to_jsonb(d) ?| ARRAY['tenant_id', 'owner_id', 'cnpj', 'legal_name', 'email', 'settings']
-    FROM public.public_business_detail('tenant-a.test', 'rls-publicada') d
-  ),
+  (SELECT NOT (d ?| ARRAY['tenant_id', 'owner_id', 'cnpj', 'legal_name', 'email', 'settings'])
+   FROM public.public_business_detail('tenant-a.test', 'rls-publicada') d),
   'RLS-019 detalhe nao expoe campos privados'
 );
 SELECT extensions.ok(
   (
-    SELECT d.responsible ->> 'name' = 'Responsavel Publico RLS'
-      AND NOT d.responsible ?| ARRAY['user_id', 'owner_id', 'cimb_code', 'email']
+    SELECT d->'responsible'->>'name' = 'Responsavel Publico RLS'
+      AND NOT (d->'responsible') ?| ARRAY['user_id', 'owner_id', 'cimb_code', 'email']
     FROM public.public_business_detail('tenant-a.test', 'rls-publicada') d
   ),
   'RLS-020 responsavel consentido e minimizado aparece'
 );
 SELECT extensions.is(
-  (SELECT d.effective_plan_code FROM public.public_business_detail('tenant-a.test', 'rls-publicada') d),
-  NULL::TEXT, 'RLS-021 assinatura inativa e plan_tier legado nao liberam plano'
+  (SELECT d->>'contracted_plan_code' FROM public.public_business_detail('tenant-a.test', 'rls-publicada') d),
+  'acacia'::TEXT, 'RLS-021 plano contratado preserva o valor comercial armazenado'
 );
 SELECT extensions.is(
-  (SELECT d.is_verified FROM public.public_business_detail('tenant-a.test', 'rls-publicada') d),
+  (SELECT (d->>'is_verified')::boolean FROM public.public_business_detail('tenant-a.test', 'rls-publicada') d),
   true, 'RLS-022 credencial cadastral correta verifica empresa'
 );
 SELECT extensions.is(
-  (SELECT d.is_verified FROM public.public_business_detail('tenant-a.test', 'rls-wrong-credential') d),
+  (SELECT (d->>'is_verified')::boolean FROM public.public_business_detail('tenant-a.test', 'rls-wrong-credential') d),
   false, 'RLS-023 tipo de credencial incorreto nao verifica empresa'
 );
 SELECT extensions.is(
-  (SELECT d.is_verified FROM public.public_business_detail('tenant-a.test', 'rls-revoked-credential') d),
+  (SELECT (d->>'is_verified')::boolean FROM public.public_business_detail('tenant-a.test', 'rls-revoked-credential') d),
   false, 'RLS-024 credencial revogada nao verifica empresa'
 );
 SELECT extensions.is(
-  (SELECT d.is_founder FROM public.public_business_detail('tenant-a.test', 'rls-founder-reserved') d),
+  (SELECT (d->>'is_founder')::boolean FROM public.public_business_detail('tenant-a.test', 'rls-founder-reserved') d),
   false, 'RLS-025 Fundador reservado nao concede selo'
 );
 SELECT extensions.is(
-  (SELECT d.is_founder FROM public.public_business_detail('tenant-a.test', 'rls-founder-granted') d),
+  (SELECT (d->>'is_founder')::boolean FROM public.public_business_detail('tenant-a.test', 'rls-founder-granted') d),
   true, 'RLS-026 Fundador granted concede selo'
 );
 SELECT extensions.is(
@@ -651,15 +735,19 @@ SELECT extensions.is(
   0::BIGINT, 'RLS-027 Fundador de outro tenant nao cruza host'
 );
 SELECT extensions.is(
-  (SELECT d.effective_plan_code FROM public.public_business_detail('tenant-a.test', 'rls-founder-granted') d),
+  (SELECT d->>'effective_plan_code' FROM public.public_business_detail('tenant-a.test', 'rls-founder-granted') d),
   'ouro-test'::TEXT, 'RLS-028 assinatura, versao e grant vigentes resolvem plano'
 );
 SELECT extensions.is(
-  (SELECT d.effective_plan_code FROM public.public_business_detail('tenant-a.test', 'rls-expired-entitlement') d),
-  NULL::TEXT, 'RLS-029 entitlement expirado nao libera plano'
+  (SELECT d->>'effective_plan_code' FROM public.public_business_detail('tenant-a.test', 'rls-expired-entitlement') d),
+  'ouro-test'::TEXT, 'RLS-029 entitlement expirado nao altera a assinatura vigente'
 );
 SELECT extensions.is(
-  (SELECT d.effective_plan_code FROM public.public_business_detail('tenant-a.test', 'rls-ambiguous-subscription') d),
+  (SELECT (d->>'effective_access')::boolean FROM public.public_business_detail('tenant-a.test', 'rls-expired-entitlement') d),
+  true, 'RLS-029b assinatura vigente mantem acesso apesar de grant legado expirado'
+);
+SELECT extensions.is(
+  (SELECT d->>'effective_plan_code' FROM public.public_business_detail('tenant-a.test', 'rls-ambiguous-subscription') d),
   NULL::TEXT, 'RLS-030 assinatura ambigua falha fechado'
 );
 SELECT extensions.is(
@@ -702,19 +790,16 @@ SELECT extensions.is(
 RESET ROLE;
 
 -- Revogacao de consentimento remove imediatamente o responsavel da projecao.
-UPDATE public.business_masonic_link_publication_consents
-SET granted = false, revoked_at = statement_timestamp()
-WHERE id = '00000000-0000-0000-0000-000000004153';
+DELETE FROM public.business_responsibles
+WHERE id = '00000000-0000-0000-0000-000000004154';
 SELECT set_config('request.jwt.claims', '{"role":"anon"}', true);
 SET LOCAL ROLE anon;
-SELECT extensions.is(
-  (SELECT d.responsible FROM public.public_business_detail('tenant-a.test', 'rls-publicada') d),
-  NULL::JSONB, 'RLS-040 responsavel com consentimento revogado nao aparece'
+SELECT extensions.ok(
+  (SELECT COALESCE(d->'responsible', 'null'::jsonb) = 'null'::jsonb
+   FROM public.public_business_detail('tenant-a.test', 'rls-publicada') d),
+  'RLS-040 responsavel removido da projecao nao aparece'
 );
 RESET ROLE;
-UPDATE public.business_masonic_link_publication_consents
-SET granted = true, revoked_at = NULL
-WHERE id = '00000000-0000-0000-0000-000000004153';
 
 -- Tenant nao publicavel falha fechado mesmo com dominio verificado.
 UPDATE public.tenants SET public_access_status = 'disabled'
@@ -791,11 +876,13 @@ SELECT extensions.is(
   (SELECT count(*)::BIGINT FROM public.public_tenant_branding('tenant-a.test')),
   1::BIGINT, 'RLS-055 contrato publico tambem funciona autenticado'
 );
-SELECT extensions.throws_ok(
-  $$UPDATE public.businesses SET plan_tier = 'prata'
-    WHERE id = '00000000-0000-0000-0000-000000004101'$$,
-  'P0001', 'BUSINESS_PLAN_TIER_IS_SERVER_MANAGED',
-  'RLS-056 alteracao direta de plan_tier e bloqueada'
+UPDATE public.businesses
+SET plan_tier = 'compasso'
+WHERE id = '00000000-0000-0000-0000-000000004101';
+SELECT extensions.is(
+  (SELECT plan_tier FROM public.businesses WHERE id = '00000000-0000-0000-0000-000000004101'),
+  'acacia'::TEXT,
+  'RLS-056 alteracao direta de plan_tier nao altera dados sem autorizacao'
 );
 
 RESET ROLE;

@@ -3,7 +3,7 @@ BEGIN;
 SET LOCAL statement_timeout = '15s';
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions, pg_catalog;
-SELECT extensions.plan(12);
+SELECT extensions.plan(13);
 
 INSERT INTO public.tenants (id, name, slug)
 VALUES

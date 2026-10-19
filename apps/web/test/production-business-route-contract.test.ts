@@ -94,10 +94,12 @@ describe('Contrato Produtivo da Rota Pública de Empresa (/guia/[slug])', () => 
   });
 
   it('9. Assinatura inativa ou inválida resulta em effectivePlan null (fail closed)', () => {
-    const row = createMockDetailRow({ effective_plan_code: null });
+    const row = createMockDetailRow({ effective_plan_code: null, effective_access: false });
     const presentation = toPublicBusinessPresentation(row, []);
 
     expect(presentation.authority.effectivePlan).toBeNull();
+    expect(presentation.entitlements.maxBenefits).toBe(0);
+    expect(presentation.entitlements.maxServices).toBe(0);
   });
 
   it('12. Omitir dados ausentes em vez de inventar mídias ou contatos', () => {

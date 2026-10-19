@@ -1,4 +1,5 @@
 import { createServerSideClient } from '@/lib/supabase/server';
+import { getProfileAuthorization } from '@/lib/member/profile-access-service';
 
 /**
  * Para onde mandar quem abriu o Portal do Anunciante sem ter uma empresa:
@@ -12,7 +13,7 @@ export async function resolveNoBusinessRedirectPath(): Promise<string> {
     const { data } = await supabase.auth.getUser();
     if (!data?.user) return '/login?redirect=%2Fanunciante';
 
-    const { data: profile } = await (supabase as any).from('profiles').select('role').eq('id', data.user.id).maybeSingle();
+    const profile = await getProfileAuthorization(supabase, data.user.id);
     return profile?.role === 'anunciante' ? '/anunciar/passo-1' : '/minha-conta';
   } catch {
     return '/minha-conta';

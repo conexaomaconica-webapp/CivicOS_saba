@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { validateEmail, validateName, validatePassword } from '@/lib/auth/validation';
 import type { Database } from '@/types/database.types';
 import { createServerSideClient } from '@/lib/supabase/server';
+import { getProfileAuthorization, getAdminProfileDTO, listAdminProfileDTOs, updateAdminProfileFields } from '@/lib/member/profile-access-service';
 import {
   membershipRoleForAdministrativeProfile,
   provisionAuthorizedMembership,
@@ -27,8 +28,8 @@ async function getSettingsActor() {
   const { data: authData } = await sessionClient.auth.getUser();
   if (!authData.user) throw new Error('UNAUTHORIZED: Sessão expirada.');
   const adminClient = getAdminClient();
-  const { data: profile, error } = await adminClient.from('profiles').select('role').eq('id', authData.user.id).maybeSingle();
-  if (error || !profile) throw error || new Error('Perfil do usuário não encontrado.');
+  const profile = await getProfileAuthorization(adminClient, authData.user.id);
+  if (!profile) throw new Error('Perfil do usuário não encontrado.');
   return { user: authData.user, role: (profile.role || 'member').toLowerCase(), adminClient };
 }
 
@@ -74,12 +75,7 @@ export async function listAdminUsersAction(): Promise<{
     const { user: actor, role: actorRole, adminClient } = await getSettingsActor();
 
     // 1. Busca perfis
-    const { data: profiles, error: profErr } = await adminClient
-      .from('profiles')
-      .select('id, name, email, role, status, tenant_id, created_at')
-      .order('created_at', { ascending: false });
-
-    if (profErr) throw profErr;
+    const profiles = await listAdminProfileDTOs(adminClient);
 
     // 2. Busca lista de usuários no Auth para cruzar user_metadata (allowed_modules)
     const { data: authData } = await adminClient.auth.admin.listUsers({ perPage: 100 });
@@ -221,12 +217,8 @@ export async function updateAdminUserPermissionsAction(
     if (!userId) return { success: false, error: 'Identificador do usuário ausente.' };
     if (!MANAGEABLE_ADMIN_ROLES.has(role)) return { success: false, error: 'Perfil administrativo inválido.' };
 
-    const { data: originalProfile, error: lookupError } = await adminClient
-      .from('profiles')
-      .select('name, role, status')
-      .eq('id', userId)
-      .maybeSingle();
-    if (lookupError || !originalProfile) throw lookupError || new Error('Perfil do usuário não encontrado.');
+    const originalProfile = await getAdminProfileDTO(adminClient, userId);
+    if (!originalProfile) throw new Error('Perfil do usuário não encontrado.');
     const targetRole = (originalProfile.role || 'member').toLowerCase();
     if (!canManageTarget(actorRole, targetRole)) {
       if (actor.id !== userId) return { success: false, error: 'Você não pode editar este usuário.' };
@@ -250,23 +242,17 @@ export async function updateAdminUserPermissionsAction(
     };
     if (status) updatePayload.status = status;
 
-    const { error: profErr } = await adminClient
-      .from('profiles')
-      .update(updatePayload)
-      .eq('id', userId);
-
-    if (profErr) throw profErr;
+    await updateAdminProfileFields(adminClient, userId, updatePayload);
 
     const { error: authError } = await adminClient.auth.admin.updateUserById(userId, {
       user_metadata: { name, full_name: name, role, allowed_modules: allowedModules },
     });
     if (authError) {
-      await adminClient.from('profiles').update({
-        name: originalProfile.name,
+      await updateAdminProfileFields(adminClient, userId, {
+        name: originalProfile.name || undefined,
         role: originalProfile.role,
         status: originalProfile.status,
-        updated_at: new Date().toISOString(),
-      }).eq('id', userId);
+      });
       throw authError;
     }
 
@@ -288,17 +274,12 @@ export async function toggleAdminUserStatusAction(
   try {
     const { user: actor, role: actorRole, adminClient } = await getSettingsActor();
     if (userId === actor.id) return { success: false, error: 'Você não pode alterar o status da própria conta.' };
-    const { data: target } = await adminClient.from('profiles').select('role').eq('id', userId).maybeSingle();
+    const target = await getAdminProfileDTO(adminClient, userId);
     if (!target || !canManageTarget(actorRole, (target.role || 'member').toLowerCase())) {
       return { success: false, error: 'Você não pode alterar o status deste usuário.' };
     }
 
-    const { error } = await adminClient
-      .from('profiles')
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
-      .eq('id', userId);
-
-    if (error) throw error;
+    await updateAdminProfileFields(adminClient, userId, { status: newStatus });
 
     revalidatePath('/admin/settings');
     return { success: true };
@@ -313,12 +294,7 @@ export async function deleteAdminUserAction(userId: string): Promise<{ success: 
     if (!userId) return { success: false, error: 'Identificador do usuário ausente.' };
     if (userId === currentAdmin.id) return { success: false, error: 'Você não pode excluir a própria conta.' };
 
-    const { data: target, error: lookupError } = await adminClient
-      .from('profiles')
-      .select('id, role')
-      .eq('id', userId)
-      .maybeSingle();
-    if (lookupError) throw lookupError;
+    const target = await getAdminProfileDTO(adminClient, userId);
     if (!target) return { success: false, error: 'Usuário não encontrado.' };
     if (!canManageTarget(actorRole, (target.role || 'member').toLowerCase())) {
       return { success: false, error: 'Você não pode excluir este usuário.' };

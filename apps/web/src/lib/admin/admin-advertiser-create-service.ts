@@ -6,6 +6,7 @@ import { resolveCanonicalAdminTenant } from './admin-tenant-context';
 import { validateEmail, validateName, validatePassword } from '@/lib/auth/validation';
 import { sanitizeCnpj, validatePhone } from '@/lib/onboarding/onboarding-validation';
 import type { Database } from '@/types/database.types';
+import { findInternalProfileByEmail } from '@/lib/member/profile-access-service';
 import {
   provisionAuthorizedMembership,
   type AuthorizedMembershipSource,
@@ -119,11 +120,7 @@ export async function createAdminAdvertiserAction(
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { data: existingProfile } = await adminClient
-      .from('profiles')
-      .select('id')
-      .eq('email', responsibleEmail)
-      .maybeSingle();
+    const existingProfile = await findInternalProfileByEmail(adminClient, responsibleEmail);
 
     let ownerId = existingProfile?.id ?? null;
     let temporaryPasswordCreated = false;

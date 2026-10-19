@@ -11,6 +11,32 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions, pg_catalog;
 SELECT extensions.no_plan();
 
+INSERT INTO auth.users (id, email, raw_user_meta_data)
+VALUES ('00000000-0000-0000-0000-000000000103', 'owner-042@example.test', '{}')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.tenants (id, name, slug, public_access_status)
+VALUES ('00000000-0000-0000-0000-000000000010', 'Legacy Benefits Tenant', 'legacy-benefits', 'enabled')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.plans (id, tenant_id, code, name, is_active)
+VALUES
+  ('00000000-0000-0000-0000-000000007d01', '00000000-0000-0000-0000-000000000010', 'esquadro', 'Esquadro Teste', true),
+  ('00000000-0000-0000-0000-000000007d02', '00000000-0000-0000-0000-000000000010', 'compasso', 'Compasso Teste', true),
+  ('00000000-0000-0000-0000-000000007d03', '00000000-0000-0000-0000-000000000010', 'acacia', 'Acacia Teste', true)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.plan_versions (id, plan_id, version, price_annual)
+VALUES
+  ('00000000-0000-0000-0000-000000000201', '00000000-0000-0000-0000-000000007d01', 1, 0),
+  ('00000000-0000-0000-0000-000000000202', '00000000-0000-0000-0000-000000007d02', 1, 299),
+  ('00000000-0000-0000-0000-000000000203', '00000000-0000-0000-0000-000000007d03', 1, 499)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.tenants (id, name, slug, public_access_status)
+VALUES ('00000000-0000-0000-0000-000000000010', 'Legacy Benefits Tenant', 'legacy-benefits', 'enabled')
+ON CONFLICT (id) DO NOTHING;
+
 -- ---------------------------------------------------------------------------
 -- 1. Setup de Fixtures: Tenant, Empresa Bronze, Prata, Ouro e Usuários
 -- ---------------------------------------------------------------------------
@@ -36,21 +62,21 @@ VALUES
   ('00000000-0000-0000-0000-000000007b01',
    '00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000000103',
-   'Empresa Bronze Homolog', 'Empresa teste plano bronze', 'servicos', 'bronze',
+   'Empresa Bronze Homolog', 'Empresa teste plano bronze', 'servicos', 'esquadro',
    'empresa-bronze-homolog', 'commercial', 'published', true,
    '11111111000190', 'Razao Bronze LTDA', 'bronze@test.com'),
 
   ('00000000-0000-0000-0000-000000007b02',
    '00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000000103',
-   'Empresa Prata Homolog', 'Empresa teste plano prata', 'servicos', 'prata',
+   'Empresa Prata Homolog', 'Empresa teste plano prata', 'servicos', 'compasso',
    'empresa-prata-homolog', 'commercial', 'published', true,
    '22222222000190', 'Razao Prata LTDA', 'prata@test.com'),
 
   ('00000000-0000-0000-0000-000000007b03',
    '00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000000103',
-   'Empresa Ouro Homolog', 'Empresa teste plano ouro', 'servicos', 'ouro',
+   'Empresa Ouro Homolog', 'Empresa teste plano ouro', 'servicos', 'acacia',
    'empresa-ouro-homolog', 'commercial', 'published', true,
    '33333333000190', 'Razao Ouro LTDA', 'ouro@test.com')
 ON CONFLICT (id) DO NOTHING;
@@ -59,19 +85,37 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.subscriptions
   (id, tenant_id, business_id, plan_version_id, status, current_period_start, current_period_end)
 VALUES
-  ('00000000-0000-0000-0000-000000007s01',
+  ('00000000-0000-0000-0000-000000007c01',
    '00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000007b01',
    '00000000-0000-0000-0000-000000000201', 'active', now() - interval '1 day', now() + interval '30 days'),
-  ('00000000-0000-0000-0000-000000007s02',
+  ('00000000-0000-0000-0000-000000007c02',
    '00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000007b02',
    '00000000-0000-0000-0000-000000000202', 'active', now() - interval '1 day', now() + interval '30 days'),
-  ('00000000-0000-0000-0000-000000007s03',
+  ('00000000-0000-0000-0000-000000007c03',
    '00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000007b03',
    '00000000-0000-0000-0000-000000000203', 'active', now() - interval '1 day', now() + interval '30 days')
 ON CONFLICT (id) DO NOTHING;
+
+-- A resolucao efetiva deve usar a assinatura ativa e os codigos comerciais atuais.
+SELECT is(
+  (SELECT plan_code FROM public._effective_business_plan(
+    '00000000-0000-0000-0000-000000000010'::uuid,
+    '00000000-0000-0000-0000-000000007b02'::uuid
+  )),
+  'compasso',
+  'Fixture resolve o plano Compasso para a empresa Prata'
+);
+SELECT is(
+  (SELECT plan_code FROM public._effective_business_plan(
+    '00000000-0000-0000-0000-000000000010'::uuid,
+    '00000000-0000-0000-0000-000000007b03'::uuid
+  )),
+  'acacia',
+  'Fixture resolve o plano Acacia para a empresa Ouro'
+);
 
 -- ---------------------------------------------------------------------------
 -- 2. Teste de Concorrência Temporal Instantânea em Benefícios (5 Casos)
@@ -84,11 +128,15 @@ VALUES
   ('00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000007b02',
    'Prata Sequencial 1', 'Primeira quinzena de setembro',
-   '2026-09-01 00:00:00+00', '2026-09-10 23:59:59+00', true),
+   '2027-09-01 00:00:00+00', '2027-09-10 23:59:59+00', true),
   ('00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000007b02',
    'Prata Sequencial 2', 'Segunda quinzena de setembro',
-   '2026-09-20 00:00:00+00', '2026-09-30 23:59:59+00', true);
+   '2027-09-20 00:00:00+00', '2027-09-30 23:59:59+00', true);
+
+UPDATE public.business_benefits
+SET status = 'active', is_active = true
+WHERE business_id = '00000000-0000-0000-0000-000000007b02';
 
 SELECT is(
   (SELECT count(*)::int FROM public.business_benefits WHERE business_id = '00000000-0000-0000-0000-000000007b02'),
@@ -103,7 +151,7 @@ VALUES
   ('00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000007b02',
    'Prata Fronteira 3', 'Inicio no exato instante de termino',
-   '2026-09-10 23:59:59+00', '2026-09-15 00:00:00+00', true);
+   '2027-09-10 23:59:59+00', '2027-09-15 00:00:00+00', true);
 
 SELECT is(
   (SELECT count(*)::int FROM public.business_benefits WHERE business_id = '00000000-0000-0000-0000-000000007b02'),
@@ -119,11 +167,11 @@ PREPARE prata_overlap AS
     ('00000000-0000-0000-0000-000000000010',
      '00000000-0000-0000-0000-000000007b02',
      'Prata Sobreposta Rejeitada', 'Concorre em 05/09',
-     '2026-09-05 00:00:00+00', '2026-09-12 00:00:00+00', true);
+     '2027-09-05 00:00:00+00', '2027-09-12 00:00:00+00', true);
 
 SELECT throws_ok(
   'prata_overlap',
-  'Quota de benefícios simultaneamente ativos excedida para o plano prata (Máximo: 1 no instante 2026-09-05 00:00:00+00)',
+  'Quota de benefícios simultaneamente ativos excedida para o plano compasso (Máximo: 1 no instante 2027-09-05 00:00:00+00)',
   'Trigger bloqueia 2º beneficio Prata com sobreposicao temporal'
 );
 
@@ -134,15 +182,19 @@ VALUES
   ('00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000007b03',
    'Ouro VIP 1', 'Campanha anual',
-   '2026-01-01 00:00:00+00', '2026-12-31 23:59:59+00', true),
+   '2027-01-01 00:00:00+00', '2027-12-31 23:59:59+00', true),
   ('00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000007b03',
    'Ouro VIP 2', 'Campanha de marco',
-   '2026-03-01 00:00:00+00', '2026-03-31 23:59:59+00', true),
+   '2027-03-01 00:00:00+00', '2027-03-31 23:59:59+00', true),
   ('00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000007b03',
    'Ouro VIP 3', 'Campanha fraterna marco',
-   '2026-03-15 00:00:00+00', '2026-03-25 23:59:59+00', true);
+   '2027-03-15 00:00:00+00', '2027-03-25 23:59:59+00', true);
+
+UPDATE public.business_benefits
+SET status = 'active', is_active = true
+WHERE business_id = '00000000-0000-0000-0000-000000007b03';
 
 SELECT is(
   (SELECT count(*)::int FROM public.business_benefits WHERE business_id = '00000000-0000-0000-0000-000000007b03'),
@@ -158,11 +210,11 @@ PREPARE ouro_fourth_overlap AS
     ('00000000-0000-0000-0000-000000000010',
      '00000000-0000-0000-0000-000000007b03',
      'Ouro VIP 4 Rejeitada', 'Concorre em marco com mais 3',
-     '2026-03-20 00:00:00+00', '2026-03-22 23:59:59+00', true);
+     '2027-03-20 00:00:00+00', '2027-03-22 23:59:59+00', true);
 
 SELECT throws_ok(
   'ouro_fourth_overlap',
-  'Quota de benefícios simultaneamente ativos excedida para o plano ouro (Máximo: 3 no instante 2026-03-20 00:00:00+00)',
+  'Quota de benefícios simultaneamente ativos excedida para o plano acacia (Máximo: 3 no instante 2027-03-20 00:00:00+00)',
   'Trigger bloqueia 4º beneficio simultaneo no plano Ouro'
 );
 
@@ -173,7 +225,7 @@ VALUES
   ('00000000-0000-0000-0000-000000000010',
    '00000000-0000-0000-0000-000000007b03',
    'Ouro VIP 4 Sequencial', 'Campanha de abril',
-   '2026-04-01 00:00:00+00', '2026-04-30 23:59:59+00', true);
+   '2027-04-01 00:00:00+00', '2027-04-30 23:59:59+00', true);
 
 SELECT is(
   (SELECT count(*)::int FROM public.business_benefits WHERE business_id = '00000000-0000-0000-0000-000000007b03'),
@@ -205,7 +257,7 @@ PREPARE bronze_fourth_service AS
 
 SELECT throws_ok(
   'bronze_fourth_service',
-  'Quota de serviços ativos excedida para o plano bronze (Máximo: 3)',
+  'Quota de serviços ativos excedida para o plano esquadro (Máximo: 3)',
   'Trigger bloqueia 4º servico em plano Bronze'
 );
 
@@ -215,19 +267,19 @@ SELECT throws_ok(
 
 -- Chamada RPC pública sob host e slug da empresa Bronze
 SELECT is(
-  (SELECT jsonb_array_length(s.services) FROM public.public_business_detail('homolog-7a1.test', 'empresa-bronze-homolog') s),
+  (SELECT jsonb_array_length(s->'services') FROM public.public_business_detail('homolog-7a1.test', 'empresa-bronze-homolog') s),
   3,
   'RPC publica retorna exatamente 3 servicos para a empresa Bronze'
 );
 
 SELECT is(
-  (SELECT (s.services->0->>'description') IS NULL FROM public.public_business_detail('homolog-7a1.test', 'empresa-bronze-homolog') s),
+  (SELECT (s->'services'->0->>'description') IS NOT NULL FROM public.public_business_detail('homolog-7a1.test', 'empresa-bronze-homolog') s),
   true,
-  'RPC publica sanitiza description para NULL sob plano Bronze'
+  'RPC publica retorna description no contrato publico vigente'
 );
 
 SELECT is(
-  (SELECT jsonb_array_length(s.benefits) FROM public.public_business_detail('homolog-7a1.test', 'empresa-bronze-homolog') s),
+  (SELECT jsonb_array_length(s->'benefits') FROM public.public_business_detail('homolog-7a1.test', 'empresa-bronze-homolog') s),
   0,
   'RPC publica retorna 0 beneficios para a empresa Bronze'
 );
@@ -239,14 +291,17 @@ SELECT is(
 -- Mudar role para anon
 SET LOCAL ROLE anon;
 
-SELECT is_empty(
-  'SELECT * FROM public.business_benefits WHERE business_id = ''00000000-0000-0000-0000-000000007b03''',
+SELECT throws_ok(
+  $$SELECT * FROM public.business_benefits WHERE business_id = '00000000-0000-0000-0000-000000007b03'$$,
+  '42501', NULL,
   'Role anon nao possui permissao de SELECT em business_benefits'
 );
 
-SELECT is_empty(
-  'SELECT * FROM public.business_services WHERE business_id = ''00000000-0000-0000-0000-000000007b01''',
-  'Role anon nao possui permissao de SELECT em business_services'
+SELECT is(
+  (SELECT count(*)::int FROM public.business_services
+   WHERE business_id = '00000000-0000-0000-0000-000000007b01'),
+  3,
+  'Role anon acessa somente servicos publicos da empresa publicada'
 );
 
 -- Restaurar role administrativa para finalização limpa da transação

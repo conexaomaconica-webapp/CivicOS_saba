@@ -1,4 +1,5 @@
 import { createServerSideClient } from '@/lib/supabase/server';
+import { getProfileAuthorization } from '@/lib/member/profile-access-service';
 
 export async function assertPlatformAdminAccess() {
   const supabase = await createServerSideClient();
@@ -29,13 +30,8 @@ export async function assertMasterAdminAccess() {
   }
 
   // Consulta canônica do perfil para validação estrita do papel 'master'
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  if (profileError || !profile) {
+  const profile = await getProfileAuthorization(supabase, user.id);
+  if (!profile) {
     throw new Error('UNAUTHORIZED: Perfil de usuário não localizado.');
   }
 

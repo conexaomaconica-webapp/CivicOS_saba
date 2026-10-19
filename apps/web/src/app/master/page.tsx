@@ -1,6 +1,7 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
+import { getProfileAuthorization } from '@/lib/member/profile-access-service';
 import MasterDashboardClient from './master-dashboard-client';
 
 export const metadata = {
@@ -15,11 +16,7 @@ export default async function MasterDashboardPage() {
     const { data: userData } = await supabase.auth.getUser();
 
     if (userData?.user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', userData.user.id)
-        .maybeSingle();
+      const profile = await getProfileAuthorization(supabase, userData.user.id);
 
       const role = profile?.role || userData.user.user_metadata?.role;
       isSuperAdmin = role === 'master' || role === 'superadmin' || role === 'socio_admin';

@@ -5191,7 +5191,9 @@ export type Database = {
           company_type: string
           contacts: Json
           description: string
-          effective_plan_code: string
+          contracted_plan_code?: string | null
+          effective_access?: boolean
+          effective_plan_code: string | null
           is_founder: boolean
           is_verified: boolean
           locations: Json

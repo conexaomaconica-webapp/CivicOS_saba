@@ -21,14 +21,11 @@ BEGIN
 END;
 $$;
 
-ALTER ROLE anon NOLOGIN NOBYPASSRLS;
-ALTER ROLE authenticated NOLOGIN NOBYPASSRLS;
-ALTER ROLE service_role NOLOGIN BYPASSRLS;
-ALTER ROLE supabase_admin NOLOGIN SUPERUSER;
+-- Supabase-managed roles already exist in the local stack; altering them is unnecessary.
 
-CREATE SCHEMA auth;
-CREATE SCHEMA extensions;
-CREATE SCHEMA cron;
+CREATE SCHEMA IF NOT EXISTS auth;
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE SCHEMA IF NOT EXISTS cron;
 
 -- Supabase grants API roles privileges on new public objects and lets RLS
 -- decide row access. Migration 040 then deliberately revokes anon SELECT from
@@ -43,23 +40,15 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 
-CREATE TABLE auth.users (
-  instance_id UUID,
-  id UUID PRIMARY KEY,
-  aud TEXT,
-  role TEXT,
-  email TEXT,
-  encrypted_password TEXT,
-  email_confirmed_at TIMESTAMPTZ,
-  raw_app_meta_data JSONB NOT NULL DEFAULT '{}'::JSONB,
-  raw_user_meta_data JSONB NOT NULL DEFAULT '{}'::JSONB,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  confirmation_token TEXT NOT NULL DEFAULT '',
-  email_change TEXT NOT NULL DEFAULT '',
-  email_change_token_new TEXT NOT NULL DEFAULT '',
-  recovery_token TEXT NOT NULL DEFAULT ''
-);
+-- The Supabase local stack owns auth.users. Verify it exists without trying
+-- to create objects in the protected auth schema.
+DO $$
+BEGIN
+  IF to_regclass('auth.users') IS NULL THEN
+    RAISE EXCEPTION 'auth.users is required for the local Supabase tests';
+  END IF;
+END;
+$$;
 
 CREATE OR REPLACE FUNCTION auth.jwt()
 RETURNS JSONB
@@ -95,3 +84,7 @@ GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION auth.jwt() TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION auth.role() TO anon, authenticated, service_role;
+
+SELECT extensions.plan(1);
+SELECT extensions.ok(to_regclass('auth.users') IS NOT NULL, 'auth.users disponível');
+SELECT extensions.finish();

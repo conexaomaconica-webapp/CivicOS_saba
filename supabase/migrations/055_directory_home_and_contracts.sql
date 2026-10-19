@@ -605,7 +605,7 @@ GRANT EXECUTE ON FUNCTION public.public_organizations_search(TEXT, TEXT, TEXT, T
 -- ---------------------------------------------------------------------------
 DO $$
 DECLARE
-  v_tenant_id UUID := '00000000-0000-0000-0000-000000000010';
+  v_tenant_id UUID := '00000000-0000-0000-0000-000000000000';
 BEGIN
   -- Default Home Settings
   INSERT INTO public.directory_home_settings (tenant_id, hero_title, hero_subtitle, hero_search_placeholder, default_page_size)

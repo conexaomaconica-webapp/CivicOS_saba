@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import OnboardingHeader from '@/components/onboarding/OnboardingHeader';
 import ContractSigningClient from './contract-signing-client';
+import { getOwnProfileDTO } from '@/lib/member/profile-access-service';
 
 export const metadata = {
   title: 'Onboarding Anunciante · Passo 5 de 6 — Revise e Assine',
@@ -31,11 +32,7 @@ export default async function OnboardingStep5Page() {
     redirect('/anunciar/passo-2?error=complete_business_first');
   }
 
-  const { data: profile } = await (supabase as any)
-    .from('profiles')
-    .select('name, email')
-    .eq('id', user.id)
-    .maybeSingle();
+  const profile = await getOwnProfileDTO(supabase, user.id);
 
   const planCode = biz.plan_tier || 'ouro';
   const planName = planCode === 'ouro' ? 'Plano Acácia (Anual)' : planCode === 'prata' ? 'Plano Compasso (Anual)' : 'Plano Esquadro (Essencial)';

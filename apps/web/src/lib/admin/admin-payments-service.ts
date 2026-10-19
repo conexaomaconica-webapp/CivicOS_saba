@@ -13,6 +13,7 @@ import {
   type CommercialStatus,
   isCommercialStatus,
 } from '@/lib/commercial-onboarding-status';
+import { listPublicMemberDTOs } from '@/lib/member/profile-access-service';
 
 export interface AdminPaymentListItem {
   id: string;
@@ -66,6 +67,24 @@ export interface AdminPaymentsDashboardDTO {
 }
 
 /**
+ * Retorna o cliente administrativo para extração de métricas de pagamentos consolidadas.
+ */
+function getAdminPaymentsClient(ssrClient: any) {
+  if (process.env.VITEST) {
+    return ssrClient;
+  }
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (supabaseUrl && serviceRoleKey) {
+    return createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+  return ssrClient;
+}
+
+/**
  * Retorna os dados do Dashboard Financeiro/Admin.
  * PROTEÇÃO P0: Exige autorização server-side via RPC has_platform_admin_access.
  */
@@ -75,7 +94,8 @@ export async function getAdminPaymentsDashboardAction(params?: {
   methodFilter?: string;
   planFilter?: string;
 }): Promise<AdminPaymentsDashboardDTO> {
-  const { supabase } = await assertPlatformAdminAccess();
+  const { supabase: ssrClient } = await assertPlatformAdminAccess();
+  const db = getAdminPaymentsClient(ssrClient);
 
   const statusFilter = params?.statusFilter || 'todos';
   const methodFilter = params?.methodFilter || 'todos';
@@ -84,20 +104,19 @@ export async function getAdminPaymentsDashboardAction(params?: {
 
   try {
     // 1. Consultar empresas
-    const { data: businesses } = await (supabase as any)
+    const { data: businesses } = await (db as any)
       .from('businesses')
       .select('id, name, owner_id, plan_tier, publication_status, is_active, phone, email');
 
-    // 2. Consultar perfis dos donos
-    const { data: profiles } = await (supabase as any)
-      .from('profiles')
-      .select('id, name, email');
-    const profilesMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+    // 2. Consultar somente a projeção pública dos donos; e-mail vem da empresa.
+    const ownerIds = (businesses || []).map((business: any) => business.owner_id).filter(Boolean);
+    const profiles = await listPublicMemberDTOs(db, ownerIds);
+    const profilesMap = new Map(profiles.map((profile) => [profile.public_id, profile]));
 
     // 3. Consultar assinaturas com Join Canônico de Plano
     let subscriptions: any[] = [];
     try {
-      const { data: subsData } = await (supabase as any)
+      const { data: subsData } = await (db as any)
         .from('subscriptions')
         .select('id, business_id, tenant_id, status, plan_version_id, created_at, plan_versions(id, plan_id, plans(code, name))');
       subscriptions = subsData || [];
@@ -106,7 +125,7 @@ export async function getAdminPaymentsDashboardAction(params?: {
     }
 
     // 4. Consultar faturas
-    let invoicesQuery = (supabase as any)
+    let invoicesQuery = (db as any)
       .from('invoices')
       .select('*');
 
@@ -122,7 +141,7 @@ export async function getAdminPaymentsDashboardAction(params?: {
     const invoiceList = invoicesData || [];
     let providerEvents: any[] = [];
     try {
-      let eventsQuery = (supabase as any).from('payment_provider_events').select('*');
+      let eventsQuery = (db as any).from('payment_provider_events').select('*');
       if (eventsQuery && typeof eventsQuery.order === 'function') {
         eventsQuery = eventsQuery.order('created_at', { ascending: false });
       }
@@ -172,8 +191,8 @@ export async function getAdminPaymentsDashboardAction(params?: {
           asaas_payment_id: inv.idempotency_key || `pay_${inv.id.slice(0, 8)}`,
           business_id: inv.business_id,
           business_name: biz?.name || 'Empresa Anunciante',
-          owner_name: (owner as any)?.name || 'Anunciante Titular',
-          owner_email: (owner as any)?.email || biz?.email || 'contato@anunciante.com',
+          owner_name: owner?.display_name || 'Anunciante Titular',
+          owner_email: biz?.email || 'contato@anunciante.com',
           plan_code: planCode,
           amount_cents: amountCents,
           payment_method: inv.payment_method === 'pix' ? 'pix' : 'credit_card',

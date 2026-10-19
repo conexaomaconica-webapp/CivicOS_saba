@@ -4,9 +4,17 @@
 > **Status:** Homologado (Fase 0 — Arquitetura Concluída)  
 > **Estratégia:** Evolução incremental em 12 fases sem interrupção do sistema Web em produção.
 
+> **Fundação compartilhada:** o desenho normativo Web + Mobile está em
+> [`MOBILE_ARCHITECTURE_P0A.md`](./MOBILE_ARCHITECTURE_P0A.md). Esse documento
+> preserva Next.js na web e React + Vite + Capacitor no aplicativo, define os
+> canais API/BFF ou Supabase/RPC e substitui recomendações anteriores de guardar
+> refresh token em `@capacitor/preferences`.
+
 ---
 
 ## Estrutura Geral das Fases
+
+> Escopo funcional congelado: consulte [`MOBILE_MEMBER_SCOPE.md`](./MOBILE_MEMBER_SCOPE.md). O aplicativo é uma única experiência de membro; gestão comercial e administrativa permanece exclusivamente na Web.
 
 ```
 [ Fase 0: Arquitetura ] ➔ [ Fase 1: PWA ] ➔ [ Fase 2: Base Capacitor ] ➔ [ Fase 3: Auth Mobile ]
@@ -26,6 +34,33 @@
 - **Riscos**: Baixo (apenas análise e documentação).
 - **Testes Necessários**: `pnpm --filter web typecheck`.
 - **Critério de Aceite**: Documentos de auditoria e roadmap gerados e validados com 0 erros de compilação.
+
+### P0-A — Fundação da Arquitetura Compartilhada (APROVADO)
+
+- **Objetivo**: Consolidar contratos versionados, limites do monorepo, matriz API/BFF versus Supabase/RPC, isolamento de tenants, sessão mobile segura e evolução retrocompatível da Home antes de qualquer integração funcional.
+- **Documento normativo**: [`docs/mobile/MOBILE_ARCHITECTURE_P0A.md`](./MOBILE_ARCHITECTURE_P0A.md).
+- **Dependências**: auditoria da Fase 0 e arquitetura atual (`apps/web` Next.js; `apps/mobile` React + Vite + Capacitor).
+- **Não inclui**: migrations, alterações de RLS, instalação de plugins, endpoints ou funcionalidades mobile.
+- **Próximo gate**: P0-B, com implementação dos contratos, escolha/homologação do armazenamento Keychain/Keystore e auditoria de RLS com testes entre tenants.
+- **Status**: aprovado em 14/10/2026 para o planejamento executivo do P0-B. A implementação continua bloqueada até o atendimento dos critérios de entrada definidos no documento normativo.
+- **Critério de Aceite**: decisões e pendências do documento P0-A revisadas e aprovadas; aprovação documental não equivale à validação da implementação ou da segurança.
+
+### P0-B — Planejamento Executivo de Auth, Sessão e Tenancy (EM REVISÃO)
+
+- **Objetivo**: detalhar autenticação PKCE, armazenamento Keychain/Keystore, deep links, lifecycle, tenant canônico fixo, fronteiras BFF e auditoria efetiva de RLS/grants/RPCs.
+- **Relatório para revisão**: [`docs/mobile/MOBILE_ARCHITECTURE_P0B_PLAN.md`](./MOBILE_ARCHITECTURE_P0B_PLAN.md).
+- **Auditoria de segurança**: [`docs/mobile/SUPABASE_SECURITY_AUDIT_P0B.md`](./SUPABASE_SECURITY_AUDIT_P0B.md) — catálogo remoto coletado; testes comportamentais e revisão dos corpos de funções permanecem pendentes.
+- **Pacote SQL somente leitura**: [`supabase/audits/p0b_security_catalog_readonly.sql`](../../supabase/audits/p0b_security_catalog_readonly.sql), com instruções em [`docs/mobile/SUPABASE_SECURITY_CATALOG_EXPORT.md`](./SUPABASE_SECURITY_CATALOG_EXPORT.md).
+- **Plano de remediação global**: [`docs/mobile/SUPABASE_SECURITY_REMEDIATION_PLAN_P0B.md`](./SUPABASE_SECURITY_REMEDIATION_PLAN_P0B.md); não autoriza alterações no Supabase.
+- **Análise de impacto de `profiles`**: [`docs/mobile/SUPABASE_PROFILES_IMPACT_ANALYSIS_P0B.md`](./SUPABASE_PROFILES_IMPACT_ANALYSIS_P0B.md); consumidores e campos ainda precisam de validação funcional.
+- **Desenho de remediação de `profiles`**: [`docs/mobile/SUPABASE_PROFILES_REMEDIATION_DESIGN_P0B.md`](./SUPABASE_PROFILES_REMEDIATION_DESIGN_P0B.md); proposta sem migration executável.
+- **Especificação pré-migration de `profiles`**: [`docs/mobile/SUPABASE_PROFILES_REMEDIATION_IMPLEMENTATION_SPEC_P0B.md`](./SUPABASE_PROFILES_REMEDIATION_IMPLEMENTATION_SPEC_P0B.md); requer aprovação técnica antes de qualquer SQL.
+- **Draft de homologação**: [`supabase/audits/p0b_profiles_remediation_homologation_draft.sql`](../../supabase/audits/p0b_profiles_remediation_homologation_draft.sql), com testes e rollback separados; não executar sem gate formal.
+- **Decisão de tenant**: o Supabase permanece multi-tenant, mas Android e iOS operam exclusivamente no tenant canônico da Conexão Maçônica; não há descoberta, seleção ou alternância de tenant no cliente. Auth e `public.profiles` são compartilhados; empresas são recursos internos, não tenants.
+- **Estado**: P0-B em revisão técnica; Fase 1 de contenção aplicada em homologação, Fase 2 pendente; implementação mobile não autorizada.
+- **Bloqueio**: implementação depende de auditoria de segurança somente leitura, de um segundo gate formal e da resolução dos bloqueadores B01–B04 do relatório.
+- **Critério adicional do gate**: a auditoria deve aprovar separadamente a segurança global do banco multi-tenant e a autorização específica de usuários da Conexão Maçônica.
+- **Restrições**: sem dependências, migrations, policies, grants, Auth config, credenciais, deploys, commits ou testes remotos nesta etapa.
 
 ---
 
@@ -62,7 +97,7 @@
   - `apps/web/src/app/(public)/excluir-conta/page.tsx` (Página pública de solicitação LGPD/Stores)
   - `apps/web/src/components/profile/DeleteAccountModal.tsx` (Modal de exclusão dentro do app)
 - **Dependências**: RPC Supabase `request_account_deletion` (já existente).
-- **Riscos**: Perda de sessão ao fechar o app mobile. Mitigar utilizando o plugin `@capacitor/preferences` com chaveamento de refresh token.
+- **Riscos**: Perda ou exposição da sessão ao fechar o app mobile. Mitigar com adaptador de armazenamento seguro baseado em Keychain (iOS) e Keystore (Android), conforme o P0-A. `@capacitor/preferences` não deve armazenar refresh tokens.
 - **Testes Necessários**: Teste de login, permanência da sessão após reboot do app, logout e disparo de exclusão de conta.
 - **Critério de Aceite**: Sessão mantida com sucesso no app e requisição de exclusão de conta funcionando via App e URL pública.
 
@@ -71,9 +106,8 @@
 ### FASE MOBILE 4 — Interface e Navegação Mobile (Bottom Navigation)
 - **Objetivo**: Implementar a barra de navegação inferior (*Bottom Navigation Bar*) e adaptar a UX para celulares (Início, Explorar, QR Code, Conexões, Perfil).
 - **Arquivos Envolvidos**:
-  - `apps/web/src/components/mobile/MobileBottomNav.tsx` (Novo)
-  - `apps/web/src/components/mobile/MobileHeader.tsx` (Novo)
-  - `apps/web/src/app/layout.tsx` (Inclusão condicional da barra móvel para telas de aplicativo)
+  - `apps/mobile/src/*` (navegação e composição próprias do aplicativo)
+  - `packages/ui/*` (somente primitives comprovadamente isomórficos)
 - **Dependências**: Tokens de cores (`#6B1D2F`, `#D4AF37`) e componentes da UI.
 - **Riscos**: Barra inferior sobrepor conteúdos ou formulários. Mitigar ajustando `padding-bottom: env(safe-area-inset-bottom)` para notch do iOS.
 - **Testes Necessários**: Teste de navegação em viewport mobile (390px x 844px) em Chrome/Safari móvel.
@@ -85,8 +119,8 @@
 - **Objetivo**: Completar os adaptadores nativos pendentes em `apps/mobile` e integrar os recursos do dispositivo.
 - **Arquivos Envolvidos**:
   - [`apps/mobile/src/adapters.ts`](file:///c:/saas-platform/apps/mobile/src/adapters.ts) (Implementar `CapacitorGeolocationAdapter` e `CapacitorPushAdapter`)
-  - `apps/web/src/components/qr/QRCodeScannerModal.tsx` (Integração com Câmera/QR)
-  - `apps/web/src/components/directory/ShareBusinessButton.tsx` (Share Nativo)
+  - `apps/mobile/src/*` (fluxos de Câmera/QR e compartilhamento nativo)
+  - `packages/core/*` ou `packages/shared/*` (contratos e validações puras reutilizáveis)
 - **Dependências**: Permissões de câmera e localização no sistema operacional.
 - **Riscos**: Usuário negar permissão de câmera/localização. Mitigar com fallbacks amigáveis (digitação manual de código ou busca por cidade).
 - **Testes Necessários**: Testes unitários dos adaptadores em `apps/mobile/src/adapters.ts`.
@@ -98,8 +132,8 @@
 - **Objetivo**: Configurar o serviço de Notificações Push via Firebase Cloud Messaging (FCM) para Android e Apple Push Notification Service (APNs) para iOS.
 - **Arquivos Envolvidos**:
   - `supabase/functions/send-push/index.ts` (Edge Function de disparo)
-  - `apps/web/src/lib/notifications/push-service.ts`
   - [`apps/mobile/src/adapters.ts`](file:///c:/saas-platform/apps/mobile/src/adapters.ts)
+  - API/BFF ou serviço de servidor responsável por registrar dispositivos e segmentos
 - **Dependências**: Credenciais do FCM (google-services.json) e chave APNs da Apple.
 - **Riscos**: Notificações bloqueadas em background no iOS. Mitigar configurando o payload APNs adequado com `content-available: 1`.
 - **Testes Necessários**: Disparo de push de teste por ID de usuário e por segmento de cidade.
@@ -112,6 +146,7 @@
 - **Arquivos Envolvidos**:
   - `apps/web/src/lib/analytics/tracker.ts`
   - `apps/web/src/components/analytics/GoogleAnalytics.tsx`
+  - cliente de analytics do `apps/mobile`, baseado no contrato compartilhado aprovado
 - **Dependências**: Tabela `analytics_events` no Supabase.
 - **Riscos**: Contagem duplicada de eventos em navegações internas. Mitigar mantendo o controle de navegação de página única (SPA).
 - **Testes Necessários**: Disparo de eventos `view_business`, `click_whatsapp` e `register_connection` filtrados por plataforma.

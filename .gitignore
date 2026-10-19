@@ -54,3 +54,6 @@ scratch/
 
 .pnpm-store/
 .npmrc
+.gradle-home/
+.gradle/
+

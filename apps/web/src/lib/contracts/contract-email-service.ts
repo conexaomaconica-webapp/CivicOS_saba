@@ -10,6 +10,7 @@ import type { AppDatabase } from '@/types/database-extensions';
 import { getEmailProvider, brandedEmailHtml } from '@/lib/email/send-email';
 import { generatePublicLinkToken } from '@/lib/security/public-link-token';
 import { pickResponsibleName } from '@/lib/contracts/responsible-name';
+import { getInternalProfileDTO } from '@/lib/member/profile-access-service';
 
 export interface DispatchContractEmailResult {
   success: boolean;
@@ -134,11 +135,7 @@ export async function dispatchContractEmail(
 
   let recipientName = pickResponsibleName(resp?.name);
   if (!recipientName && business.owner_id) {
-    const { data: prof } = await (dbClient as any)
-      .from('profiles')
-      .select('name')
-      .eq('id', business.owner_id)
-      .maybeSingle();
+    const prof = await getInternalProfileDTO(dbClient as unknown as SupabaseClient<Database>, business.owner_id);
     recipientName = pickResponsibleName(prof?.name);
   }
   recipientName = recipientName || business.name;
@@ -573,11 +570,7 @@ export async function dispatchPaymentLinkEmail(
 
   let recipientName = pickResponsibleName(resp?.name);
   if (!recipientName && business.owner_id) {
-    const { data: prof } = await (dbClient as any)
-      .from('profiles')
-      .select('name')
-      .eq('id', business.owner_id)
-      .maybeSingle();
+    const prof = await getInternalProfileDTO(dbClient as unknown as SupabaseClient<Database>, business.owner_id);
     recipientName = pickResponsibleName(prof?.name);
   }
   recipientName = recipientName || business.name;

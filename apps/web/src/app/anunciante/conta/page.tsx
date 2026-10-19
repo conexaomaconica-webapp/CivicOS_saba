@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { getSignedMemberAvatarUrl } from '@/lib/member/member-profile-service';
 import ProfileTabs from '@/app/minha-conta/perfil/profile-tabs';
+import { getOwnProfileDTO } from '@/lib/member/profile-access-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,11 +21,7 @@ export default async function AdvertiserAccountPage({ searchParams }: { searchPa
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login?redirect=%2Fanunciante%2Fconta');
 
-  const { data: profile } = await (supabase as any)
-    .from('profiles')
-    .select('name, email, phone, city, state, avatar_url')
-    .eq('id', user.id)
-    .maybeSingle();
+  const profile = await getOwnProfileDTO(supabase, user.id);
 
   const providers: string[] = Array.isArray(user.app_metadata?.providers) ? user.app_metadata.providers : [];
   const canChangePassword = providers.length === 0 || providers.includes('email');

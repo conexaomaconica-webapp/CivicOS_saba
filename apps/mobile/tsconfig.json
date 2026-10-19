@@ -4,14 +4,17 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "node",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@saas/core": ["../../packages/core/src"]
+      "@saas/core": ["../../packages/core/src"],
+      "@saas/ui": ["../../packages/ui/src"]
     }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "vite.config.ts"]
 }

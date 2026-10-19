@@ -9,6 +9,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createMiddlewareSideClient } from '@/lib/supabase/middleware';
 import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
 import { isNoIndexFollowPath } from '@/lib/seo/noindex-paths';
+import { getProfileAuthorization } from '@/lib/member/profile-access-service';
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
@@ -25,6 +26,12 @@ export async function middleware(request: NextRequest) {
   const subdomain = extractSubdomain(host);
   // Public resolution never trusts x-tenant-id or tenant_id cookies. Server
   // components pass this original Host to the verified-domain RPC.
+
+  // O BFF do Guia é público e usa um cliente Supabase sem sessão. Não tente
+  // renovar cookies do navegador nesta rota, evitando refresh_token_not_found.
+  if (request.nextUrl.pathname === '/api/mobile/guide') {
+    return response;
+  }
 
   // ---------------------------------------------------------------------------
   // 2. Auth & RBAC Check
@@ -97,11 +104,7 @@ export async function middleware(request: NextRequest) {
 
     // Authorization data must come from the protected profile, never from
     // raw_user_meta_data, which the end user can modify.
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, tenant_id')
-      .eq('id', user.id)
-      .maybeSingle();
+    const profile = await getProfileAuthorization(supabase, user.id);
     const userRole = profile?.role ?? 'member';
     const userTenantId = profile?.tenant_id ?? null;
 

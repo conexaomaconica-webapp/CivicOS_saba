@@ -13,7 +13,7 @@ CREATE POLICY "Public can view approved active links of published businesses"
     AND EXISTS (
       SELECT 1 FROM public.businesses b
       WHERE b.id = business_masonic_links.business_id
-        AND (b.publication_status = 'published' OR b.is_published = true)
+        AND b.publication_status = 'published'
         AND b.is_active = true
     )
   );
@@ -29,7 +29,7 @@ CREATE POLICY "Public read active business_recognitions"
       SELECT 1 FROM public.businesses b
       WHERE b.id = business_recognitions.business_id
         AND b.is_active = true
-        AND (b.publication_status = 'published' OR b.is_published = true)
+        AND b.publication_status = 'published'
     )
   );
 

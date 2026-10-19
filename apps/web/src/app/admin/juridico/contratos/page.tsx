@@ -3,6 +3,7 @@ import { createServerSideClient } from '@/lib/supabase/server';
 import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
 import ContractsManagementClient from './contracts-management-client';
 import { loadManagedDocumentsAction } from '@/lib/contracts/legal-document-management-service';
+import { getProfileAuthorization } from '@/lib/member/profile-access-service';
 
 export const metadata = {
   title: 'Admin · Modelos de Contratos & Jurídico — Conexão Maçônica',
@@ -18,12 +19,7 @@ export default async function AdminJuridicoContratosPage({ searchParams }: { sea
     redirect('/login?redirect=%2Fadmin%2Fjuridico%2Fcontratos');
   }
 
-  const { data: profile } = await (supabase as any)
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .limit(1)
-    .maybeSingle();
+  const profile = await getProfileAuthorization(supabase, user.id);
 
   const role = profile?.role || user.user_metadata?.role;
   if (!isPlatformAdminRole(role)) {

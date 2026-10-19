@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 import { assertOperationalTenantId, resolveBusinessTenantIdFromDb } from '@/lib/tenant/tenant-policy';
+import { listPublicMemberDTOs } from '@/lib/member/profile-access-service';
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -225,11 +226,11 @@ export async function getReviewsForModerationAction(): Promise<AdminActionResult
 
     const userIds = [...new Set((reviews || []).map((review) => review.author_id))];
     const businessIds = [...new Set((reviews || []).map((review) => review.business_id))];
-    const [{ data: profiles }, { data: businesses }] = await Promise.all([
-      userIds.length ? supabase.from('profiles').select('id, name').in('id', userIds) : Promise.resolve({ data: [] }),
+    const [profiles, { data: businesses }] = await Promise.all([
+      listPublicMemberDTOs(supabase, userIds),
       businessIds.length ? supabase.from('businesses').select('id, name').in('id', businessIds) : Promise.resolve({ data: [] }),
     ]);
-    const names = new Map((profiles || []).map((profile) => [profile.id, profile.name || 'Membro']));
+    const names = new Map(profiles.map((profile) => [profile.public_id, profile.display_name]));
     const businessNames = new Map((businesses || []).map((business) => [business.id, business.name]));
 
     return {

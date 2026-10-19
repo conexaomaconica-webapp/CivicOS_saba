@@ -273,7 +273,11 @@ export function toPublicBusinessPresentation(
   reviewRows: ReviewRow[] = [],
   recognitionsCatalog?: InstitutionalRecognitionDTO[]
 ): PublicBusinessPresentation {
-  const rawPlanCode = row.effective_plan_code || 'bronze';
+  // Contratos antigos não possuem effective_access; nesse caso preservamos a
+  // compatibilidade. No contrato novo, acesso falso nunca recebe quotas por
+  // fallback do businesses.plan_tier.
+  const hasEffectiveAccess = row.effective_access !== false;
+  const rawPlanCode = hasEffectiveAccess ? (row.effective_plan_code || 'bronze') : 'bronze';
   const template = resolveBusinessProfileTemplate(rawPlanCode);
   
   const isLegacyOuroFounder = rawPlanCode === 'ouro_founder';
@@ -290,32 +294,32 @@ export function toPublicBusinessPresentation(
       ? row.profile_section_order
       : validSectionKeys;
 
-  const maxPhotos = typeof customEntitlements.gallery_photos_limit === 'number'
+  const maxPhotos = !hasEffectiveAccess ? 0 : typeof customEntitlements.gallery_photos_limit === 'number'
     ? customEntitlements.gallery_photos_limit
     : getCanonicalDefaultLimit(commercialPlan, 'gallery_photos_limit');
-  const maxServices = typeof customEntitlements.services_limit === 'number'
+  const maxServices = !hasEffectiveAccess ? 0 : typeof customEntitlements.services_limit === 'number'
     ? customEntitlements.services_limit
     : getCanonicalDefaultLimit(commercialPlan, 'services_limit');
-  const maxBenefits = typeof customEntitlements.benefits_limit === 'number'
+  const maxBenefits = !hasEffectiveAccess ? 0 : typeof customEntitlements.benefits_limit === 'number'
     ? customEntitlements.benefits_limit
     : getCanonicalDefaultLimit(commercialPlan, 'benefits_limit');
-  const maxEvents = typeof customEntitlements.events_limit === 'number'
+  const maxEvents = !hasEffectiveAccess ? 0 : typeof customEntitlements.events_limit === 'number'
     ? customEntitlements.events_limit
     : getCanonicalDefaultLimit(commercialPlan, 'events_limit');
-  const maxPosts = typeof customEntitlements.posts_limit === 'number'
+  const maxPosts = !hasEffectiveAccess ? 0 : typeof customEntitlements.posts_limit === 'number'
     ? customEntitlements.posts_limit
     : getCanonicalDefaultLimit(commercialPlan, 'posts_limit');
-  const maxVideos = typeof customEntitlements.business_video_limit === 'number'
+  const maxVideos = !hasEffectiveAccess ? 0 : typeof customEntitlements.business_video_limit === 'number'
     ? customEntitlements.business_video_limit
     : getCanonicalDefaultLimit(commercialPlan, 'business_video_limit');
 
   const canShowBenefits = maxBenefits > 0;
   const canShowEvents = maxEvents > 0;
   const canShowPosts = maxPosts > 0;
-  const canShowWebsite = typeof customEntitlements.can_show_website === 'boolean'
+  const canShowWebsite = !hasEffectiveAccess ? false : typeof customEntitlements.can_show_website === 'boolean'
     ? customEntitlements.can_show_website
     : (commercialPlan === 'prata' || commercialPlan === 'ouro');
-  const canShowSocialLinks = typeof customEntitlements.can_show_social === 'boolean'
+  const canShowSocialLinks = !hasEffectiveAccess ? false : typeof customEntitlements.can_show_social === 'boolean'
     ? customEntitlements.can_show_social
     : (commercialPlan === 'prata' || commercialPlan === 'ouro');
 
@@ -480,7 +484,7 @@ export function toPublicBusinessPresentation(
       logo: publicAsset(row.logo_url, `Logotipo de ${row.business_name}`),
     },
     authority: {
-      effectivePlan: plan(row.effective_plan_code),
+      effectivePlan: hasEffectiveAccess ? plan(row.effective_plan_code) : null,
       isVerified: verified,
       isFounder: founder,
       communityVerified,

@@ -1,14 +1,15 @@
 import Link from 'next/link';
 import { Gift, Heart, MessageSquareText, UserRound } from 'lucide-react';
 import { createServerSideClient } from '@/lib/supabase/server';
+import { getOwnProfileDTO } from '@/lib/member/profile-access-service';
 
 export const metadata = { title: { absolute: 'Minha Conta | Conexão Maçônica' } };
 
 export default async function MemberDashboardPage() {
   const supabase = await createServerSideClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const [{ data: profile }, favorites, benefits, reviews] = await Promise.all([
-    (supabase as any).from('profiles').select('name, city, state, phone, avatar_url').eq('id', user!.id).maybeSingle(),
+  const [profile, favorites, benefits, reviews] = await Promise.all([
+    getOwnProfileDTO(supabase, user!.id),
     (supabase as any).from('business_favorites').select('*', { count: 'exact', head: true }).eq('user_id', user!.id),
     (supabase as any).from('business_benefit_redemptions').select('*', { count: 'exact', head: true }).eq('user_id', user!.id),
     (supabase as any).from('business_reviews').select('*', { count: 'exact', head: true }).eq('author_id', user!.id).eq('status', 'pending'),
