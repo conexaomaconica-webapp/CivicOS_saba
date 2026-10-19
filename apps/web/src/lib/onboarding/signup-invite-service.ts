@@ -155,11 +155,11 @@ export async function createSignupInviteAction(input: {
           footnote: `Este link é pessoal, de uso único e vale até ${validity}.`,
           signature: {
             name: 'Conexão Maçônica',
-            tagline: 'Tradição que une! conexão que nos fortalece',
+            tagline: 'Tradição que une! conexão que fortalece!',
             phone: '75 981524838',
           },
         }),
-        text: `${greeting}\n\nA equipe da ${brandName} enviou este convite para você dar continuidade ao cadastro da sua empresa.\n\nPara iniciar o preenchimento, acesse o link seguro abaixo:\n${url}\n\nO link é pessoal, de uso único e vale até ${validity}. Neste momento, nenhuma informação será publicada antes da conferência da equipe.\n\nAtenciosamente,\n\nConexão Maçônica\n"Tradição que une! conexão que nos fortalece"\nTel: 75 981524838`,
+        text: `${greeting}\n\nA equipe da ${brandName} enviou este convite para você dar continuidade ao cadastro da sua empresa.\n\nPara iniciar o preenchimento, acesse o link seguro abaixo:\n${url}\n\nO link é pessoal, de uso único e vale até ${validity}. Neste momento, nenhuma informação será publicada antes da conferência da equipe.\n\nAtenciosamente,\n\nConexão Maçônica\n"Tradição que une! conexão que fortalece!"\nTel: 75 981524838`,
       });
       emailStatus = mail.sent ? 'sent' : mail.reason === 'not_configured' ? 'not_configured' : 'failed';
       if (mail.sent) {
