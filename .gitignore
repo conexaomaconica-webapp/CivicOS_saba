@@ -9,6 +9,8 @@ out/
 .env.*.local
 android/
 ios/
+.gradle/
+.gradle-home/
 .DS_Store
 Thumbs.db
 
