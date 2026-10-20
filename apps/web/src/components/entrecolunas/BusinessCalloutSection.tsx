@@ -2,8 +2,7 @@
 
 import React from 'react';
 import { ArrowRight, ShieldCheck, Gem } from 'lucide-react';
-import { BUSINESS_WHATSAPP_URL } from './constants';
-
+import { COMMERCIAL_PLANS_URL } from './constants';
 
 export function BusinessCalloutSection() {
   return (
@@ -52,7 +51,7 @@ export function BusinessCalloutSection() {
         {/* Button */}
         <div className="mb-6">
           <a
-            href={BUSINESS_WHATSAPP_URL}
+            href={COMMERCIAL_PLANS_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full font-semibold text-xs sm:text-sm text-[#4B161B] border-2 border-[#C9A227] hover:bg-[#F3EEDD]/60 transition-all duration-200 active:scale-95 shadow-2xs"

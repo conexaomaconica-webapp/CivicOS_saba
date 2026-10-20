@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CheckCircle2, ChevronRight, ChevronLeft, HelpCircle, Sparkles } from 'lucide-react';
+import { CheckCircle2, ChevronRight, ChevronLeft, HelpCircle, Sparkles, Loader2 } from 'lucide-react';
+import { submitEntreColunasSurveyAction } from '@/app/actions/entrecolunas-survey';
 
 interface SurveyData {
   vinculo: string;
@@ -17,6 +18,7 @@ export function QuickSurveySection() {
     categorias: [],
   });
   const [completed, setCompleted] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
   const vinculoOptions = [
     { id: 'irmao', label: 'Irmão' },
@@ -58,11 +60,22 @@ export function QuickSurveySection() {
     });
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 1 && !formData.vinculo) return;
     if (step === 2 && !formData.intencao) return;
     if (step === 3) {
-      setCompleted(true);
+      setSubmitting(true);
+      try {
+        const res = await submitEntreColunasSurveyAction(formData);
+        if (!res.success) {
+          console.warn('[QuickSurveySection] Erro ao gravar resposta:', res.error);
+        }
+      } catch (err) {
+        console.error('[QuickSurveySection] Falha ao enviar resposta:', err);
+      } finally {
+        setSubmitting(false);
+        setCompleted(true);
+      }
       return;
     }
     setStep((prev) => prev + 1);
@@ -256,11 +269,20 @@ export function QuickSurveySection() {
               <button
                 type="button"
                 onClick={handleNext}
-                disabled={(step === 1 && !formData.vinculo) || (step === 2 && !formData.intencao)}
+                disabled={(step === 1 && !formData.vinculo) || (step === 2 && !formData.intencao) || submitting}
                 className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-full text-xs sm:text-sm font-semibold text-white bg-[#4B161B] hover:bg-[#611D23] disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all cursor-pointer"
               >
-                <span>{step === 3 ? 'Finalizar Respostas' : 'Avançar'}</span>
-                <ChevronRight className="w-4 h-4" />
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-[#C9A227]" />
+                    <span>Enviando respostas...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{step === 3 ? 'Finalizar Respostas' : 'Avançar'}</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
             </div>
           </div>

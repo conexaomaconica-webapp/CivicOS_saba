@@ -20,10 +20,12 @@ export function CommunityCardsSection() {
         >
           Tendo empresa ou não, esta conexão é sua.
         </h2>
-        <div className="space-y-2 text-base sm:text-lg text-[#5A483E] max-w-2xl mx-auto font-light leading-relaxed">
-          <p>A Conexão Maçônica nasce para aproximar quem procura de quem oferece.</p>
+        <div className="space-y-3 text-base sm:text-lg text-[#5A483E] max-w-2xl mx-auto font-light leading-relaxed">
           <p>
-            Cada irmão que utiliza o guia, cada empresa que participa e cada nova relação construída contribuem para fortalecer essa iniciativa.
+            A Conexão Maçônica nasce para aproximar quem procura de quem oferece, valorizando os laços que nos unem.
+          </p>
+          <p>
+            Cada irmão que encontra o que precisa, cada empresa que apresenta seu trabalho e cada nova conexão fortalecem essa iniciativa, construída para todos nós.
           </p>
         </div>
       </div>

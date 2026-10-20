@@ -26,6 +26,9 @@ export const BUSINESS_WHATSAPP_URL = `https://wa.me/${CANONICAL_WHATSAPP_NUMBER}
 export const EVENT_CONFIRMATION_URL =
   'https://www.conexaomaconica.com.br/eventos/conexao-empresarial-2026';
 
+export const COMMERCIAL_PLANS_URL =
+  'https://www.conexaomaconica.com.br/#planos';
+
 export const EVENT_DATE_ISO = '2026-11-24T19:30:00-03:00';
 export const EVENT_TIME_LABEL = '19h30';
 export const EVENT_DAY_OF_WEEK = 'Terça-feira';
