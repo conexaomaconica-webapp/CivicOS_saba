@@ -148,7 +148,8 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
     savedTerms?.payment_method || 'avista'
   );
   const [installmentsCount, setInstallmentsCount] = useState<number>(
-    savedTerms?.installments_count || (savedTerms?.payment_method === 'parcelado' ? 2 : 1)
+    savedTerms?.installments_count ||
+      (savedTerms?.payment_method === 'parcelado' ? (isPedraFundamental ? 4 : 2) : 1)
   );
   const [amountCents, setAmountCents] = useState<number>(
     savedTerms?.amount_cents ||
@@ -1816,25 +1817,35 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
               <button
                 type="button"
                 onClick={() => handlePaymentMethodChange('avista')}
-                className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-bold transition ${paymentMethod === 'avista'
+                className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 rounded-xl border text-xs font-bold transition ${paymentMethod === 'avista'
                   ? 'border-[#3B0B14] bg-[#3B0B14]/5 text-[#3B0B14]'
                   : 'border-stone-200 text-stone-600 hover:bg-stone-50'
                   }`}
               >
-                <CreditCard className="h-4 w-4" />
-                À vista (PIX / Boleto / Cartão)
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 shrink-0" />
+                  <span>À vista (PIX / Cartão 1x)</span>
+                </div>
+                {isPedraFundamental && (
+                  <span className="text-[10px] font-semibold text-stone-500">R$ 1.200,00</span>
+                )}
               </button>
 
               <button
                 type="button"
                 onClick={() => handlePaymentMethodChange('parcelado')}
-                className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-bold transition ${paymentMethod === 'parcelado'
+                className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 rounded-xl border text-xs font-bold transition ${paymentMethod === 'parcelado'
                   ? 'border-[#3B0B14] bg-[#3B0B14]/5 text-[#3B0B14]'
                   : 'border-stone-200 text-stone-600 hover:bg-stone-50'
                   }`}
               >
-                <CreditCard className="h-4 w-4" />
-                Parcelado no Cartão
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 shrink-0" />
+                  <span>Parcelado no Cartão</span>
+                </div>
+                {isPedraFundamental && (
+                  <span className="text-[10px] font-semibold text-emerald-700">Até 4x de R$ 325,00</span>
+                )}
               </button>
             </div>
           </div>

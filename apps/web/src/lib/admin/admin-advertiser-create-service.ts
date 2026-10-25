@@ -218,6 +218,33 @@ export async function createAdminAdvertiserAction(
         },
         { onConflict: 'tenant_id,business_id,recognition_key' },
       ).throwOnError();
+
+      // Inicializa os termos comerciais congelados (R$ 1.200 à vista ou R$ 1.300 em até 4x de R$ 325)
+      const isParcelado = input.paymentCondition === 'parcelado_4x325';
+      const promoAmountCents = isParcelado ? 130000 : 120000;
+      const promoInstallmentsCount = isParcelado ? 4 : 1;
+      const promoInstallmentAmountCents = isParcelado ? 32500 : 120000;
+
+      await (adminClient as any).from('business_commercial_terms').upsert(
+        {
+          business_id: business.id,
+          tenant_id: tenantId,
+          plan_code: 'ouro',
+          plan_name: 'Plano Acácia (Pedra Fundamental)',
+          billing_cycle: 'biennial',
+          payment_method: isParcelado ? 'parcelado' : 'avista',
+          amount_cents: promoAmountCents,
+          installments_count: promoInstallmentsCount,
+          installment_amount_cents: promoInstallmentAmountCents,
+          is_pedra_fundamental: true,
+          notes: input.closingNotes?.trim() || null,
+          status: 'conferido',
+          conferred_at: new Date().toISOString(),
+          conferred_by: admin.id,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'business_id' }
+      ).throwOnError();
     }
 
     await (adminClient as any).from('admin_audit_logs').insert({

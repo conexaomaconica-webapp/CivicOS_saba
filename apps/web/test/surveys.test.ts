@@ -13,6 +13,7 @@ vi.mock('@/lib/supabase/server', () => {
       const mockSingleSurvey = vi.fn().mockResolvedValue({
         data: {
           id: 'survey-123',
+          tenant_id: 'a0000000-0000-0000-0000-000000000001',
           title: 'Conexão Maçônica • Perfil & Negócios',
           slug: 'perfil-e-negocios',
           description: 'Pesquisa institucional',
@@ -23,6 +24,24 @@ vi.mock('@/lib/supabase/server', () => {
       });
 
       const mockFrom = vi.fn().mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: {
+                    id: '00000000-0000-0000-0000-000000000099',
+                    role: 'master',
+                    status: 'active',
+                    tenant_id: 'a0000000-0000-0000-0000-000000000001',
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+
         if (table === 'surveys') {
           return {
             select: vi.fn().mockReturnValue({
@@ -30,6 +49,7 @@ vi.mock('@/lib/supabase/server', () => {
                 data: [
                   {
                     id: 'survey-123',
+                    tenant_id: 'a0000000-0000-0000-0000-000000000001',
                     title: 'Conexão Maçônica • Perfil & Negócios',
                     slug: 'perfil-e-negocios',
                     status: 'published',
@@ -40,12 +60,17 @@ vi.mock('@/lib/supabase/server', () => {
               }),
               eq: vi.fn().mockReturnValue({
                 single: mockSingleSurvey,
+                maybeSingle: mockSingleSurvey,
                 eq: vi.fn().mockReturnValue({
                   single: mockSingleSurvey,
+                  maybeSingle: mockSingleSurvey,
                 }),
               }),
             }),
             update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ error: null }),
+            }),
+            delete: vi.fn().mockReturnValue({
               eq: vi.fn().mockResolvedValue({ error: null }),
             }),
           };
@@ -85,6 +110,16 @@ vi.mock('@/lib/supabase/server', () => {
                 order: vi.fn().mockResolvedValue({ data: questionsData, error: null }),
                 eq: vi.fn().mockReturnValue({
                   order: vi.fn().mockResolvedValue({ data: questionsData, error: null }),
+                }),
+              }),
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: {
+                    id: 'q1',
+                    block_id: 'b1',
+                    survey_blocks: { survey_id: 'survey-123' },
+                  },
+                  error: null,
                 }),
               }),
             }),
@@ -176,7 +211,15 @@ vi.mock('@/lib/supabase/server', () => {
         };
       });
 
-      return { from: mockFrom };
+      return {
+        from: mockFrom,
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: '00000000-0000-0000-0000-000000000099' } },
+            error: null,
+          }),
+        },
+      };
     }),
   };
 });

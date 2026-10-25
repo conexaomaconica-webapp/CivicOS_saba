@@ -5,6 +5,7 @@ import {
 } from '@/lib/commercial-onboarding-status';
 import { anonymizeIpForAudit } from '@/lib/contracts/contract-constants';
 import { buildOnboardingPaymentReference } from '@/lib/payment/payment-idempotency';
+import { getCheckoutMaxInstallments, getCheckoutCalculatedAmount } from '@/lib/payment/payment-rules-types';
 
 describe('Microetapa 6.1 — Criação Segura de Cobrança Asaas e Hardenings', () => {
   describe('Hardening 1: Anonimização de IP para LGPD', () => {
@@ -197,27 +198,155 @@ describe('Microetapa 6.1 — Criação Segura de Cobrança Asaas e Hardenings', 
       expect(pixChargeResult.status).toBe('aguardando_pagamento');
     });
 
-    it('critério 6: Cartão de crédito restringe parcelamento estritamente ao congelado em business_commercial_terms', () => {
-      const termsMaxInstallments = 4; // Contratado em 4x
+    it('critério 6: Cartão de crédito restringe parcelamento ao teto comercial do plano e permite até 4x para Acácia com Pedra Fundamental', () => {
+      // 1. Plano Acácia com Pedra Fundamental contratado à vista (1x) permite parcelar em até 4x no cartão
+      const pedraMax = getCheckoutMaxInstallments({
+        installmentsCount: 1,
+        planCode: 'ouro',
+        planName: 'Plano Acácia (Pedra Fundamental)',
+        isPedraFundamental: true,
+      });
+      expect(pedraMax).toBe(4);
 
-      // Gerador de opções de parcelas da interface
+      // 2. Plano Acácia normal permite até 4x
+      const acaciaMax = getCheckoutMaxInstallments({
+        installmentsCount: 1,
+        planCode: 'ouro',
+        planName: 'Plano Acácia',
+        isPedraFundamental: false,
+      });
+      expect(acaciaMax).toBe(4);
+
+      // 3. Plano Compasso permite até 3x
+      const compassoMax = getCheckoutMaxInstallments({
+        installmentsCount: 1,
+        planCode: 'prata',
+        planName: 'Plano Compasso',
+        isPedraFundamental: false,
+      });
+      expect(compassoMax).toBe(3);
+
+      // 4. Plano Esquadro permite até 2x
+      const esquadroMax = getCheckoutMaxInstallments({
+        installmentsCount: 1,
+        planCode: 'bronze',
+        planName: 'Plano Esquadro',
+        isPedraFundamental: false,
+      });
+      expect(esquadroMax).toBe(2);
+
+      // 5. Opções geradas para o seletor do cartão no Plano Acácia c/ Pedra Fundamental
       const availableInstallmentOptions = Array.from(
-        { length: termsMaxInstallments },
+        { length: pedraMax },
         (_, i) => i + 1
       );
-
       expect(availableInstallmentOptions).toEqual([1, 2, 3, 4]);
       expect(availableInstallmentOptions).not.toContain(5);
       expect(availableInstallmentOptions).not.toContain(12);
 
-      // Backend enforce: mesmo se o cliente forçar envio de 12x via API
+      // 6. Backend enforce: cliente solicitando 12x tem parcelamento limitado ao teto de 4x
       const clientRequestedInstallments = 12;
       const finalInstallments = Math.min(
         Math.max(1, clientRequestedInstallments),
-        termsMaxInstallments
+        pedraMax
       );
-
       expect(finalInstallments).toBe(4);
+
+      // 7. Cliente solicitando 3x dentro do teto de 4x tem suas 3 parcelas respeitadas
+      const clientRequested3 = 3;
+      const finalInstallments3 = Math.min(
+        Math.max(1, clientRequested3),
+        pedraMax
+      );
+      expect(finalInstallments3).toBe(3);
+    });
+
+    it('critério 6.1: Plano Acácia com Pedra Fundamental pode parcelar até 4x ficando R$ 1.300,00 ou R$ 1.200,00 à vista', () => {
+      // 1. Pagamento via PIX: R$ 1.200,00 (desconto à vista)
+      const pixPricing = getCheckoutCalculatedAmount({
+        amountCents: 120000,
+        paymentMethod: 'pix',
+        installmentsCount: 1,
+        isPedraFundamental: true,
+        planCode: 'ouro',
+        planName: 'Plano Acácia (Pedra Fundamental)',
+      });
+      expect(pixPricing.finalAmountCents).toBe(120000);
+      expect(pixPricing.installmentValueCents).toBe(120000);
+      expect(pixPricing.isDiscountedAvista).toBe(true);
+
+      // 2. Pagamento via Cartão de Crédito 1x (à vista): R$ 1.200,00
+      const card1xPricing = getCheckoutCalculatedAmount({
+        amountCents: 120000,
+        paymentMethod: 'credit_card',
+        installmentsCount: 1,
+        isPedraFundamental: true,
+        planCode: 'ouro',
+        planName: 'Plano Acácia (Pedra Fundamental)',
+      });
+      expect(card1xPricing.finalAmountCents).toBe(120000);
+      expect(card1xPricing.installmentValueCents).toBe(120000);
+      expect(card1xPricing.isDiscountedAvista).toBe(true);
+
+      // 3. Pagamento via Cartão de Crédito 4x: total R$ 1.300,00 (4x de R$ 325,00)
+      const card4xPricing = getCheckoutCalculatedAmount({
+        amountCents: 120000,
+        paymentMethod: 'credit_card',
+        installmentsCount: 4,
+        isPedraFundamental: true,
+        planCode: 'ouro',
+        planName: 'Plano Acácia (Pedra Fundamental)',
+      });
+      expect(card4xPricing.finalAmountCents).toBe(130000);
+      expect(card4xPricing.installmentValueCents).toBe(32500); // 4x de R$ 325,00
+      expect(card4xPricing.isDiscountedAvista).toBe(false);
+
+      // 4. Pagamento via Cartão de Crédito 2x: total R$ 1.300,00 (2x de R$ 650,00)
+      const card2xPricing = getCheckoutCalculatedAmount({
+        amountCents: 120000,
+        paymentMethod: 'credit_card',
+        installmentsCount: 2,
+        isPedraFundamental: true,
+        planCode: 'ouro',
+        planName: 'Plano Acácia (Pedra Fundamental)',
+      });
+      expect(card2xPricing.finalAmountCents).toBe(130000);
+      expect(card2xPricing.installmentValueCents).toBe(65000); // 2x de R$ 650,00
+
+      // 5. Pagamento via Cartão de Crédito 3x: total R$ 1.300,00 (3x de R$ 433,33)
+      const card3xPricing = getCheckoutCalculatedAmount({
+        amountCents: 120000,
+        paymentMethod: 'credit_card',
+        installmentsCount: 3,
+        isPedraFundamental: true,
+        planCode: 'ouro',
+        planName: 'Plano Acácia (Pedra Fundamental)',
+      });
+      expect(card3xPricing.finalAmountCents).toBe(130000);
+      expect(card3xPricing.installmentValueCents).toBe(43333);
+
+      // 6. Mesmo se o contrato no banco tiver sido salvo como 130000 (parcelado), ao pagar PIX aplica R$ 1.200,00
+      const pixFromParceladoDb = getCheckoutCalculatedAmount({
+        amountCents: 130000,
+        paymentMethod: 'pix',
+        installmentsCount: 1,
+        isPedraFundamental: true,
+        planCode: 'ouro',
+        planName: 'Plano Acácia (Pedra Fundamental)',
+      });
+      expect(pixFromParceladoDb.finalAmountCents).toBe(120000);
+
+      // 7. Planos regulares (ex: Compasso 3x) respeitam seus presets
+      const compasso3x = getCheckoutCalculatedAmount({
+        amountCents: 78000,
+        paymentMethod: 'credit_card',
+        installmentsCount: 3,
+        isPedraFundamental: false,
+        planCode: 'prata',
+        planName: 'Plano Compasso',
+      });
+      expect(compasso3x.finalAmountCents).toBe(85500);
+      expect(compasso3x.installmentValueCents).toBe(28500); // 3x de R$ 285,00
     });
 
     it('critério 7: Idempotência visual no refresh (não duplica cobrança no gateway)', () => {

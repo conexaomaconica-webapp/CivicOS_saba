@@ -24,6 +24,7 @@ import {
 } from '@/lib/contracts/admin-contracts-service';
 import { createCommercialOnboardingChargeAction } from '@/lib/payment/commercial-onboarding-charge-service';
 import { checkCommercialPaymentStatusAction } from '@/lib/payment/commercial-onboarding-webhook-service';
+import { getCheckoutMaxInstallments, getCheckoutCalculatedAmount } from '@/lib/payment/payment-rules-types';
 import { formatCpfCnpj, validateCpf } from '@/lib/onboarding/onboarding-validation';
 
 interface ContractSignatureClientProps {
@@ -53,6 +54,8 @@ export function ContractSignatureClient({
           billing_cycle: contractData.billing_cycle || 'Anual (12 meses)',
           payment_method: contractData.payment_method || 'À vista',
           installments_count: contractData.installments_count || 1,
+          plan_code: contractData.plan_code || 'ouro',
+          is_pedra_fundamental: contractData.is_pedra_fundamental || false,
           payment_token: contractData.payment_token,
         }
       : null
@@ -85,7 +88,12 @@ export function ContractSignatureClient({
   const [copiedPixFeedback, setCopiedPixFeedback] = useState(false);
 
   // Formulário do Cartão de Crédito
-  const maxAllowedInstallments = contractData.installments_count || 1;
+  const maxAllowedInstallments = getCheckoutMaxInstallments({
+    installmentsCount: signedState?.installments_count || contractData.installments_count,
+    planCode: signedState?.plan_code || contractData.plan_code,
+    planName: signedState?.plan_name || contractData.plan_name,
+    isPedraFundamental: signedState?.is_pedra_fundamental ?? contractData.is_pedra_fundamental,
+  });
   const [cardHolderName, setCardHolderName] = useState(contractData.responsavel_nome || '');
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiryMonth, setCardExpiryMonth] = useState('12');
@@ -94,7 +102,13 @@ export function ContractSignatureClient({
   const [cardPostalCode, setCardPostalCode] = useState('');
   const [cardAddressNumber, setCardAddressNumber] = useState('');
   const [cardAddressComplement, setCardAddressComplement] = useState('');
-  const [selectedInstallments, setSelectedInstallments] = useState(maxAllowedInstallments);
+  const [selectedInstallments, setSelectedInstallments] = useState(
+    contractData.payment_method === 'Parcelado' || (contractData.installments_count && contractData.installments_count > 1)
+      ? Math.min(contractData.installments_count || maxAllowedInstallments, maxAllowedInstallments)
+      : maxAllowedInstallments > 1
+        ? maxAllowedInstallments
+        : 1
+  );
   const [cardSuccessMsg, setCardSuccessMsg] = useState<string | null>(null);
   const cardFeedbackRef = useRef<HTMLDivElement | null>(null);
   // Contador de espera da confirmação (webhook Asaas) após cartão enviado
@@ -391,7 +405,31 @@ export function ContractSignatureClient({
       : '';
 
     const totalCents = signedState.amount_cents || contractData.amount_cents || 0;
-    const installmentsCount = contractData.installments_count || 1;
+    const isPedra = Boolean(contractData.is_pedra_fundamental || signedState.is_pedra_fundamental);
+    const planCode = signedState.plan_code || contractData.plan_code;
+    const planName = signedState.plan_name || contractData.plan_name;
+
+    const pixPricing = getCheckoutCalculatedAmount({
+      amountCents: totalCents,
+      paymentMethod: 'pix',
+      installmentsCount: 1,
+      isPedraFundamental: isPedra,
+      planCode,
+      planName,
+    });
+    const pixFormattedAmount = (pixPricing.finalAmountCents / 100).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    });
+
+    const currentCardPricing = getCheckoutCalculatedAmount({
+      amountCents: totalCents,
+      paymentMethod: 'credit_card',
+      installmentsCount: selectedInstallments,
+      isPedraFundamental: isPedra,
+      planCode,
+      planName,
+    });
 
     return (
       <section className="rounded-2xl border-2 border-emerald-500 bg-white p-6 sm:p-10 shadow-lg space-y-8 animate-in fade-in zoom-in-95">
@@ -608,7 +646,9 @@ export function ContractSignatureClient({
                 <div>
                   <strong className="text-sm font-bold text-stone-900 block">Cartão de Crédito</strong>
                   <span className="text-[11px] text-stone-500">
-                    Parcelamento em até {installmentsCount}x sem juros
+                    {maxAllowedInstallments > 1
+                      ? `Parcelamento em até ${maxAllowedInstallments}x sem juros`
+                      : 'Pagamento à vista'}
                   </span>
                 </div>
               </div>
@@ -625,7 +665,7 @@ export function ContractSignatureClient({
                   </div>
                   <div className="space-y-1">
                     <h4 className="font-serif font-bold text-base text-stone-900">
-                      Pague via Pix no valor de {signedState.formatted_amount}
+                      Pague via Pix no valor de {pixFormattedAmount}
                     </h4>
                     <p className="text-xs text-stone-500 max-w-md mx-auto">
                       Clique no botão abaixo para gerar o QR Code oficial e o código Copia e Cola.
@@ -637,7 +677,7 @@ export function ContractSignatureClient({
                     className="inline-flex items-center gap-2 rounded-xl bg-[#3B0B14] hover:bg-[#2A080E] text-white px-6 py-3 text-xs font-bold transition shadow-xs cursor-pointer"
                   >
                     <Sparkles className="h-4 w-4" />
-                    <span>Gerar Código Pix</span>
+                    <span>Gerar Código Pix ({pixFormattedAmount})</span>
                   </button>
                 </div>
               )}
@@ -660,7 +700,7 @@ export function ContractSignatureClient({
                       <span>Status da Cobrança: Aguardando pagamento</span>
                     </div>
                     <span className="font-mono text-xs font-semibold">
-                      {signedState.formatted_amount}
+                      {activeCharge?.formatted_amount || pixFormattedAmount}
                     </span>
                   </div>
 
@@ -882,10 +922,10 @@ export function ContractSignatureClient({
                   </div>
                 </div>
 
-                {/* Seletor Estrito de Parcelas (Máximo congelado em business_commercial_terms) */}
+                {/* Seletor Estrito de Parcelas */}
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block">
-                    Opções de Parcelamento Permitidas
+                    Opções de Parcelamento
                   </label>
                   <select
                     value={selectedInstallments}
@@ -894,20 +934,46 @@ export function ContractSignatureClient({
                   >
                     {Array.from({ length: maxAllowedInstallments }, (_, i) => {
                       const count = i + 1;
-                      const instValue = (totalCents / 100 / count).toLocaleString('pt-BR', {
+                      const optionPricing = getCheckoutCalculatedAmount({
+                        amountCents: totalCents,
+                        paymentMethod: 'credit_card',
+                        installmentsCount: count,
+                        isPedraFundamental: isPedra,
+                        planCode,
+                        planName,
+                      });
+                      const instFormatted = (optionPricing.installmentValueCents / 100).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      });
+                      const totalFormatted = (optionPricing.finalAmountCents / 100).toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
                       });
                       return (
                         <option key={count} value={count}>
-                          {count === 1 ? `1x de ${instValue} (À vista)` : `${count}x de ${instValue} sem juros`}
+                          {count === 1
+                            ? `1x de ${instFormatted} (À vista: ${totalFormatted})`
+                            : `${count}x de ${instFormatted} sem juros (Total: ${totalFormatted})`}
                         </option>
                       );
                     })}
                   </select>
-                  <p className="text-[11px] text-stone-400">
-                    Condição negociada e congelada no contrato (máximo de {maxAllowedInstallments}x).
+                  <p className="text-[11px] text-stone-500">
+                    {isPedra
+                      ? `Promoção de Lançamento Pedra Fundamental: R$ 1.200,00 à vista ou em até 4x de R$ 325,00 sem juros (R$ 1.300,00 total).`
+                      : `Condição permitida para o plano (máximo de ${maxAllowedInstallments}x sem juros).`}
                   </p>
+                  {selectedInstallments > 1 && (
+                    <div className="rounded-xl bg-amber-50/80 p-3 border border-amber-200 text-xs text-amber-900 flex items-center justify-between">
+                      <span className="font-semibold">
+                        Total no Cartão: {(currentCardPricing.finalAmountCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </span>
+                      <span className="font-medium text-amber-800">
+                        {selectedInstallments}x de {(currentCardPricing.installmentValueCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} sem juros
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -962,7 +1028,11 @@ export function ContractSignatureClient({
                   ) : (
                     <>
                       <CreditCard className="h-4 w-4" />
-                      <span>Confirmar Pagamento no Cartão</span>
+                      <span>
+                        {selectedInstallments === 1
+                          ? `Pagar ${(currentCardPricing.finalAmountCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} à Vista`
+                          : `Pagar ${selectedInstallments}x de ${(currentCardPricing.installmentValueCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} (Total ${(currentCardPricing.finalAmountCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})`}
+                      </span>
                     </>
                   )}
                 </button>

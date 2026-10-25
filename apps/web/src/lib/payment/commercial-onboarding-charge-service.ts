@@ -8,6 +8,7 @@ import { getAsaasDynamicConfig } from './asaas-config-service';
 import type { CreditCardPayload } from './payment-provider.interface';
 import { buildOnboardingPaymentReference } from './payment-idempotency';
 import { buildManualPixCharge, getManualPixConfig, isAccountNotApprovedError } from './manual-pix';
+import { getCheckoutMaxInstallments, getCheckoutCalculatedAmount } from './payment-rules-types';
 import { MIN_PUBLIC_LINK_TOKEN_LENGTH } from '@/lib/security/public-link-token';
 import {
   COMMERCIAL_STATUS,
@@ -211,11 +212,6 @@ export async function createCommercialOnboardingChargeAction(
       };
     }
 
-    const amountCents = terms.amount_cents;
-    const formattedAmount = (amountCents / 100).toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    });
 
     // 5. Dados do pagador / responsável
     const { data: resp } = await (dbClient as any)
@@ -274,12 +270,34 @@ export async function createCommercialOnboardingChargeAction(
       planCode: terms.plan_code,
     });
 
-    // Validação rígida do parcelamento: nunca excede o limite congelado em business_commercial_terms
-    const maxAllowedInstallments = terms.installments_count || 1;
+    // Validação rígida do parcelamento: respeita o teto do plano comercial ou da condição de lançamento (Acácia c/ Pedra Fundamental até 4x)
+    const maxAllowedInstallments = getCheckoutMaxInstallments({
+      installmentsCount: terms.installments_count,
+      planCode: terms.plan_code,
+      planName: terms.plan_name,
+      isPedraFundamental: Boolean(terms.is_pedra_fundamental),
+    });
     const requestedInstallments = payload.credit_card?.installments || 1;
     const finalInstallments = payload.payment_method === 'credit_card'
       ? Math.min(Math.max(1, requestedInstallments), maxAllowedInstallments)
       : 1;
+
+    // Regra canônica de valores:
+    // - Pedra Fundamental: à vista (PIX ou 1x no Cartão) = R$ 1.200,00; parcelado no cartão (em até 4x) = R$ 1.300,00 (4x de R$ 325,00)
+    // - Planos comerciais: respeitam descontos à vista e valor parcelado correspondente
+    const calculatedPricing = getCheckoutCalculatedAmount({
+      amountCents: terms.amount_cents,
+      paymentMethod: payload.payment_method,
+      installmentsCount: finalInstallments,
+      isPedraFundamental: Boolean(terms.is_pedra_fundamental),
+      planCode: terms.plan_code,
+      planName: terms.plan_name,
+    });
+    const amountCents = calculatedPricing.finalAmountCents;
+    const formattedAmount = (amountCents / 100).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    });
 
     let invoiceId: string;
     let { data: existingInv } = await (dbClient as any)
@@ -305,6 +323,20 @@ export async function createCommercialOnboardingChargeAction(
 
     if (existingInv) {
       invoiceId = existingInv.id;
+      // Atualiza fatura em aberto caso o cliente alterne entre à vista (ex: R$ 1.200) e parcelado (ex: R$ 1.300 em 4x)
+      if (existingInv.status === 'open') {
+        try {
+          await (dbClient as any)
+            .from('invoices')
+            .update({
+              amount_due: amountCents / 100,
+              installments: finalInstallments,
+              payment_method: payload.payment_method,
+            })
+            .eq('id', existingInv.id)
+            .throwOnError();
+        } catch (_updErr) {}
+      }
     } else {
       const { data: newInv, error: invErr } = await (dbClient as any)
         .from('invoices')
@@ -563,7 +595,7 @@ export async function createCommercialOnboardingChargeAction(
         formatted_amount: formattedAmount,
         billing_cycle: terms.billing_cycle === 'biennial' ? 'Bienal (24 meses)' : 'Anual (12 meses)',
         payment_method: payload.payment_method,
-        installments_count: terms.installments_count || 1,
+        installments_count: finalInstallments,
         invoice_id: invoiceId,
         payment_id: paymentId,
         status: chargeStatus,

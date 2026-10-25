@@ -1146,6 +1146,7 @@ export interface PublicContractDetailsResult {
     sha256_hash: string;
     created_at: string;
     expires_at: string;
+    plan_code?: string;
     plan_name?: string;
     amount_cents?: number;
     formatted_amount?: string;
@@ -1195,12 +1196,14 @@ export interface SignPublicContractResult {
     accepted_at: string;
     signer_cpf: string;
     business_name: string;
+    plan_code?: string;
     plan_name: string;
     amount_cents: number;
     formatted_amount: string;
     billing_cycle: string;
     payment_method: string;
     installments_count: number;
+    is_pedra_fundamental?: boolean;
     payment_token?: string;
   };
 }
@@ -1917,7 +1920,7 @@ export async function getPublicContractByTokenAction(
     // 5. Busca dados dos termos comerciais conferidos
     const { data: terms } = await (dbClient as any)
       .from('business_commercial_terms')
-      .select('plan_name, amount_cents, billing_cycle, payment_method, installments_count, installment_amount_cents, is_pedra_fundamental, responsible_cpf, invoice_required, invoice_issued_at, invoice_number')
+      .select('plan_code, plan_name, amount_cents, billing_cycle, payment_method, installments_count, installment_amount_cents, is_pedra_fundamental, responsible_cpf, invoice_required, invoice_issued_at, invoice_number')
       .eq('business_id', biz.id)
       .maybeSingle();
 
@@ -2056,13 +2059,14 @@ export async function getPublicContractByTokenAction(
         sha256_hash: snap.sha256_hash,
         created_at: snap.created_at,
         expires_at: tokenRow.expires_at,
+        plan_code: terms?.plan_code || 'ouro',
         plan_name: planName,
         amount_cents: amountCents,
         formatted_amount: formattedAmount,
         billing_cycle: terms?.billing_cycle === 'biennial' ? 'Bienal (24 meses)' : 'Anual (12 meses)',
         payment_method: terms?.payment_method === 'parcelado' ? 'Parcelado' : 'À vista',
         installments_count: terms?.installments_count || 1,
-        is_pedra_fundamental: terms?.is_pedra_fundamental || false,
+        is_pedra_fundamental: Boolean(terms?.is_pedra_fundamental),
         signature_image_data: snap.signature_image_data || undefined,
         signer_cpf: snap.signer_cpf || undefined,
         accepted_at: isSigned ? contract.updated_at : undefined,
@@ -2469,7 +2473,7 @@ export async function signPublicContractAction(
     // 12. Busca dados comerciais para resumo pós-assinatura
     const { data: terms } = await (dbClient as any)
       .from('business_commercial_terms')
-      .select('plan_name, amount_cents, billing_cycle, payment_method, installments_count')
+      .select('plan_code, plan_name, amount_cents, billing_cycle, payment_method, installments_count, is_pedra_fundamental')
       .eq('business_id', biz.id)
       .maybeSingle();
 
@@ -2516,12 +2520,14 @@ export async function signPublicContractAction(
         accepted_at: acceptedAt,
         signer_cpf: cleanCpf,
         business_name: biz.name,
+        plan_code: terms?.plan_code || 'ouro',
         plan_name: planName,
         amount_cents: amountCents,
         formatted_amount: formattedAmount,
         billing_cycle: terms?.billing_cycle === 'biennial' ? 'Bienal (24 meses)' : 'Anual (12 meses)',
         payment_method: terms?.payment_method === 'parcelado' ? 'Parcelado' : 'À vista',
         installments_count: terms?.installments_count || 1,
+        is_pedra_fundamental: Boolean(terms?.is_pedra_fundamental),
         payment_token: rawPaymentToken,
       },
     };

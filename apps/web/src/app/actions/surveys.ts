@@ -4,10 +4,14 @@ import { createServerSideClient } from '@/lib/supabase/server';
 import { getQuestionChoices } from '@/lib/surveys/conditional';
 import { resolveRequestOperationalTenantId } from '@/lib/tenant/tenant-policy';
 import { dispatchNotification as dispatchNotificationAction } from '@/lib/notifications/notification-core';
+import {
+  assertSurveyAdminAccess,
+  assertSurveyResourceAccess,
+  formatSurveyActionError,
+} from '@/lib/surveys/survey-auth';
 
 // Destinatário dos avisos de nova resposta de pesquisa (equipe administrativa da Conexão).
 const SURVEY_ADMIN_NOTIFICATION_EMAIL = 'conexaomaconica@gmail.com';
-import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import type {
   Survey,
@@ -18,41 +22,24 @@ import type {
 } from '@/types/surveys';
 
 /**
- * Retorna o cliente com acesso administrativo para gerenciar pesquisas com segurança RLS
- */
-async function getSurveysAdminClient() {
-  const supabase = await createServerSideClient();
-  let user: any = null;
-  try {
-    const authRes = await supabase?.auth?.getUser?.();
-    user = authRes?.data?.user || null;
-  } catch {
-    user = null;
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (supabaseUrl && serviceRoleKey && !process.env.VITEST) {
-    const admin = createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-    return { client: admin, user: user || { id: 'admin-service-role' } };
-  }
-
-  return { client: supabase, user: user || { id: '00000000-0000-0000-0000-000000000001' } };
-}
-
-/**
- * Busca todas as pesquisas cadastradas para o painel administrativo.
+ * Busca pesquisas cadastradas para o painel administrativo.
+ * Aplica estritamente autorização administrativa e isolamento de tenant.
  */
 export async function getAdminSurveysListAction() {
   try {
-    const { client: supabase } = await getSurveysAdminClient();
-    const { data, error } = await (supabase as any)
+    const actor = await assertSurveyAdminAccess();
+    const { supabase, isGlobalAdmin, tenantId } = actor;
+
+    let query = (supabase as any)
       .from('surveys')
       .select('*, survey_responses(count)')
       .order('created_at', { ascending: false });
+
+    if (!isGlobalAdmin) {
+      query = query.eq('tenant_id', tenantId);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     const surveys = ((data as any[]) || []).map(({ survey_responses, ...survey }) => ({
@@ -61,7 +48,7 @@ export async function getAdminSurveysListAction() {
     })) as Survey[];
     return { success: true, data: surveys };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Erro ao carregar lista de pesquisas.' };
+    return { success: false, error: formatSurveyActionError(err, 'Erro ao carregar lista de pesquisas.') };
   }
 }
 
@@ -70,16 +57,8 @@ export async function getAdminSurveysListAction() {
  */
 export async function getAdminSurveyDetailAction(surveyId: string) {
   try {
-    const supabase = await createServerSideClient();
-
-    // 1. Pesquisa
-    const { data: survey, error: sErr } = await (supabase as any)
-      .from('surveys')
-      .select('*')
-      .eq('id', surveyId)
-      .single();
-
-    if (sErr || !survey) throw new Error('Pesquisa não encontrada.');
+    const { actor, survey } = await assertSurveyResourceAccess(surveyId);
+    const { supabase } = actor;
 
     // 2. Blocos
     const { data: blocks, error: bErr } = await (supabase as any)
@@ -134,12 +113,12 @@ export async function getAdminSurveyDetailAction(surveyId: string) {
     return {
       success: true,
       data: {
-        ...(survey as Survey),
+        ...(survey as unknown as Survey),
         blocks: fullBlocks,
       },
     };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Erro ao carregar detalhes da pesquisa.' };
+    return { success: false, error: formatSurveyActionError(err, 'Erro ao carregar detalhes da pesquisa.') };
   }
 }
 
@@ -224,9 +203,9 @@ export async function validateQuestionDependencyAction(surveyId: string, questio
     const detailRes = await getAdminSurveyDetailAction(surveyId);
     if (!detailRes.success || !detailRes.data) throw new Error(detailRes.error);
 
-    const allQuestions = (detailRes.data.blocks || []).flatMap((b) => b.questions || []);
+    const allQuestions = (detailRes.data.blocks || []).flatMap((b: SurveyBlock) => b.questions || []);
 
-    const dependentQuestions = allQuestions.filter((q) => {
+    const dependentQuestions = allQuestions.filter((q: SurveyQuestion) => {
       if (!q.is_active || q.id === questionIdToDeactivate) return false;
       const rules = q.conditional_rules as any;
       return rules?.depends_on_question_id === questionIdToDeactivate;
@@ -235,7 +214,7 @@ export async function validateQuestionDependencyAction(surveyId: string, questio
     if (dependentQuestions.length > 0) {
       return {
         hasDependencies: true,
-        dependentQuestions: dependentQuestions.map((q) => q.question_text),
+        dependentQuestions: dependentQuestions.map((q: SurveyQuestion) => q.question_text),
         warningMessage: `Atenção: A pergunta "${dependentQuestions[0]?.question_text || ''}" possui regra condicional baseada nesta pergunta. Desativá-la poderá afetar o fluxo do questionário.`,
       };
     }
@@ -251,7 +230,8 @@ export async function validateQuestionDependencyAction(surveyId: string, questio
  */
 export async function toggleQuestionActiveAction(surveyId: string, questionId: string, isActive: boolean) {
   try {
-    const { client: supabase } = await getSurveysAdminClient();
+    const { actor } = await assertSurveyResourceAccess(surveyId);
+    const { supabase } = actor;
 
     if (!isActive) {
       const depCheck = await validateQuestionDependencyAction(surveyId, questionId);
@@ -264,6 +244,17 @@ export async function toggleQuestionActiveAction(surveyId: string, questionId: s
       }
     }
 
+    // Valida que a pergunta pertence à pesquisa autorizada
+    const { data: qBlock, error: qErr } = await (supabase as any)
+      .from('survey_questions')
+      .select('id, block_id, survey_blocks!inner(survey_id)')
+      .eq('id', questionId)
+      .maybeSingle();
+
+    if (qErr || !qBlock || qBlock.survey_blocks?.survey_id !== surveyId) {
+      throw new Error('A pergunta não pertence a esta pesquisa.');
+    }
+
     const { error } = await (supabase as any)
       .from('survey_questions')
       .update({ is_active: isActive, updated_at: new Date().toISOString() })
@@ -274,7 +265,7 @@ export async function toggleQuestionActiveAction(surveyId: string, questionId: s
     revalidatePath(`/admin/pesquisas/${surveyId}/editor`);
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Erro ao alterar status da pergunta.' };
+    return { success: false, error: formatSurveyActionError(err, 'Erro ao alterar status da pergunta.') };
   }
 }
 
@@ -283,23 +274,24 @@ export async function toggleQuestionActiveAction(surveyId: string, questionId: s
  */
 export async function publishSurveyVersionAction(surveyId: string) {
   try {
-    const { client: supabase } = await getSurveysAdminClient();
+    const { actor, survey } = await assertSurveyResourceAccess(surveyId);
+    const { supabase } = actor;
 
     const detailRes = await getAdminSurveyDetailAction(surveyId);
     if (!detailRes.success || !detailRes.data) throw new Error(detailRes.error);
 
-    const survey = detailRes.data;
-    const nextVersion = (survey.current_version || 1) + 1;
+    const fullSurvey = detailRes.data;
+    const nextVersion = (fullSurvey.current_version || 1) + 1;
 
     const schemaSnapshot = {
       version: nextVersion,
       published_at: new Date().toISOString(),
-      survey_title: survey.title,
-      logo_url: survey.logo_url,
-      show_logo: survey.show_logo,
-      header_color: survey.header_color,
-      banner_url: survey.banner_url,
-      blocks: survey.blocks,
+      survey_title: fullSurvey.title,
+      logo_url: fullSurvey.logo_url,
+      show_logo: fullSurvey.show_logo,
+      header_color: fullSurvey.header_color,
+      banner_url: fullSurvey.banner_url,
+      blocks: fullSurvey.blocks,
     };
 
     const { error: vErr } = await (supabase as any).from('survey_versions').insert({
@@ -327,7 +319,7 @@ export async function publishSurveyVersionAction(surveyId: string) {
     revalidatePath(`/pesquisas/${survey.slug}`);
     return { success: true, versionNumber: nextVersion };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Erro ao publicar nova versão.' };
+    return { success: false, error: formatSurveyActionError(err, 'Erro ao publicar nova versão.') };
   }
 }
 
@@ -407,9 +399,21 @@ export async function saveSurveyBlockAction(
   blockData: { id?: string; title: string; description?: string; order_index?: number; is_active?: boolean }
 ) {
   try {
-    const { client: supabase } = await getSurveysAdminClient();
+    const { actor } = await assertSurveyResourceAccess(surveyId);
+    const { supabase } = actor;
 
     if (blockData.id) {
+      const { data: existingBlock, error: bErr } = await (supabase as any)
+        .from('survey_blocks')
+        .select('id')
+        .eq('id', blockData.id)
+        .eq('survey_id', surveyId)
+        .maybeSingle();
+
+      if (bErr || !existingBlock) {
+        throw new Error('Bloco não encontrado nesta pesquisa.');
+      }
+
       const { error } = await (supabase as any)
         .from('survey_blocks')
         .update({
@@ -434,7 +438,7 @@ export async function saveSurveyBlockAction(
     revalidatePath(`/admin/pesquisas/${surveyId}/editor`);
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Erro ao salvar bloco.' };
+    return { success: false, error: formatSurveyActionError(err, 'Erro ao salvar bloco.') };
   }
 }
 
@@ -443,7 +447,20 @@ export async function saveSurveyBlockAction(
  */
 export async function deleteSurveyBlockAction(surveyId: string, blockId: string) {
   try {
-    const { client: supabase } = await getSurveysAdminClient();
+    const { actor } = await assertSurveyResourceAccess(surveyId);
+    const { supabase } = actor;
+
+    const { data: existingBlock, error: bErr } = await (supabase as any)
+      .from('survey_blocks')
+      .select('id')
+      .eq('id', blockId)
+      .eq('survey_id', surveyId)
+      .maybeSingle();
+
+    if (bErr || !existingBlock) {
+      throw new Error('Bloco não encontrado nesta pesquisa.');
+    }
+
     const { error } = await (supabase as any)
       .from('survey_blocks')
       .delete()
@@ -453,7 +470,7 @@ export async function deleteSurveyBlockAction(surveyId: string, blockId: string)
     revalidatePath(`/admin/pesquisas/${surveyId}/editor`);
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Erro ao excluir bloco.' };
+    return { success: false, error: formatSurveyActionError(err, 'Erro ao excluir bloco.') };
   }
 }
 
@@ -476,7 +493,8 @@ export async function saveSurveyQuestionAction(
   }
 ) {
   try {
-    const { client: supabase } = await getSurveysAdminClient();
+    const { actor } = await assertSurveyResourceAccess(surveyId);
+    const { supabase } = actor;
 
     const { data: targetBlock, error: blockError } = await (supabase as any)
       .from('survey_blocks')
@@ -489,6 +507,16 @@ export async function saveSurveyQuestionAction(
     let questionId = questionData.id;
 
     if (questionId) {
+      const { data: existingQ, error: qErr } = await (supabase as any)
+        .from('survey_questions')
+        .select('id, block_id, survey_blocks!inner(survey_id)')
+        .eq('id', questionId)
+        .maybeSingle();
+
+      if (qErr || !existingQ || existingQ.survey_blocks?.survey_id !== surveyId) {
+        throw new Error('A pergunta não pertence a esta pesquisa.');
+      }
+
       const { data: updatedQuestion, error } = await (supabase as any)
         .from('survey_questions')
         .update({
@@ -508,7 +536,7 @@ export async function saveSurveyQuestionAction(
       if (error) throw error;
       if (!updatedQuestion) throw new Error('A pergunta não foi atualizada. Verifique suas permissões e tente novamente.');
     } else {
-      // Nova pergunta vai para o fim do bloco (antes todas recebiam 99, e o empate deixava a ordem indefinida).
+      // Nova pergunta vai para o fim do bloco
       const { data: lastInBlock } = await (supabase as any)
         .from('survey_questions')
         .select('order_index')
@@ -542,7 +570,6 @@ export async function saveSurveyQuestionAction(
       questionData.options &&
       ['single_choice', 'multiple_choice', 'dropdown'].includes(questionData.question_type)
     ) {
-      // Remove opções existentes não presentes na lista
       const newOptionIds = questionData.options.map((o) => o.id).filter(Boolean);
       if (questionData.id) {
         if (newOptionIds.length > 0) {
@@ -602,7 +629,7 @@ export async function saveSurveyQuestionAction(
     revalidatePath(`/admin/pesquisas/${surveyId}/editor`);
     return { success: true, questionId, question: { ...savedQuestion, options: savedOptions || [] } as SurveyQuestion };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Erro ao salvar pergunta.' };
+    return { success: false, error: formatSurveyActionError(err, 'Erro ao salvar pergunta.') };
   }
 }
 
@@ -611,7 +638,18 @@ export async function saveSurveyQuestionAction(
  */
 export async function deleteSurveyQuestionAction(surveyId: string, questionId: string) {
   try {
-    const { client: supabase } = await getSurveysAdminClient();
+    const { actor } = await assertSurveyResourceAccess(surveyId);
+    const { supabase } = actor;
+
+    const { data: qBlock, error: qErr } = await (supabase as any)
+      .from('survey_questions')
+      .select('id, block_id, survey_blocks!inner(survey_id)')
+      .eq('id', questionId)
+      .maybeSingle();
+
+    if (qErr || !qBlock || qBlock.survey_blocks?.survey_id !== surveyId) {
+      throw new Error('A pergunta não pertence a esta pesquisa.');
+    }
 
     // Verifica se já possui respostas gravadas
     const { count } = await (supabase as any)
@@ -638,7 +676,7 @@ export async function deleteSurveyQuestionAction(surveyId: string, questionId: s
     revalidatePath(`/admin/pesquisas/${surveyId}/editor`);
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Erro ao excluir pergunta.' };
+    return { success: false, error: formatSurveyActionError(err, 'Erro ao excluir pergunta.') };
   }
 }
 
@@ -647,12 +685,12 @@ export async function deleteSurveyQuestionAction(surveyId: string, questionId: s
  */
 export async function getSurveyAnalyticsAction(surveyId: string, versionNumber?: number) {
   try {
-    const supabase = await createServerSideClient();
-
+    const { actor } = await assertSurveyResourceAccess(surveyId);
     const detailRes = await getAdminSurveyDetailAction(surveyId);
     if (!detailRes.success || !detailRes.data) throw new Error(detailRes.error);
 
     const survey = detailRes.data;
+    const { supabase } = actor;
 
     let query = (supabase as any)
       .from('survey_responses')
@@ -706,8 +744,8 @@ export async function getSurveyAnalyticsAction(surveyId: string, versionNumber?:
     });
     const completedDates = (responses || []).map((r: any) => r.completed_at).filter(Boolean) as string[];
 
-    const blockSummaries = (survey.blocks || []).map((block) => {
-      const questionSummaries = (block.questions || []).map((q) => {
+    const blockSummaries = (survey.blocks || []).map((block: SurveyBlock) => {
+      const questionSummaries = (block.questions || []).map((q: SurveyQuestion) => {
         const qAnswers = answers.filter((a) => a.question_id === q.id);
         const totalAnswers = qAnswers.length;
 
@@ -777,12 +815,13 @@ export async function getSurveyAnalyticsAction(surveyId: string, versionNumber?:
 
     return { success: true, data: summary };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Erro ao gerar indicadores do dashboard.' };
+    return { success: false, error: formatSurveyActionError(err, 'Erro ao gerar indicadores do dashboard.') };
   }
 }
 
 /**
  * Cria uma nova pesquisa administrativa com estrutura inicial.
+ * Associa estritamente ao tenant legítimo e ao usuário autenticado.
  */
 export async function createSurveyAction(payload: {
   title: string;
@@ -794,12 +833,21 @@ export async function createSurveyAction(payload: {
   banner_url?: string;
 }) {
   try {
-    const { client: supabase, user } = await getSurveysAdminClient();
-    if (!user) {
-      return { success: false, error: 'Acesso não autenticado.' };
+    const actor = await assertSurveyAdminAccess();
+    const { supabase, user, isGlobalAdmin, tenantId } = actor;
+
+    let surveyTenantId = tenantId;
+    if (isGlobalAdmin) {
+      try {
+        surveyTenantId = await resolveRequestOperationalTenantId(supabase);
+      } catch {
+        surveyTenantId = tenantId;
+      }
     }
 
-    const tenantId = await resolveRequestOperationalTenantId(supabase);
+    if (!surveyTenantId) {
+      throw new Error('Não foi possível identificar o tenant para criar a pesquisa.');
+    }
 
     const rawSlug = payload.slug || payload.title;
     const cleanSlug = rawSlug
@@ -813,7 +861,7 @@ export async function createSurveyAction(payload: {
     const { data: survey, error: sErr } = await (supabase as any)
       .from('surveys')
       .insert({
-        tenant_id: tenantId,
+        tenant_id: surveyTenantId,
         title: payload.title.trim(),
         description: payload.description?.trim() || null,
         slug: cleanSlug,
@@ -849,8 +897,7 @@ export async function createSurveyAction(payload: {
 
     return { success: true, data: survey };
   } catch (err: any) {
-    console.error('Erro ao criar pesquisa:', err);
-    return { success: false, error: err.message || 'Erro ao criar pesquisa.' };
+    return { success: false, error: formatSurveyActionError(err, 'Erro ao criar pesquisa.') };
   }
 }
 
@@ -862,7 +909,9 @@ export async function toggleSurveyStatusAction(
   status: 'draft' | 'published' | 'archived'
 ) {
   try {
-    const { client: supabase } = await getSurveysAdminClient();
+    const { actor } = await assertSurveyResourceAccess(surveyId);
+    const { supabase } = actor;
+
     const { error } = await (supabase as any)
       .from('surveys')
       .update({ status, updated_at: new Date().toISOString() })
@@ -872,7 +921,7 @@ export async function toggleSurveyStatusAction(
     revalidatePath('/admin/pesquisas');
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Erro ao atualizar status da pesquisa.' };
+    return { success: false, error: formatSurveyActionError(err, 'Erro ao atualizar status da pesquisa.') };
   }
 }
 
@@ -894,7 +943,9 @@ export async function updateSurveyDetailsAction(
   }
 ) {
   try {
-    const { client: supabase } = await getSurveysAdminClient();
+    const { actor } = await assertSurveyResourceAccess(surveyId);
+    const { supabase } = actor;
+
     const updateData: Record<string, any> = {
       title: payload.title.trim(),
       description: payload.description?.trim() || null,
@@ -935,32 +986,39 @@ export async function updateSurveyDetailsAction(
     revalidatePath(`/admin/pesquisas/${surveyId}/editor`);
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Erro ao atualizar dados da pesquisa.' };
+    return { success: false, error: formatSurveyActionError(err, 'Erro ao atualizar dados da pesquisa.') };
   }
 }
 
 export async function uploadSurveyBrandAssetAction(fileDataUrl: string) {
   try {
+    const actor = await assertSurveyAdminAccess();
+    const { supabase, isGlobalAdmin, tenantId } = actor;
+
     const match = fileDataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
     if (!match) return { success: false, error: 'Formato inválido. Use PNG, JPEG ou WebP.' };
     const buffer = Buffer.from(match[2]!, 'base64');
     if (!buffer.length || buffer.length > 5 * 1024 * 1024) return { success: false, error: 'A imagem deve ter no máximo 5 MB.' };
 
-    const supabase = await createServerSideClient();
-    const auth = await supabase.auth.getUser();
-    if (!auth.data.user) return { success: false, error: 'Acesso não autenticado.' };
-    const tenantId = await resolveRequestOperationalTenantId(supabase);
+    let assetTenantId = tenantId;
+    if (isGlobalAdmin) {
+      try {
+        assetTenantId = await resolveRequestOperationalTenantId(supabase);
+      } catch {
+        assetTenantId = tenantId || 'global';
+      }
+    }
 
     const mimeType = match[1]!;
     const extension = mimeType === 'image/jpeg' ? 'jpg' : mimeType.split('/')[1];
-    const path = `${tenantId}/${crypto.randomUUID()}.${extension}`;
+    const path = `${assetTenantId}/${crypto.randomUUID()}.${extension}`;
     const { error } = await supabase.storage.from('survey-assets').upload(path, buffer, { contentType: mimeType });
     if (error) return { success: false, error: error.message };
     const { data } = supabase.storage.from('survey-assets').getPublicUrl(path);
     return { success: true, data: { url: data.publicUrl } };
-  } catch (error) {
-    console.error('[Admin/Surveys] Falha no upload:', error);
-    return { success: false, error: 'Não foi possível enviar a imagem.' };
+  } catch (err: any) {
+    console.error('[Admin/Surveys] Falha no upload:', err);
+    return { success: false, error: formatSurveyActionError(err, 'Não foi possível enviar a imagem.') };
   }
 }
 
@@ -969,7 +1027,9 @@ export async function uploadSurveyBrandAssetAction(fileDataUrl: string) {
  */
 export async function deleteSurveyAction(surveyId: string) {
   try {
-    const { client: supabase } = await getSurveysAdminClient();
+    const { actor } = await assertSurveyResourceAccess(surveyId);
+    const { supabase } = actor;
+
     const { error } = await (supabase as any)
       .from('surveys')
       .delete()
@@ -979,7 +1039,7 @@ export async function deleteSurveyAction(surveyId: string) {
     revalidatePath('/admin/pesquisas');
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Erro ao excluir pesquisa.' };
+    return { success: false, error: formatSurveyActionError(err, 'Erro ao excluir pesquisa.') };
   }
 }
 
@@ -992,9 +1052,32 @@ export async function moveQuestionToBlockAction(
   targetBlockId: string
 ) {
   try {
-    const { client: supabase } = await getSurveysAdminClient();
+    const { actor } = await assertSurveyResourceAccess(surveyId);
+    const { supabase } = actor;
 
-    // Obtém o maior order_index do bloco de destino
+    // Valida que targetBlockId pertence à pesquisa
+    const { data: targetBlock, error: tErr } = await (supabase as any)
+      .from('survey_blocks')
+      .select('id')
+      .eq('id', targetBlockId)
+      .eq('survey_id', surveyId)
+      .maybeSingle();
+
+    if (tErr || !targetBlock) {
+      throw new Error('Bloco de destino não pertence a esta pesquisa.');
+    }
+
+    // Valida que questionId pertence a esta pesquisa
+    const { data: qBlock, error: qErr } = await (supabase as any)
+      .from('survey_questions')
+      .select('id, block_id, survey_blocks!inner(survey_id)')
+      .eq('id', questionId)
+      .maybeSingle();
+
+    if (qErr || !qBlock || qBlock.survey_blocks?.survey_id !== surveyId) {
+      throw new Error('A pergunta não pertence a esta pesquisa.');
+    }
+
     const { data: existingQuestions } = await (supabase as any)
       .from('survey_questions')
       .select('order_index')
@@ -1018,7 +1101,7 @@ export async function moveQuestionToBlockAction(
     revalidatePath(`/admin/pesquisas/${surveyId}/editor`);
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Erro ao mover pergunta para o bloco.' };
+    return { success: false, error: formatSurveyActionError(err, 'Erro ao mover pergunta para o bloco.') };
   }
 }
 
@@ -1031,7 +1114,19 @@ export async function reorderSurveyQuestionsAction(
   orderedQuestionIds: string[]
 ) {
   try {
-    const { client: supabase } = await getSurveysAdminClient();
+    const { actor } = await assertSurveyResourceAccess(surveyId);
+    const { supabase } = actor;
+
+    const { data: block, error: bErr } = await (supabase as any)
+      .from('survey_blocks')
+      .select('id')
+      .eq('id', blockId)
+      .eq('survey_id', surveyId)
+      .maybeSingle();
+
+    if (bErr || !block) {
+      throw new Error('Bloco não pertence a esta pesquisa.');
+    }
 
     const updates = orderedQuestionIds.map((qId, index) =>
       (supabase as any)
@@ -1049,6 +1144,6 @@ export async function reorderSurveyQuestionsAction(
     revalidatePath(`/admin/pesquisas/${surveyId}/editor`);
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Erro ao reordenar perguntas.' };
+    return { success: false, error: formatSurveyActionError(err, 'Erro ao reordenar perguntas.') };
   }
 }

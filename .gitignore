@@ -9,6 +9,8 @@ out/
 .env.*.local
 android/
 ios/
+.gradle/
+.gradle-home/
 .DS_Store
 Thumbs.db
 
@@ -56,4 +58,13 @@ scratch/
 .npmrc
 .gradle-home/
 .gradle/
+*.tmp
+.augment/
+.cursor/
+.devin/
+.idx/
+.kiro/
+.roo/
+.vscode/
+.github/instructions/
 

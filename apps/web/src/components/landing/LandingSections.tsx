@@ -71,7 +71,7 @@ export function LandingHero() {
       <div className={`${SECTION} relative grid items-center gap-10 py-16 sm:py-24 lg:grid-cols-[1.15fr_0.85fr]`}>
         <div>
           <span className="inline-flex items-center gap-2 rounded-full border border-[#C9A227]/50 bg-white px-3 py-1 text-xs font-bold text-[#8a6d12]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#C9A227]" /> Tradição que une! Conexão que fortalece!
+            <span className="h-1.5 w-1.5 rounded-full bg-[#C9A227]" /> Tradição que une, conexão que nos fortalece.
           </span>
           <h1 className="mt-5 text-4xl font-extrabold leading-[1.1] tracking-tight text-[#2a0a10] sm:text-5xl lg:text-6xl">
             Seu negócio visto por quem <span className="text-[#5d1523]">confia</span> em você.
