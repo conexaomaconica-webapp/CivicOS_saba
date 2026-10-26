@@ -34,6 +34,8 @@ describe('P0 — Contratação: Resiliência de Erros e Isolamento de Schema de 
 
     expect(screen.getByText('Instabilidade Técnica Temporária')).toBeTruthy();
     expect(screen.getByRole('link', { name: /Tentar Novamente/i })).toBeTruthy();
+    expect(screen.getByText('Conexão Maçônica · Assinatura Digital')).toBeTruthy();
+    expect(container.querySelector('.bg-\\[\\#3B0B14\\]')).toBeTruthy();
     expect(container.textContent).not.toContain('column profiles.document_number does not exist');
     expect(container.textContent).not.toContain('SQL');
     expect(container.textContent).not.toContain('SELECT');
