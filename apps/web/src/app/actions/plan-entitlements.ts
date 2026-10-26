@@ -98,7 +98,7 @@ export async function getPlanEntitlementsAction() {
       prata: {
         plan_code: 'prata',
         title: 'Plano Compasso',
-        slogan: 'Excelente visibilidade comercial e mídias',
+        slogan: 'Visibilidade comercial e mídias',
         description: 'Recomendado para empresas estabelecidas buscando destaque fraterno e canal direto no WhatsApp.',
         amount_cents: 178800,
         pix_amount_cents: 178800,

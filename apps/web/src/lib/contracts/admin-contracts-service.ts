@@ -1127,6 +1127,7 @@ export interface RevokeContractSignatureTokenResult {
 export interface PublicContractDetailsResult {
   success: boolean;
   error?: string;
+  errorType?: 'expired_or_revoked' | 'technical_error' | 'not_found';
   data?: {
     business_id: string;
     business_name: string;
@@ -1804,13 +1805,13 @@ export async function getPublicContractByTokenAction(
   try {
     const cleanToken = token?.trim();
     if (!cleanToken || cleanToken.length < MIN_PUBLIC_LINK_TOKEN_LENGTH) {
-      return { success: false, error: 'Token de acesso inválido ou malformado.' };
+      return { success: false, error: 'Token de acesso inválido ou malformado.', errorType: 'not_found' };
     }
 
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     if (!serviceRoleKey || !supabaseUrl) {
-      return { success: false, error: 'Serviço de validação temporariamente indisponível.' };
+      return { success: false, error: 'Serviço de validação temporariamente indisponível.', errorType: 'technical_error' };
     }
 
     const dbClient = createClient<Database>(supabaseUrl, serviceRoleKey, {
@@ -1839,7 +1840,7 @@ export async function getPublicContractByTokenAction(
     }
 
     if (!tokenRow) {
-      return { success: false, error: 'Link de contratação não encontrado ou inválido.' };
+      return { success: false, error: 'Link de contratação não encontrado ou inválido.', errorType: 'not_found' };
     }
 
     // 2. Busca dados da empresa
@@ -1850,7 +1851,7 @@ export async function getPublicContractByTokenAction(
       .single();
 
     if (bizErr || !biz) {
-      return { success: false, error: 'Empresa associada ao contrato não foi localizada.' };
+      return { success: false, error: 'Empresa associada ao contrato não foi localizada.', errorType: 'not_found' };
     }
 
     // 3. Busca o contrato associado (priorizando contract_id vinculado ao token)
@@ -1883,18 +1884,18 @@ export async function getPublicContractByTokenAction(
     const { data: contract, error: contractErr } = await contractQuery.maybeSingle();
 
     if (contractErr || !contract) {
-      return { success: false, error: 'Contrato ativo não localizado para este link.' };
+      return { success: false, error: 'Contrato ativo não localizado para este link.', errorType: 'not_found' };
     }
 
     // Se o contrato já foi assinado, permitimos visualização da tela pós-assinatura mesmo se token revogado
     const isSigned = contract.status === 'signed' || biz.commercial_status === 'contrato_assinado';
 
     if (tokenRow.is_revoked && !isSigned) {
-      return { success: false, error: 'Este link de contratação foi revogado pela administração.' };
+      return { success: false, error: 'Este link de contratação foi revogado pela administração.', errorType: 'expired_or_revoked' };
     }
 
     if (new Date(tokenRow.expires_at).getTime() < Date.now() && !isSigned) {
-      return { success: false, error: 'Este link de contratação expirou. Solicite um novo link à administração.' };
+      return { success: false, error: 'Este link de contratação expirou. Solicite um novo link à administração.', errorType: 'expired_or_revoked' };
     }
 
     // 4. Busca o snapshot imutável gravado (priorizando snapshot_id vinculado ao token)
@@ -1914,7 +1915,7 @@ export async function getPublicContractByTokenAction(
     const { data: snap, error: snapErr } = await snapQuery.maybeSingle();
 
     if (snapErr || !snap) {
-      return { success: false, error: 'Minuta oficial do contrato não localizada.' };
+      return { success: false, error: 'Minuta oficial do contrato não localizada.', errorType: 'not_found' };
     }
 
     // 5. Busca dados dos termos comerciais conferidos
@@ -1943,11 +1944,14 @@ export async function getPublicContractByTokenAction(
     let responsavelEmail = biz.email;
 
     if (biz.owner_id) {
-      const prof = await getInternalProfileDTO(dbClient, biz.owner_id);
-      if (prof) {
-        if (!responsavelNome) responsavelNome = pickResponsibleName(prof.name);
-        if (!responsavelCpf) responsavelCpf = prof.document_number ?? undefined;
-        if (prof.email) responsavelEmail = prof.email;
+      try {
+        const prof = await getInternalProfileDTO(dbClient, biz.owner_id);
+        if (prof) {
+          if (!responsavelNome) responsavelNome = pickResponsibleName(prof.name);
+          if (prof.email) responsavelEmail = prof.email;
+        }
+      } catch (profErr) {
+        console.warn('[getPublicContractByTokenAction] Aviso ao buscar perfil do proprietário (não impeditivo):', profErr);
       }
     }
     responsavelNome = responsavelNome || biz.name;
@@ -2077,10 +2081,11 @@ export async function getPublicContractByTokenAction(
       },
     };
   } catch (err: any) {
-    console.error('[getPublicContractByTokenAction] Exception:', err);
+    console.error('[getPublicContractByTokenAction] Falha técnica ao consultar contrato:', err);
     return {
       success: false,
-      error: err?.message || 'Erro inesperado ao consultar contrato.',
+      error: 'Não foi possível carregar as informações do contrato no momento devido a uma instabilidade técnica. Por favor, tente novamente em instantes.',
+      errorType: 'technical_error',
     };
   }
 }

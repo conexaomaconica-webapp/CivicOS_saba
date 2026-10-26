@@ -146,12 +146,13 @@ export async function reconcileCommercialPaymentWebhook(
 
     const dbClient = customSupabase || getAdminClient();
     const payment = (payload.payment as Record<string, unknown>) || {};
+    const externalReference = String(payment.externalReference || payload.externalReference || '').trim();
     const amountCents = Math.round(((payment.value as number) || 0) * 100);
 
     // 5. Tratamento de Criação de Cobrança (PAYMENT_CREATED, PAYMENT_UPDATED)
     // NUNCA confirma pagamento! Registra o status de aguardando_pagamento
     if (classification.category === 'financial_creation') {
-      const { data: attempt } = await dbClient
+      let { data: attempt } = await dbClient
         .from('payment_attempts')
         .select('id, invoice_id, business_id, tenant_id, payload_received')
         .eq('provider_code', 'asaas')
@@ -160,7 +161,27 @@ export async function reconcileCommercialPaymentWebhook(
         .limit(1)
         .maybeSingle();
 
-      const businessId = attempt?.business_id;
+      let businessId = attempt?.business_id;
+      let invoiceId = attempt?.invoice_id;
+      let tenantId = attempt?.tenant_id;
+
+      // Fallback por externalReference da fatura (ex: onb_sha256)
+      if (!businessId && externalReference) {
+        const { data: inv } = await dbClient
+          .from('invoices')
+          .select('id, business_id, tenant_id')
+          .eq('idempotency_key', externalReference)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (inv) {
+          businessId = inv.business_id;
+          invoiceId = inv.id;
+          tenantId = inv.tenant_id;
+        }
+      }
+
       if (businessId) {
         const { data: biz } = await dbClient
           .from('businesses')
@@ -185,6 +206,29 @@ export async function reconcileCommercialPaymentWebhook(
 
             if (updateErr) {
               console.warn('[ASAAS_WEBHOOK] Erro ao atualizar tentativa com payment_id:', updateErr);
+            }
+          } else if (invoiceId) {
+            try {
+              await dbClient
+                .from('payment_attempts')
+                .insert({
+                  invoice_id: invoiceId,
+                  business_id: businessId,
+                  tenant_id: tenantId || biz.tenant_id,
+                  provider_code: 'asaas',
+                  provider_charge_id: asaasPaymentId,
+                  amount: amountCents > 0 ? (amountCents / 100) : 0,
+                  status: 'initiated',
+                  attempt_count: 1,
+                  idempotency_key: `init_${asaasPaymentId}_${Date.now()}`,
+                  payload_received: {
+                    payment_id: asaasPaymentId,
+                    external_reference: externalReference,
+                    status: 'Aguardando pagamento',
+                  },
+                });
+            } catch (_initAttErr) {
+              console.warn('[ASAAS_WEBHOOK] Falha ao registrar payment_attempt inicial (não impeditivo):', _initAttErr);
             }
           }
 
@@ -234,7 +278,7 @@ export async function reconcileCommercialPaymentWebhook(
     // 6. Tratamento de Exclusão de Cobrança (PAYMENT_DELETED)
     // PROTEÇÃO: Impede reversão indevida de pagamentos já liquidados!
     if (rawEvent === 'PAYMENT_DELETED') {
-      const { data: attempt } = await dbClient
+      let { data: attempt } = await dbClient
         .from('payment_attempts')
         .select('id, invoice_id, business_id, tenant_id')
         .eq('provider_code', 'asaas')
@@ -243,7 +287,21 @@ export async function reconcileCommercialPaymentWebhook(
         .limit(1)
         .maybeSingle();
 
-      const businessId = attempt?.business_id;
+      let businessId = attempt?.business_id;
+      if (!businessId && externalReference) {
+        const { data: inv } = await dbClient
+          .from('invoices')
+          .select('id, business_id, tenant_id')
+          .eq('idempotency_key', externalReference)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (inv) {
+          businessId = inv.business_id;
+        }
+      }
+
       if (businessId) {
         const { data: biz } = await dbClient
           .from('businesses')
@@ -385,8 +443,25 @@ export async function reconcileCommercialPaymentWebhook(
     let invoiceId = attempt?.invoice_id;
     let tenantId = attempt?.tenant_id;
 
+    // Fallback 1: Localização canônica via externalReference (ex: onb_sha256)
+    if (!businessId && externalReference) {
+      const { data: invByRef } = await dbClient
+        .from('invoices')
+        .select('id, business_id, tenant_id')
+        .eq('idempotency_key', externalReference)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (invByRef) {
+        businessId = invByRef.business_id;
+        invoiceId = invByRef.id;
+        tenantId = invByRef.tenant_id;
+      }
+    }
+
     if (!businessId) {
-      // Fallback por fatura
+      // Fallback 2: Localização por fatura contendo o payment ID
       const { data: inv } = await dbClient
         .from('invoices')
         .select('id, business_id, tenant_id')
@@ -469,12 +544,13 @@ export async function reconcileCommercialPaymentWebhook(
           .eq('id', invoiceId).throwOnError();
       }
 
-      // Atualiza tentativa
+      // Atualiza tentativa existente ou cria registro se ausente
       if (attempt?.id) {
         await dbClient
           .from('payment_attempts')
           .update({
             status: 'success',
+            provider_charge_id: asaasPaymentId,
             response_received: {
               ...(attempt.payload_received || {}),
               webhook_reconciled: {
@@ -485,6 +561,34 @@ export async function reconcileCommercialPaymentWebhook(
             },
           })
           .eq('id', attempt.id).throwOnError();
+      } else if (invoiceId && businessId) {
+        try {
+          await dbClient
+            .from('payment_attempts')
+            .insert({
+              invoice_id: invoiceId,
+              business_id: businessId,
+              tenant_id: tenantId || biz.tenant_id,
+              provider_code: 'asaas',
+              provider_charge_id: asaasPaymentId,
+              amount: amountCents > 0 ? (amountCents / 100) : 0,
+              status: 'success',
+              idempotency_key: `reconciled_${asaasPaymentId}_${Date.now()}`,
+              payload_received: {
+                payment_id: asaasPaymentId,
+                external_reference: externalReference,
+              },
+              response_received: {
+                webhook_reconciled: {
+                  event_type: rawEvent,
+                  event_id: eventId,
+                  reconciled_at: new Date().toISOString(),
+                },
+              },
+            });
+        } catch (_insAttErr) {
+          console.warn('[ASAAS_WEBHOOK] Falha ao registrar payment_attempt retroativo (não impeditivo):', _insAttErr);
+        }
       }
 
       // Log de auditoria

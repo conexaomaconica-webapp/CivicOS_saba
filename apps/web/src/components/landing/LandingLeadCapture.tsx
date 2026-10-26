@@ -11,18 +11,19 @@ const LABEL = 'mb-1 block text-xs font-bold text-stone-700';
 type PlanOption = { value: 'bronze' | 'prata' | 'ouro'; label: string };
 
 const DEFAULT_PLAN_OPTIONS: PlanOption[] = [
-  { value: 'bronze', label: 'Plano Esquadro' },
-  { value: 'prata', label: 'Plano Compasso' },
   { value: 'ouro', label: 'Plano Acácia' },
+  { value: 'prata', label: 'Plano Compasso' },
+  { value: 'bronze', label: 'Plano Esquadro' },
 ];
 
 export function LandingLeadCapture({ planOptions = DEFAULT_PLAN_OPTIONS }: { planOptions?: PlanOption[] }) {
+  const defaultPlan = planOptions.find((p) => p.value === 'ouro')?.value ?? 'ouro';
   const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [phone, setPhone] = useState('');
   const [cityState, setCityState] = useState('');
   const [lodgeName, setLodgeName] = useState('');
-  const [interestedPlan, setInterestedPlan] = useState<PlanOption['value']>(planOptions[1]?.value ?? 'prata');
+  const [interestedPlan, setInterestedPlan] = useState<PlanOption['value']>(defaultPlan);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -41,6 +42,7 @@ export function LandingLeadCapture({ planOptions = DEFAULT_PLAN_OPTIONS }: { pla
       setPhone('');
       setCityState('');
       setLodgeName('');
+      setInterestedPlan(defaultPlan);
     } else {
       setStatus({ type: 'error', text: res.error || 'Não foi possível enviar. Tente novamente.' });
     }

@@ -7,7 +7,7 @@ const rejectedId = '00000000-0000-0000-0000-000000000002';
 describe('profile access service', () => {
   it('filters batch profile reads to the authorized scope before querying', async () => {
     const inFilter = vi.fn().mockResolvedValue({
-      data: [{ id: allowedId, name: 'Membro', email: 'membro@example.com', document_number: null }],
+      data: [{ id: allowedId, name: 'Membro', email: 'membro@example.com' }],
       error: null,
     });
     const select = vi.fn().mockReturnValue({ in: inFilter });

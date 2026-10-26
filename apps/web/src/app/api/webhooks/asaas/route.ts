@@ -187,6 +187,40 @@ export async function POST(req: Request) {
       }
     }
 
+    // Se o evento é explicitamente de onboarding comercial (externalReference onb_...) mas não pôde ser conciliado,
+    // registra para triagem sem repassar ao RPC de assinaturas recorrentes
+    const paymentObj = (payload.payment as Record<string, unknown>) || {};
+    const externalRef = String(paymentObj.externalReference || payload.externalReference || '').trim();
+    const isOnboardingReference = externalRef.startsWith('onb_') || externalRef.startsWith('onboarding_');
+
+    if (isOnboardingReference) {
+      logger.warn('Evento de onboarding comercial Asaas não conciliado', {
+        event_type: rawEventType,
+        event_id: eventId,
+        error: onboardingRes.error,
+      });
+
+      try {
+        await supabase.from('payment_provider_events').insert({
+          provider_code: 'asaas',
+          event_id: eventId,
+          event_type: rawEventType,
+          payload: { ...payload, classification: 'onboarding_unreconciled' },
+          processed: false,
+          error_log: onboardingRes.error || 'Cobrança comercial não localizada',
+        });
+      } catch {
+        /* auditoria best-effort */
+      }
+
+      return NextResponse.json({
+        received: true,
+        commercial_onboarding: true,
+        reconciled: false,
+        error: onboardingRes.error || 'Cobrança comercial não localizada',
+      });
+    }
+
     // 5. Se não for onboarding comercial, processa ciclo regular de assinaturas
     const canonicalEvent = AsaasBillingAdapter.parseEvent(req.headers, payload);
 

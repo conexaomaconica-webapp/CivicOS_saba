@@ -1,3 +1,4 @@
+import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { formatCentsToReais, type CommercialPlan } from '@/lib/billing/plans-service';
@@ -44,9 +45,11 @@ export function LandingHeader({ primaryColor }: { primaryColor?: string | null }
           </Link>
           <nav className="hidden items-center gap-6 text-sm font-semibold text-white md:flex">
             <a href="#para-quem" className="text-white transition hover:text-[#C9A227]">Para quem é</a>
-            <a href="#lancamento" className="text-white transition hover:text-[#C9A227]">Lançamento</a>
+            <a href="#diferenciais" className="text-white transition hover:text-[#C9A227]">Diferenciais</a>
+            <a href="#mural" className="text-white transition hover:text-[#C9A227]">Mural</a>
+            <a href="#resultados" className="text-white transition hover:text-[#C9A227]">Resultados</a>
             <a href="#planos" className="text-white transition hover:text-[#C9A227]">Planos</a>
-            <a href="#pedra-fundamental" className="text-white transition hover:text-[#C9A227]">Pedra Fundamental</a>
+            <a href="#lancamento" className="text-white transition hover:text-[#C9A227]">Lançamento</a>
             <a href="#faq" className="text-white transition hover:text-[#C9A227]">Dúvidas</a>
           </nav>
           <div className="flex items-center gap-2">
@@ -71,27 +74,29 @@ export function LandingHero() {
       <div className={`${SECTION} relative grid items-center gap-10 py-16 sm:py-24 lg:grid-cols-[1.15fr_0.85fr]`}>
         <div>
           <span className="inline-flex items-center gap-2 rounded-full border border-[#C9A227]/50 bg-white px-3 py-1 text-xs font-bold text-[#8a6d12]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#C9A227]" /> Tradição que une, conexão que nos fortalece.
+            <span className="h-1.5 w-1.5 rounded-full bg-[#C9A227]" /> Tradição que une! conexão que fortalece!
           </span>
           <h1 className="mt-5 text-4xl font-extrabold leading-[1.1] tracking-tight text-[#2a0a10] sm:text-5xl lg:text-6xl">
-            Seu negócio visto por quem <span className="text-[#5d1523]">confia</span> em você.
+            Muito além de um guia de empresas.{' '}
+            <span className="text-[#5d1523]">Uma conexão que gera oportunidades.</span>
           </h1>
           <p className="mt-5 max-w-xl text-lg leading-relaxed text-stone-600">
-            Conexão Maçônica reúne empresas, profissionais e serviços de maçons, cunhadas e sobrinhos, facilitando conexões por cidade, categoria e segmento.
-            Faça parte da Conexão Maçônica e fortaleça a presença da sua empresa.
+            A Conexão Maçônica vai além de apresentar empresas e profissionais. Promovemos visibilidade, incentivamos
+            relacionamentos e criamos oportunidades para que os negócios dos irmãos e familiares sejam conhecidos,
+            valorizados e fortalecidos.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link href="/anunciar/passo-1" className={CTA_PRIMARY}>
               Quero anunciar minha empresa
             </Link>
-            <Link href="/guia" className={CTA_GHOST}>
-              Explorar o guia de empresas
-            </Link>
+            <a href="#diferenciais" className={CTA_GHOST}>
+              Conhecer a iniciativa
+            </a>
           </div>
           <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-stone-600">
-            <li>✓ Cadastro em poucos minutos</li>
-            <li>✓ Pagamento por Pix ou cartão</li>
+            <li>✓ Para toda a família maçônica</li>
             <li>✓ Empresas verificadas</li>
+            <li>✓ Painel de desempenho para todos os planos</li>
           </ul>
         </div>
         <div className="relative mx-auto w-full max-w-sm">
@@ -149,10 +154,10 @@ export function LandingLaunchSection() {
 }
 
 const AUDIENCE = [
+  { title: 'Irmãos e famílias', text: 'Encontre produtos, serviços e profissionais de confiança dentro da nossa comunidade.' },
   { title: 'Empresário maçom', text: 'Divulgue sua empresa, seus serviços e suas ofertas para a comunidade que valoriza confiança.' },
   { title: 'Cunhadas', text: 'Negócio próprio, ateliê, clínica ou consultoria? Seu espaço no guia é o mesmo, com a mesma visibilidade.' },
-  { title: 'Sobrinhos', text: 'Quem faz parte da família maçônica também pode anunciar e ser indicado por quem já confia.' },
-  { title: 'Profissionais liberais', text: 'Advogados, médicos, contadores, arquitetos e prestadores de serviço ganham uma vitrine qualificada.' },
+  { title: 'Sobrinhos e jovens', text: 'Quem faz parte da família maçônica também pode anunciar e ser indicado por quem já confia.' },
 ];
 
 export function LandingAudienceSection() {
@@ -162,7 +167,7 @@ export function LandingAudienceSection() {
         <p className={EYEBROW}>Para quem é</p>
         <h2 className={H2}>Uma vitrine para toda a família maçônica</h2>
         <p className="mt-3 max-w-2xl text-stone-600">
-          Não é preciso ser maçom para anunciar: cunhadas, sobrinhos com negócio próprio também fazem parte.
+          Feita para quem procura produtos e serviços de confiança e para quem deseja divulgar seu negócio próprio.
         </p>
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {AUDIENCE.map((item) => (
@@ -172,9 +177,12 @@ export function LandingAudienceSection() {
             </div>
           ))}
         </div>
-        <div className="mt-8">
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <Link href="/anunciar/passo-1" className={CTA_PRIMARY}>
             Cadastrar minha empresa
+          </Link>
+          <Link href="/guia" className={CTA_GHOST}>
+            Explorar o guia de empresas
           </Link>
         </div>
       </div>
@@ -218,39 +226,80 @@ export function LandingFeaturesSection() {
   );
 }
 
+const TIER_DISPLAY_ORDER: Record<CommercialPlan['tier'], number> = {
+  ouro: 0,
+  prata: 1,
+  bronze: 2,
+};
+
+const PRICING_BY_TIER: Record<
+  CommercialPlan['tier'],
+  { installments: number; installmentValue: string; inFullValue: string }
+> = {
+  ouro: { installments: 4, installmentValue: 'R$ 270,00', inFullValue: 'R$ 1.000,00' },
+  prata: { installments: 3, installmentValue: 'R$ 285,00', inFullValue: 'R$ 800,00' },
+  bronze: { installments: 2, installmentValue: 'R$ 317,50', inFullValue: 'R$ 600,00' },
+};
+
 export function LandingPlansSection({ plans }: { plans: CommercialPlan[] }) {
+  const sortedPlans = [...plans].sort(
+    (a, b) => (TIER_DISPLAY_ORDER[a.tier] ?? 99) - (TIER_DISPLAY_ORDER[b.tier] ?? 99)
+  );
+
   return (
     <section id="planos" className="scroll-mt-24 bg-white py-16 sm:py-24">
       <div className={SECTION}>
         <p className={EYEBROW}>Planos</p>
         <h2 className={H2}>Escolha o plano ideal para o seu negócio</h2>
-        <p className="mt-3 max-w-2xl text-stone-600">Vigência anual. Pagamento à vista no Pix ou parcelado no cartão.</p>
+        <p className="mt-3 max-w-2xl text-stone-600">
+          Vigência anual. Pagamento parcelado sem juros no cartão ou com desconto à vista.
+        </p>
         <div className="mt-10 grid gap-6 lg:grid-cols-3">
-          {plans.map((plan) => {
-            const pix = plan.pixPriceCents ?? plan.annualPriceCents;
-            const highlight = Boolean(plan.isPopular);
-            const installments = plan.installmentsMax && plan.installmentsMax > 1 ? plan.installmentsMax : 0;
+          {sortedPlans.map((plan) => {
+            const pricing = PRICING_BY_TIER[plan.tier];
+            const installments = plan.installmentsMax ?? pricing.installments;
+            const installmentValue = plan.installmentValueCents
+              ? formatCentsToReais(plan.installmentValueCents)
+              : pricing.installmentValue;
+            const inFullCents = plan.payInFullCents ?? plan.pixPriceCents ?? plan.annualPriceCents;
+            const inFullValue = inFullCents ? formatCentsToReais(inFullCents) : pricing.inFullValue;
+            const highlight = plan.tier === 'ouro' || Boolean(plan.isPopular);
+            const badgeLabel = plan.tier === 'ouro' ? 'Mais Completo' : plan.isPopular ? 'Mais Escolhido' : null;
+
             return (
               <article
                 key={plan.tier}
                 className={`relative flex flex-col rounded-3xl bg-white p-7 ${highlight ? 'shadow-2xl ring-2 ring-[#C9A227]' : 'shadow-sm ring-1 ring-stone-200'
                   }`}
               >
-                {highlight ? (
+                {badgeLabel ? (
                   <span className="absolute -top-3 left-7 rounded-full bg-[#C9A227] px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-[#2a0a10]">
-                    Mais escolhido
+                    {badgeLabel}
                   </span>
                 ) : null}
-                <Image src={SEAL_BY_TIER[plan.tier]} alt={PLAN_SEAL_ALT[plan.tier]} width={160} height={160} className="h-28 w-28 self-start object-contain" />
+                <Image
+                  src={SEAL_BY_TIER[plan.tier]}
+                  alt={PLAN_SEAL_ALT[plan.tier]}
+                  width={160}
+                  height={160}
+                  className="h-28 w-28 self-start object-contain"
+                />
                 <h3 className="mt-5 text-2xl font-extrabold text-[#2a0a10]">{plan.name}</h3>
                 <p className="mt-1 text-sm text-stone-600">{plan.tagline}</p>
-                <p className="mt-6 text-4xl font-extrabold tracking-tight text-[#5d1523]">
-                  {formatCentsToReais(pix)}
-                  <span className="ml-1 text-sm font-semibold text-stone-500">/ano no Pix</span>
-                </p>
-                <p className="mt-1 text-xs text-stone-500">
-                  ou {formatCentsToReais(plan.annualPriceCents)} no cartão{installments ? `, em até ${installments}x sem juros` : ''}
-                </p>
+
+                {/* DESTAQUE PRINCIPAL: VALOR PARCELADO */}
+                <div className="mt-6 rounded-2xl bg-[#fbf7ee]/70 p-4 border border-[#C9A227]/30">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#8a6d12]">
+                    Parcelado no cartão sem juros
+                  </p>
+                  <p className="mt-1 text-3xl font-extrabold tracking-tight text-[#5d1523] sm:text-4xl">
+                    {installments}x de {installmentValue}
+                  </p>
+                  <p className="mt-1.5 text-xs font-semibold text-stone-600">
+                    ou <span className="text-[#2a0a10] font-bold">{inFullValue}</span> à vista
+                  </p>
+                </div>
+
                 <ul className="mt-6 flex-1 space-y-2 text-sm text-stone-700">
                   {plan.features
                     .filter((feature) => feature.included)
@@ -260,6 +309,10 @@ export function LandingPlansSection({ plans }: { plans: CommercialPlan[] }) {
                         <span>{feature.text}</span>
                       </li>
                     ))}
+                  <li className="flex gap-2 font-semibold text-[#5d1523]">
+                    <span aria-hidden className="font-bold text-[#8a6d12]">✓</span>
+                    <span>Painel de desempenho e métricas</span>
+                  </li>
                 </ul>
                 <Link href="/anunciar/passo-1" className={`${highlight ? CTA_PRIMARY : CTA_GHOST} mt-8`}>
                   Assinar {plan.name.replace(/^Plano\s+/i, '')}

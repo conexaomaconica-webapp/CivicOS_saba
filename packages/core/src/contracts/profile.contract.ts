@@ -31,7 +31,7 @@ export const internalProfileDTOSchema = z.object({
   id: z.string().uuid(),
   name: nullableString,
   email: z.string().email().nullable(),
-  document_number: nullableString,
+  document_number: nullableString.optional().default(null),
 }).strict();
 
 export type InternalProfileDTO = z.infer<typeof internalProfileDTOSchema>;
@@ -64,6 +64,6 @@ export const PROFILE_SELF_COLUMNS = [
 
 export const PROFILE_AUTHORIZATION_COLUMNS = ['id', 'role', 'tenant_id', 'status'] as const;
 export const ADMIN_PROFILE_COLUMNS = ['id', 'name', 'email', 'role', 'status', 'tenant_id', 'created_at'] as const;
-export const INTERNAL_PROFILE_COLUMNS = ['id', 'name', 'email', 'document_number'] as const;
+export const INTERNAL_PROFILE_COLUMNS = ['id', 'name', 'email'] as const;
 
 export const PROFILE_ADMIN_UPDATE_FIELDS = ['name', 'role', 'status', 'updated_at'] as const;

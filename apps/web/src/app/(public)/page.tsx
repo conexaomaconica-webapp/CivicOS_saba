@@ -11,12 +11,16 @@ import {
   LandingHero,
   LandingLaunchSection,
   LandingAudienceSection,
-  LandingFeaturesSection,
   LandingPlansSection,
   LandingPedraSection,
   LandingFaqSection,
 } from '@/components/landing/LandingSections';
+import { LandingDifferentialsSection } from '@/components/landing/LandingDifferentialsSection';
+import { LandingConnectionsMuralSection } from '@/components/landing/LandingConnectionsMuralSection';
+import { LandingMetricsPreviewSection } from '@/components/landing/LandingMetricsPreviewSection';
+import { LandingHowItWorksSection } from '@/components/landing/LandingHowItWorksSection';
 import { LandingLeadCapture } from '@/components/landing/LandingLeadCapture';
+import { getConfirmedConnectionsCountAction, getConnectionsFeedAction } from '@/app/actions/connections';
 
 export const metadata: Metadata = {
   title: { absolute: 'Conexão Maçônica | Guia de Empresas e Anúncios Maçônicos' },
@@ -69,11 +73,11 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Quanto custa anunciar no Conexão Maçônica?',
-    a: 'Os planos são anuais e começam em R$ 600 no Pix (R$ 635 no cartão, parcelado sem juros). Os valores atualizados de cada plano estão na seção de planos desta página.',
+    a: 'Os planos são anuais: Plano Acácia em 4x de R$ 270,00 (ou R$ 1.000,00 à vista), Plano Compasso em 3x de R$ 285,00 (ou R$ 800,00 à vista) e Plano Esquadro em 2x de R$ 317,50 (ou R$ 600,00 à vista). Todos os valores e recursos estão detalhados na seção de planos desta página.',
   },
   {
     q: 'Cunhada ou sobrinho de maçom pode anunciar?',
-    a: 'Sim. O guia é aberto à família maçônica: cunhadas, sobrinhos e demais familiares com negócio próprio podem se cadastrar e anunciar nos mesmos planos.',
+    a: 'Sim. O guia é aberto à família maçônica: cunhadas e sobrinhos com negócio próprio podem se cadastrar e anunciar nos mesmos planos.',
   },
   {
     q: 'Como encontro empresas de maçons na minha cidade?',
@@ -188,11 +192,15 @@ async function loadPlans(): Promise<CommercialPlan[]> {
 }
 
 export default async function HomePage() {
-  const [plans, brand] = await Promise.all([
+  const [plans, brand, confirmedConnections, connectionsFeed] = await Promise.all([
     loadPlans(),
     resolveTenantBrandContext().catch(() => null),
+    getConfirmedConnectionsCountAction().catch(() => 0),
+    getConnectionsFeedAction(6).catch(() => []),
   ]);
-  const planOptions = plans.map((plan) => ({ value: plan.tier, label: plan.name }));
+  const planOrder: Record<string, number> = { ouro: 0, prata: 1, bronze: 2 };
+  const sortedPlans = [...plans].sort((a, b) => (planOrder[a.tier] ?? 99) - (planOrder[b.tier] ?? 99));
+  const planOptions = sortedPlans.map((plan) => ({ value: plan.tier, label: plan.name }));
 
   return (
     <>
@@ -200,16 +208,38 @@ export default async function HomePage() {
       <StructuredData schema={websiteSchema} />
       <StructuredData schema={webPageSchema} />
       <StructuredData schema={launchEventSchema} />
-      <StructuredData schema={buildPlansSchema(plans)} />
+      <StructuredData schema={buildPlansSchema(sortedPlans)} />
       <StructuredData schema={faqSchema} />
       <div className="w-full">
+        {/* 1. Hero institucional */}
         <LandingHeader primaryColor={brand?.primaryColor} />
         <LandingHero />
-        <LandingLaunchSection />
+
+        {/* 2. Para quem é */}
         <LandingAudienceSection />
-        <LandingFeaturesSection />
+
+        {/* 3. Diferenciais do ecossistema */}
+        <LandingDifferentialsSection />
+
+        {/* 4. Mural de Conexões */}
+        <LandingConnectionsMuralSection items={connectionsFeed} confirmedTotal={confirmedConnections} />
+
+        {/* 5. Visibilidade e resultados */}
+        <LandingMetricsPreviewSection />
+
+        {/* 6. Como participar */}
+        <LandingHowItWorksSection />
+
+        {/* 7. Planos comerciais Esquadro, Compasso e Acácia */}
         <LandingPlansSection plans={plans} />
+
+        {/* 8. Pedra Fundamental */}
         <LandingPedraSection />
+
+        {/* 9. Lançamento oficial de 24/11/2026 */}
+        <LandingLaunchSection />
+
+        {/* 10. FAQ e captação de interessados */}
         <LandingFaqSection items={FAQ_ITEMS} />
         <LandingLeadCapture planOptions={planOptions} />
       </div>

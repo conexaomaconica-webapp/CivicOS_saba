@@ -491,8 +491,9 @@ export async function createCommercialOnboardingChargeAction(
           business_id: biz.id,
           provider_code: isManualPix ? 'manual_pix' : 'asaas',
           provider_charge_id: paymentId,
-          provider_environment: isManualPix ? 'manual' : asaasConfig.environment,
+          provider_environment: isManualPix ? null : (asaasConfig.environment || 'production'),
           payment_method: payload.payment_method,
+          amount: amountCents / 100,
           status: 'initiated',
           attempt_count: 1,
           idempotency_key: `${idempotencyKey}_attempt_${Date.now()}`,
@@ -509,7 +510,9 @@ export async function createCommercialOnboardingChargeAction(
             status: chargeStatus,
           },
         }).throwOnError();
-      } catch (_attErr) {}
+      } catch (_attErr) {
+        console.error('[commercial-charge] Falha ao registrar payment_attempt:', _attErr);
+      }
     }
 
     const normalizedChargeStatus = String(chargeStatus || '').trim().toUpperCase();

@@ -29,8 +29,13 @@ describe('profile contracts', () => {
     expect(profileAuthorizationDTOSchema.safeParse({ id, role: 'member', tenant_id: id, status: 'active' }).success).toBe(true);
   });
 
-  it('keeps document number restricted to the internal server projection', () => {
-    expect(internalProfileDTOSchema.safeParse({ id, name: 'ResponsÃ¡vel', email: 'responsavel@example.com', document_number: '12.345.678/0001-90' }).success).toBe(true);
-    expect(publicMemberDTOSchema.safeParse({ public_id: id, display_name: 'ResponsÃ¡vel', avatar_url: null, document_number: '12.345.678/0001-90' }).success).toBe(false);
+  it('keeps internal profile fields restricted to the server projection and defaults document_number to null when omitted', () => {
+    const parsedWithoutDoc = internalProfileDTOSchema.safeParse({ id, name: 'Responsável', email: 'responsavel@example.com' });
+    expect(parsedWithoutDoc.success).toBe(true);
+    if (parsedWithoutDoc.success) {
+      expect(parsedWithoutDoc.data.document_number).toBeNull();
+    }
+    expect(internalProfileDTOSchema.safeParse({ id, name: 'Responsável', email: 'responsavel@example.com', document_number: '12.345.678/0001-90' }).success).toBe(true);
+    expect(publicMemberDTOSchema.safeParse({ public_id: id, display_name: 'Responsável', avatar_url: null, document_number: '12.345.678/0001-90' }).success).toBe(false);
   });
 });

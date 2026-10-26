@@ -69,7 +69,9 @@ export class AsaasBillingAdapter {
     }
 
     const payment = (payload.payment as Record<string, unknown>) || {};
-    const externalRef = (payment.externalReference as string) || (payload.externalReference as string) || '00000000-0000-0000-0000-000000000001';
+    const rawExternalRef = ((payment.externalReference as string) || (payload.externalReference as string) || '').trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(rawExternalRef);
+    const businessId = isUuid ? rawExternalRef : '00000000-0000-0000-0000-000000000001';
     const rawPlan = (payment.planCode as string) || 'ouro';
     const amountCents = Math.round(((payment.value as number) || 199.0) * 100);
 
@@ -80,7 +82,7 @@ export class AsaasBillingAdapter {
       provider: 'asaas',
       providerEventId: eventId,
       canonicalEvent,
-      businessId: externalRef,
+      businessId,
       userId: (payment.userId as string) || null,
       planCode,
       amountCents,

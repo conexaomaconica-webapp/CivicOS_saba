@@ -529,6 +529,156 @@ describe('CONEXÃO MAÇÔNICA — Auditoria e Classificação de Eventos Asaas',
       expect(result.reconciled).toBe(false);
       expect(result.error).toContain('Falha de conexão com PostgreSQL');
     });
+
+    it('concilia pagamento com sucesso via externalReference quando payment_attempts não existia previamente', async () => {
+      const updatedBusinessData: any[] = [];
+      const updatedInvoiceData: any[] = [];
+      const insertedAttemptData: any[] = [];
+
+      const mockSupabase = {
+        rpc: vi.fn(() => Promise.reject(new Error('RPC não disponível'))),
+        from: vi.fn((table: string) => {
+          if (table === 'payment_attempts') {
+            return {
+              select: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  or: vi.fn(() => ({
+                    order: vi.fn(() => ({
+                      limit: vi.fn(() => ({
+                        maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
+                      })),
+                    })),
+                  })),
+                })),
+              })),
+              insert: vi.fn((data: any) => {
+                insertedAttemptData.push(data);
+                return Promise.resolve({ error: null });
+              }),
+            };
+          }
+          if (table === 'invoices') {
+            return {
+              select: vi.fn(() => ({
+                eq: vi.fn((field: string, val: string) => ({
+                  order: vi.fn(() => ({
+                    limit: vi.fn(() => ({
+                      maybeSingle: vi.fn(() => {
+                        if (val === 'onb_abc123def456') {
+                          return Promise.resolve({
+                            data: {
+                              id: 'inv-ext-1',
+                              business_id: 'biz-ext-1',
+                              tenant_id: 'tenant-ext-1',
+                            },
+                            error: null,
+                          });
+                        }
+                        return Promise.resolve({ data: null, error: null });
+                      }),
+                    })),
+                  })),
+                })),
+                ilike: vi.fn(() => ({
+                  order: vi.fn(() => ({
+                    limit: vi.fn(() => ({
+                      maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
+                    })),
+                  })),
+                })),
+              })),
+              update: vi.fn((data: any) => {
+                updatedInvoiceData.push(data);
+                return {
+                  eq: vi.fn(() => ({
+                    throwOnError: vi.fn(() => Promise.resolve()),
+                  })),
+                };
+              }),
+            };
+          }
+          if (table === 'businesses') {
+            return {
+              select: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  maybeSingle: vi.fn(() =>
+                    Promise.resolve({
+                      data: {
+                        id: 'biz-ext-1',
+                        commercial_status: 'aguardando_pagamento',
+                        tenant_id: 'tenant-ext-1',
+                      },
+                      error: null,
+                    })
+                  ),
+                })),
+              })),
+              update: vi.fn((data: any) => {
+                updatedBusinessData.push(data);
+                return {
+                  eq: vi.fn(() => ({
+                    throwOnError: vi.fn(() => Promise.resolve()),
+                  })),
+                };
+              }),
+            };
+          }
+          if (table === 'admin_audit_logs') {
+            return {
+              insert: vi.fn(() => Promise.resolve({ error: null })),
+            };
+          }
+          return {};
+        }),
+      };
+
+      const payload = {
+        id: 'evt_ext_ref_100',
+        event: 'PAYMENT_RECEIVED',
+        payment: {
+          id: 'pay_ext_ref_100',
+          value: 1200.0,
+          externalReference: 'onb_abc123def456',
+        },
+      };
+
+      const result = await reconcileCommercialPaymentWebhook(payload, null, mockSupabase as any);
+      expect(result.success).toBe(true);
+      expect(result.reconciled).toBe(true);
+      expect(result.data?.business_id).toBe('biz-ext-1');
+      expect(result.data?.invoice_id).toBe('inv-ext-1');
+
+      // Verifica baixa da empresa
+      expect(updatedBusinessData.length).toBe(1);
+      expect(updatedBusinessData[0].commercial_status).toBe('pagamento_confirmado');
+
+      // Verifica baixa da fatura
+      expect(updatedInvoiceData.length).toBe(1);
+      expect(updatedInvoiceData[0].status).toBe('paid');
+      expect(updatedInvoiceData[0].amount_paid).toBe(1200);
+
+      // Verifica inserção retroativa em payment_attempts
+      expect(insertedAttemptData.length).toBe(1);
+      expect(insertedAttemptData[0].status).toBe('success');
+      expect(insertedAttemptData[0].provider_charge_id).toBe('pay_ext_ref_100');
+      expect(insertedAttemptData[0].amount).toBe(1200);
+      expect(insertedAttemptData[0].invoice_id).toBe('inv-ext-1');
+    });
+
+    it('AsaasBillingAdapter não quebra e sanitiza externalReference no formato onb_ para UUID fallback seguro', () => {
+      const payload = {
+        event: 'PAYMENT_CONFIRMED',
+        payment: {
+          id: 'pay_onb_test_1',
+          value: 1200,
+          externalReference: 'onb_275fe62de6299c889c67bcca61d8e597a23cfcf81caca2e966d0299cf251e66d',
+        },
+      };
+
+      const parsed = AsaasBillingAdapter.parseEvent(new Headers(), payload);
+      expect(parsed.businessId).toBe('00000000-0000-0000-0000-000000000001');
+      expect(parsed.businessId).not.toContain('onb_');
+    });
   });
 });
 

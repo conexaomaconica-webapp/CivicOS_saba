@@ -69,7 +69,7 @@ export const CANONICAL_PLANS: Record<PlanTier, Omit<CommercialPlan, 'id'>> = {
     tier: 'prata',
     name: 'Plano Compasso',
     code: 'compasso',
-    tagline: 'Excelente visibilidade comercial e mídias',
+    tagline: 'Visibilidade comercial e mídias',
     currency: 'BRL',
     payInFullCents: 80000,
     installmentTotalCents: 85500,

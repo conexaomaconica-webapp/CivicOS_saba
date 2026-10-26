@@ -1,11 +1,13 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   ShieldCheck,
   FileText,
   AlertTriangle,
   Clock,
+  RotateCcw,
 } from 'lucide-react';
 import { getPublicContractByTokenAction } from '@/lib/contracts/admin-contracts-service';
 import { contractTextForPlainDisplay } from '@/lib/contracts/contract-template-renderer';
@@ -34,6 +36,9 @@ export default async function ContratacaoPublicPage({ params }: ContratacaoPageP
   const res = await getPublicContractByTokenAction(token);
 
   if (!res.success || !res.data) {
+    const isTechnical = res.errorType === 'technical_error';
+    const isExpiredOrRevoked = res.errorType === 'expired_or_revoked';
+
     return (
       <main className="min-h-screen bg-stone-100 flex items-center justify-center p-4">
         <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl border border-stone-200 text-center space-y-4">
@@ -45,27 +50,71 @@ export default async function ContratacaoPublicPage({ params }: ContratacaoPageP
             className="mx-auto h-auto w-44 object-contain"
             priority
           />
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
-            <AlertTriangle className="h-7 w-7" />
-          </div>
-          <div className="space-y-1">
-            <h1 className="font-serif text-xl font-bold text-stone-900">
-              Link Indisponível ou Expirado
-            </h1>
-            <p className="text-xs text-stone-600 leading-relaxed">
-              {res.error || 'O link de acesso ao contrato não foi localizado ou perdeu a validade.'}
-            </p>
-          </div>
-          <div className="rounded-xl bg-stone-50 p-3.5 border border-stone-200 text-[11px] text-stone-500 text-left space-y-1">
-            <p className="font-bold text-stone-700">Possíveis motivos:</p>
-            <ul className="list-disc pl-4 space-y-0.5">
-              <li>O link pode ter ultrapassado a validade máxima de 7 dias.</li>
-              <li>A administração pode ter gerado uma nova versão da minuta.</li>
-              <li>O contrato pode ter sido revogado administrativamente.</li>
-            </ul>
-          </div>
-          <p className="text-xs text-stone-500">
-            Entre em contato com o suporte da <strong>Conexão Maçônica</strong> para receber um link atualizado.
+
+          {isTechnical ? (
+            <>
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 border border-amber-200">
+                <AlertTriangle className="h-7 w-7" />
+              </div>
+              <div className="space-y-1.5">
+                <h1 className="font-serif text-xl font-bold text-stone-900">
+                  Instabilidade Técnica Temporária
+                </h1>
+                <p className="text-xs text-stone-600 leading-relaxed">
+                  Não foi possível carregar os dados do contrato no momento devido a uma oscilação temporária de conexão.
+                  A sua minuta contratual e os termos acordados permanecem preservados com total segurança.
+                </p>
+              </div>
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                <Link
+                  href={`/contratacao/${token}`}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-red-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-red-800 transition"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Tentar Novamente
+                </Link>
+              </div>
+            </>
+          ) : isExpiredOrRevoked ? (
+            <>
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
+                <Clock className="h-7 w-7" />
+              </div>
+              <div className="space-y-1">
+                <h1 className="font-serif text-xl font-bold text-stone-900">
+                  Link Expirado ou Revogado
+                </h1>
+                <p className="text-xs text-stone-600 leading-relaxed">
+                  {res.error || 'O link de acesso ao contrato perdeu a validade ou foi revogado pela administração.'}
+                </p>
+              </div>
+              <div className="rounded-xl bg-stone-50 p-3.5 border border-stone-200 text-[11px] text-stone-500 text-left space-y-1">
+                <p className="font-bold text-stone-700">Possíveis motivos:</p>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  <li>O link ultrapassou o prazo de validade de 7 dias.</li>
+                  <li>Uma nova versão da minuta foi emitida pela administração.</li>
+                  <li>O contrato foi revogado administrativamente para ajustes.</li>
+                </ul>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-stone-100 text-stone-700">
+                <AlertTriangle className="h-7 w-7" />
+              </div>
+              <div className="space-y-1">
+                <h1 className="font-serif text-xl font-bold text-stone-900">
+                  Link Indisponível
+                </h1>
+                <p className="text-xs text-stone-600 leading-relaxed">
+                  {res.error || 'O link de acesso ao contrato não foi localizado ou é inválido.'}
+                </p>
+              </div>
+            </>
+          )}
+
+          <p className="text-xs text-stone-500 pt-2 border-t border-stone-100">
+            Entre em contato com o suporte da <strong>Conexão Maçônica</strong> para assistência ou solicitação de um novo link.
           </p>
         </div>
       </main>

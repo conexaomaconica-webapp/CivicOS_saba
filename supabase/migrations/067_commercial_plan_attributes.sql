@@ -31,7 +31,7 @@ WHERE plan_code = 'bronze';
 UPDATE public.plan_payment_rules
 SET
   title = 'Plano Prata',
-  slogan = 'Excelente visibilidade comercial e mídias',
+  slogan = 'Visibilidade comercial e mídias',
   description = 'Recomendado para empresas estabelecidas buscando destaque fraterno e canal direto no WhatsApp.',
   is_popular = true,
   is_active = true,
