@@ -13,6 +13,7 @@ import {
 } from './guide-data';
 import { visibleHomeSections, type HomeSectionId } from './home-sections';
 import { claimColdLaunch } from './launch-session';
+import { trackMobileEvent, resetMobileCycleId } from './mobile-analytics';
 import { routeFromHash, routeHref, routeLabels, routes, type Route } from './navigation';
 
 const launchOnThisBoot = claimColdLaunch(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -2088,6 +2089,16 @@ function AnuncioModal({
                 target="_blank"
                 rel="noreferrer"
                 className="whatsapp-primary-btn"
+                onClick={() => {
+                  if (detail?.business_id) {
+                    trackMobileEvent({
+                      businessId: detail.business_id,
+                      eventType: 'whatsapp',
+                      city: detail.city,
+                      state: detail.state,
+                    });
+                  }
+                }}
               >
                 <span>💬</span>
                 <span>Falar no WhatsApp</span>
@@ -2098,7 +2109,17 @@ function AnuncioModal({
               <button
                 type="button"
                 className="btn-indicar-fraterno"
-                onClick={() => onRefer?.(detail.business_name, detail.business_slug)}
+                onClick={() => {
+                  if (detail?.business_id) {
+                    trackMobileEvent({
+                      businessId: detail.business_id,
+                      eventType: 'share',
+                      city: detail.city,
+                      state: detail.state,
+                    });
+                  }
+                  onRefer?.(detail.business_name, detail.business_slug);
+                }}
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2" width="18" height="18">
                   <circle cx="18" cy="5" r="3" />
@@ -2226,6 +2247,9 @@ function BusinessDetailModal({
 
   useEffect(() => {
     if (!slug) {
+      if (detail?.business_id) {
+        resetMobileCycleId(detail.business_id);
+      }
       setDetail(null);
       setError(null);
       setIsAnuncioOpen(false);
@@ -2242,6 +2266,14 @@ function BusinessDetailModal({
           setError('Empresa não encontrada ou temporariamente indisponível.');
         } else {
           setDetail(data);
+          if (data.business_id) {
+            trackMobileEvent({
+              businessId: data.business_id,
+              eventType: 'view',
+              city: data.city,
+              state: data.state,
+            });
+          }
         }
       })
       .catch(() => {
@@ -2495,6 +2527,16 @@ function BusinessDetailModal({
                       target="_blank"
                       rel="noreferrer"
                       className="whatsapp-primary-btn"
+                      onClick={() => {
+                        if (detail.business_id) {
+                          trackMobileEvent({
+                            businessId: detail.business_id,
+                            eventType: 'whatsapp',
+                            city: detail.city,
+                            state: detail.state,
+                          });
+                        }
+                      }}
                     >
                       <span>💬</span>
                       <span>Falar no WhatsApp</span>
@@ -2505,7 +2547,17 @@ function BusinessDetailModal({
                     <button
                       type="button"
                       className="btn-indicar-fraterno"
-                      onClick={() => onRefer?.(detail.business_name, detail.business_slug)}
+                      onClick={() => {
+                        if (detail.business_id) {
+                          trackMobileEvent({
+                            businessId: detail.business_id,
+                            eventType: 'share',
+                            city: detail.city,
+                            state: detail.state,
+                          });
+                        }
+                        onRefer?.(detail.business_name, detail.business_slug);
+                      }}
                     >
                       <svg viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2" width="18" height="18">
                         <circle cx="18" cy="5" r="3" />
@@ -2544,7 +2596,20 @@ function BusinessDetailModal({
 
                   <div className="contacts-grid">
                     {phoneContact && (
-                      <a href={`tel:${phoneContact.value.replace(/\D/g, '')}`} className="contact-item-btn">
+                      <a
+                        href={`tel:${phoneContact.value.replace(/\D/g, '')}`}
+                        className="contact-item-btn"
+                        onClick={() => {
+                          if (detail.business_id) {
+                            trackMobileEvent({
+                              businessId: detail.business_id,
+                              eventType: 'phone',
+                              city: detail.city,
+                              state: detail.state,
+                            });
+                          }
+                        }}
+                      >
                         <span>📞</span>
                         <span>Ligar</span>
                       </a>
@@ -2565,6 +2630,16 @@ function BusinessDetailModal({
                         target="_blank"
                         rel="noreferrer"
                         className="contact-item-btn"
+                        onClick={() => {
+                          if (detail.business_id) {
+                            trackMobileEvent({
+                              businessId: detail.business_id,
+                              eventType: 'instagram',
+                              city: detail.city,
+                              state: detail.state,
+                            });
+                          }
+                        }}
                       >
                         <span>📸</span>
                         <span>Instagram</span>
@@ -2580,6 +2655,16 @@ function BusinessDetailModal({
                         target="_blank"
                         rel="noreferrer"
                         className="contact-item-btn"
+                        onClick={() => {
+                          if (detail.business_id) {
+                            trackMobileEvent({
+                              businessId: detail.business_id,
+                              eventType: 'website',
+                              city: detail.city,
+                              state: detail.state,
+                            });
+                          }
+                        }}
                       >
                         <span>🌐</span>
                         <span>Site Oficial</span>
@@ -2800,6 +2885,16 @@ function BusinessDetailModal({
                               target="_blank"
                               rel="noreferrer"
                               className="service-quote-btn"
+                              onClick={() => {
+                                if (detail.business_id) {
+                                  trackMobileEvent({
+                                    businessId: detail.business_id,
+                                    eventType: 'whatsapp',
+                                    city: detail.city,
+                                    state: detail.state,
+                                  });
+                                }
+                              }}
                             >
                               <span>💬</span>
                               <span>Solicitar Orçamento no WhatsApp</span>
@@ -2912,6 +3007,16 @@ function BusinessDetailModal({
                         target="_blank"
                         rel="noreferrer"
                         className="map-open-link"
+                        onClick={() => {
+                          if (detail.business_id) {
+                            trackMobileEvent({
+                              businessId: detail.business_id,
+                              eventType: 'route',
+                              city: detail.city,
+                              state: detail.state,
+                            });
+                          }
+                        }}
                       >
                         <span>📍</span>
                         <span>Traçar rota no Google Maps</span>

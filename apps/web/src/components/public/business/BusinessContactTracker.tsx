@@ -54,7 +54,13 @@ export function BusinessContactTracker({ business, children }: { business: Busin
     const gaName = gaNameForContactEvent(eventType);
     if (gaName) value.track(gaName);
     if (!anchor.hasAttribute('data-cm-tracked')) {
-      trackEvent({ businessId: business.id, eventType, source: SOURCE_PAGE });
+      trackEvent({
+        businessId: business.id,
+        eventType,
+        source: SOURCE_PAGE,
+        city: business.city || undefined,
+        state: business.state || undefined,
+      });
     }
   };
 

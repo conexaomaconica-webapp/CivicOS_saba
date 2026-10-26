@@ -154,10 +154,10 @@ export function LandingLaunchSection() {
 }
 
 const AUDIENCE = [
-  { title: 'Irmãos e famílias', text: 'Encontre produtos, serviços e profissionais de confiança dentro da nossa comunidade.' },
-  { title: 'Empresário maçom', text: 'Divulgue sua empresa, seus serviços e suas ofertas para a comunidade que valoriza confiança.' },
+  { title: 'Na Plataforma', text: 'Encontre produtos, serviços e profissionais de confiança dentro da nossa comunidade.' },
+  { title: 'Maçons', text: 'Publique sua empresa, seus serviços e suas ofertas para a comunidade que valoriza confiança.' },
   { title: 'Cunhadas', text: 'Negócio próprio, ateliê, clínica ou consultoria? Seu espaço no guia é o mesmo, com a mesma visibilidade.' },
-  { title: 'Sobrinhos e jovens', text: 'Quem faz parte da família maçônica também pode anunciar e ser indicado por quem já confia.' },
+  { title: 'Sobrinhos', text: 'Quem faz parte da família maçônica também pode anunciar e ser indicado por quem já confia.' },
 ];
 
 export function LandingAudienceSection() {

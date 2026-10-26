@@ -77,7 +77,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Cunhada ou sobrinho de maçom pode anunciar?',
-    a: 'Sim. O guia é aberto à família maçônica: cunhadas e sobrinhos com negócio próprio podem se cadastrar e anunciar nos mesmos planos.',
+    a: 'Sim. O guia é aberto à família maçônica: cunhadas e sobrinhos com negócio próprio ou profissionais, podem se cadastrar e anunciar nos mesmos planos.',
   },
   {
     q: 'Como encontro empresas de maçons na minha cidade?',

@@ -23,8 +23,61 @@ function sameOrigin(request: Request): boolean {
   }
 }
 
+const BOT_PATTERNS = [
+  /googlebot/i,
+  /bingbot/i,
+  /yandex/i,
+  /baiduspider/i,
+  /facebookexternalhit/i,
+  /twitterbot/i,
+  /rogerbot/i,
+  /linkedinbot/i,
+  /embedly/i,
+  /quora link preview/i,
+  /showyoubot/i,
+  /outbrain/i,
+  /pinterest\/0\./i,
+  /slackbot/i,
+  /vkshare/i,
+  /w3c_validator/i,
+  /redditbot/i,
+  /applebot/i,
+  /whatsapp/i,
+  /flipboard/i,
+  /tumblr/i,
+  /bitlybot/i,
+  /skypeuripreview/i,
+  /discordbot/i,
+  /google page speed/i,
+  /chrome-lighthouse/i,
+  /telegrambot/i,
+  /ahrefsbot/i,
+  /semrushbot/i,
+  /dotbot/i,
+  /petalbot/i,
+  /headlesschrome/i,
+  /crawler/i,
+  /spider/i,
+  /robot/i,
+];
+
+function isBot(userAgent: string | null): boolean {
+  if (!userAgent) return false;
+  return BOT_PATTERNS.some((pattern) => pattern.test(userAgent));
+}
+
+function isPrefetch(request: Request): boolean {
+  const purpose = request.headers.get('purpose') || request.headers.get('sec-purpose') || request.headers.get('x-moz');
+  return Boolean(purpose && purpose.toLowerCase().includes('prefetch'));
+}
+
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });
+
+  // Descarta silenciosamente pré-carregamento do navegador e robôs conhecidos sem gravar no banco
+  if (isPrefetch(request) || isBot(request.headers.get('user-agent'))) {
+    return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
+  }
 
   let body: unknown;
   try {
@@ -35,12 +88,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 
-  const { businessId, businessIds, eventType, source, origin } = (body ?? {}) as {
+  const { businessId, businessIds, eventType, source, origin, cycleId, city, state, device } = (body ?? {}) as {
     businessId?: unknown;
     businessIds?: unknown;
     eventType?: unknown;
     source?: unknown;
     origin?: unknown;
+    cycleId?: unknown;
+    city?: unknown;
+    state?: unknown;
+    device?: unknown;
   };
 
   // Aparições na busca chegam em lote (até 50 empresas).
@@ -59,6 +116,10 @@ export async function POST(request: Request) {
     eventType: eventType as AllowedEventType,
     source: typeof source === 'string' ? source.slice(0, 60) : undefined,
     origin: isVisitOrigin(origin) ? origin : undefined,
+    cycleId: typeof cycleId === 'string' ? cycleId.slice(0, 100) : undefined,
+    city: typeof city === 'string' ? city.slice(0, 100) : undefined,
+    state: typeof state === 'string' ? state.slice(0, 10) : undefined,
+    device: typeof device === 'string' ? device.slice(0, 30) : undefined,
   });
   // Telemetria nunca devolve erro detalhado ao navegador.
   return NextResponse.json({ ok: Boolean((result as { ok?: boolean }).ok) }, { status: 200 });

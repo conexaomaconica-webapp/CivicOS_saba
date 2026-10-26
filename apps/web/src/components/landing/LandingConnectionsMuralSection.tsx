@@ -41,12 +41,12 @@ export function LandingConnectionsMuralSection({ items, confirmedTotal }: Props)
               Mural de Conexões
             </span>
             <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-[#2a0a10] sm:text-4xl">
-              Conexões que saem da tela e acontecem na vida real.
+              Da conexão ao encontro. Do encontro a novas oportunidades.
             </h2>
             <p className="mt-3 text-base leading-relaxed text-stone-600 sm:text-lg">
-              A cada visita, compra ou indicação, os laços que nos unem se transformam em novas histórias.
-              O Mural de Conexões valoriza esses encontros, dando visibilidade aos irmãos e familiares que prestigiam
-              as empresas da nossa rede.
+              A cada visita, compra ou parceria, os laços que nos unem se transformam em novas histórias.
+              O Mural de Conexões valoriza esses encontros reais, dando visibilidade aos irmãos e familiares que prestigiam
+              os negócios participantes da nossa rede, mediante autorização.
             </p>
           </div>
 

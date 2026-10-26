@@ -62,6 +62,10 @@ export async function trackDirectoryEventAction(payload: {
   source?: string;
   /** Origem da visita (organic_google, qr, share...). Validada na rota; opcional. */
   origin?: string;
+  /** Identificador único do ciclo de navegação/renderização para idempotência de views */
+  cycleId?: string;
+  /** Tipo de dispositivo/canal: 'web' | 'mobile_app' */
+  device?: string;
 }) {
   const allowedEvents: AllowedEventType[] = [
     'view',
@@ -92,15 +96,20 @@ export async function trackDirectoryEventAction(payload: {
     return { ok: true, skipped: true };
   }
 
-  let sessionHash = '';
+  let subjectId = '';
   try {
-    const reqHeaders = await headers();
-    const ip = reqHeaders.get('x-forwarded-for') || reqHeaders.get('x-real-ip') || '127.0.0.1';
-    const ua = reqHeaders.get('user-agent') || 'Browser';
-    // Gera hash efêmero não reversível para deduplicação sem salvar IP bruto
-    sessionHash = crypto.createHash('sha256').update(`${ip}_${ua}_${new Date().toISOString().slice(0, 10)}`).digest('hex').slice(0, 32);
+    const visitorKey = await readVisitorKey();
+    if (visitorKey) {
+      subjectId = `vid_${visitorKey.slice(0, 32)}`;
+    } else {
+      const reqHeaders = await headers();
+      const ip = reqHeaders.get('x-forwarded-for') || reqHeaders.get('x-real-ip') || '127.0.0.1';
+      const ua = reqHeaders.get('user-agent') || 'Browser';
+      // Gera hash efêmero não reversível para deduplicação sem salvar IP bruto
+      subjectId = crypto.createHash('sha256').update(`${ip}_${ua}_${new Date().toISOString().slice(0, 10)}`).digest('hex').slice(0, 32);
+    }
   } catch (_e) {
-    sessionHash = 'anon_session';
+    subjectId = 'anon_session';
   }
 
   try {
@@ -114,16 +123,41 @@ export async function trackDirectoryEventAction(payload: {
       return { ok: false, error: businessError?.message || 'BUSINESS_NOT_PUBLIC' };
     }
 
+    // Idempotência por ciclo de navegação: impede que re-renders ou requisições repetidas
+    // do mesmo ciclo inflem visualizações. Reloads manuais geram um cycleId novo e gravam normalmente.
+    if (payload.eventType === 'view' && payload.cycleId) {
+      try {
+        const { data: existing } = await (supabase as any)
+          .from('analytics_events')
+          .select('id')
+          .eq('business_id', payload.businessId)
+          .eq('event_name', 'view')
+          .eq('metadata->>cycle_id', payload.cycleId)
+          .limit(1)
+          .maybeSingle();
+
+        if (existing) {
+          return { ok: true, deduplicated: true };
+        }
+      } catch {
+        // Prossegue com segurança caso ocorra instabilidade temporária na checagem
+      }
+    }
+
     const { error } = await (supabase as any).from('analytics_events').insert({
       tenant_id: business.tenant_id,
       business_id: payload.businessId,
       event_name: payload.eventType,
-      pseudonymous_subject_id: sessionHash,
+      pseudonymous_subject_id: subjectId,
+      source: payload.source || 'direct',
+      device: payload.device || 'web',
       metadata: {
         city: payload.city || null,
         state: payload.state || null,
         source: payload.source || 'direct',
         origin: payload.origin || null,
+        cycle_id: payload.cycleId || null,
+        device: payload.device || 'web',
       },
     });
     if (error) return { ok: false, error: error.message };

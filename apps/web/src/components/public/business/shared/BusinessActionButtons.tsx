@@ -26,7 +26,13 @@ export function QuickActionBar({
   className = '',
 }: BusinessActionButtonsProps) {
   const track = (eventType: AllowedEventType, source: string) => {
-    trackEvent({ businessId, eventType, source });
+    trackEvent({
+      businessId,
+      eventType,
+      source,
+      city: location?.city || undefined,
+      state: location?.state || undefined,
+    });
   };
   useEffect(() => {
     track('view', 'business_profile');
