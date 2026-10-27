@@ -587,6 +587,7 @@ export default async function GuiaPage({ searchParams }: Props) {
           logoUrl={brand.logoUrl}
           selectedCity={city}
           availableCities={availableCities}
+          categories={homeCategories}
         />
 
         {/* Seções da home na ordem e com a visibilidade definidas em /admin/guia/geral */}

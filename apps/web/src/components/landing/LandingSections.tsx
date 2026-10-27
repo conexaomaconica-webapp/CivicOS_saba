@@ -34,16 +34,18 @@ function withAlpha(hex: string | null | undefined, alpha: number): string {
 export function LandingHeader({ primaryColor }: { primaryColor?: string | null }) {
   return (
     <>
+      {/* Espaçador responsivo para compensar o header fixo da landing */}
       <div aria-hidden className="h-[64px] sm:h-[72px]" />
+
       <header
         className="fixed inset-x-0 top-0 z-50 border-b border-[#C9A227]/40 shadow-lg backdrop-blur-md"
         style={{ backgroundColor: withAlpha(primaryColor, 0.88) }}
       >
         <div className={`${SECTION} flex items-center justify-between gap-4 py-2`}>
           <Link href="/" aria-label="Conexão Maçônica — página inicial">
-            <Image src="/logoconexao_red_vert.png" alt="Conexão Maçônica" width={971} height={208} priority className="h-10 w-auto sm:h-12" />
+            <Image src="/logoconexao_red_vert.png" alt="Conexão Maçônica" width={971} height={208} priority className="h-9 w-auto sm:h-12" />
           </Link>
-          <nav className="hidden items-center gap-6 text-sm font-semibold text-white md:flex">
+          <nav className="hidden items-center gap-6 text-sm font-semibold text-white lg:flex">
             <a href="#para-quem" className="text-white transition hover:text-[#C9A227]">Para quem é</a>
             <a href="#diferenciais" className="text-white transition hover:text-[#C9A227]">Diferenciais</a>
             <a href="#mural" className="text-white transition hover:text-[#C9A227]">Mural</a>
@@ -53,11 +55,11 @@ export function LandingHeader({ primaryColor }: { primaryColor?: string | null }
             <a href="#faq" className="text-white transition hover:text-[#C9A227]">Dúvidas</a>
           </nav>
           <div className="flex items-center gap-2">
-            <Link href="/anunciar/passo-1" className="hidden rounded-xl px-4 py-2 text-sm font-bold text-white transition hover:text-[#C9A227] sm:inline-flex">
-              Anunciar
+            <Link href="/anunciar/passo-1" className="rounded-xl px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-bold text-white transition hover:text-[#C9A227]">
+              ANUNCIAR
             </Link>
-            <Link href="/login" className="inline-flex rounded-xl bg-[#C9A227] px-5 py-2 text-sm font-bold text-[#2a0a10] transition hover:bg-[#e0b92f]">
-              Entrar
+            <Link href="/login" className="inline-flex rounded-xl bg-[#C9A227] px-3.5 py-1.5 sm:px-5 sm:py-2 text-xs sm:text-sm font-bold text-[#2a0a10] transition hover:bg-[#e0b92f]">
+              ENTRAR
             </Link>
           </div>
         </div>
@@ -74,24 +76,23 @@ export function LandingHero() {
       <div className={`${SECTION} relative grid items-center gap-10 py-16 sm:py-24 lg:grid-cols-[1.15fr_0.85fr]`}>
         <div>
           <span className="inline-flex items-center gap-2 rounded-full border border-[#C9A227]/50 bg-white px-3 py-1 text-xs font-bold text-[#8a6d12]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#C9A227]" /> Tradição que une! conexão que fortalece!
+            <span className="h-1.5 w-1.5 rounded-full bg-[#C9A227]" /> Tradição que une, conexão que nos fortalece.
           </span>
           <h1 className="mt-5 text-4xl font-extrabold leading-[1.1] tracking-tight text-[#2a0a10] sm:text-5xl lg:text-6xl">
             Muito além de um guia de empresas.{' '}
             <span className="text-[#5d1523]">Uma conexão que gera oportunidades.</span>
           </h1>
           <p className="mt-5 max-w-xl text-lg leading-relaxed text-stone-600">
-            A Conexão Maçônica vai além de apresentar empresas e profissionais. Promovemos visibilidade, incentivamos
-            relacionamentos e criamos oportunidades para que os negócios dos irmãos e familiares sejam conhecidos,
-            valorizados e fortalecidos.
+            A Conexão Maçônica aproxima irmãos, cunhadas e sobrinhos, valoriza empresas e profissionais e incentiva novas
+            oportunidades por meio de relacionamentos, visibilidade e confiança.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link href="/anunciar/passo-1" className={CTA_PRIMARY}>
-              Quero anunciar minha empresa
+            <Link href="/guia" className={CTA_PRIMARY}>
+              Quero encontrar empresas
             </Link>
-            <a href="#diferenciais" className={CTA_GHOST}>
-              Conhecer a iniciativa
-            </a>
+            <Link href="/anunciar/passo-1" className={CTA_GHOST}>
+              Quero divulgar meu negócio
+            </Link>
           </div>
           <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-stone-600">
             <li>✓ Para toda a família maçônica</li>
@@ -129,7 +130,7 @@ export function LandingLaunchSection() {
           <h2 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Uma noite de relacionamentos, oportunidades e negócios</h2>
           <p className="mt-4 max-w-2xl leading-relaxed text-white/80">
             A Conexão Maçônica convida você para uma noite especial de relacionamentos, oportunidades e fortalecimento de negócios.
-            Um encontro pensado para aproximar irmãos, cunhadas, sobrinhos e empresários, estimulando parcerias e novas conexões.
+            Um encontro pensado para aproximar irmãos, cunhadas, familiares e empresários, estimulando parcerias e novas conexões.
           </p>
           <div className="mt-6 rounded-2xl bg-white/5 p-5 ring-1 ring-[#C9A227]/30">
             <p className="text-sm font-bold text-[#C9A227]">Palestras</p>
@@ -145,7 +146,7 @@ export function LandingLaunchSection() {
           <p className="mt-1 text-sm text-stone-600">Centro de Convenções de Feira de Santana</p>
           <p className="text-sm text-stone-600">Feira de Santana — BA</p>
           <a href="#captacao-lead" className={`${CTA_PRIMARY} mt-6 w-full`}>
-            Quero anunciar e participar
+            Quero participar do evento
           </a>
         </div>
       </div>
@@ -154,10 +155,10 @@ export function LandingLaunchSection() {
 }
 
 const AUDIENCE = [
-  { title: 'Na Plataforma', text: 'Encontre produtos, serviços e profissionais de confiança dentro da nossa comunidade.' },
-  { title: 'Maçons', text: 'Publique sua empresa, seus serviços e suas ofertas para a comunidade que valoriza confiança.' },
-  { title: 'Cunhadas', text: 'Negócio próprio, ateliê, clínica ou consultoria? Seu espaço no guia é o mesmo, com a mesma visibilidade.' },
-  { title: 'Sobrinhos', text: 'Quem faz parte da família maçônica também pode anunciar e ser indicado por quem já confia.' },
+  { title: 'Para quem procura', text: 'Encontre produtos, serviços e profissionais de confiança dentro da nossa comunidade, valorizando os laços que nos unem.' },
+  { title: 'Para quem oferece', text: 'Apresente sua empresa, clínica, consultoria ou negócio próprio para irmãos e familiares que valorizam relações de confiança.' },
+  { title: 'Toda a família maçônica', text: 'Irmãos, cunhadas e sobrinhos participam com as mesmas oportunidades de visibilidade, conexão e indicação mútua.' },
+  { title: 'Benefícios e parcerias', text: 'Acesse condições especiais, descubra oportunidades de networking e prestigie iniciativas participantes da rede.' },
 ];
 
 export function LandingAudienceSection() {
@@ -165,9 +166,10 @@ export function LandingAudienceSection() {
     <section id="para-quem" className="scroll-mt-24 bg-white py-16 sm:py-24">
       <div className={SECTION}>
         <p className={EYEBROW}>Para quem é</p>
-        <h2 className={H2}>Uma vitrine para toda a família maçônica</h2>
+        <h2 className={H2}>Tendo empresa ou não, esta conexão é sua.</h2>
         <p className="mt-3 max-w-2xl text-stone-600">
-          Feita para quem procura produtos e serviços de confiança e para quem deseja divulgar seu negócio próprio.
+          A Conexão Maçônica foi criada para aproximar quem procura de quem oferece. Cada irmão ou familiar que utiliza
+          o guia, cada empresa que participa e cada relação construída contribuem para fortalecer essa iniciativa.
         </p>
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {AUDIENCE.map((item) => (
@@ -250,9 +252,9 @@ export function LandingPlansSection({ plans }: { plans: CommercialPlan[] }) {
     <section id="planos" className="scroll-mt-24 bg-white py-16 sm:py-24">
       <div className={SECTION}>
         <p className={EYEBROW}>Planos</p>
-        <h2 className={H2}>Escolha o plano ideal para o seu negócio</h2>
+        <h2 className={H2}>Escolha como sua empresa vai fazer parte desta conexão.</h2>
         <p className="mt-3 max-w-2xl text-stone-600">
-          Vigência anual. Pagamento parcelado sem juros no cartão ou com desconto à vista.
+          Conheça os planos Esquadro, Compasso e Acácia e escolha a opção de visibilidade e recursos mais adequada ao seu negócio.
         </p>
         <div className="mt-10 grid gap-6 lg:grid-cols-3">
           {sortedPlans.map((plan) => {
@@ -315,7 +317,7 @@ export function LandingPlansSection({ plans }: { plans: CommercialPlan[] }) {
                   </li>
                 </ul>
                 <Link href="/anunciar/passo-1" className={`${highlight ? CTA_PRIMARY : CTA_GHOST} mt-8`}>
-                  Assinar {plan.name.replace(/^Plano\s+/i, '')}
+                  Escolher {plan.name.replace(/^Plano\s+/i, '')}
                 </Link>
               </article>
             );
@@ -343,7 +345,7 @@ export function LandingPedraSection() {
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C9A227]">Reconhecimento institucional</p>
           <h2 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Pedra Fundamental: os primeiros a acreditar</h2>
           <p className="mt-4 max-w-xl leading-relaxed text-white/80">
-            A Pedra Fundamental é um reconhecimento destinado aos primeiros anunciantes da plataforma, que ajudam a erguer o
+            A Pedra Fundamental é um reconhecimento destinado aos primeiros anunciantes da plataforma, que ajudam a erguer a
             Conexão Maçônica desde a base. É uma distinção histórica da empresa, separada dos planos comerciais.
           </p>
           <p className="mt-3 text-sm text-white/60">

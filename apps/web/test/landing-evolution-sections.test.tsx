@@ -24,19 +24,20 @@ vi.mock('../src/components/public/business/sections/ConnectionLikeButton', () =>
 afterEach(cleanup);
 
 describe('Landing Differentials Section', () => {
-  it('renderiza os 6 pilares do ecossistema e o aviso de governança e transparência', () => {
+  it('renderiza os 7 pilares do ecossistema e o aviso de governança e transparência', () => {
     render(<LandingDifferentialsSection />);
 
-    expect(screen.getByText('Como fortalecemos essas conexões')).toBeDefined();
+    expect(screen.getByText('Conexões que vão além do digital.')).toBeDefined();
     expect(screen.getByText('Exposição em mídia')).toBeDefined();
-    expect(screen.getByText('Networking e relacionamento')).toBeDefined();
+    expect(screen.getByText('Networking')).toBeDefined();
     expect(screen.getByText('Divulgação nas redes sociais')).toBeDefined();
-    expect(screen.getByText('Listas de transmissão autorizadas')).toBeDefined();
+    expect(screen.getByText('Comunicação direcionada')).toBeDefined();
     expect(screen.getByText('Encontros de negócios')).toBeDefined();
     expect(screen.getByText('Palestras e conhecimento')).toBeDefined();
+    expect(screen.getByText('Divulgação de eventos maçônicos')).toBeDefined();
 
-    expect(screen.getByText(/Compromisso de Transparência:/i)).toBeDefined();
-    expect(screen.getByText(/não representam promessa de entrega contratual individual/i)).toBeDefined();
+    expect(screen.getByText(/Compromisso Institucional:/i)).toBeDefined();
+    expect(screen.getByText(/não representando verba de anúncios individual garantida/i)).toBeDefined();
   });
 });
 
@@ -44,7 +45,7 @@ describe('Landing Connections Mural Section', () => {
   it('renderiza o estado vazio institucional elegante quando não há registros reais', () => {
     render(<LandingConnectionsMuralSection items={[]} confirmedTotal={0} />);
 
-    expect(screen.getByText('Conexões que saem da tela e acontecem na vida real.')).toBeDefined();
+    expect(screen.getByText('Da conexão ao encontro. Do encontro a novas oportunidades.')).toBeDefined();
     expect(screen.getByText(/O que acontece quando você prestigia uma empresa da Conexão/i)).toBeDefined();
     expect(screen.getByText(/1. Prestigie uma empresa/i)).toBeDefined();
     expect(screen.getByText(/2. Registre a experiência/i)).toBeDefined();
@@ -72,7 +73,7 @@ describe('Landing Connections Mural Section', () => {
 
     render(<LandingConnectionsMuralSection items={mockItems} confirmedTotal={42} />);
 
-    expect(screen.getByText(/42 negócios confirmados na rede/i)).toBeDefined();
+    expect(screen.getByText(/42 conexões confirmadas na rede/i)).toBeDefined();
     expect(screen.getByText('Carlos')).toBeDefined();
     expect(screen.getByText('Ótica Visão Fraterna')).toBeDefined();
     expect(screen.getByText(/Excelente atendimento!/i)).toBeDefined();

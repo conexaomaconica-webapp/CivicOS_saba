@@ -523,18 +523,13 @@
 
 @media (max-width: 768px) {
   .dh-container { padding-inline: 14px; }
-  .dh-header__inner { height: 62px; }
+  .dh-header { padding: 0 !important; }
+  .dh-header__inner { display: none !important; }
   .dh-header__brand { min-width: 0; }
   .dh-header__brand img { width: auto; max-width: min(44vw, 145px); height: 42px; }
   .dh-header__actions { display: none !important; }
-  .dh-header__mobile-actions { flex: 0 0 auto; }
-  .dh-header__mobile-city { padding: 0 14px 9px; }
-  .dh-header__mobile-city .dh-city-dropdown {
-    width: 100%;
-    min-width: 0;
-    padding: 7px 12px;
-    border-radius: 10px;
-  }
+  .dh-header__mobile-actions { display: none !important; }
+  .dh-header__mobile-city { display: none !important; }
   .dh-hero { padding: 44px 16px 38px; overflow: hidden; }
   .dh-hero__title { font-size: clamp(30px, 9vw, 40px); }
   .dh-hero__tags { flex-wrap: wrap; gap: 10px 18px; }

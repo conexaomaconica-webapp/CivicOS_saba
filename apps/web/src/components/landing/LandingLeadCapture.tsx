@@ -54,7 +54,7 @@ export function LandingLeadCapture({ planOptions = DEFAULT_PLAN_OPTIONS }: { pla
         <div className="text-center">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#8a6d12]">Fale com a gente</p>
           <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-[#2a0a10] sm:text-4xl">Prefere que entremos em contato?</h2>
-          <p className="mt-3 text-stone-600">Deixe seus dados e nossa equipe ajuda você a anunciar.</p>
+          <p className="mt-3 text-stone-600">Deixe seus dados e nossa equipe entrará em contato para apresentar a plataforma e esclarecer suas dúvidas.</p>
         </div>
 
         {status ? (

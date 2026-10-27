@@ -35,15 +35,17 @@ export function DirectoryHero({
         <h1 className="dh-hero__title">{title}</h1>
         <p className="dh-hero__subtitle">{subtitle}</p>
 
-        {/* Live Search Input Bar & Dropdown */}
-        <DirectoryLiveSearchBox
-          initialQuery={initialQuery}
-          placeholder={searchPlaceholder}
-          selectedCity={selectedCity}
-          actionUrl="/guia/empresas"
-          className="max-w-[780px] mx-auto z-40"
-          iconType="search"
-        />
+        {/* Live Search Input Bar & Dropdown (Desktop / Tablet) */}
+        <div className="hidden md:block">
+          <DirectoryLiveSearchBox
+            initialQuery={initialQuery}
+            placeholder={searchPlaceholder}
+            selectedCity={selectedCity}
+            actionUrl="/guia/empresas"
+            className="max-w-[780px] mx-auto z-40"
+            iconType="search"
+          />
+        </div>
 
         {/* Badges de Confiança do Hero */}
         <div className="dh-hero__tags">

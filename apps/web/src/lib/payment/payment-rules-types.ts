@@ -91,24 +91,24 @@ export const PLAN_PRESETS = {
   bronze: {
     name: 'Plano Esquadro',
     code: 'bronze',
-    payInFullCents: 50000,
-    installmentTotalCents: 55000,
+    payInFullCents: 60000, // R$ 600,00 no PIX
+    installmentTotalCents: 63500, // R$ 635,00 no Cartão (2x de R$ 317,50)
     installmentsMax: 2,
-    installmentValueCents: 27500,
+    installmentValueCents: 31750,
   },
   prata: {
     name: 'Plano Compasso',
     code: 'prata',
-    payInFullCents: 78000,
-    installmentTotalCents: 85500,
+    payInFullCents: 80000, // R$ 800,00 no PIX
+    installmentTotalCents: 85500, // R$ 855,00 no Cartão (3x de R$ 285,00)
     installmentsMax: 3,
     installmentValueCents: 28500,
   },
   ouro: {
     name: 'Plano Acácia',
     code: 'ouro',
-    payInFullCents: 100000,
-    installmentTotalCents: 108000,
+    payInFullCents: 100000, // R$ 1.000,00 no PIX
+    installmentTotalCents: 108000, // R$ 1.080,00 no Cartão (4x de R$ 270,00)
     installmentsMax: 4,
     installmentValueCents: 27000,
   },
@@ -155,14 +155,14 @@ export function getCheckoutCalculatedAmount(params: {
 
   // 1. Promoção de Lançamento: Acácia com Pedra Fundamental
   if (isPedra) {
-    if (paymentMethod === 'pix' || count === 1) {
+    if (paymentMethod === 'pix') {
       return {
         finalAmountCents: PEDRA_FUNDAMENTAL_PRICING.payInFullCents, // R$ 1.200,00
         installmentValueCents: PEDRA_FUNDAMENTAL_PRICING.payInFullCents,
         isDiscountedAvista: true,
       };
     }
-    // Parcelado no cartão (em até 4x): R$ 1.300,00 no total
+    // No Cartão de Crédito (mesmo 1x ou parcelado em até 4x): R$ 1.300,00 no total
     const finalAmountCents = PEDRA_FUNDAMENTAL_PRICING.installmentTotalCents; // R$ 1.300,00
     const installmentValueCents = Math.round(finalAmountCents / count);
     return {
@@ -186,13 +186,14 @@ export function getCheckoutCalculatedAmount(params: {
   }
 
   if (preset) {
-    if (paymentMethod === 'pix' || count === 1) {
+    if (paymentMethod === 'pix') {
       return {
         finalAmountCents: preset.payInFullCents,
         installmentValueCents: preset.payInFullCents,
         isDiscountedAvista: true,
       };
     }
+    // No Cartão de Crédito (mesmo 1x ou parcelado): valor total de cartão
     const finalAmountCents = preset.installmentTotalCents;
     const installmentValueCents = Math.round(finalAmountCents / count);
     return {

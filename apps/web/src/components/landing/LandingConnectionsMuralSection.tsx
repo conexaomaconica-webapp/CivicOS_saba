@@ -54,7 +54,7 @@ export function LandingConnectionsMuralSection({ items, confirmedTotal }: Props)
             <div className="inline-flex items-center gap-2 self-start rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-800 sm:self-auto">
               <BadgeCheck className="h-4 w-4 text-emerald-600" />
               <span>
-                {confirmedTotal} {confirmedTotal === 1 ? 'negócio confirmado' : 'negócios confirmados'} na rede
+                {confirmedTotal} {confirmedTotal === 1 ? 'conexão confirmada' : 'conexões confirmadas'} na rede
               </span>
             </div>
           )}
@@ -168,7 +168,7 @@ export function LandingConnectionsMuralSection({ items, confirmedTotal }: Props)
 
             <div className="mt-8 flex flex-col items-start justify-between gap-4 border-t border-stone-200/70 pt-6 sm:flex-row sm:items-center">
               <p className="text-xs text-stone-500">
-                Os registros reais serão publicados à medida que os primeiros anunciantes confirmarem os atendimentos na rede.
+                Os registros são compartilhados voluntariamente e passam por confirmação prévia antes da publicação na rede.
               </p>
               <Link
                 href="/guia#mural-de-conexoes"

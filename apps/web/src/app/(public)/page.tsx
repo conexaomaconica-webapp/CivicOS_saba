@@ -23,23 +23,24 @@ import { LandingLeadCapture } from '@/components/landing/LandingLeadCapture';
 import { getConfirmedConnectionsCountAction, getConnectionsFeedAction } from '@/app/actions/connections';
 
 export const metadata: Metadata = {
-  title: { absolute: 'Conexão Maçônica | Guia de Empresas e Anúncios Maçônicos' },
+  title: { absolute: 'Conexão Maçônica — Empresas, Benefícios e Conexões' },
   description:
-    'Guia de empresas da comunidade maçônica: encontre serviços e anuncie seu negócio. Planos anuais no Pix ou cartão para maçons, cunhadas e familiares.',
+    'Descubra empresas, profissionais, benefícios e oportunidades. Uma iniciativa que aproxima irmãos, cunhadas e sobrinhos, fortalece negócios, relacionamentos e a fraternidade.',
   keywords: [
-    'guia maçônico',
-    'empresas maçônicas',
-    'anunciar empresa maçom',
-    'guia comercial maçonaria',
-    'negócios maçons',
-    'networking maçônico',
     'Conexão Maçônica',
+    'empresas maçônicas',
+    'profissionais maçônicos',
+    'benefícios maçonaria',
+    'guia maçônico',
+    'networking maçônico',
+    'negócios maçons',
+    'família maçônica',
   ],
   alternates: { canonical: appUrl('/') },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 } },
   openGraph: {
-    title: 'Conexão Maçônica | Anuncie para quem confia em você',
-    description: 'Guia comercial da comunidade maçônica. Conheça os planos e o reconhecimento Pedra Fundamental para os primeiros anunciantes.',
+    title: 'Conexão Maçônica — Tradição que une, conexão que nos fortalece.',
+    description: 'Conheça uma plataforma que valoriza negócios, aproxima irmãos, cunhadas e sobrinhos, fortalece negócios, relacionamentos e a fraternidade.',
     url: appUrl('/'),
     siteName: 'Conexão Maçônica',
     locale: 'pt_BR',
@@ -48,44 +49,44 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Conexão Maçônica | Guia de Empresas Maçônicas',
-    description: 'Anuncie seu negócio para a comunidade maçônica e seja encontrado.',
+    title: 'Conexão Maçônica — Empresas, Benefícios e Conexões',
+    description: 'Descubra empresas, serviços e benefícios. Conheça a Conexão Maçônica e faça parte dessa iniciativa.',
     images: [appUrl('/logoconexao_red.png')],
   },
 };
 
 const FAQ_ITEMS = [
   {
-    q: 'O Conexão Maçônica é exclusivo para maçons?',
-    a: 'O guia foi pensado para a família maçônica: maçons, cunhadas, sobrinhos, familiares e amigos que têm negócio próprio e valorizam relações baseadas em confiança.',
+    q: 'A Conexão Maçônica é exclusiva para maçons?',
+    a: 'A Conexão Maçônica foi criada para aproximar irmãos, cunhadas e sobrinhos, valorizando os laços de confiança que nos unem. A plataforma permite descobrir empresas, profissionais, produtos, serviços e benefícios, além de oferecer oportunidades de divulgação para negócios participantes da comunidade.',
   },
   {
     q: 'Quem pode cadastrar uma empresa?',
-    a: 'Empresários, profissionais liberais, prestadores de serviço e estabelecimentos comerciais que queiram divulgar seus produtos e serviços para a comunidade.',
+    a: 'Empresários, profissionais liberais e prestadores de serviços que atendam aos critérios de participação da Conexão Maçônica podem cadastrar seus negócios e apresentar produtos e serviços à comunidade.',
   },
   {
     q: 'Qual a diferença entre os planos?',
-    a: 'Cada plano libera uma quantidade maior de fotos, serviços, ofertas, eventos e destaque no guia. Os valores e recursos de cada um estão na seção de planos desta página.',
+    a: 'Os planos Esquadro, Compasso e Acácia oferecem diferentes níveis de apresentação e destaque no guia, com recursos que variam conforme a modalidade contratada. Compare as funcionalidades e condições na seção de planos desta página.',
   },
   {
     q: 'O que é a Pedra Fundamental?',
-    a: 'É um reconhecimento institucional dado aos primeiros anunciantes da plataforma. Ele é independente dos planos comerciais e não faz parte dos benefícios de nenhum plano.',
+    a: 'É um reconhecimento institucional destinado aos primeiros participantes da plataforma, independente dos planos comerciais e não vinculado como benefício de nenhuma modalidade.',
   },
   {
-    q: 'Quanto custa anunciar no Conexão Maçônica?',
-    a: 'Os planos são anuais: Plano Acácia em 4x de R$ 270,00 (ou R$ 1.000,00 à vista), Plano Compasso em 3x de R$ 285,00 (ou R$ 800,00 à vista) e Plano Esquadro em 2x de R$ 317,50 (ou R$ 600,00 à vista). Todos os valores e recursos estão detalhados na seção de planos desta página.',
+    q: 'Quanto custa participar da Conexão Maçônica?',
+    a: 'A participação possui vigência anual com condições acessíveis, opção de parcelamento sem juros no cartão ou condição especial à vista no Pix. Os valores atualizados e limites de parcelas de cada categoria (Esquadro, Compasso e Acácia) estão detalhados na seção de planos desta página.',
   },
   {
-    q: 'Cunhada ou sobrinho de maçom pode anunciar?',
-    a: 'Sim. O guia é aberto à família maçônica: cunhadas e sobrinhos com negócio próprio ou profissionais, podem se cadastrar e anunciar nos mesmos planos.',
+    q: 'Cunhadas ou sobrinhos podem anunciar?',
+    a: 'Sim. A plataforma é aberta para cunhadas e sobrinhos com negócio próprio ou atuação profissional. Podem se cadastrar e participar dos planos. As informações serão analisadas para verificação do irmão (maçon).',
   },
   {
-    q: 'Como encontro empresas de maçons na minha cidade?',
-    a: 'Acesse o guia de empresas e filtre por cidade e categoria. Cada anunciante tem uma página própria com serviços, ofertas e formas de contato.',
+    q: 'Como encontro empresas na minha cidade?',
+    a: 'Acesse o guia de empresas e filtre por cidade e categoria. Cada participante tem uma página própria com informações, serviços, ofertas e formas diretas de contato.',
   },
   {
-    q: 'Como posso pagar?',
-    a: 'À vista no Pix ou parcelado no cartão, conforme as condições exibidas em cada plano. Após a aprovação do cadastro e a assinatura do contrato, seu anúncio é publicado.',
+    q: 'Como funciona o processo até a publicação?',
+    a: 'Você preenche os dados do seu negócio, escolhe o plano, assina o contrato digital e realiza o pagamento via Pix ou cartão. Após a verificação cadastral e a confirmação do pagamento quando aplicável, seu perfil é publicado oficialmente no guia.',
   },
 ];
 
@@ -96,7 +97,7 @@ const organizationSchema = {
   name: 'Conexão Maçônica',
   url: appUrl('/'),
   logo: appUrl('/logoconexao_red.png'),
-  description: 'Guia comercial da comunidade maçônica para divulgação de empresas, profissionais e serviços.',
+  description: 'Plataforma de divulgação de empresas e profissionais, descoberta de benefícios e fortalecimento de conexões entre irmãos, cunhadas e sobrinhos.',
   areaServed: { '@type': 'Country', name: 'Brasil' },
 };
 
@@ -115,7 +116,7 @@ const webPageSchema = {
   '@type': 'WebPage',
   '@id': appUrl('/#webpage'),
   url: appUrl('/'),
-  name: 'Conexão Maçônica | Guia de Empresas e Anúncios Maçônicos',
+  name: 'Conexão Maçônica — Empresas, Benefícios e Conexões',
   isPartOf: { '@id': appUrl('/#website') },
   about: { '@id': appUrl('/#organization') },
   inLanguage: 'pt-BR',
@@ -128,9 +129,9 @@ const webPageSchema = {
 const launchEventSchema = {
   '@context': 'https://schema.org',
   '@type': 'Event',
-  name: 'Lançamento oficial do Conexão Maçônica',
+  name: 'Lançamento oficial da Conexão Maçônica',
   description:
-    'Noite de relacionamentos, oportunidades e fortalecimento de negócios para irmãos, cunhadas, sobrinhos e empresários, com palestras sobre Liderança Emocional Inteligente e Síndrome dos Pais Culpados.',
+    'Noite de relacionamentos, oportunidades e fortalecimento de negócios para irmãos, cunhadas e sobrinhos empresários, com palestras sobre Liderança Emocional Inteligente e Síndrome dos Pais Culpados.',
   startDate: '2026-11-24T19:00:00-03:00',
   eventStatus: 'https://schema.org/EventScheduled',
   eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
@@ -148,7 +149,7 @@ function buildPlansSchema(plans: CommercialPlan[]) {
   return {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
-    name: 'Planos de anúncio no Conexão Maçônica',
+    name: 'Planos de participação na Conexão Maçônica',
     itemListElement: plans.map((plan, index) => ({
       '@type': 'ListItem',
       position: index + 1,
@@ -195,8 +196,14 @@ export default async function HomePage() {
   const [plans, brand, confirmedConnections, connectionsFeed] = await Promise.all([
     loadPlans(),
     resolveTenantBrandContext().catch(() => null),
-    getConfirmedConnectionsCountAction().catch(() => 0),
-    getConnectionsFeedAction(6).catch(() => []),
+    getConfirmedConnectionsCountAction().catch((err) => {
+      console.error('[Mural/ConnectionsCount] Erro ao carregar total de conexões:', err);
+      return 0;
+    }),
+    getConnectionsFeedAction(6).catch((err) => {
+      console.error('[Mural/ConnectionsFeed] Erro ao carregar feed de conexões:', err);
+      return [];
+    }),
   ]);
   const planOrder: Record<string, number> = { ouro: 0, prata: 1, bronze: 2 };
   const sortedPlans = [...plans].sort((a, b) => (planOrder[a.tier] ?? 99) - (planOrder[b.tier] ?? 99));

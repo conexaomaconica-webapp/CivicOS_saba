@@ -275,7 +275,7 @@ describe('Microetapa 6.1 — Criação Segura de Cobrança Asaas e Hardenings', 
       expect(pixPricing.installmentValueCents).toBe(120000);
       expect(pixPricing.isDiscountedAvista).toBe(true);
 
-      // 2. Pagamento via Cartão de Crédito 1x (à vista): R$ 1.200,00
+      // 2. Pagamento via Cartão de Crédito 1x: valor de cartão R$ 1.300,00
       const card1xPricing = getCheckoutCalculatedAmount({
         amountCents: 120000,
         paymentMethod: 'credit_card',
@@ -284,9 +284,9 @@ describe('Microetapa 6.1 — Criação Segura de Cobrança Asaas e Hardenings', 
         planCode: 'ouro',
         planName: 'Plano Acácia (Pedra Fundamental)',
       });
-      expect(card1xPricing.finalAmountCents).toBe(120000);
-      expect(card1xPricing.installmentValueCents).toBe(120000);
-      expect(card1xPricing.isDiscountedAvista).toBe(true);
+      expect(card1xPricing.finalAmountCents).toBe(130000);
+      expect(card1xPricing.installmentValueCents).toBe(130000);
+      expect(card1xPricing.isDiscountedAvista).toBe(false);
 
       // 3. Pagamento via Cartão de Crédito 4x: total R$ 1.300,00 (4x de R$ 325,00)
       const card4xPricing = getCheckoutCalculatedAmount({
@@ -336,9 +336,32 @@ describe('Microetapa 6.1 — Criação Segura de Cobrança Asaas e Hardenings', 
       });
       expect(pixFromParceladoDb.finalAmountCents).toBe(120000);
 
-      // 7. Planos regulares (ex: Compasso 3x) respeitam seus presets
+      // 7. Planos regulares respeitam valores específicos para PIX e Cartão de Crédito (mesmo 1x):
+      // A) Plano Compasso: PIX = R$ 800,00 | Cartão 1x = R$ 855,00 | Cartão 3x = 3x de R$ 285,00 (Total R$ 855,00)
+      const compassoPix = getCheckoutCalculatedAmount({
+        amountCents: 80000,
+        paymentMethod: 'pix',
+        installmentsCount: 1,
+        isPedraFundamental: false,
+        planCode: 'prata',
+        planName: 'Plano Compasso',
+      });
+      expect(compassoPix.finalAmountCents).toBe(80000);
+      expect(compassoPix.installmentValueCents).toBe(80000);
+
+      const compasso1x = getCheckoutCalculatedAmount({
+        amountCents: 80000,
+        paymentMethod: 'credit_card',
+        installmentsCount: 1,
+        isPedraFundamental: false,
+        planCode: 'prata',
+        planName: 'Plano Compasso',
+      });
+      expect(compasso1x.finalAmountCents).toBe(85500);
+      expect(compasso1x.installmentValueCents).toBe(85500);
+
       const compasso3x = getCheckoutCalculatedAmount({
-        amountCents: 78000,
+        amountCents: 80000,
         paymentMethod: 'credit_card',
         installmentsCount: 3,
         isPedraFundamental: false,
@@ -347,6 +370,72 @@ describe('Microetapa 6.1 — Criação Segura de Cobrança Asaas e Hardenings', 
       });
       expect(compasso3x.finalAmountCents).toBe(85500);
       expect(compasso3x.installmentValueCents).toBe(28500); // 3x de R$ 285,00
+
+      // B) Plano Esquadro: PIX = R$ 600,00 | Cartão 1x = R$ 635,00 | Cartão 2x = 2x de R$ 317,50 (Total R$ 635,00)
+      const esquadroPix = getCheckoutCalculatedAmount({
+        amountCents: 60000,
+        paymentMethod: 'pix',
+        installmentsCount: 1,
+        isPedraFundamental: false,
+        planCode: 'bronze',
+        planName: 'Plano Esquadro',
+      });
+      expect(esquadroPix.finalAmountCents).toBe(60000);
+
+      const esquadro1x = getCheckoutCalculatedAmount({
+        amountCents: 60000,
+        paymentMethod: 'credit_card',
+        installmentsCount: 1,
+        isPedraFundamental: false,
+        planCode: 'bronze',
+        planName: 'Plano Esquadro',
+      });
+      expect(esquadro1x.finalAmountCents).toBe(63500);
+      expect(esquadro1x.installmentValueCents).toBe(63500);
+
+      const esquadro2x = getCheckoutCalculatedAmount({
+        amountCents: 60000,
+        paymentMethod: 'credit_card',
+        installmentsCount: 2,
+        isPedraFundamental: false,
+        planCode: 'bronze',
+        planName: 'Plano Esquadro',
+      });
+      expect(esquadro2x.finalAmountCents).toBe(63500);
+      expect(esquadro2x.installmentValueCents).toBe(31750); // 2x de R$ 317,50
+
+      // C) Plano Acácia regular: PIX = R$ 1.000,00 | Cartão 1x = R$ 1.080,00 | Cartão 4x = 4x de R$ 270,00 (Total R$ 1.080,00)
+      const acaciaPix = getCheckoutCalculatedAmount({
+        amountCents: 100000,
+        paymentMethod: 'pix',
+        installmentsCount: 1,
+        isPedraFundamental: false,
+        planCode: 'ouro',
+        planName: 'Plano Acácia',
+      });
+      expect(acaciaPix.finalAmountCents).toBe(100000);
+
+      const acacia1x = getCheckoutCalculatedAmount({
+        amountCents: 100000,
+        paymentMethod: 'credit_card',
+        installmentsCount: 1,
+        isPedraFundamental: false,
+        planCode: 'ouro',
+        planName: 'Plano Acácia',
+      });
+      expect(acacia1x.finalAmountCents).toBe(108000);
+      expect(acacia1x.installmentValueCents).toBe(108000);
+
+      const acacia4x = getCheckoutCalculatedAmount({
+        amountCents: 100000,
+        paymentMethod: 'credit_card',
+        installmentsCount: 4,
+        isPedraFundamental: false,
+        planCode: 'ouro',
+        planName: 'Plano Acácia',
+      });
+      expect(acacia4x.finalAmountCents).toBe(108000);
+      expect(acacia4x.installmentValueCents).toBe(27000); // 4x de R$ 270,00
     });
 
     it('critério 7: Idempotência visual no refresh (não duplica cobrança no gateway)', () => {

@@ -7,6 +7,8 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Heart, MapPin, User, Menu, X, PlusCircle, LogOut, UserPlus } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useFavorites } from '@/lib/directory/favorites-context';
+import { CategoryIcon, APP_CATEGORIES } from '@/components/landing/LandingMobileTopBar';
+import { DirectoryLiveSearchBox } from './DirectoryLiveSearchBox';
 
 type DirectoryHeaderProps = {
   appName?: string;
@@ -14,6 +16,7 @@ type DirectoryHeaderProps = {
   selectedCity?: string | null;
   availableCities?: string[];
   onCityChange?: (city: string) => void;
+  categories?: Array<{ id?: string; slug: string; name: string; icon_name?: string | null; business_count?: number }>;
 };
 
 export function DirectoryHeader({
@@ -22,6 +25,7 @@ export function DirectoryHeader({
   selectedCity,
   availableCities = [],
   onCityChange,
+  categories = [],
 }: DirectoryHeaderProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -98,6 +102,37 @@ export function DirectoryHeader({
     }
   };
 
+  const currentCat = searchParams ? (searchParams.get('cat') || searchParams.get('category') || '') : '';
+
+  const headerCategories = React.useMemo(() => {
+    if (categories && categories.length > 0) {
+      // Prioriza categorias que têm empresas no catálogo
+      const withBiz = categories.filter((c) => (c.business_count ?? 0) > 0);
+      const withoutBiz = categories.filter((c) => !(c.business_count && c.business_count > 0));
+      return [...withBiz, ...withoutBiz];
+    }
+    return APP_CATEGORIES;
+  }, [categories]);
+
+  const handleCategoryClick = (catSlug: string) => {
+    const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
+    if (currentCat === catSlug) {
+      params.delete('cat');
+      params.delete('category');
+    } else {
+      params.set('cat', catSlug);
+      params.delete('category');
+    }
+    params.delete('page');
+
+    // Se o usuário está na página inicial do Guia (/guia), permanece em /guia e rola até a listagem #todas
+    // Se está em /guia/empresas, permanece em /guia/empresas
+    const isGuiaHome = pathname === '/guia' || pathname === '/guia/';
+    const targetPath = isGuiaHome ? '/guia' : (pathname || '/guia/empresas');
+    const hash = isGuiaHome ? '#todas' : '';
+    router.push(`${targetPath}?${params.toString()}${hash}`);
+  };
+
   const citiesToDisplay = Array.from(new Set(
     (availableCities || []).filter((city): city is string => typeof city === 'string' && city.trim().length > 0)
   )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -118,7 +153,7 @@ export function DirectoryHeader({
 
   return (
     <header className="dh-header sticky top-0 z-50">
-      <div className="dh-container dh-header__inner">
+      <div className="dh-container dh-header__inner hidden md:flex">
         {/* Brand / Logo */}
         <Link href="/guia" className="dh-header__brand">
           <Image
@@ -230,46 +265,123 @@ export function DirectoryHeader({
           )}
         </div>
 
-        {/* Mobile Hamburger Toggle Button */}
-        <div className="dh-header__mobile-actions flex items-center gap-2 md:hidden">
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="dh-header__icon-btn relative p-1.5"
-            aria-label="Favoritos"
-          >
-            <Heart className={`w-4 h-4 ${favoritesCount > 0 ? 'fill-red-500 text-red-500' : ''}`} />
-            {favoritesCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
-                {favoritesCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="dh-header__icon-btn p-2 text-white"
-            aria-label="Abrir menu de navegação"
-          >
-            {mobileMenuOpen ? <X className="w-6 h-6 text-[#C9A227]" /> : <Menu className="w-6 h-6 text-white" />}
-          </button>
-        </div>
       </div>
 
-      {/* No mobile o filtro ocupa uma linha própria para não comprimir a marca e as ações. */}
-      <div className="dh-header__mobile-city md:hidden">
-        <div className="dh-city-dropdown">
-          <MapPin className="h-4 w-4 shrink-0 text-[#C9A227]" />
-          <select
-            value={activeCity || ''}
-            onChange={(e) => handleCityChange(e.target.value)}
-            aria-label="Filtrar empresas por cidade"
-            className="min-w-0 flex-1 cursor-pointer truncate border-none bg-transparent text-xs font-semibold text-white outline-none"
-          >
-            <option value="" className="bg-white text-stone-900">Todas as cidades</option>
-            {citiesToDisplay.map((c) => (
-              <option key={c} value={c} className="bg-white text-stone-900">{c}</option>
-            ))}
-          </select>
+      {/* Topo Mobile (< md) — Formato idêntico ao App nativo da Conexão Maçônica */}
+      <div className="flex flex-col gap-2 px-3 pt-2 pb-2 md:hidden bg-[#4b161b] text-white border-b border-[#c9a227]/40 shadow-md">
+        {/* Linha 1: Marca + Seletor de Cidades ao lado da Logo + Ações */}
+        <div className="flex items-center justify-between gap-2 w-full">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <Link href="/guia" className="inline-flex shrink-0 items-center" aria-label="Conexão Maçônica — início">
+              <Image
+                src={logoSrc}
+                alt={appName}
+                width={160}
+                height={56}
+                className="h-8 w-auto object-contain brightness-110"
+                priority
+                unoptimized
+              />
+            </Link>
+
+            {/* Seletor de Cidades no topo ao lado da logo (Pill idêntico ao app) */}
+            <div className="inline-flex items-center gap-1 h-8 px-2.5 rounded-full border border-[#c9a227]/50 bg-white/10 text-xs font-semibold text-[#f3eedd] max-w-[170px] truncate hover:bg-white/15 transition-colors">
+              <MapPin className="w-3.5 h-3.5 text-[#c9a227] shrink-0" />
+              <select
+                value={activeCity || ''}
+                onChange={(e) => handleCityChange(e.target.value)}
+                aria-label="Filtrar por cidade"
+                className="bg-transparent text-white border-none outline-none cursor-pointer text-xs font-semibold truncate pr-1"
+              >
+                <option value="" className="bg-white text-stone-900">Brasil (Todas)</option>
+                {citiesToDisplay.map((c) => (
+                  <option key={c} value={c} className="bg-white text-stone-900">
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <span className="text-[#dfbd58] text-[10px] shrink-0">▾</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Favoritos */}
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="dh-header__icon-btn relative p-1.5"
+              aria-label="Favoritos"
+            >
+              <Heart className={`w-4 h-4 ${favoritesCount > 0 ? 'fill-red-500 text-red-500' : ''}`} />
+              {favoritesCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
+                  {favoritesCount}
+                </span>
+              )}
+            </button>
+
+            {/* Menu */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="dh-header__icon-btn p-1.5 text-white"
+              aria-label="Abrir menu de navegação"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5 text-[#c9a227]" /> : <Menu className="w-5 h-5 text-white" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Linha 2: Campo Buscar empresas ou serviços com busca ao vivo / autocomplete */}
+        <DirectoryLiveSearchBox
+          variant="header"
+          placeholder="Buscar empresas ou serviços..."
+          selectedCity={activeCity}
+          availableCities={citiesToDisplay}
+          categories={headerCategories.map((c) => ({ id: 'id' in c ? c.id : undefined, slug: c.slug, name: c.name }))}
+          initialQuery={searchParams ? (searchParams.get('q') || '') : ''}
+          actionUrl="/guia/empresas"
+        />
+
+        {/* Linha 3: Slider Horizontal de Ícones de Categorias (Categorias do catálogo preferencialmente) */}
+        <div className="relative -mx-3 px-3 overflow-x-auto scrollbar-none py-1" role="region" aria-label="Categorias em destaque">
+          <div className="flex gap-2.5 w-max">
+            {headerCategories.map((cat) => {
+              const isActive = currentCat === cat.slug;
+              const hasCount = ('business_count' in cat && (cat.business_count ?? 0) > 0) || Boolean((cat as any).isCatalog);
+              return (
+                <button
+                  key={cat.slug}
+                  type="button"
+                  onClick={() => handleCategoryClick(cat.slug)}
+                  className={`flex flex-col items-center gap-1 w-[60px] shrink-0 text-center transition-all ${
+                    isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
+                  }`}
+                >
+                  <div
+                    className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
+                      isActive
+                        ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
+                        : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
+                    }`}
+                  >
+                    <CategoryIcon slug={cat.slug} name={cat.name} />
+                    {hasCount && (
+                      <span
+                        className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
+                        title="Ativo no Catálogo"
+                      />
+                    )}
+                  </div>
+                  <span
+                    className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
+                      isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
+                    }`}
+                  >
+                    {cat.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 

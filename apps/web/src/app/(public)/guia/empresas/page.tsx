@@ -24,6 +24,7 @@ import {
   parseGeoCookie,
 } from '@/lib/directory/business-filters';
 import { resolveSearchQuery } from '@/lib/directory/normalize-search';
+import { findBusinessesByMasonicMember } from '@/lib/directory/masonic-member-search';
 import { TrackEvent } from '@/components/analytics/TrackEvent';
 import { sanitizeSearchTerm } from '@/lib/analytics/events';
 import '@/styles/directory-home.css';
@@ -187,6 +188,53 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
     searchDataRaw = res055;
   }
 
+  // 3. Se houver termo de busca, busca também por Irmão, Cunhada, Sobrinho(a) ou Maçom de Referência
+  if (q && q.trim().length >= 2) {
+    try {
+      const memberResults = await findBusinessesByMasonicMember({
+        query: q,
+        city: city || null,
+        categorySlug: cat || null,
+        limit: pageSize,
+      });
+
+      if (memberResults.length > 0) {
+        const existingItems = Array.isArray(searchDataRaw?.items) ? [...searchDataRaw.items] : [];
+        const existingIds = new Set(existingItems.map((item: any) => item.id));
+
+        const newItems: any[] = [];
+        for (const m of memberResults) {
+          if (!existingIds.has(m.id)) {
+            existingIds.add(m.id);
+            newItems.push(m);
+          } else {
+            const existing = existingItems.find((x: any) => x.id === m.id);
+            if (existing) {
+              existing.responsible_name = m.responsible_name;
+              existing.responsible_label = m.responsible_label;
+              existing.responsible_lodge = m.responsible_lodge;
+              existing.reference_mason_name = m.reference_mason_name;
+              existing.masonic_member_name = m.masonic_member_name;
+              existing.masonic_relationship_type = m.masonic_relationship_type;
+              existing.masonic_brother_name = m.masonic_brother_name;
+            }
+          }
+        }
+
+        const mergedItems = [...newItems, ...existingItems];
+        searchDataRaw = {
+          items: mergedItems,
+          total: (searchDataRaw?.total || 0) + newItems.length,
+          page: searchDataRaw?.page || 1,
+          page_size: searchDataRaw?.page_size || pageSize,
+          total_pages: Math.max(1, Math.ceil(((searchDataRaw?.total || 0) + newItems.length) / pageSize)),
+        };
+      }
+    } catch (_memberErr) {
+      console.error('Erro ao buscar empresas por membro maçônico:', _memberErr);
+    }
+  }
+
   if (!searchDataRaw || !searchDataRaw.items || searchDataRaw.items.length === 0) {
     try {
       let directQuery = (supabase as any)
@@ -303,6 +351,7 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
           logoUrl={tenantBrand?.logoUrl}
           selectedCity={city}
           availableCities={availableCities}
+          categories={categories}
         />
 
         {/* Breadcrumb & Sub-Hero */}
@@ -326,8 +375,8 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
               Descubra oportunidades comerciais, parceiros e negócios com vínculo maçônico verificado na plataforma.
             </p>
 
-            {/* Barra de Busca Principal */}
-            <form action="/guia/empresas" method="GET" className="dh-search-box mt-8 max-w-3xl">
+            {/* Barra de Busca Principal (Apenas Desktop/Tablet — No mobile fica exclusivamente no header) */}
+            <form action="/guia/empresas" method="GET" className="dh-search-box mt-8 max-w-3xl hidden md:flex">
               <Sparkles className="w-5 h-5 text-amber-500 ml-3 shrink-0" />
               <input
                 type="text"

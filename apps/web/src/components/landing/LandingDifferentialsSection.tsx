@@ -14,49 +14,49 @@ const DIFFERENTIALS = [
     icon: Megaphone,
     title: 'Exposição em mídia',
     description:
-      'Mais visibilidade para empresas e profissionais por meio de ações de divulgação e comunicação institucional.',
+      'Mais visibilidade para empresas e profissionais por meio de ações de comunicação e divulgação institucional.',
     pilar: 'VISIBILIDADE',
   },
   {
     icon: Users,
-    title: 'Networking e relacionamento',
+    title: 'Networking',
     description:
-      'Conexões entre irmãos e familiares que fortalecem relacionamentos e abrem caminhos para novas oportunidades.',
+      'Aproximamos irmãos e familiares, fortalecendo relacionamentos baseados em confiança e abrindo caminhos para novas oportunidades.',
     pilar: 'CONEXÕES',
   },
   {
     icon: Share2,
-    title: 'Divulgação nas redes sociais e tráfego pago',
+    title: 'Divulgação nas redes sociais',
     description:
-      'Ampliamos a visibilidade de empresas, produtos, serviços e novidades por meio dos nossos canais digitais, com publicações e campanhas de impulsionamento (tráfego pago) para alcançar novos públicos.',
+      'Promovemos empresas, produtos, serviços e novidades nos canais digitais da Conexão Maçônica, incluindo ações de impulsionamento e tráfego pago para ampliar o alcance das nossas iniciativas.',
     pilar: 'DIVULGAÇÃO',
   },
   {
     icon: MessageSquare,
     title: 'Comunicação direcionada',
     description:
-      'Novidades, oportunidades e informações relevantes compartilhadas com participantes que autorizarem o recebimento.',
+      'Compartilhamos novidades, benefícios e oportunidades por meio de canais oficiais e listas de transmissão autorizadas.',
     pilar: 'COMUNICAÇÃO',
   },
   {
     icon: Briefcase,
     title: 'Encontros de negócios',
     description:
-      'Momentos para apresentar empresas, trocar experiências, criar parcerias e ampliar relacionamentos profissionais.',
+      'Criamos oportunidades para apresentar empresas, trocar experiências, construir parcerias e ampliar relacionamentos profissionais.',
     pilar: 'OPORTUNIDADES',
   },
   {
     icon: BookOpen,
     title: 'Palestras e conhecimento',
     description:
-      'Troca de experiências e conhecimentos sobre negócios, empreendedorismo, gestão e desenvolvimento profissional.',
+      'Incentivamos a troca de conhecimentos sobre empreendedorismo, gestão, liderança e desenvolvimento profissional.',
     pilar: 'CONHECIMENTO',
   },
   {
     icon: CalendarDays,
     title: 'Divulgação de eventos maçônicos',
     description:
-      'Valorizamos e divulgamos eventos promovidos por Lojas Maçônicas, incentivando a participação, a integração entre irmãos e o fortalecimento dos laços fraternos.',
+      'Valorizamos e divulgamos eventos promovidos por Lojas Maçônicas, incentivando a participação e fortalecendo os laços fraternos.',
     pilar: 'INTEGRAÇÃO',
   },
 ];
@@ -85,9 +85,8 @@ export function LandingDifferentialsSection() {
             return (
               <div
                 key={item.title}
-                className={`group relative flex flex-col justify-between rounded-2xl border border-stone-200/90 bg-white p-6 shadow-xs transition hover:border-[#C9A227]/60 hover:shadow-md ${
-                  isLastOdd ? 'sm:col-span-2 lg:col-span-3 lg:flex-row lg:items-center lg:gap-6' : ''
-                }`}
+                className={`group relative flex flex-col justify-between rounded-2xl border border-stone-200/90 bg-white p-6 shadow-xs transition hover:border-[#C9A227]/60 hover:shadow-md ${isLastOdd ? 'sm:col-span-2 lg:col-span-3 lg:flex-row lg:items-center lg:gap-6' : ''
+                  }`}
               >
                 <div className={isLastOdd ? 'lg:flex lg:items-center lg:gap-5' : ''}>
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#5d1523]/10 text-[#5d1523] transition group-hover:bg-[#5d1523] group-hover:text-white">

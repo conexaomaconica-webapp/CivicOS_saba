@@ -87,12 +87,24 @@ export const PEDRA_FUNDAMENTAL_SEAL = PEDRA_FUNDAMENTAL_CIRCULAR_SEAL;
 // Formatação do Vínculo Maçônico (Respeitando os termos tradicionais e LGPD)
 function formatMasonicConnection(data: BusinessCardData): { title: string; lodge?: string } | null {
   if (data.is_masonic_connection_public === false) return null;
-  if (!data.masonic_member_name && !data.masonic_relationship_type) return null;
-
-  const rel = (data.masonic_relationship_type || 'brother').toLowerCase();
-  const name = data.masonic_member_name || '';
+  const name = data.masonic_member_name || data.responsible_name || '';
   const brotherName = data.masonic_brother_name || '';
-  const lodge = data.masonic_lodge_name ? `Loja ${data.masonic_lodge_name}` : undefined;
+  const rel = (
+    data.masonic_relationship_type ||
+    (data.responsible_label?.toLowerCase().includes('cunhada')
+      ? 'cunhada'
+      : data.responsible_label?.toLowerCase().includes('sobrinh')
+      ? 'sobrinho'
+      : 'brother')
+  ).toLowerCase();
+
+  if (!name && !data.masonic_relationship_type && !data.responsible_label) return null;
+  const rawLodge = data.masonic_lodge_name || data.responsible_lodge;
+  const lodge = rawLodge
+    ? rawLodge.toLowerCase().startsWith('loja') || rawLodge.toLowerCase().startsWith('a.')
+      ? rawLodge
+      : `Loja ${rawLodge}`
+    : undefined;
 
   if (rel === 'representative' || rel === 'representante') {
     return {

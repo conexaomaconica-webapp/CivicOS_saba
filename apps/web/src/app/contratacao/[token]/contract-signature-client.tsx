@@ -953,7 +953,7 @@ export function ContractSignatureClient({
                       return (
                         <option key={count} value={count}>
                           {count === 1
-                            ? `1x de ${instFormatted} (À vista: ${totalFormatted})`
+                            ? `1x de ${instFormatted} no Cartão (Total: ${totalFormatted})`
                             : `${count}x de ${instFormatted} sem juros (Total: ${totalFormatted})`}
                         </option>
                       );
@@ -961,19 +961,19 @@ export function ContractSignatureClient({
                   </select>
                   <p className="text-[11px] text-stone-500">
                     {isPedra
-                      ? `Promoção de Lançamento Pedra Fundamental: R$ 1.200,00 à vista ou em até 4x de R$ 325,00 sem juros (R$ 1.300,00 total).`
-                      : `Condição permitida para o plano (máximo de ${maxAllowedInstallments}x sem juros).`}
+                      ? `Promoção de Lançamento Pedra Fundamental: R$ 1.200,00 no PIX ou R$ 1.300,00 no Cartão (em até 4x sem juros de R$ 325,00).`
+                      : `Condição de parcelamento permitida para o plano (máximo de ${maxAllowedInstallments}x sem juros no Cartão).`}
                   </p>
-                  {selectedInstallments > 1 && (
-                    <div className="rounded-xl bg-amber-50/80 p-3 border border-amber-200 text-xs text-amber-900 flex items-center justify-between">
-                      <span className="font-semibold">
-                        Total no Cartão: {(currentCardPricing.finalAmountCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      </span>
-                      <span className="font-medium text-amber-800">
-                        {selectedInstallments}x de {(currentCardPricing.installmentValueCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} sem juros
-                      </span>
-                    </div>
-                  )}
+                  <div className="rounded-xl bg-amber-50/80 p-3 border border-amber-200 text-xs text-amber-900 flex items-center justify-between">
+                    <span className="font-semibold">
+                      Total no Cartão: {(currentCardPricing.finalAmountCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
+                    <span className="font-medium text-amber-800">
+                      {selectedInstallments === 1
+                        ? `1x de ${(currentCardPricing.installmentValueCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                        : `${selectedInstallments}x de ${(currentCardPricing.installmentValueCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} sem juros`}
+                    </span>
+                  </div>
                 </div>
               </div>
 

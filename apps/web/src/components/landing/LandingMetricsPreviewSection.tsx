@@ -34,8 +34,9 @@ export function LandingMetricsPreviewSection() {
               Sua empresa em evidência. Resultados que você acompanha.
             </h2>
             <p className="mt-4 text-base leading-relaxed text-white/80 sm:text-lg">
-              Mais do que estar presente no guia, sua empresa pode acompanhar como as pessoas interagem com seu
-              perfil e seus canais de contato. Todos os assinantes têm acesso ao painel exclusivo de resultados.
+              Mais do que divulgar seu negócio, a Conexão Maçônica permite acompanhar visualizações do perfil,
+              acessos aos canais de contato e outras interações registradas na plataforma. Transparência para entender
+              como sua empresa está sendo encontrada.
             </p>
 
             <div className="mt-8 space-y-4">
