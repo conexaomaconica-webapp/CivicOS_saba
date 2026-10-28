@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server';
 import { isVisitOrigin } from '@/lib/analytics/visit-origin';
-import { trackDirectoryEventAction, trackSearchImpressionsAction, type AllowedEventType } from '@/lib/analytics/analytics-service';
+import {
+  normalizeAcquisitionSource,
+  normalizeDiscoverySource,
+} from '@/lib/analytics/traffic-sources';
+import { normalizeAnalyticsEventType } from '@/lib/analytics/analytics-normalization';
+import {
+  trackDirectoryEventAction,
+  trackSearchImpressionsAction,
+} from '@/lib/analytics/analytics-service';
 
 // Endpoint para sendBeacon/fetch keepalive: sobrevive à troca de página (Server Actions não sobrevivem).
 // Reaproveita a mesma gravação e validações de trackDirectoryEventAction.
@@ -8,19 +16,43 @@ import { trackDirectoryEventAction, trackSearchImpressionsAction, type AllowedEv
 export const dynamic = 'force-dynamic';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const EVENTS = new Set<AllowedEventType>([
-  'view', 'whatsapp_click', 'phone_click', 'website_click', 'directions_click', 'benefit_click',
-  'social_click', 'service_view', 'instagram_click', 'share', 'benefit_claim', 'benefit_redeemed', 'qr_scan',
-]);
+const CYCLE_REGEX = /^[a-zA-Z0-9_-]{10,120}$/;
 
-function sameOrigin(request: Request): boolean {
+function isAllowedOrigin(request: Request): boolean {
   const origin = request.headers.get('origin');
-  if (!origin) return true; // sendBeacon de mesma origem pode não enviar Origin
+  if (!origin) return true; // sendBeacon ou requisições mobile nativas sem Origin
   try {
-    return new URL(origin).host === request.headers.get('host');
+    const originUrl = new URL(origin);
+    const host = request.headers.get('host');
+    if (originUrl.host === host) return true;
+
+    // Suporte explícito a Capacitor / Aplicativo Móvel Conexão Maçônica
+    if (
+      originUrl.protocol === 'capacitor:' ||
+      originUrl.protocol === 'ionic:' ||
+      (originUrl.hostname === 'localhost' && (originUrl.protocol === 'http:' || originUrl.protocol === 'https:'))
+    ) {
+      return true;
+    }
+
+    // Suporte a domínios do ecossistema Conexão Maçônica
+    if (originUrl.hostname.endsWith('conexaomaconica.com.br')) {
+      return true;
+    }
   } catch {
     return false;
   }
+  return false;
+}
+
+function getCorsHeaders(request: Request): Record<string, string> {
+  const origin = request.headers.get('origin') || '*';
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Client-Platform',
+    'Access-Control-Max-Age': '86400',
+  };
 }
 
 const BOT_PATTERNS = [
@@ -71,29 +103,54 @@ function isPrefetch(request: Request): boolean {
   return Boolean(purpose && purpose.toLowerCase().includes('prefetch'));
 }
 
+export async function OPTIONS(request: Request) {
+  if (!isAllowedOrigin(request)) {
+    return new NextResponse(null, { status: 403 });
+  }
+  return new NextResponse(null, {
+    status: 204,
+    headers: getCorsHeaders(request),
+  });
+}
+
 export async function POST(request: Request) {
-  if (!sameOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });
+  const corsHeaders = getCorsHeaders(request);
+  if (!isAllowedOrigin(request)) return NextResponse.json({ ok: false }, { status: 403, headers: corsHeaders });
 
   // Descarta silenciosamente pré-carregamento do navegador e robôs conhecidos sem gravar no banco
   if (isPrefetch(request) || isBot(request.headers.get('user-agent'))) {
-    return NextResponse.json({ ok: true, skipped: true }, { status: 200 });
+    return NextResponse.json({ ok: true, skipped: true }, { status: 200, headers: corsHeaders });
   }
 
   let body: unknown;
   try {
     const text = await request.text();
-    if (text.length > 2000) return NextResponse.json({ ok: false }, { status: 413 });
+    if (text.length > 2000) return NextResponse.json({ ok: false }, { status: 413, headers: corsHeaders });
     body = JSON.parse(text);
   } catch {
-    return NextResponse.json({ ok: false }, { status: 400 });
+    return NextResponse.json({ ok: false }, { status: 400, headers: corsHeaders });
   }
 
-  const { businessId, businessIds, eventType, source, origin, cycleId, city, state, device } = (body ?? {}) as {
+  const {
+    businessId,
+    businessIds,
+    eventType,
+    source,
+    origin,
+    acquisitionSource,
+    discoverySource,
+    cycleId,
+    city,
+    state,
+    device,
+  } = (body ?? {}) as {
     businessId?: unknown;
     businessIds?: unknown;
     eventType?: unknown;
     source?: unknown;
     origin?: unknown;
+    acquisitionSource?: unknown;
+    discoverySource?: unknown;
     cycleId?: unknown;
     city?: unknown;
     state?: unknown;
@@ -103,24 +160,60 @@ export async function POST(request: Request) {
   // Aparições na busca chegam em lote (até 50 empresas).
   if (eventType === 'search_impression') {
     const ids = Array.isArray(businessIds) ? businessIds.filter((id): id is string => typeof id === 'string' && UUID.test(id)).slice(0, 50) : [];
-    if (ids.length === 0) return NextResponse.json({ ok: false }, { status: 400 });
+    if (ids.length === 0) return NextResponse.json({ ok: false }, { status: 400, headers: corsHeaders });
     const result = await trackSearchImpressionsAction(ids, typeof source === 'string' ? source.slice(0, 60) : 'directory_list');
-    return NextResponse.json({ ok: Boolean((result as { ok?: boolean }).ok) }, { status: 200 });
+    return NextResponse.json({ ok: Boolean((result as { ok?: boolean }).ok) }, { status: 200, headers: corsHeaders });
   }
 
-  if (typeof businessId !== 'string' || !UUID.test(businessId)) return NextResponse.json({ ok: false }, { status: 400 });
-  if (typeof eventType !== 'string' || !EVENTS.has(eventType as AllowedEventType)) return NextResponse.json({ ok: false }, { status: 400 });
+  if (typeof businessId !== 'string' || !UUID.test(businessId)) {
+    return NextResponse.json({ ok: false }, { status: 400, headers: corsHeaders });
+  }
+
+  // Normalização segura de vocabulário canônico (unifica web e mobile)
+  const normalizedType = normalizeAnalyticsEventType(eventType);
+  if (!normalizedType) {
+    return NextResponse.json({ ok: false }, { status: 400, headers: corsHeaders });
+  }
+
+  // Sanitização estrita do identificador de ciclo
+  let sanitizedCycleId: string | undefined = undefined;
+  if (typeof cycleId === 'string') {
+    const trimmedCycle = cycleId.trim();
+    if (trimmedCycle.length > 0) {
+      if (!CYCLE_REGEX.test(trimmedCycle)) {
+        if (normalizedType === 'view') {
+          return NextResponse.json({ ok: false, error: 'INVALID_CYCLE_ID' }, { status: 400, headers: corsHeaders });
+        }
+      } else {
+        sanitizedCycleId = trimmedCycle;
+      }
+    }
+  }
+
+  const clientPlatform = request.headers.get('x-client-platform');
+  const resolvedDevice =
+    typeof device === 'string' && device.length > 0
+      ? device.slice(0, 30)
+      : clientPlatform === 'mobile_app'
+        ? 'mobile_app'
+        : 'web';
+
+  const resolvedAcquisition = normalizeAcquisitionSource(acquisitionSource || origin);
+  const resolvedDiscovery = normalizeDiscoverySource(discoverySource || source);
 
   const result = await trackDirectoryEventAction({
     businessId,
-    eventType: eventType as AllowedEventType,
-    source: typeof source === 'string' ? source.slice(0, 60) : undefined,
-    origin: isVisitOrigin(origin) ? origin : undefined,
-    cycleId: typeof cycleId === 'string' ? cycleId.slice(0, 100) : undefined,
+    eventType: normalizedType,
+    source: typeof source === 'string' && source.length > 0 ? source.slice(0, 60) : resolvedDiscovery,
+    acquisitionSource: resolvedAcquisition,
+    discoverySource: resolvedDiscovery,
+    origin: isVisitOrigin(origin) ? origin : resolvedAcquisition,
+    cycleId: sanitizedCycleId,
     city: typeof city === 'string' ? city.slice(0, 100) : undefined,
     state: typeof state === 'string' ? state.slice(0, 10) : undefined,
-    device: typeof device === 'string' ? device.slice(0, 30) : undefined,
+    device: resolvedDevice,
   });
+
   // Telemetria nunca devolve erro detalhado ao navegador.
-  return NextResponse.json({ ok: Boolean((result as { ok?: boolean }).ok) }, { status: 200 });
+  return NextResponse.json({ ok: Boolean((result as { ok?: boolean }).ok) }, { status: 200, headers: corsHeaders });
 }

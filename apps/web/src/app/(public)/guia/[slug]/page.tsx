@@ -25,7 +25,11 @@ import type { Database } from '@/types/database.types';
 import { getInstitutionalRecognitionsAction } from '@/app/actions/institutional-recognitions';
 
 type Props = { params: Promise<{ slug: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> };
-type DetailRow = Database['public']['Functions']['public_business_detail']['Returns'][number];
+type DetailRow = Database['public']['Functions']['public_business_detail']['Returns'][number] & {
+  views_count?: number;
+  views?: number;
+  [key: string]: any;
+};
 type ReviewRow = Database['public']['Functions']['public_business_reviews']['Returns'][number];
 
 import { bronzeBusinessFixture } from '@/visual-lab/fixtures/bronze-business';
@@ -192,6 +196,17 @@ const getPublicBusiness = cache(async (slug: string) => {
             if (bMedia && bMedia.length > 0) {
               detailObj.media = bMedia;
             }
+          } catch (_e) {}
+
+          // Contagem de visualizações da página da empresa por atualização (event_name = 'view')
+          try {
+            const { count: vCount } = await (supabase as any)
+              .from('analytics_events')
+              .select('id', { count: 'exact', head: true })
+              .eq('business_id', bizId)
+              .eq('event_name', 'view');
+            detailObj.views_count = typeof vCount === 'number' ? vCount : 0;
+            detailObj.views = detailObj.views_count;
           } catch (_e) {}
         }
 
@@ -364,6 +379,17 @@ const getPublicBusiness = cache(async (slug: string) => {
       if (Array.isArray(planRule?.profile_section_order)) {
         (detailObj as any).profile_section_order = planRule.profile_section_order;
       }
+    } catch (_e) {}
+
+    // Contagem de visualizações da página da empresa por atualização (event_name = 'view')
+    try {
+      const { count: vCount } = await (supabase as any)
+        .from('analytics_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('business_id', bizId)
+        .eq('event_name', 'view');
+      detailObj.views_count = typeof vCount === 'number' ? vCount : 0;
+      detailObj.views = detailObj.views_count;
     } catch (_e) {}
 
     const recognitionsResult = await getInstitutionalRecognitionsAction();

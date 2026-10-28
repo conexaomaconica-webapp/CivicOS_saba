@@ -36,7 +36,9 @@ export type PublicSearchResultItem = {
   effective_plan_code?: string | null;
   rating_average?: number | null;
   reviews_count?: number;
+  views_count?: number | null;
   has_benefits?: boolean;
+  has_events?: boolean;
 };
 
 type DirectoryAllBusinessesProps = {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Phone, Mail, MapPin, Globe } from 'lucide-react';
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
 import { trackEvent } from '@/lib/analytics/track-client';
@@ -34,9 +34,6 @@ export function QuickActionBar({
       state: location?.state || undefined,
     });
   };
-  useEffect(() => {
-    track('view', 'business_profile');
-  }, [businessId]);
   const whatsappDigits = contacts.whatsapp ? contacts.whatsapp.replace(/\D/g, '') : null;
   const whatsappUrl = whatsappDigits
     ? `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(`Olá! Vi o anúncio de ${businessName} no Guia Conexão Maçônica.`)}`

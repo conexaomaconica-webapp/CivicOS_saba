@@ -2,12 +2,12 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Heart, Share2, MapPin, Briefcase, Star, Crown, Award, ShieldCheck, Users } from 'lucide-react';
+import { Heart, Share2, MapPin, Briefcase, Star, Crown, Award, ShieldCheck, Users, Eye } from 'lucide-react';
 import { useFavorites } from '@/lib/directory/favorites-context';
 import { usePedraCardDisplay, usePedraHorizontalSeal, type PedraCardDisplay } from '@/lib/directory/pedra-card-display-context';
-import { trackEvent } from '@/lib/analytics/track-client';
 import { useSearchImpression } from '@/lib/analytics/use-search-impression';
 import { CardReferModal } from './CardReferModal';
+import type { DiscoverySource } from '@/lib/analytics/traffic-sources';
 
 export type BusinessCardData = {
   id: string;
@@ -26,11 +26,14 @@ export type BusinessCardData = {
   effective_plan_code?: string | null;
   rating_average?: number | null;
   reviews_count?: number;
+  views_count?: number | null;
   badge_custom_text?: string | null;
   badge_custom_icon_url?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   distance_km?: number | null;
+  has_benefits?: boolean;
+  has_events?: boolean;
   masonic_relationship_type?: 'brother' | 'wife' | 'child' | 'representative' | string | null;
   masonic_member_name?: string | null;
   masonic_brother_name?: string | null;
@@ -47,6 +50,7 @@ type BusinessCardProps = {
   variant?: 'featured' | 'compact';
   showRating?: boolean;
   pedraCardDisplay?: PedraCardDisplay;
+  discoverySource?: DiscoverySource;
 };
 
 // Assets Oficiais de Selos Horizontais dos Planos Comerciais
@@ -138,6 +142,7 @@ export function BusinessCard({
   variant = 'compact',
   showRating = true,
   pedraCardDisplay,
+  discoverySource,
 }: BusinessCardProps) {
   const { isFavorite, toggleFavorite } = useFavorites();
   const contextPedraDisplay = usePedraCardDisplay();
@@ -402,12 +407,26 @@ export function BusinessCard({
             {data.name}
           </h3>
 
-          {/* Avaliação Real */}
-          {hasRealRating && (
-            <div className="flex items-center gap-1 text-xs text-stone-600 font-semibold mt-1">
-              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
-              <span>{data.rating_average}</span>
-              <span className="text-stone-400 font-normal">({data.reviews_count})</span>
+          {/* Avaliação Real e Contador de Visualizações por Atualização */}
+          {(hasRealRating || typeof data.views_count === 'number') && (
+            <div className="flex items-center gap-2 flex-wrap text-xs text-stone-600 mt-1">
+              {hasRealRating && (
+                <div className="flex items-center gap-1 font-semibold">
+                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                  <span>{data.rating_average}</span>
+                  <span className="text-stone-400 font-normal">({data.reviews_count})</span>
+                </div>
+              )}
+              {typeof data.views_count === 'number' && (
+                <div
+                  className="flex items-center gap-1 text-stone-500 font-medium"
+                  title="Visualizações da página da empresa"
+                >
+                  {hasRealRating && <span className="text-stone-300">·</span>}
+                  <Eye className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                  <span>{data.views_count.toLocaleString('pt-BR')} {data.views_count === 1 ? 'visualização' : 'visualizações'}</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -475,8 +494,7 @@ export function BusinessCard({
 
           {/* Botão Ver Empresa */}
           <Link
-            href={`/guia/${data.slug}`}
-            onClick={() => trackEvent({ businessId: data.id, eventType: 'view', source: 'directory_card' })}
+            href={discoverySource ? `/guia/${data.slug}?src=${discoverySource}` : `/guia/${data.slug}`}
             className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-xl border border-[#5d1523] text-[#5d1523] font-bold text-xs hover:bg-[#5d1523] hover:text-white transition-colors shrink-0"
           >
             Ver empresa

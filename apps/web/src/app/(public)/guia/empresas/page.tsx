@@ -299,6 +299,33 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
   };
 
   const businessItems: BusinessCardData[] = (searchData.items as BusinessCardData[]) || [];
+
+  // Enriquecimento em lote com o total de visualizações por atualização (event_name = 'view')
+  if (businessItems.length > 0) {
+    try {
+      const bizIds = businessItems.map((b) => b.id).filter(Boolean);
+      if (bizIds.length > 0) {
+        const { data: viewEvents } = await (supabase as any)
+          .from('analytics_events')
+          .select('business_id')
+          .in('business_id', bizIds)
+          .eq('event_name', 'view');
+
+        const countsMap: Record<string, number> = {};
+        if (viewEvents && viewEvents.length > 0) {
+          for (const ev of viewEvents) {
+            countsMap[ev.business_id] = (countsMap[ev.business_id] || 0) + 1;
+          }
+        }
+        businessItems.forEach((item) => {
+          item.views_count = countsMap[item.id] ?? 0;
+        });
+      }
+    } catch (_viewsErr) {
+      // Degradação graciosa: mantém views_count existente ou undefined
+    }
+  }
+
   const activeCategory = categories.find((c: { slug: string }) => c.slug === cat);
 
   const initialFilters: FilterState = {

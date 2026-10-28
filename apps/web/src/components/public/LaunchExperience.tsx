@@ -1,14 +1,42 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 
-let launchShownInSession = false;
+const STORAGE_KEY_SESSION = 'cm_launch_shown_session';
+const STORAGE_KEY_PERMANENT = 'cm_launch_last_seen_ts';
+const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 horas
+
+export function hasLaunchBeenShown(): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    if (sessionStorage.getItem(STORAGE_KEY_SESSION) === '1') {
+      return true;
+    }
+    const lastSeen = localStorage.getItem(STORAGE_KEY_PERMANENT);
+    if (lastSeen && Date.now() - Number(lastSeen) < COOLDOWN_MS) {
+      return true;
+    }
+  } catch {
+    // Caso storage esteja indisponível
+  }
+  return false;
+}
+
+export function markLaunchAsShown(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(STORAGE_KEY_SESSION, '1');
+    localStorage.setItem(STORAGE_KEY_PERMANENT, String(Date.now()));
+  } catch {}
+}
 
 type LaunchExperienceProps = {
   forceShow?: boolean;
 };
 
 export function LaunchExperience({ forceShow = false }: LaunchExperienceProps) {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
   const [fading, setFading] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -19,16 +47,25 @@ export function LaunchExperience({ forceShow = false }: LaunchExperienceProps) {
     const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
     if (prefersReducedMotion && !forceShow) return;
 
-    // Mostra no primeiro carregamento do app (cold boot) ou sob demanda
-    if (!launchShownInSession || forceShow) {
-      launchShownInSession = true;
-      setVisible(true);
+    // Apenas deve ser elegível para exibição automática na raiz da plataforma (home /)
+    const isRootLanding = pathname === '/' || pathname === '';
+    if (!forceShow && !isRootLanding) {
+      return;
     }
-  }, [forceShow]);
+
+    // Se já foi exibida nesta sessão (sobrevive a F5 e navegação) ou nas últimas 24h, não exibe
+    if (!forceShow && hasLaunchBeenShown()) {
+      return;
+    }
+
+    // Marca imediatamente para não disparar em requisições paralelas ou re-renders
+    markLaunchAsShown();
+    setVisible(true);
+  }, [forceShow, pathname]);
 
   const handleComplete = useCallback(() => {
     setFading(true);
-    launchShownInSession = true;
+    markLaunchAsShown();
     setTimeout(() => {
       setVisible(false);
     }, 280);

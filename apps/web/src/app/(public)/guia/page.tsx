@@ -482,6 +482,120 @@ export default async function GuiaPage({ searchParams }: Props) {
     } catch (_locErr) {}
   }
 
+  // Enriquecimento em lote com o total de visualizações por atualização (event_name = 'view')
+  const allCardBizIds = Array.from(
+    new Set([
+      ...businessItems.map((b) => b.id),
+      ...sponsored.map((b) => b.id),
+    ].filter(Boolean))
+  );
+
+  if (allCardBizIds.length > 0) {
+    try {
+      const { data: viewEvents } = await (supabase as any)
+        .from('analytics_events')
+        .select('business_id')
+        .in('business_id', allCardBizIds)
+        .eq('event_name', 'view');
+
+      const countsMap: Record<string, number> = {};
+      if (viewEvents && viewEvents.length > 0) {
+        for (const ev of viewEvents) {
+          countsMap[ev.business_id] = (countsMap[ev.business_id] || 0) + 1;
+        }
+      }
+      businessItems.forEach((item) => {
+        item.views_count = countsMap[item.id] ?? 0;
+      });
+      sponsored.forEach((item) => {
+        item.views_count = countsMap[item.id] ?? 0;
+      });
+    } catch (_viewsErr) {
+      // Degradação graciosa
+    }
+  }
+
+  // Busca todas as empresas publicadas com coordenadas para exibição completa com pins no mapa geral
+  let mapBusinesses: PublicSearchResultItem[] = [];
+  try {
+    const { data: allMapRows, error: mapRowsErr } = await (supabase as any)
+      .from('businesses')
+      .select('id, slug, name, description, logo_url, category, plan_tier, is_active, publication_status, business_locations(street, number, neighborhood, city, state, postal_code, latitude, longitude, is_headquarters), business_benefits(id, title, is_active), business_events(id, title, is_active)')
+      .eq('publication_status', 'published')
+      .eq('is_active', true);
+
+    if (mapRowsErr) {
+      console.warn('[GuiaPage] Aviso ao buscar businesses com relações completas para o mapa:', mapRowsErr.message);
+    }
+
+    if (allMapRows && allMapRows.length > 0) {
+      mapBusinesses = allMapRows.map((b: any) => {
+        const locs = Array.isArray(b.business_locations) ? b.business_locations : [];
+        const hq = locs.find((l: any) => l.is_headquarters) || locs[0] || null;
+        const street = hq ? [hq.street, hq.number].filter(Boolean).join(', ') : null;
+        const cityState = hq ? [hq.city, hq.state].filter(Boolean).join(' - ') : null;
+        const addressLine = hq
+          ? [street, hq.neighborhood, cityState, hq.postal_code, 'Brasil'].filter(Boolean).join(', ')
+          : null;
+
+        const rawBenefits = Array.isArray(b.business_benefits)
+          ? b.business_benefits.filter((ben: any) => ben.is_active)
+          : [];
+        const hasBenefits = rawBenefits.length > 0;
+
+        const rawEvents = Array.isArray(b.business_events)
+          ? b.business_events.filter((ev: any) => ev.is_active)
+          : [];
+        const hasEvents = rawEvents.length > 0;
+
+        return {
+          id: b.id,
+          slug: b.slug,
+          name: b.name,
+          short_description: b.description ? b.description.slice(0, 200) : '',
+          logo_url: b.logo_url,
+          cover_url: null,
+          category_slug: b.category,
+          category_name: b.category,
+          city: hq?.city ?? null,
+          state: hq?.state ?? null,
+          latitude: hq?.latitude != null ? Number(hq.latitude) : null,
+          longitude: hq?.longitude != null ? Number(hq.longitude) : null,
+          address_line: addressLine,
+          is_verified: true,
+          is_founder: false,
+          effective_plan_code: b.plan_tier || 'esquadro',
+          has_benefits: hasBenefits,
+          has_events: hasEvents,
+        };
+      });
+    }
+  } catch (_mapErr) {
+    mapBusinesses = [];
+  }
+
+  // Fallback: se allMapRows falhar ou vier vazio, enriquece businessItems com business_benefits
+  if (mapBusinesses.length === 0) {
+    if (businessItems.length > 0) {
+      try {
+        const { data: activeBenefits } = await (supabase as any)
+          .from('business_benefits')
+          .select('business_id')
+          .eq('is_active', true)
+          .in('business_id', businessItems.map((b) => b.id));
+
+        const bizWithBenefits = new Set((activeBenefits || []).map((ab: any) => ab.business_id));
+        mapBusinesses = businessItems.map((b) => ({
+          ...b,
+          has_benefits: bizWithBenefits.has(b.id),
+        }));
+      } catch (_fbBenErr) {
+        mapBusinesses = businessItems;
+      }
+    } else {
+      mapBusinesses = businessItems;
+    }
+  }
 
   // Opções do filtro "Todas as Categorias": todas as que têm empresas publicadas.
   const filterCategories = await fetchFilterCategories(supabase, host, categories);
@@ -544,7 +658,7 @@ export default async function GuiaPage({ searchParams }: Props) {
         sortBy={sort}
       />
     ),
-    map: <DirectoryMapExplore businesses={businessItems} selectedCity={city} />,
+    map: <DirectoryMapExplore businesses={mapBusinesses} selectedCity={city} />,
     lodges: <DirectoryLodgesGuide facets={lodgeFacets} />,
   };
 

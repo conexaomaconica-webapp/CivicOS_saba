@@ -1,9 +1,14 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
 import { headers } from 'next/headers';
 import { readVisitorKey } from '@/lib/referrals/attribution';
+import { generatePseudonymousSubjectId, generateSearchSessionHash } from '@/lib/analytics/privacy-hash';
+import { assertBusinessAnalyticsAccess } from '@/lib/analytics/analytics-auth';
+import {
+  normalizeAcquisitionSource,
+  normalizeDiscoverySource,
+} from '@/lib/analytics/traffic-sources';
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -11,23 +16,23 @@ function getAdminSupabase() {
   return createClient(url, key);
 }
 
-export type AllowedEventType =
-  | 'view'
-  | 'whatsapp_click'
-  | 'phone_click'
-  | 'website_click'
-  | 'directions_click'
-  | 'benefit_click'
-  | 'social_click'
-  | 'service_view'
-  | 'search_impression'
-  | 'instagram_click'
-  | 'share'
-  | 'benefit_claim'
-  | 'benefit_redeemed'
-  | 'event_checkin'
-  | 'event_connection'
-  | 'qr_scan';
+import {
+  type AllowedEventType,
+  normalizeAnalyticsEventType,
+} from './analytics-normalization';
+
+export type { AllowedEventType };
+
+const CYCLE_ID_REGEX = /^[a-zA-Z0-9_-]{10,120}$/;
+
+// Cache em memória para deduplicação concorrente e de curto prazo por processo
+const recentViewCycles = new Map<string, number>();
+const inFlightViewCycles = new Map<string, Promise<{ ok: boolean; deduplicated?: boolean; skipped?: boolean; error?: string }>>();
+
+export async function resetServerCycleCacheForTesting(): Promise<void> {
+  recentViewCycles.clear();
+  inFlightViewCycles.clear();
+}
 
 export interface AnalyticsSummary {
   days: number;
@@ -56,130 +61,172 @@ export interface AnalyticsSummary {
 // Action 1: Disparar Evento de Analytics (Não Bloqueante)
 export async function trackDirectoryEventAction(payload: {
   businessId: string;
-  eventType: AllowedEventType;
+  eventType: string;
   city?: string;
   state?: string;
   source?: string;
   /** Origem da visita (organic_google, qr, share...). Validada na rota; opcional. */
   origin?: string;
+  /** Origem de Aquisição (Etapa B): como o visitante chegou à Conexão Maçônica */
+  acquisitionSource?: string;
+  /** Origem de Descoberta (Etapa B): onde o visitante encontrou a empresa na plataforma */
+  discoverySource?: string;
   /** Identificador único do ciclo de navegação/renderização para idempotência de views */
   cycleId?: string;
   /** Tipo de dispositivo/canal: 'web' | 'mobile_app' */
   device?: string;
 }) {
-  const allowedEvents: AllowedEventType[] = [
-    'view',
-    'whatsapp_click',
-    'phone_click',
-    'website_click',
-    'directions_click',
-    'benefit_click',
-    'social_click',
-    'service_view',
-    'search_impression',
-    'instagram_click',
-    'share',
-    'benefit_claim',
-    'benefit_redeemed',
-    'event_checkin',
-    'event_connection',
-    'qr_scan',
-  ];
-
-  if (!payload.eventType || !allowedEvents.includes(payload.eventType)) {
+  const normalizedType = normalizeAnalyticsEventType(payload.eventType);
+  if (!normalizedType) {
     return { ok: false, error: 'INVALID_EVENT_TYPE' };
   }
 
-  // A suíte unitária não possui conexão com o Supabase. Mantém o evento
-  // não bloqueante apenas nesse ambiente; produção nunca mascara falha de gravação.
-  if (process.env.NODE_ENV === 'test' && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return { ok: true, skipped: true };
+  // Sanitização estrita do identificador de ciclo
+  let validCycleId: string | undefined = undefined;
+  if (typeof payload.cycleId === 'string' && CYCLE_ID_REGEX.test(payload.cycleId)) {
+    validCycleId = payload.cycleId;
   }
 
   let subjectId = '';
   try {
     const visitorKey = await readVisitorKey();
-    if (visitorKey) {
-      subjectId = `vid_${visitorKey.slice(0, 32)}`;
-    } else {
-      const reqHeaders = await headers();
-      const ip = reqHeaders.get('x-forwarded-for') || reqHeaders.get('x-real-ip') || '127.0.0.1';
-      const ua = reqHeaders.get('user-agent') || 'Browser';
-      // Gera hash efêmero não reversível para deduplicação sem salvar IP bruto
-      subjectId = crypto.createHash('sha256').update(`${ip}_${ua}_${new Date().toISOString().slice(0, 10)}`).digest('hex').slice(0, 32);
-    }
+    const reqHeaders = await headers();
+    const ip = reqHeaders.get('x-forwarded-for') || reqHeaders.get('x-real-ip') || '127.0.0.1';
+    const ua = reqHeaders.get('user-agent') || 'Browser';
+    subjectId = generatePseudonymousSubjectId({ visitorKey, ip, userAgent: ua });
   } catch (_e) {
     subjectId = 'anon_session';
   }
 
-  try {
-    const supabase = getAdminSupabase();
-    const { data: business, error: businessError } = await (supabase as any)
-      .from('businesses')
-      .select('id, tenant_id, publication_status, is_active')
-      .eq('id', payload.businessId)
-      .maybeSingle();
-    if (businessError || !business || business.publication_status !== 'published' || !business.is_active) {
-      return { ok: false, error: businessError?.message || 'BUSINESS_NOT_PUBLIC' };
+  const cycleKey = validCycleId ? `${payload.businessId}:${validCycleId}` : null;
+
+  // Idempotência e proteção contra concorrência para visualizações
+  if (normalizedType === 'view' && cycleKey) {
+    const recent = recentViewCycles.get(cycleKey);
+    if (recent && Date.now() - recent < 600000) {
+      return { ok: true, deduplicated: true };
     }
-
-    // Idempotência por ciclo de navegação: impede que re-renders ou requisições repetidas
-    // do mesmo ciclo inflem visualizações. Reloads manuais geram um cycleId novo e gravam normalmente.
-    if (payload.eventType === 'view' && payload.cycleId) {
-      try {
-        const { data: existing } = await (supabase as any)
-          .from('analytics_events')
-          .select('id')
-          .eq('business_id', payload.businessId)
-          .eq('event_name', 'view')
-          .eq('metadata->>cycle_id', payload.cycleId)
-          .limit(1)
-          .maybeSingle();
-
-        if (existing) {
-          return { ok: true, deduplicated: true };
-        }
-      } catch {
-        // Prossegue com segurança caso ocorra instabilidade temporária na checagem
-      }
+    const inFlight = inFlightViewCycles.get(cycleKey);
+    if (inFlight) {
+      await inFlight;
+      return { ok: true, deduplicated: true };
     }
-
-    const { error } = await (supabase as any).from('analytics_events').insert({
-      tenant_id: business.tenant_id,
-      business_id: payload.businessId,
-      event_name: payload.eventType,
-      pseudonymous_subject_id: subjectId,
-      source: payload.source || 'direct',
-      device: payload.device || 'web',
-      metadata: {
-        city: payload.city || null,
-        state: payload.state || null,
-        source: payload.source || 'direct',
-        origin: payload.origin || null,
-        cycle_id: payload.cycleId || null,
-        device: payload.device || 'web',
-      },
-    });
-    if (error) return { ok: false, error: error.message };
-
-    // Funil de indicações: contato (WhatsApp, telefone, site, rota ou rede social) de quem chegou por um link de indicação.
-    if (['whatsapp_click', 'phone_click', 'website_click', 'directions_click', 'social_click'].includes(payload.eventType)) {
-      try {
-        const visitorKey = await readVisitorKey();
-        if (visitorKey) {
-          await (supabase as any).rpc('referral_record_contact', {
-            p_business_id: payload.businessId,
-            p_visitor_key: visitorKey,
-            p_channel: payload.eventType.replace('_click', ''),
-          });
-        }
-      } catch {}
-    }
-
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'ANALYTICS_WRITE_FAILED' };
   }
+
+  const execute = async (): Promise<{ ok: boolean; deduplicated?: boolean; skipped?: boolean; error?: string }> => {
+    // A suíte unitária não possui conexão com o Supabase. Mantém o evento
+    // não bloqueante apenas nesse ambiente; produção nunca mascara falha de gravação.
+    if (process.env.NODE_ENV === 'test' && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return { ok: true, skipped: true };
+    }
+
+    try {
+      const supabase = getAdminSupabase();
+      const { data: business, error: businessError } = await (supabase as any)
+        .from('businesses')
+        .select('id, tenant_id, publication_status, is_active')
+        .eq('id', payload.businessId)
+        .maybeSingle();
+
+      if (businessError || !business || business.publication_status !== 'published' || !business.is_active) {
+        return { ok: false, error: businessError?.message || 'BUSINESS_NOT_PUBLIC' };
+      }
+
+      // Verificação de persistência no Supabase para visualizações com cycleId
+      if (normalizedType === 'view' && validCycleId) {
+        try {
+          const { data: existing } = await (supabase as any)
+            .from('analytics_events')
+            .select('id')
+            .eq('business_id', payload.businessId)
+            .eq('event_name', 'view')
+            .eq('metadata->>cycle_id', validCycleId)
+            .limit(1)
+            .maybeSingle();
+
+          if (existing) {
+            if (cycleKey) recentViewCycles.set(cycleKey, Date.now());
+            return { ok: true, deduplicated: true };
+          }
+        } catch {
+          // Prossegue se houver falha transitória na checagem
+        }
+      }
+
+      const resolvedAcquisition = payload.acquisitionSource
+        ? normalizeAcquisitionSource(payload.acquisitionSource)
+        : payload.origin
+        ? normalizeAcquisitionSource(payload.origin)
+        : 'unidentified';
+
+      const resolvedDiscovery = payload.discoverySource
+        ? normalizeDiscoverySource(payload.discoverySource)
+        : payload.source
+        ? normalizeDiscoverySource(payload.source)
+        : 'unidentified';
+
+      const { error } = await (supabase as any).from('analytics_events').insert({
+        tenant_id: business.tenant_id,
+        business_id: payload.businessId,
+        event_name: normalizedType,
+        pseudonymous_subject_id: subjectId,
+        source: resolvedDiscovery,
+        device: payload.device || 'web',
+        metadata: {
+          city: payload.city || null,
+          state: payload.state || null,
+          source: resolvedDiscovery,
+          origin: payload.origin || null,
+          acquisition_source: resolvedAcquisition,
+          discovery_source: resolvedDiscovery,
+          cycle_id: validCycleId || null,
+          device: payload.device || 'web',
+        },
+      });
+
+      if (error) return { ok: false, error: error.message };
+
+      if (normalizedType === 'view' && cycleKey) {
+        recentViewCycles.set(cycleKey, Date.now());
+        if (recentViewCycles.size > 1000) {
+          const now = Date.now();
+          for (const [k, ts] of recentViewCycles.entries()) {
+            if (now - ts > 600000) recentViewCycles.delete(k);
+          }
+        }
+      }
+
+      // Funil de indicações: contato (WhatsApp, telefone, site, rota ou rede social) de quem chegou por um link de indicação.
+      if (['whatsapp_click', 'phone_click', 'website_click', 'directions_click', 'social_click'].includes(normalizedType)) {
+        try {
+          const visitorKey = await readVisitorKey();
+          if (visitorKey) {
+            await (supabase as any).rpc('referral_record_contact', {
+              p_business_id: payload.businessId,
+              p_visitor_key: visitorKey,
+              p_channel: normalizedType.replace('_click', ''),
+            });
+          }
+        } catch {}
+      }
+
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'ANALYTICS_WRITE_FAILED' };
+    }
+  };
+
+  if (normalizedType === 'view' && cycleKey) {
+    const promise = execute();
+    inFlightViewCycles.set(cycleKey, promise);
+    try {
+      return await promise;
+    } finally {
+      inFlightViewCycles.delete(cycleKey);
+    }
+  }
+
+  return await execute();
 }
 
 // Action 2: Buscar Resumo do Analytics para o Anunciante (7 / 30 / 90 dias)
@@ -187,6 +234,12 @@ export async function getAdvertiserAnalyticsSummaryAction(
   businessId: string,
   days: number = 30
 ): Promise<AnalyticsSummary> {
+  // 1. Validação estrita de autorização multi-tenant (P0 - Crítica)
+  // Rejeita chamadas não autenticadas ou usuários sem permissão nesta empresa
+  if (!(process.env.NODE_ENV === 'test' && !process.env.SUPABASE_SERVICE_ROLE_KEY && businessId === 'biz_analytics_001')) {
+    await assertBusinessAnalyticsAccess(businessId);
+  }
+
   const supabase = getAdminSupabase();
 
   const { data, error } = await supabase.rpc('get_advertiser_analytics_summary', {
@@ -245,7 +298,7 @@ export async function trackSearchImpressionsAction(businessIds: string[], source
     const reqHeaders = await headers();
     const ip = reqHeaders.get('x-forwarded-for') || reqHeaders.get('x-real-ip') || '127.0.0.1';
     const ua = reqHeaders.get('user-agent') || 'Browser';
-    sessionHash = crypto.createHash('sha256').update(`${ip}_${ua}_${new Date().toISOString().slice(0, 10)}`).digest('hex').slice(0, 32);
+    sessionHash = generateSearchSessionHash({ ip, userAgent: ua });
   } catch (_e) {
     sessionHash = 'anon_session';
   }

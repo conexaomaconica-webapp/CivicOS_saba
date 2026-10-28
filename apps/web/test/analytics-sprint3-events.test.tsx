@@ -197,13 +197,20 @@ describe('rastreador da página da empresa', () => {
     return { trackGa, trackEvent, BusinessContactTracker };
   }
 
-  it('dispara view_business uma vez, com os dados públicos da empresa', async () => {
-    const { trackGa, BusinessContactTracker } = await setup();
+  it('dispara view_business e trackEvent de view uma vez, com os dados públicos da empresa', async () => {
+    const { trackGa, trackEvent, BusinessContactTracker } = await setup();
     render(<BusinessContactTracker business={business}><p>perfil</p></BusinessContactTracker>);
     expect(trackGa).toHaveBeenCalledTimes(1);
     expect(trackGa).toHaveBeenCalledWith('view_business', expect.objectContaining({
       business_id: 'uuid-1', business_slug: 'otica-exemplo', business_name: 'Ótica Exemplo', category_name: 'Ótica',
       city: 'Feira de Santana', state: 'BA', plan: 'ouro', source_page: 'business_profile',
+    }));
+    expect(trackEvent).toHaveBeenCalledWith(expect.objectContaining({
+      businessId: 'uuid-1',
+      eventType: 'view',
+      source: 'business_profile',
+      city: 'Feira de Santana',
+      state: 'BA',
     }));
   });
 
@@ -213,9 +220,10 @@ describe('rastreador da página da empresa', () => {
       <BusinessContactTracker business={business}><a href="https://wa.me/5575999998888">Falar</a></BusinessContactTracker>
     );
     trackGa.mockClear();
+    trackEvent.mockClear();
     fireEvent.click(getByText('Falar'));
     expect(trackGa).toHaveBeenCalledWith('click_whatsapp', expect.objectContaining({ business_slug: 'otica-exemplo' }));
-    expect(trackEvent).toHaveBeenCalledWith({ businessId: 'uuid-1', eventType: 'whatsapp_click', source: 'business_profile' });
+    expect(trackEvent).toHaveBeenCalledWith(expect.objectContaining({ businessId: 'uuid-1', eventType: 'whatsapp_click', source: 'business_profile' }));
   });
 
   it('link que já se registra sozinho (data-cm-tracked): vai ao GA4, mas NÃO duplica a medição própria', async () => {
@@ -224,6 +232,7 @@ describe('rastreador da página da empresa', () => {
       <BusinessContactTracker business={business}><a href="tel:+5575999998888" data-cm-tracked>Ligar</a></BusinessContactTracker>
     );
     trackGa.mockClear();
+    trackEvent.mockClear();
     fireEvent.click(getByText('Ligar'));
     expect(trackGa).toHaveBeenCalledWith('click_phone', expect.objectContaining({ business_slug: 'otica-exemplo' }));
     expect(trackEvent).not.toHaveBeenCalled();

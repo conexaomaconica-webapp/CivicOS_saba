@@ -9,6 +9,14 @@ import {
   type Milestone,
   type ValueSummaryRaw,
 } from '@/lib/advertiser/value-summary';
+import {
+  StreamingAnalyticsAggregator,
+  type StreamAggregationResult,
+} from '@/lib/analytics/analytics-aggregation';
+import {
+  type AcquisitionSource,
+  type DiscoverySource,
+} from '@/lib/analytics/traffic-sources';
 
 export type TimePeriod = '7d' | '30d' | '90d';
 
@@ -59,6 +67,18 @@ export interface AdvertiserResultsDTO {
     count: number;
     percentage: number;
   }>;
+  acquisitionSources?: Array<{
+    source: AcquisitionSource;
+    label: string;
+    count: number;
+    percentage: number;
+  }>;
+  discoverySources?: Array<{
+    source: DiscoverySource;
+    label: string;
+    count: number;
+    percentage: number;
+  }>;
   actionRanking: Array<{
     action: string;
     label: string;
@@ -92,6 +112,16 @@ export interface AdvertiserResultsDTO {
   connectionResults: ConnectionResultsDTO | null;
   /** Resumo do mês e marcos alcançados. Null quando indisponível. */
   valueSummary: ValueSummaryDTO | null;
+  dataCompleteness?: {
+    isComplete: boolean;
+    isSampled: boolean;
+    isTruncated: boolean;
+    totalProcessedEvents: number;
+    isLegacyDataPresent?: boolean;
+    hasAcquisitionCoverage?: boolean;
+    hasDiscoveryCoverage?: boolean;
+    totalRecordsAnalyzed?: number;
+  };
   lastUpdatedAt: string;
   timezone: string;
 }
@@ -160,50 +190,66 @@ async function loadConnectionResults(supabase: any, businessId: string, days: nu
   }
 }
 
-function calcGrowth(current: number, prev: number): number {
-  if (prev <= 0) {
-    return current > 0 ? 100 : 0;
-  }
-  return Math.round(((current - prev) / prev) * 100);
-}
-
 /**
- * Consulta eventos do banco de dados paginados usando o índice (business_id, created_at)
- * para evitar limites de truncamento e assegurar contagem exata até 10.000 registros.
+ * Executa a agregação de métricas de forma escalável.
+ * 1. Tenta a RPC agregadora no PostgreSQL (get_business_analytics_aggregate_metrics - Migration 215).
+ * 2. Fallback: streaming iterativo em chunks de 1.000 eventos sem corte em 10.000 registros e sem estourar memória.
  */
-async function fetchBusinessAnalyticsEvents(
+async function loadAggregatedBusinessAnalytics(
   supabase: any,
   businessId: string,
-  sinceIso: string,
-  maxRecords = 10000
-) {
+  periodDays: number,
+  nowMs: number,
+  timezone: string
+): Promise<StreamAggregationResult> {
+  // 1. Tenta a RPC no PostgreSQL se disponível
+  try {
+    const { data, error } = await supabase.rpc('get_business_analytics_aggregate_metrics', {
+      p_business_id: businessId,
+      p_days: periodDays,
+    });
+    if (!error && data && data.kpis && Array.isArray(data.dailyEvolution)) {
+      return data as StreamAggregationResult;
+    }
+  } catch {
+    // Prossegue para o streaming em fallback
+  }
+
+  // 2. Fallback Streaming por Chunks (sem limite de 10.000)
+  const doublePeriodStartIso = new Date(nowMs - 2 * periodDays * 86_400_000).toISOString();
+  const aggregator = new StreamingAnalyticsAggregator(periodDays, nowMs, timezone);
   const pageSize = 1000;
-  const allEvents: any[] = [];
+  const maxSafeCeiling = 250000; // Teto de proteção de memória em fallback (250 mil)
   let from = 0;
   let hasMore = true;
 
-  while (hasMore && allEvents.length < maxRecords) {
+  while (hasMore) {
     const to = from + pageSize - 1;
     const { data, error } = await supabase
       .from('analytics_events')
       .select('event_name, pseudonymous_subject_id, source, metadata, created_at')
       .eq('business_id', businessId)
-      .gte('created_at', sinceIso)
+      .gte('created_at', doublePeriodStartIso)
       .order('created_at', { ascending: false })
       .range(from, to);
 
     if (error || !data || data.length === 0) {
       break;
     }
-    allEvents.push(...data);
+
+    aggregator.processChunk(data);
+
     if (data.length < pageSize) {
+      hasMore = false;
+    } else if (aggregator.totalProcessedEvents >= maxSafeCeiling) {
+      aggregator.isTruncated = true;
       hasMore = false;
     } else {
       from += pageSize;
     }
   }
 
-  return allEvents;
+  return aggregator.finalize();
 }
 
 export async function getAdvertiserResultsDTOAction(
@@ -243,165 +289,8 @@ export async function getAdvertiserResultsDTOAction(
       loadValueSummary(supabase, businessId),
     ]);
 
-    // Busca eventos dos dois períodos (atual e anterior) em uma única consulta paginada
-    const periodStartMs = now - periodDays * 86_400_000;
-    const doublePeriodStartMs = now - 2 * periodDays * 86_400_000;
-    const doublePeriodStartIso = new Date(doublePeriodStartMs).toISOString();
-
-    let rawEvents: any[] = [];
-    try {
-      rawEvents = await fetchBusinessAnalyticsEvents(supabase, businessId, doublePeriodStartIso);
-    } catch {
-      rawEvents = [];
-    }
-
-    const currentEvents = rawEvents.filter((e) => new Date(e.created_at).getTime() >= periodStartMs);
-    const prevEvents = rawEvents.filter((e) => {
-      const t = new Date(e.created_at).getTime();
-      return t < periodStartMs && t >= doublePeriodStartMs;
-    });
-
-    const isView = (e: any) => e.event_name === 'view' || e.event_name === 'page_view';
-    const isWhatsapp = (e: any) => e.event_name === 'whatsapp_click';
-    const isRoute = (e: any) => e.event_name === 'route_click' || e.event_name === 'directions_click';
-    const isWebsite = (e: any) => e.event_name === 'website_click';
-    const isPhone = (e: any) => e.event_name === 'phone_click';
-    const isInstagram = (e: any) => e.event_name === 'instagram_click' || (e.event_name === 'social_click' && e.metadata?.channel === 'instagram');
-    const isShare = (e: any) => e.event_name === 'share';
-
-    // 1. Contagens do Período Atual
-    const views = currentEvents.filter(isView).length;
-    const prevViews = prevEvents.filter(isView).length;
-
-    const currentVisitorSet = new Set<string>();
-    currentEvents.filter(isView).forEach((e) => {
-      if (e.pseudonymous_subject_id) currentVisitorSet.add(e.pseudonymous_subject_id);
-    });
-    const uniqueVisitors = currentVisitorSet.size || (views > 0 ? 1 : 0);
-
-    const prevVisitorSet = new Set<string>();
-    prevEvents.filter(isView).forEach((e) => {
-      if (e.pseudonymous_subject_id) prevVisitorSet.add(e.pseudonymous_subject_id);
-    });
-    const prevUniqueVisitors = prevVisitorSet.size || (prevViews > 0 ? 1 : 0);
-
-    const whatsappClicks = currentEvents.filter(isWhatsapp).length;
-    const prevWhatsappClicks = prevEvents.filter(isWhatsapp).length;
-
-    const routeClicks = currentEvents.filter(isRoute).length;
-    const prevRouteClicks = prevEvents.filter(isRoute).length;
-
-    const websiteClicks = currentEvents.filter(isWebsite).length;
-    const prevWebsiteClicks = prevEvents.filter(isWebsite).length;
-
-    const phoneClicks = currentEvents.filter(isPhone).length;
-    const prevPhoneClicks = prevEvents.filter(isPhone).length;
-
-    const instagramClicks = currentEvents.filter(isInstagram).length;
-    const prevInstagramClicks = prevEvents.filter(isInstagram).length;
-
-    const shares = currentEvents.filter(isShare).length;
-    const prevShares = prevEvents.filter(isShare).length;
-
-    const interactions = whatsappClicks + routeClicks + websiteClicks + phoneClicks + instagramClicks + shares;
-    const prevInteractions = prevWhatsappClicks + prevRouteClicks + prevWebsiteClicks + prevPhoneClicks + prevInstagramClicks + prevShares;
-
-    const interactionRatePercent = views > 0 ? Number(((interactions / views) * 100).toFixed(1)) : 0;
-
-    // 2. Evolução Diária Real com Datas Reais
-    const dailyMap = new Map<string, { date: string; views: number; uniqueVisitors: Set<string>; interactions: number }>();
-    for (let i = periodDays - 1; i >= 0; i--) {
-      const d = new Date(now - i * 86_400_000);
-      const key = d.toLocaleDateString('pt-BR', { timeZone: timezone, day: '2-digit', month: '2-digit' });
-      dailyMap.set(key, { date: key, views: 0, uniqueVisitors: new Set<string>(), interactions: 0 });
-    }
-
-    for (const e of currentEvents) {
-      const eventDate = new Date(e.created_at).toLocaleDateString('pt-BR', { timeZone: timezone, day: '2-digit', month: '2-digit' });
-      const entry = dailyMap.get(eventDate);
-      if (entry) {
-        if (isView(e)) {
-          entry.views++;
-          if (e.pseudonymous_subject_id) entry.uniqueVisitors.add(e.pseudonymous_subject_id);
-        } else {
-          entry.interactions++;
-        }
-      }
-    }
-
-    const dailyEvolution = Array.from(dailyMap.values()).map((d) => ({
-      date: d.date,
-      views: d.views,
-      uniqueVisitors: d.uniqueVisitors.size || (d.views > 0 ? 1 : 0),
-      interactions: d.interactions,
-    }));
-
-    // 3. Origens dos Acessos
-    const originCounts = {
-      guia: 0,
-      redes: 0,
-      buscadores: 0,
-      mural: 0,
-      direto: 0,
-    };
-
-    currentEvents.filter(isView).forEach((e) => {
-      const o = String(e.metadata?.origin || e.source || '').toLowerCase();
-      if (o.includes('search') || o.includes('directory') || o.includes('categoria') || o.includes('lista') || o.includes('destaque')) {
-        originCounts.guia++;
-      } else if (o.includes('social') || o.includes('share') || o.includes('whatsapp') || o.includes('qr') || o.includes('instagram')) {
-        originCounts.redes++;
-      } else if (o.includes('google') || o.includes('organic') || o.includes('bing') || o.includes('ai_search')) {
-        originCounts.buscadores++;
-      } else if (o.includes('mural') || o.includes('connection') || o.includes('referral')) {
-        originCounts.mural++;
-      } else {
-        originCounts.direto++;
-      }
-    });
-
-    const totalViewsForOrigin = views > 0 ? views : 1;
-    const trafficOrigins = [
-      { origin: 'guia', label: 'Busca e Navegação no Guia', count: originCounts.guia, percentage: views > 0 ? Math.round((originCounts.guia / totalViewsForOrigin) * 100) : 0 },
-      { origin: 'redes', label: 'Links Compartilhados e Redes', count: originCounts.redes, percentage: views > 0 ? Math.round((originCounts.redes / totalViewsForOrigin) * 100) : 0 },
-      { origin: 'buscadores', label: 'Google e Motores de Busca', count: originCounts.buscadores, percentage: views > 0 ? Math.round((originCounts.buscadores / totalViewsForOrigin) * 100) : 0 },
-      { origin: 'mural', label: 'Mural de Conexões e Indicações', count: originCounts.mural, percentage: views > 0 ? Math.round((originCounts.mural / totalViewsForOrigin) * 100) : 0 },
-      { origin: 'direto', label: 'Acessos Diretos / Outros', count: originCounts.direto, percentage: views > 0 ? Math.round((originCounts.direto / totalViewsForOrigin) * 100) : 0 },
-    ];
-
-    // 4. Ranking de Ações
-    const actionRanking = [
-      { action: 'whatsapp', label: 'Cliques no WhatsApp Direct', count: whatsappClicks, iconType: 'whatsapp' },
-      { action: 'routes', label: 'Solicitações de Rota GPS', count: routeClicks, iconType: 'map-pin' },
-      { action: 'website', label: 'Acessos ao Website Oficial', count: websiteClicks, iconType: 'globe' },
-      { action: 'phone', label: 'Chamadas Telefônicas', count: phoneClicks, iconType: 'phone' },
-      { action: 'instagram', label: 'Visitas ao Instagram', count: instagramClicks, iconType: 'instagram' },
-      { action: 'share', label: 'Compartilhamentos do Anúncio', count: shares, iconType: 'share-2' },
-    ].sort((a, b) => b.count - a.count);
-
-    // 5. Agregação Geográfica Real
-    const geoMap = new Map<string, { city: string; state: string; count: number }>();
-    currentEvents.forEach((e) => {
-      const city = e.metadata?.city;
-      const state = e.metadata?.state;
-      if (city && state) {
-        const key = `${city}-${state}`;
-        const curr = geoMap.get(key) || { city, state, count: 0 };
-        curr.count++;
-        geoMap.set(key, curr);
-      }
-    });
-
-    const totalGeo = Array.from(geoMap.values()).reduce((acc, curr) => acc + curr.count, 0);
-    const geographicAggregation = Array.from(geoMap.values())
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5)
-      .map((g) => ({
-        city: g.city,
-        state: g.state,
-        visitorsCount: g.count,
-        percentage: totalGeo > 0 ? Math.round((g.count / totalGeo) * 100) : 0,
-      }));
+    // Agregação escalável (PostgreSQL RPC ou Streaming Chunk Aggregator)
+    const agg = await loadAggregatedBusinessAnalytics(supabase, businessId, periodDays, now, timezone);
 
     // 6. Diagnóstico de Preenchimento do Perfil
     const missingItems: Array<{ field: string; label: string; actionUrl: string }> = [];
@@ -437,11 +326,11 @@ export async function getAdvertiserResultsDTOAction(
 
     // 7. Recomendações
     const recommendations: Array<{ id: string; title: string; description: string; type: 'success' | 'info' | 'warning' }> = [];
-    if (whatsappClicks > 0) {
+    if (agg.kpis.whatsappClicks > 0) {
       recommendations.push({
         id: 'rec-wa',
         title: 'WhatsApp é o seu canal de maior tração',
-        description: `${whatsappClicks} pessoas iniciaram conversa direta neste período. Mantenha as notificações ativas e equipe alinhada para resposta rápida.`,
+        description: `${agg.kpis.whatsappClicks} pessoas iniciaram conversa direta neste período. Mantenha as notificações ativas e equipe alinhada para resposta rápida.`,
         type: 'success',
       });
     }
@@ -453,7 +342,7 @@ export async function getAdvertiserResultsDTOAction(
         type: 'info',
       });
     }
-    if (views === 0) {
+    if (agg.kpis.views === 0) {
       recommendations.push({
         id: 'rec-share',
         title: 'Divulgue seu anúncio no Guia',
@@ -470,42 +359,20 @@ export async function getAdvertiserResultsDTOAction(
         name: b.name,
         slug: b.slug,
       },
-      kpis: {
-        views,
-        viewsComparisonPercent: calcGrowth(views, prevViews),
-        uniqueVisitors,
-        uniqueVisitorsComparisonPercent: calcGrowth(uniqueVisitors, prevUniqueVisitors),
-        interactions,
-        interactionsComparisonPercent: calcGrowth(interactions, prevInteractions),
-        whatsappClicks,
-        whatsappComparisonPercent: calcGrowth(whatsappClicks, prevWhatsappClicks),
-        phoneClicks,
-        phoneComparisonPercent: calcGrowth(phoneClicks, prevPhoneClicks),
-        websiteClicks,
-        websiteComparisonPercent: calcGrowth(websiteClicks, prevWebsiteClicks),
-        instagramClicks,
-        instagramComparisonPercent: calcGrowth(instagramClicks, prevInstagramClicks),
-        routeClicks,
-        routeComparisonPercent: calcGrowth(routeClicks, prevRouteClicks),
-        shares,
-        sharesComparisonPercent: calcGrowth(shares, prevShares),
-        interactionRatePercent,
-      },
-      funnel: {
-        views,
-        interactions,
-        whatsapp: whatsappClicks,
-        routes: routeClicks,
-      },
-      dailyEvolution,
-      trafficOrigins,
-      actionRanking,
+      kpis: agg.kpis,
+      funnel: agg.funnel,
+      dailyEvolution: agg.dailyEvolution,
+      trafficOrigins: agg.trafficOrigins,
+      acquisitionSources: agg.acquisitionSources,
+      discoverySources: agg.discoverySources,
+      actionRanking: agg.actionRanking,
       topContent: {},
-      geographicAggregation,
+      geographicAggregation: agg.geographicAggregation,
       recommendations,
       profileDiagnosis,
       connectionResults,
       valueSummary,
+      dataCompleteness: agg.dataCompleteness,
       lastUpdatedAt,
       timezone,
     };
@@ -548,6 +415,8 @@ export async function getAdvertiserResultsDTOAction(
       },
       dailyEvolution: [],
       trafficOrigins: [],
+      acquisitionSources: [],
+      discoverySources: [],
       actionRanking: [],
       topContent: {},
       geographicAggregation: [],

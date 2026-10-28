@@ -43,7 +43,14 @@ export function BusinessContactTracker({ business, children }: { business: Busin
 
   useEffect(() => {
     value.track('view_business');
-  }, [value]);
+    trackEvent({
+      businessId: business.id,
+      eventType: 'view',
+      source: SOURCE_PAGE,
+      city: business.city || undefined,
+      state: business.state || undefined,
+    });
+  }, [value, business.id, business.city, business.state]);
 
   const onClickCapture = (event: React.MouseEvent<HTMLDivElement>) => {
     const anchor = (event.target as HTMLElement | null)?.closest?.('a[href]') as HTMLAnchorElement | null;

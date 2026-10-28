@@ -65,7 +65,7 @@ export function DirectorySponsored({
                 return (
                   <Link
                     key={`${biz.id}-${idx}`}
-                    href={`/guia/${biz.slug}`}
+                    href={`/guia/${biz.slug}?src=featured_sponsored`}
                     title={businessTitle}
                     className="relative group/logo flex items-center justify-center px-4 py-2 shrink-0 transition-transform duration-300 hover:scale-110"
                   >
@@ -144,7 +144,7 @@ export function DirectorySponsored({
       {/* Grid de 3 colunas para Empresas Patrocinadas (Cards maiores e mais destacados) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
         {items.map((biz) => (
-          <BusinessCard key={biz.id} data={biz} variant="featured" />
+          <BusinessCard key={biz.id} data={biz} variant="featured" discoverySource="featured_sponsored" />
         ))}
       </div>
     </section>

@@ -563,7 +563,14 @@ export function toPublicBusinessPresentation(
           : publicAsset(text(review.author_avatar_url, 2048), `Foto de ${text(review.author_name, 120) || 'membro'}`),
       })),
     },
-    metrics: { views: null, openingStatus: null },
+    metrics: {
+      views: typeof (row as any).views_count === 'number'
+        ? (row as any).views_count
+        : typeof (row as any).views === 'number'
+          ? (row as any).views
+          : null,
+      openingStatus: null,
+    },
   };
 }
 

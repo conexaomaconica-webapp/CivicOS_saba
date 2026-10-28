@@ -27,7 +27,14 @@ export function LodgeMapView({ items }: LodgeMapViewProps) {
   const points = useMemo<MapPoint[]>(
     () =>
       items
-        .map((item) => ({ slug: item.slug, name: item.name, latitude: Number(item.latitude), longitude: Number(item.longitude) }))
+        .map((item) => ({
+          slug: item.slug,
+          name: item.name,
+          latitude: Number(item.latitude),
+          longitude: Number(item.longitude),
+          logo_url: item.logo_url,
+          category_name: item.potency_name || 'Loja Maçônica',
+        }))
         .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude) && !(p.latitude === 0 && p.longitude === 0)),
     [items],
   );

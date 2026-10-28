@@ -59,7 +59,7 @@ export function DirectoryConnectionsMural({ items, confirmedTotal }: Props) {
                   <strong>{item.member_first_name}</strong> {info.verb}
                   {item.item_description ? <> {item.item_description}</> : null}{' '}
                   {info.preposition ? `${info.preposition} ` : ''}
-                  <Link href={`/guia/${item.business_slug}`} className="font-bold text-[#4B161B] hover:underline">
+                  <Link href={`/guia/${item.business_slug}?src=feed_wall`} className="font-bold text-[#4B161B] hover:underline">
                     {item.business_name}
                   </Link>
                 </p>

@@ -208,7 +208,7 @@ export function DirectoryLiveSearchBox({
 
   const handleSelectBusiness = (slug: string) => {
     setIsOpen(false);
-    router.push(`/guia/${slug}`);
+    router.push(`/guia/${slug}?src=text_search`);
   };
 
   const handleSelectCategory = (catSlug: string) => {

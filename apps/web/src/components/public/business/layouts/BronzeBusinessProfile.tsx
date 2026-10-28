@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Heart, Share2, Building2 } from 'lucide-react';
+import { Heart, Share2, Building2, Eye } from 'lucide-react';
 import { useFavorites } from '@/lib/directory/favorites-context';
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
 import { getObjectPosition } from '@/lib/business/public-business-presentation';
@@ -52,12 +52,21 @@ export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
                     {identity.category}
                   </p>
 
-                  {/* Cidade e Estado */}
-                  {location && (location.city || location.state) && (
-                    <p className="text-xs text-stone-500 font-medium pt-0.5">
-                      {[location.city, location.state].filter(Boolean).join(' • ')}
-                    </p>
-                  )}
+                  {/* Cidade, Estado e Visualizações */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500 font-medium pt-0.5">
+                    {location && (location.city || location.state) && (
+                      <p>
+                        {[location.city, location.state].filter(Boolean).join(' • ')}
+                      </p>
+                    )}
+                    {profile.metrics?.views != null && (
+                      <div className="inline-flex items-center gap-1.5 text-stone-600 font-medium" title="Visualizações da página da empresa">
+                        {location && (location.city || location.state) && <span className="text-stone-300">·</span>}
+                        <Eye className="w-3.5 h-3.5 text-[#C9A227] shrink-0" />
+                        <span>{profile.metrics.views.toLocaleString('pt-BR')} {profile.metrics.views === 1 ? 'visualização' : 'visualizações'}</span>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Selo do plano e selos institucionais: abaixo da categoria e da localização */}
                   <InstitutionalBadges recognition={recognition} catalog={recognition.catalog} commercialPlan={profile.plan.commercialPlan} variant="compact" />

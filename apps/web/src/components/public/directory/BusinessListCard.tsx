@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Heart, Share2, Star, Crown, Award, ShieldCheck, Users, Map, Building2 } from 'lucide-react';
+import { Heart, Share2, Star, Crown, Award, ShieldCheck, Users, Map, Building2, Eye } from 'lucide-react';
 import { useFavorites } from '@/lib/directory/favorites-context';
 import { useSearchImpression } from '@/lib/analytics/use-search-impression';
 import { CardReferModal } from './CardReferModal';
@@ -12,11 +12,13 @@ import {
   PEDRA_FUNDAMENTAL_SEAL,
   PEDRA_FUNDAMENTAL_HORIZONTAL_SEAL,
 } from './BusinessCard';
+import type { DiscoverySource } from '@/lib/analytics/traffic-sources';
 
 type BusinessListCardProps = {
   data: BusinessCardData;
   onViewOnMap?: (slug: string) => void;
   pedraCardDisplay?: PedraCardDisplay;
+  discoverySource?: DiscoverySource;
 };
 
 // Format Masonic Connection string
@@ -56,7 +58,7 @@ function formatMasonicConnection(data: BusinessCardData): { title: string; lodge
   };
 }
 
-export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay }: BusinessListCardProps) {
+export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discoverySource }: BusinessListCardProps) {
   const { isFavorite, toggleFavorite } = useFavorites();
   const contextPedraDisplay = usePedraCardDisplay();
   const pedraHorizontalSealUrl = usePedraHorizontalSeal();
@@ -170,6 +172,14 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay }: Busine
             {hasRealRating && (
               <span className="flex items-center gap-1 font-semibold text-stone-700">
                 · <Star className="w-3 h-3 fill-amber-400 text-amber-400" /> {data.rating_average} ({data.reviews_count})
+              </span>
+            )}
+            {typeof data.views_count === 'number' && (
+              <span
+                className="flex items-center gap-1 font-medium text-stone-500"
+                title="Visualizações da página da empresa"
+              >
+                · <Eye className="w-3 h-3 text-stone-400" /> {data.views_count.toLocaleString('pt-BR')} {data.views_count === 1 ? 'visualização' : 'visualizações'}
               </span>
             )}
           </p>
@@ -305,7 +315,7 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay }: Busine
           )}
 
           <Link
-            href={`/guia/${data.slug}`}
+            href={discoverySource ? `/guia/${data.slug}?src=${discoverySource}` : `/guia/${data.slug}`}
             className="inline-flex items-center justify-center px-4 py-1.5 rounded-xl border border-[#5d1523] text-[#5d1523] font-bold text-xs hover:bg-[#5d1523] hover:text-white transition-colors"
           >
             Ver empresa
