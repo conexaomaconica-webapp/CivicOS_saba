@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createServerSideClient } from '@/lib/supabase/server';
+import { sanitizeAndValidateSvg } from '@/lib/media/svg-sanitizer';
 
 export interface InstitutionalRecognitionDTO {
   id: string;
@@ -182,6 +183,26 @@ export async function uploadRecognitionSealAction(formData: FormData): Promise<{
 
     if (file.type && !allowedMimeTypes.includes(file.type)) {
       return { success: false, error: `Tipo de arquivo ${file.type} inválido. Utilize apenas imagens SVG, PNG ou WebP.` };
+    }
+    // Sanitização e validação de segurança específica por tipo de arquivo
+    const arrayBuffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+
+    if (fileExt === 'svg' || file.type === 'image/svg+xml') {
+      const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+      const svgCheck = sanitizeAndValidateSvg(text);
+      if (!svgCheck.valid) {
+        return { success: false, error: svgCheck.error || 'Arquivo SVG rejeitado pelas políticas de segurança.' };
+      }
+    } else {
+      // Validação estrita de magic bytes para PNG ou WebP
+      const isPng = bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+      const isWebp = bytes.length >= 12
+        && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46
+        && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+      if (!isPng && !isWebp) {
+        return { success: false, error: 'Arquivo binário corrompido ou formato não reconhecido (esperado PNG ou WebP genuíno).' };
+      }
     }
 
     const cleanType = sealType.replace(/[^a-zA-Z0-9_-]/g, '');

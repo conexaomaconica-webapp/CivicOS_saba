@@ -184,7 +184,26 @@ export async function trackDirectoryEventAction(payload: {
         },
       });
 
-      if (error) return { ok: false, error: error.message };
+      if (error) {
+        // Concorrência PostgreSQL: se colidir especificamente com o índice único parcial de
+        // idempotência de ciclo de visualização (uq_analytics_events_view_cycle_forward),
+        // trata estritamente como deduplicação idempotente de sucesso.
+        // Qualquer outro erro 23505 (colisão de PK id, tenant_id ou índices não relacionados)
+        // é preservado como falha real de integridade e não mascarado.
+        const errObj = error as { code?: string; message?: string; details?: string };
+        const isCycleIndexConflict =
+          (errObj.code === '23505' || Boolean(errObj.message?.includes('duplicate key'))) &&
+          (Boolean(errObj.message?.includes('uq_analytics_events_view_cycle_forward')) ||
+            Boolean(errObj.details?.includes('uq_analytics_events_view_cycle_forward')) ||
+            (Boolean(errObj.message?.includes('cycle_id')) && Boolean(errObj.message?.includes('analytics_events'))));
+
+        if (normalizedType === 'view' && validCycleId && isCycleIndexConflict) {
+          if (cycleKey) recentViewCycles.set(cycleKey, Date.now());
+          return { ok: true, deduplicated: true };
+        }
+
+        return { ok: false, error: error.message };
+      }
 
       if (normalizedType === 'view' && cycleKey) {
         recentViewCycles.set(cycleKey, Date.now());

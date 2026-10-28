@@ -143,8 +143,8 @@ export function DirectorySponsored({
 
       {/* Grid de 3 colunas para Empresas Patrocinadas (Cards maiores e mais destacados) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-        {items.map((biz) => (
-          <BusinessCard key={biz.id} data={biz} variant="featured" discoverySource="featured_sponsored" />
+        {items.map((biz, idx) => (
+          <BusinessCard key={biz.id} data={biz} variant="featured" discoverySource="featured_sponsored" priority={idx === 0} />
         ))}
       </div>
     </section>

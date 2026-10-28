@@ -74,7 +74,7 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1280px) 100vw, 1280px"
           quality={75}
-          priority={activeIndex === 0 && !current.image_mobile_url}
+          priority={activeIndex === 0}
           className={`${fit} ${current.image_mobile_url ? 'max-sm:hidden' : ''}`}
         />
         {current.image_mobile_url && (
@@ -84,6 +84,7 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
             fill
             sizes="100vw"
             quality={75}
+            priority={activeIndex === 0}
             className={`${fit} sm:hidden`}
           />
         )}
@@ -96,6 +97,7 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
           src={current.image_desktop_url}
           alt={alt}
           loading={activeIndex === 0 ? 'eager' : 'lazy'}
+          fetchPriority={activeIndex === 0 ? 'high' : 'auto'}
           decoding="async"
           className={`h-full w-full ${fit}`}
         />

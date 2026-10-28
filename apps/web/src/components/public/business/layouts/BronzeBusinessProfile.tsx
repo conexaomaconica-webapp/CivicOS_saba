@@ -95,6 +95,8 @@ export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
               <img
                 src={coverUrl}
                 alt={`Foto corporativa de ${identity.name}`}
+                fetchPriority="high"
+                decoding="async"
                 style={{ objectPosition: getObjectPosition(media.cover) }}
                 className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
               />

@@ -306,8 +306,8 @@ export function DirectoryAllBusinesses({
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 my-6">
-          {items.map((biz) => (
-            <BusinessCard key={biz.id} data={biz} variant="compact" />
+          {items.map((biz, idx) => (
+            <BusinessCard key={biz.id} data={biz} variant="compact" priority={idx < 2} />
           ))}
         </div>
       ) : (
@@ -318,7 +318,7 @@ export function DirectoryAllBusinesses({
               <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 overflow-hidden p-1 ${biz.logo_url ? 'bg-white border-stone-200' : 'bg-amber-950 text-amber-400 font-bold border-amber-900'}`}>
                   {biz.logo_url ? (
-                    <img src={biz.logo_url} alt={biz.name} className="max-w-full max-h-full object-contain object-center bg-white" />
+                    <img src={biz.logo_url} alt={biz.name} loading="lazy" decoding="async" className="max-w-full max-h-full object-contain object-center bg-white" />
                   ) : (
                     biz.name.slice(0, 2).toUpperCase()
                   )}

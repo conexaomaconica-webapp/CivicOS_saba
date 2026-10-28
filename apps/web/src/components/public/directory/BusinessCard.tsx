@@ -51,6 +51,7 @@ type BusinessCardProps = {
   showRating?: boolean;
   pedraCardDisplay?: PedraCardDisplay;
   discoverySource?: DiscoverySource;
+  priority?: boolean;
 };
 
 // Assets Oficiais de Selos Horizontais dos Planos Comerciais
@@ -143,6 +144,7 @@ export function BusinessCard({
   showRating = true,
   pedraCardDisplay,
   discoverySource,
+  priority = false,
 }: BusinessCardProps) {
   const { isFavorite, toggleFavorite } = useFavorites();
   const contextPedraDisplay = usePedraCardDisplay();
@@ -289,6 +291,9 @@ export function BusinessCard({
           <img
             src={data.cover_url}
             alt={`Capa de ${data.name}`}
+            loading={priority ? 'eager' : 'lazy'}
+            fetchPriority={priority ? 'high' : 'auto'}
+            decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
@@ -334,6 +339,9 @@ export function BusinessCard({
                 <img
                   src={data.logo_url}
                   alt={data.name}
+                  loading={priority ? 'eager' : 'lazy'}
+                  fetchPriority={priority ? 'high' : 'auto'}
+                  decoding="async"
                   className="max-w-full max-h-full object-contain object-center p-0.5 transition-transform duration-300 ease-out group-hover:scale-105 hover:scale-110"
                 />
               ) : (
@@ -357,6 +365,8 @@ export function BusinessCard({
                     <img
                       src={pedraSealSrc}
                       alt="Pedra Fundamental"
+                      loading="lazy"
+                      decoding="async"
                       onError={handlePedraSealError}
                       className="max-w-full max-h-full object-contain drop-shadow-md hover:drop-shadow-2xl transition-all duration-300 ease-out"
                     />
@@ -372,6 +382,8 @@ export function BusinessCard({
                     <img
                       src={pedraHorizontalSealUrl || PEDRA_FUNDAMENTAL_HORIZONTAL_SEAL.fallback}
                       alt="Pedra Fundamental"
+                      loading="lazy"
+                      decoding="async"
                       onError={(event) => {
                         event.currentTarget.src = PEDRA_FUNDAMENTAL_HORIZONTAL_SEAL.fallback;
                       }}
@@ -484,7 +496,7 @@ export function BusinessCard({
               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold shadow-2xs ${badge.bg}`}
             >
               {badge.customIconUrl ? (
-                <img src={badge.customIconUrl} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />
+                <img src={badge.customIconUrl} alt="" loading="lazy" decoding="async" className="w-3.5 h-3.5 object-contain shrink-0" />
               ) : (
                 <badge.icon className="w-3.5 h-3.5 shrink-0 text-amber-800" />
               )}

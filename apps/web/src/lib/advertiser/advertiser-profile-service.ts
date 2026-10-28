@@ -552,17 +552,34 @@ export async function updateAdvertiserProfileFieldsAction(
   }
 }
 
-function validateImageMagicBytes(buffer: Uint8Array): boolean {
-  if (!buffer || buffer.length < 4) return false;
-  // JPEG: FF D8 FF
-  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return true;
+interface ImageBinaryFormat {
+  mimeType: string;
+  extension: string;
+}
+
+function detectImageBinaryFormat(buffer: Uint8Array): ImageBinaryFormat | null {
+  if (!buffer || buffer.length < 4) return null;
   // PNG: 89 50 4E 47
-  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return true;
-  // WebP/RIFF: 52 49 46 46
-  if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) return true;
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
+    return { mimeType: 'image/png', extension: 'png' };
+  }
+  // WebP: RIFF (bytes 0-3) + WEBP (bytes 8-11)
+  if (
+    buffer.length >= 12 &&
+    buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+    buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50
+  ) {
+    return { mimeType: 'image/webp', extension: 'webp' };
+  }
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return { mimeType: 'image/jpeg', extension: 'jpg' };
+  }
   // GIF: 47 49 46 38
-  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) return true;
-  return false;
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) {
+    return { mimeType: 'image/gif', extension: 'gif' };
+  }
+  return null;
 }
 
 function isValidPublicVideoUrl(value: string): boolean {
@@ -643,7 +660,8 @@ export async function uploadAdvertiserAssetAction(formData: FormData): Promise<{
     const arrayBuffer = await file.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
 
-    if (!validateImageMagicBytes(uint8Array)) {
+    const formatInfo = detectImageBinaryFormat(uint8Array);
+    if (!formatInfo) {
       return {
         success: false,
         message: 'Arquivo inválido ou corrompido. Envie uma imagem real (JPG, PNG ou WebP).',
@@ -667,11 +685,11 @@ export async function uploadAdvertiserAssetAction(formData: FormData): Promise<{
     }
 
     const timestamp = Date.now();
-    const safeFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const storagePath = `${tenantId}/${businessId}/${assetType}/${timestamp}-${safeFilename}`;
+    const baseName = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_') || 'asset';
+    const storagePath = `${tenantId}/${businessId}/${assetType}/${timestamp}-${baseName}.${formatInfo.extension}`;
 
-    // Upload real para o bucket business-assets no Supabase Storage
-    const storageError = await uploadBusinessAsset(supabase, storagePath, Buffer.from(arrayBuffer), file.type || 'image/webp');
+    // Upload real para o bucket business-assets no Supabase Storage com MIME e extensão sincronizados
+    const storageError = await uploadBusinessAsset(supabase, storagePath, Buffer.from(arrayBuffer), formatInfo.mimeType);
 
     if (storageError) {
       console.error('Erro no upload para Storage:', storageError.message);

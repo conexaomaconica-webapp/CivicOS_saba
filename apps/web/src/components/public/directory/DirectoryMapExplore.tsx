@@ -39,6 +39,32 @@ export function DirectoryMapExplore({ businesses = [], selectedCity }: Directory
   const [selectedBizId, setSelectedBizId] = useState<string | null>(businesses[0]?.id || null);
   const [isCardMinimized, setIsCardMinimized] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMapInView, setIsMapInView] = useState(false);
+  const mapContainerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isMapInView) return;
+    const el = mapContainerRef.current;
+    if (!el) return;
+
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsMapInView(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setIsMapInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '300px' }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isMapInView]);
 
   // Fecha tela cheia ao pressionar ESC
   useEffect(() => {
@@ -142,17 +168,25 @@ export function DirectoryMapExplore({ businesses = [], selectedCity }: Directory
 
         {/* Container do Mapa Interativo com Leaflet e Pins com Balões */}
         <div
+          ref={mapContainerRef}
           className={`relative h-full bg-slate-100 flex flex-col justify-between p-0 border-r border-gray-200 overflow-hidden ${
             isFullscreen ? 'md:col-span-2 lg:col-span-3 min-h-[460px]' : 'min-h-[460px]'
           }`}
         >
-          <DirectoryLeafletMap
-            businesses={displayList}
-            selectedId={selectedBiz?.id || null}
-            onSelect={handleSelectBiz}
-            isFullscreen={isFullscreen}
-            onToggleFullscreen={toggleFullscreen}
-          />
+          {isMapInView || isFullscreen ? (
+            <DirectoryLeafletMap
+              businesses={displayList}
+              selectedId={selectedBiz?.id || null}
+              onSelect={handleSelectBiz}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={toggleFullscreen}
+            />
+          ) : (
+            <div className="w-full h-full min-h-[460px] flex flex-col items-center justify-center bg-slate-100 text-amber-900 gap-2 p-6 text-center">
+              <Compass className="w-8 h-8 text-amber-800 animate-spin" />
+              <span className="text-xs font-semibold">Carregando mapa interativo com as empresas...</span>
+            </div>
+          )}
 
           {/* Badge Minimizado da Empresa Selecionada */}
           {selectedBiz && isCardMinimized && (

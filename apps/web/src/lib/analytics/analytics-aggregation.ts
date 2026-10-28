@@ -13,7 +13,9 @@ export interface RawAnalyticsEvent {
   event_name: string;
   pseudonymous_subject_id?: string | null;
   source?: string | null;
-  metadata?: Record<string, any> | null;
+  acquisition_source?: string | null;
+  discovery_source?: string | null;
+  metadata?: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -111,10 +113,11 @@ export const isPhoneEvent = (e: RawAnalyticsEvent) =>
 
 export const isInstagramEvent = (e: RawAnalyticsEvent) =>
   e.event_name === 'instagram_click' ||
+  e.event_name === 'social_click' ||
   (e.event_name === 'social_click' && e.metadata?.channel === 'instagram');
 
 export const isShareEvent = (e: RawAnalyticsEvent) =>
-  e.event_name === 'share';
+  e.event_name === 'share' || e.event_name === 'share_click' || e.event_name === 'profile_share';
 
 /**
  * Agregador streaming em memória de alta performance.
@@ -221,16 +224,29 @@ export class StreamingAnalyticsAggregator {
           if (e.pseudonymous_subject_id) this.currentVisitorSet.add(e.pseudonymous_subject_id);
 
           // Rastreabilidade Independente (Etapa B)
-          const rawAcq = e.metadata?.acquisition_source ?? e.metadata?.origin ?? (e.source === 'direct' ? 'direct' : null);
+          const rawAcq = e.acquisition_source && e.acquisition_source !== 'unidentified'
+            ? e.acquisition_source
+            : (typeof e.metadata?.acquisition_source === 'string'
+              ? e.metadata.acquisition_source
+              : typeof e.metadata?.origin === 'string'
+              ? e.metadata.origin
+              : (e.source === 'direct' ? 'direct' : null));
           const acq = normalizeAcquisitionSource(rawAcq);
           this.acquisitionCounts[acq] = (this.acquisitionCounts[acq] || 0) + 1;
 
-          const rawDisc = e.metadata?.discovery_source ?? e.metadata?.source ?? e.source;
+          const rawDisc = e.discovery_source && e.discovery_source !== 'unidentified'
+            ? e.discovery_source
+            : (typeof e.metadata?.discovery_source === 'string'
+              ? e.metadata.discovery_source
+              : typeof e.metadata?.source === 'string'
+              ? e.metadata.source
+              : e.source);
           const disc = normalizeDiscoverySource(rawDisc);
           this.discoveryCounts[disc] = (this.discoveryCounts[disc] || 0) + 1;
 
           // Origem da visita (retrocompatibilidade)
-          const o = String(e.metadata?.origin || e.source || '').toLowerCase().trim();
+          const originVal = typeof e.metadata?.origin === 'string' ? e.metadata.origin : (e.source || '');
+          const o = originVal.toLowerCase().trim();
           if (o.includes('search') || o.includes('directory') || o.includes('categoria') || o.includes('lista') || o.includes('destaque')) {
             this.originCounts.guia++;
           } else if (o.includes('social') || o.includes('share') || o.includes('whatsapp') || o.includes('qr') || o.includes('instagram')) {
@@ -271,8 +287,8 @@ export class StreamingAnalyticsAggregator {
         }
 
         // Agregação Geográfica
-        const city = e.metadata?.city;
-        const state = e.metadata?.state;
+        const city = typeof e.metadata?.city === 'string' ? e.metadata.city : undefined;
+        const state = typeof e.metadata?.state === 'string' ? e.metadata.state : undefined;
         if (city && state) {
           const key = `${city}-${state}`;
           const curr = this.geoMap.get(key) || { city, state, count: 0 };

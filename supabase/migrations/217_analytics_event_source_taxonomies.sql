@@ -15,12 +15,33 @@ ALTER TABLE public.analytics_events
   ADD COLUMN IF NOT EXISTS acquisition_source TEXT NOT NULL DEFAULT 'unidentified',
   ADD COLUMN IF NOT EXISTS discovery_source TEXT NOT NULL DEFAULT 'unidentified';
 
--- 2. Retrocompatibilidade: preenchimento gradual a partir de metadata existente se presente
+-- 2. Retrocompatibilidade e Preservação Histórica:
+-- Preenche as colunas a partir de metadata->>'acquisition_source', com fallback para
+-- metadata->>'origin' e coluna legada 'source', garantindo que valores históricos
+-- válidos jamais sejam descartados ou indevidamente rebaixados a 'unidentified'.
 UPDATE public.analytics_events
 SET
-  acquisition_source = COALESCE(metadata->>'acquisition_source', acquisition_source),
-  discovery_source = COALESCE(metadata->>'discovery_source', discovery_source)
-WHERE metadata ? 'acquisition_source' OR metadata ? 'discovery_source';
+  acquisition_source = COALESCE(
+    NULLIF(TRIM(metadata->>'acquisition_source'), ''),
+    NULLIF(TRIM(metadata->>'origin'), ''),
+    CASE 
+      WHEN source = 'direct' THEN 'direct'
+      ELSE NULL
+    END,
+    acquisition_source
+  ),
+  discovery_source = COALESCE(
+    NULLIF(TRIM(metadata->>'discovery_source'), ''),
+    NULLIF(TRIM(metadata->>'source'), ''),
+    NULLIF(TRIM(source), ''),
+    discovery_source
+  )
+WHERE 
+  metadata ? 'acquisition_source'
+  OR metadata ? 'origin'
+  OR metadata ? 'discovery_source'
+  OR metadata ? 'source'
+  OR source IS NOT NULL;
 
 -- 3. Índices parciais para otimizar agregações de tráfego com estrito isolamento multi-tenant
 CREATE INDEX IF NOT EXISTS idx_analytics_events_acquisition_source

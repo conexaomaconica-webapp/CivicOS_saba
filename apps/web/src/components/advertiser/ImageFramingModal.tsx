@@ -256,14 +256,14 @@ export function ImageFramingModal({ kind, source, title, onConfirm, onCancel }: 
                 />
               </label>
               {kind === 'logo' && (
-                <label className="flex min-h-8 items-center gap-1.5 font-medium text-stone-700">
+                <label className="flex min-h-8 items-center gap-1.5 font-medium text-stone-700 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={transparent}
                     onChange={(e) => patch({ background: e.target.checked ? null : '#ffffff' })}
-                    className="h-4 w-4"
+                    className="h-4 w-4 rounded border-stone-300 text-[#3B0B14] focus:ring-[#C9A227]"
                   />
-                  Fundo transparente
+                  <span>Fundo transparente <span className="text-[10px] text-stone-500 font-normal">(PNG sem perdas para máxima nitidez)</span></span>
                 </label>
               )}
             </div>

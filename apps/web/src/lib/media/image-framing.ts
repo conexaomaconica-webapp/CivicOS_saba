@@ -73,7 +73,7 @@ export function loadFramingImage(source: File | string): Promise<{ img: HTMLImag
   });
 }
 
-/** Gera o arquivo final (WebP) já enquadrado, no tamanho do tipo de imagem. */
+/** Gera o arquivo final já enquadrado no tamanho do tipo de imagem (PNG sem perdas para transparência/logo e WebP 0.88-0.92 para demais). */
 export function renderFramedFile(img: HTMLImageElement, kind: FramingKind, options: FramingOptions, baseName: string): Promise<File> {
   const spec = FRAMING_SPEC[kind];
   const canvas = document.createElement('canvas');
@@ -82,6 +82,16 @@ export function renderFramedFile(img: HTMLImageElement, kind: FramingKind, optio
   const ctx = canvas.getContext('2d');
   if (!ctx) return Promise.reject(new Error('Seu navegador não conseguiu preparar a imagem.'));
   drawFramed(ctx, img, spec.width, spec.height, options);
+
+  // Tratamento diferenciado de fidelidade:
+  // Logotipos com fundo transparente usam PNG lossless para máxima nitidez em traços finos e textos.
+  // Logotipos com fundo sólido usam WebP 0.92 (alta fidelidade).
+  // Fotos de capa e galeria usam WebP 0.88 (excelente compressão fotográfica).
+  const isLosslessLogo = kind === 'logo' && options.background === null;
+  const mimeType = isLosslessLogo ? 'image/png' : 'image/webp';
+  const quality = kind === 'logo' ? 0.92 : 0.88;
+  const extension = isLosslessLogo ? 'png' : 'webp';
+
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
@@ -90,10 +100,10 @@ export function renderFramedFile(img: HTMLImageElement, kind: FramingKind, optio
           return;
         }
         const safeName = baseName.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9-_]/g, '_') || 'imagem';
-        resolve(new File([blob], `${safeName}.webp`, { type: 'image/webp', lastModified: Date.now() }));
+        resolve(new File([blob], `${safeName}.${extension}`, { type: mimeType, lastModified: Date.now() }));
       },
-      'image/webp',
-      0.88
+      mimeType,
+      quality
     );
   });
 }

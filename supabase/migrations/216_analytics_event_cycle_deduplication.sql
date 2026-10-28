@@ -61,11 +61,21 @@ WHERE event_name = 'view'
 COMMENT ON INDEX public.uq_analytics_events_view_cycle_forward IS
 'Garante unicidade física contra condições de corrida distribuídas para eventos gerados a partir do corte de homologação.';
 
--- 4. Função e Gatilho (Trigger) para descarte atômico e silencioso de ciclos concorrentes
+-- 4. Função e Gatilho (Trigger) para descarte atômico e silencioso de ciclos concorrentes sob alta concorrência
 CREATE OR REPLACE FUNCTION public.fn_prevent_duplicate_view_cycle()
 RETURNS trigger AS $$
+DECLARE
+  v_lock_key BIGINT;
 BEGIN
-  IF NEW.event_name = 'view' AND NEW.metadata->>'cycle_id' IS NOT NULL THEN
+  -- Aplica-se exclusivamente a eventos de visualização com cycle_id presente
+  -- e com data de criação a partir da data de corte (preserva 100% eventos históricos e eventos sem cycle_id)
+  IF NEW.event_name = 'view'
+     AND NEW.metadata->>'cycle_id' IS NOT NULL
+     AND COALESCE(NEW.created_at, now()) >= '2026-10-28 00:00:00+00' THEN
+    -- Gera chave determinística de 64-bit para advisory lock transacional (evita race conditions entre transações simultâneas)
+    v_lock_key := ('x' || substr(md5(NEW.business_id::text || ':' || (NEW.metadata->>'cycle_id')), 1, 15))::bit(64)::bigint;
+    PERFORM pg_advisory_xact_lock(v_lock_key);
+
     IF EXISTS (
       SELECT 1 FROM public.analytics_events
       WHERE business_id = NEW.business_id

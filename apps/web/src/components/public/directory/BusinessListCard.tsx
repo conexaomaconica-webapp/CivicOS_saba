@@ -19,6 +19,7 @@ type BusinessListCardProps = {
   onViewOnMap?: (slug: string) => void;
   pedraCardDisplay?: PedraCardDisplay;
   discoverySource?: DiscoverySource;
+  priority?: boolean;
 };
 
 // Format Masonic Connection string
@@ -58,7 +59,7 @@ function formatMasonicConnection(data: BusinessCardData): { title: string; lodge
   };
 }
 
-export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discoverySource }: BusinessListCardProps) {
+export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discoverySource, priority = false }: BusinessListCardProps) {
   const { isFavorite, toggleFavorite } = useFavorites();
   const contextPedraDisplay = usePedraCardDisplay();
   const pedraHorizontalSealUrl = usePedraHorizontalSeal();
@@ -146,6 +147,9 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discover
             <img
               src={data.logo_url}
               alt={data.name}
+              loading={priority ? 'eager' : 'lazy'}
+              fetchPriority={priority ? 'high' : 'auto'}
+              decoding="async"
               className="max-w-full max-h-full object-contain object-center bg-white transition-transform duration-300 ease-out group-hover:scale-105 hover:scale-110"
             />
           ) : (

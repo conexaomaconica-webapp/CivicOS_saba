@@ -77,6 +77,8 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
             <img
               src={imgMain.url}
               alt={imgMain.alt || `Ambiente principal de ${identity.name}`}
+              fetchPriority="high"
+              decoding="async"
               style={{ objectPosition: getObjectPosition(imgMain) }}
               className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
             />
@@ -90,6 +92,8 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
                 <img
                   src={img.url}
                   alt={img.alt || `Foto ${idx + 2} de ${identity.name}`}
+                  loading="lazy"
+                  decoding="async"
                   style={{ objectPosition: getObjectPosition(img) }}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
@@ -112,6 +116,8 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
             <img
               src={imgMain.url}
               alt={imgMain.alt || `Foto principal de ${identity.name}`}
+              fetchPriority="high"
+              decoding="async"
               style={{ objectPosition: getObjectPosition(imgMain) }}
               className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
             />
@@ -124,6 +130,8 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
                 <img
                   src={img.url}
                   alt={img.alt || `Foto ${idx + 2} de ${identity.name}`}
+                  loading="lazy"
+                  decoding="async"
                   style={{ objectPosition: getObjectPosition(img) }}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
@@ -171,6 +179,8 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
         <img
           src={singleImg.url}
           alt={singleImg.alt || `Foto corporativa de ${identity.name}`}
+          fetchPriority="high"
+          decoding="async"
           style={{ objectPosition: getObjectPosition(singleImg) }}
           className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
         />

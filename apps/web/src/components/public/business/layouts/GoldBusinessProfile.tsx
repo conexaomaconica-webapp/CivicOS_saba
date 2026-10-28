@@ -39,6 +39,8 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
           <img
             src={coverUrl}
             alt={identity.name}
+            fetchPriority="high"
+            decoding="async"
             // Sem ponto focal definido, enquadra um pouco acima do centro (rostos, fachadas e letreiros costumam ficar ali).
             style={{ objectPosition: getObjectPosition(media.cover) ?? '50% 35%' }}
             className={`h-full w-full object-cover ${hasCover ? '' : 'opacity-35 brightness-90'}`}

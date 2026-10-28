@@ -28,13 +28,7 @@ vi.mock('../src/lib/supabase/server', () => ({
         is: () => c,
         in: () => c,
         limit: () => c,
-        order: () => Promise.resolve({
-          data: [
-            { id: 'srv-1', title: 'Portaria Remota', description: 'Atendimento 24h', is_active: true },
-          ],
-          count: 1,
-          error: null,
-        }),
+        order: () => c,
         maybeSingle: () => Promise.resolve({
           data: {
             id: 'biz_001',

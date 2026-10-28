@@ -330,11 +330,12 @@ export function BusinessDirectoryClient({
             <BusinessMapView items={businessItems} />
           ) : viewMode === 'list' ? (
             <div className="space-y-4">
-              {businessItems.map((biz) => {
+              {businessItems.map((biz, idx) => {
                 const info = responsibles[biz.slug];
                 return (
                   <BusinessListCard
                     key={biz.id}
+                    priority={idx === 0}
                     data={{
                       ...biz,
                       responsible_name: info?.name ?? null,
@@ -348,8 +349,8 @@ export function BusinessDirectoryClient({
           ) : (
             /* Modo Grade (3 colunas no desktop) */
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {businessItems.map((biz) => (
-                <BusinessCard key={biz.id} data={biz} variant="compact" />
+              {businessItems.map((biz, idx) => (
+                <BusinessCard key={biz.id} data={biz} variant="compact" priority={idx < 2} />
               ))}
             </div>
           )}

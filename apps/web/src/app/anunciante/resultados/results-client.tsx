@@ -617,8 +617,8 @@ export default function AdvertiserResultsClient({ initialData }: { initialData: 
                       Funil de Interesse Comercial
                     </h3>
                   </div>
-                  <span className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-full text-xs font-bold font-mono">
-                    Taxa Geral de Conversão: {kpis.interactionRatePercent}%
+                  <span className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-full text-xs font-bold font-mono" title="Proporção entre ações de contato direto nos canais e visualizações do perfil">
+                    Taxa de Interações por Visualização: {kpis.interactionRatePercent}%
                   </span>
                 </div>
 
@@ -665,7 +665,7 @@ export default function AdvertiserResultsClient({ initialData }: { initialData: 
                     Transparência &amp; Diretrizes Comerciais:
                   </p>
                   <p className="text-[11px] leading-relaxed text-stone-600">
-                    Métricas de cliques e interações representam interesse manifesto de contato com a sua empresa. Nenhum clique ou visualização garante venda concretizada ou faturamento comercial. As oportunidades geradas dependem do atendimento comercial e fechamento direto entre a sua empresa e os clientes da rede.
+                    Métricas de cliques e interações representam interesse manifesto de contato com a sua empresa. A Taxa de Interações por Visualização indica a proporção entre ações diretas de contato (WhatsApp, telefone, rotas, site, etc.) e visualizações do perfil, não representando conversão em vendas ou faturamento garantido. O fechamento efetivo de negócios depende exclusivamente do atendimento da sua equipe.
                   </p>
                 </div>
               </div>
