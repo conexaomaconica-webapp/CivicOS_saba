@@ -141,3 +141,51 @@ textarea {
 [data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
   background: var(--color-gray-600);
 }
+
+/* -- Rich Text & Formatted Content (Serviços e Prontuário 360) -------------- */
+.rich-text-editor-area ul,
+.formatted-content ul {
+  list-style-type: disc !important;
+  padding-left: 1.25rem !important;
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.35rem !important;
+}
+
+.rich-text-editor-area ol,
+.formatted-content ol {
+  list-style-type: decimal !important;
+  padding-left: 1.25rem !important;
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.35rem !important;
+}
+
+.rich-text-editor-area li,
+.formatted-content li {
+  margin-top: 0.125rem !important;
+  margin-bottom: 0.125rem !important;
+}
+
+.rich-text-editor-area p,
+.formatted-content p {
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.25rem !important;
+}
+
+.rich-text-editor-area strong,
+.rich-text-editor-area b,
+.formatted-content strong,
+.formatted-content b {
+  font-weight: 700 !important;
+}
+
+.rich-text-editor-area em,
+.rich-text-editor-area i,
+.formatted-content em,
+.formatted-content i {
+  font-style: italic !important;
+}
+
+.rich-text-editor-area u,
+.formatted-content u {
+  text-decoration: underline !important;
+}

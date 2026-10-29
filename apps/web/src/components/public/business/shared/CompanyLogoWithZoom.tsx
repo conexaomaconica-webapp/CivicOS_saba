@@ -11,6 +11,7 @@ interface CompanyLogoWithZoomProps {
   className?: string;
   imgClassName?: string;
   fallbackText?: string;
+  backgroundColor?: string;
 }
 
 export function CompanyLogoWithZoom({
@@ -18,6 +19,7 @@ export function CompanyLogoWithZoom({
   businessName,
   className = 'w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white border border-[#E8E5DF] p-2 shrink-0 flex items-center justify-center shadow-xs relative group cursor-pointer overflow-hidden',
   imgClassName = 'max-w-full max-h-full object-contain rounded-xl transition-transform group-hover:scale-105',
+  backgroundColor,
 }: CompanyLogoWithZoomProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -30,6 +32,7 @@ export function CompanyLogoWithZoom({
         type="button"
         onClick={() => setIsOpen(true)}
         title="Clique para ampliar a logomarca da empresa"
+        style={backgroundColor ? { backgroundColor } : undefined}
         className={`${className} transition-all hover:scale-[1.03] hover:border-[#C9A227]`}
       >
         <img src={logoUrl} alt={altText} className={imgClassName} />

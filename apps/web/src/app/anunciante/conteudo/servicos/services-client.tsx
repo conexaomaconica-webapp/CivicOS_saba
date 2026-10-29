@@ -22,6 +22,8 @@ import {
   saveAdvertiserServiceAction,
   toggleServiceActiveAction,
 } from '@/lib/advertiser/advertiser-content-service';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { FormattedText } from '@/components/ui/formatted-text';
 
 export default function AdvertiserServicesClient({ data }: { data: AdvertiserContentDTO }) {
   const { business, quotas, services: initialServices } = data;
@@ -250,9 +252,12 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
                   {srv.title}
                 </h3>
 
-                <p className="text-xs text-stone-600 leading-relaxed line-clamp-3">
-                  {srv.description}
-                </p>
+                <FormattedText
+                  content={srv.description}
+                  className="text-xs text-stone-600 leading-relaxed"
+                  collapsible
+                  maxCollapsedLength={160}
+                />
               </div>
 
               <div className="pt-3 border-t border-stone-100 flex items-center justify-between text-xs">
@@ -274,9 +279,10 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
 
                 <div className="flex items-center gap-2">
                   <Link
-                    href={`/guia/${business.slug || '#'}`}
+                    href={`/guia/${business.slug || '#'}?preview=true`}
                     target="_blank"
                     className="p-2 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors text-[11px] font-bold flex items-center gap-1"
+                    title="Visualizar como fica no anúncio do Guia"
                   >
                     <Eye className="w-3.5 h-3.5 text-[#C9A227]" />
                     <span>Ver no meu anúncio</span>
@@ -299,8 +305,14 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
 
       {/* MODAL DE CRIAÇÃO / EDIÇÃO DE SERVIÇO */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative">
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto overscroll-contain"
+          onWheel={(e) => e.stopPropagation()}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto overscroll-contain"
+            onWheel={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <h3 className="font-serif font-bold text-lg text-stone-900">
                 {editingService ? 'Editar Serviço' : 'Cadastrar Novo Serviço'}
@@ -330,13 +342,10 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
 
               <div className="space-y-1">
                 <label className="font-bold text-stone-800">Descrição Detalhada</label>
-                <textarea
-                  rows={4}
+                <RichTextEditor
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium text-xs"
-                  placeholder="Descreva o serviço, diferenciais e público-alvo..."
-                  required
+                  onChange={setDescription}
+                  placeholder="Descreva o serviço, diferenciais, tópicos e público-alvo..."
                 />
               </div>
 

@@ -738,6 +738,14 @@ export default function ApprovalDossierClient({ initialDossier }: Props) {
                 {displayOptionalText(dossier.masonic_link.lodge_name, 'Loja não informada')} ({displayOptionalText(dossier.masonic_link.potencia_name, 'Potência não informada')})
               </strong>
             </div>
+            {dossier.masonic_link.related_brother_name && (
+              <div className="sm:col-span-2 pt-2 border-t border-stone-100">
+                <span className="text-stone-500 block">Irmão de Referência (Cônjuge / Pai):</span>
+                <strong className="text-[#3B0B14] font-serif text-sm">
+                  Ir. {dossier.masonic_link.related_brother_name}
+                </strong>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2 pt-2">

@@ -1,5 +1,6 @@
 import type { Database, Json } from '@/types/database.types';
 import { getCanonicalDefaultLimit } from '@/lib/billing/plans-service';
+import { resolveResponsibleRole, resolveTreatmentLabel } from '@/lib/business/responsible-role-resolver';
 
 export type PublicBusinessPlan = 'bronze' | 'prata' | 'ouro' | null;
 export type PublicBusinessTemplate = 'bronze' | 'prata' | 'ouro';
@@ -117,9 +118,11 @@ export type PublicBusinessPresentation = {
     id: string;
     slug: string;
     name: string;
+    shortDescription?: string | null;
     category: string | null;
     description: string | null;
     logo: PublicMediaAsset | null;
+    logoBgColor?: string | null;
   };
   authority: {
     effectivePlan: PublicBusinessPlan;
@@ -141,6 +144,10 @@ export type PublicBusinessPresentation = {
     communityLabel: string | null;
     whatsapp?: string | null;
     avatar: PublicMediaAsset | null;
+    referenceMasonName?: string | null;
+    familyRelationship?: string | null;
+    eligibilityType?: string | null;
+    isMasonicVerified?: boolean;
     endorsedByCount?: number;
     endorserAvatars?: string[];
   } | null;
@@ -182,6 +189,8 @@ export type PublicBusinessPresentation = {
     views: number | null;
     openingStatus: string | null;
   };
+  publicationStatus?: string | null;
+  isPreview?: boolean;
 };
 
 export function resolveBusinessProfileTemplate(
@@ -400,7 +409,7 @@ export function toPublicBusinessPresentation(
       return {
         id: text(item.id, 64) ?? undefined,
         name,
-        description: text(item.description, 1000),
+        description: text(item.description, 5000),
         iconName: text(item.icon_name, 50),
         priceInfo: text(item.price_info, 80),
       };
@@ -479,9 +488,11 @@ export function toPublicBusinessPresentation(
       id: text((row as DetailRow & { business_id?: string }).business_id, 64) || '',
       slug: row.business_slug,
       name: row.business_name,
+      shortDescription: text((row as any).short_description, 160) || null,
       category: row.primary_category_name,
       description: row.description,
       logo: publicAsset(row.logo_url, `Logotipo de ${row.business_name}`),
+      logoBgColor: text((row as any).logo_background_color || (row as any).logo_bg_color, 24) || null,
     },
     authority: {
       effectivePlan: hasEffectiveAccess ? plan(row.effective_plan_code) : null,
@@ -494,23 +505,32 @@ export function toPublicBusinessPresentation(
     media: { cover, gallery, video },
     owner: (ownerName || commercialPlan === 'ouro' || (responsible && responsible.name) || row.business_name) ? {
       name: text(responsible?.name, 180) || ownerName || text((row as any).owner_name, 180) || row.business_name || 'Anunciante Titular',
-      businessRole: text(responsible?.business_role, 120) || 'Proprietário',
+      businessRole: resolveResponsibleRole({
+        businessRole: text(responsible?.business_role, 120) || text((row as any).owner_role, 120),
+        communityLabel: text(responsible?.community_label, 80) || text((row as any).community_label, 80),
+        category: row.primary_category_name || (row as any).category,
+        eligibilityType: text(responsible?.eligibility_type, 40) || text((row as any).eligibility_type, 40),
+        familyRelationship: text(responsible?.family_relationship, 80) || text((row as any).family_relationship, 80),
+      }),
       organization: text(responsible?.organization, 180)
         || text((row as any).organization, 180)
         || text((row as any).lodge_name, 180)
         || text((row as any).masonic_lodge, 180)
         || null,
-      communityLabel: (() => {
-        const raw = text(responsible?.community_label, 80) || text((row as any).community_label, 80) || 'Ir.\'.';
-        if (raw === 'Irmão' || raw === 'Ir.' || raw === 'Ir.\'.') return 'Ir.\'.';
-        if (raw.toLowerCase().includes('cunhada')) return 'Cunhada';
-        return raw;
-      })(),
+      communityLabel: resolveTreatmentLabel({
+        communityLabel: text(responsible?.community_label, 80) || text((row as any).community_label, 80),
+        eligibilityType: text(responsible?.eligibility_type, 40) || text((row as any).eligibility_type, 40),
+        familyRelationship: text(responsible?.family_relationship, 80) || text((row as any).family_relationship, 80),
+      }),
       whatsapp: text(responsible?.whatsapp, 32),
       avatar: publicAsset(
         text(responsible?.avatar_url, 2048) || text((row as any).avatar_url, 2048) || text((row as any).owner_avatar_url, 2048),
         `Foto do responsável`
       ),
+      referenceMasonName: text(responsible?.reference_mason_name, 180) || text((row as any).reference_mason_name, 180) || null,
+      familyRelationship: text(responsible?.family_relationship, 80) || text((row as any).family_relationship, 80) || null,
+      eligibilityType: text(responsible?.eligibility_type, 40) || text((row as any).eligibility_type, 40) || null,
+      isMasonicVerified: Boolean(responsible?.is_masonic_verified ?? (row as any).is_masonic_verified ?? verified),
 
       endorsedByCount: typeof (row as any).recommendations_count === 'number'
         ? (row as any).recommendations_count
@@ -571,6 +591,7 @@ export function toPublicBusinessPresentation(
           : null,
       openingStatus: null,
     },
+    publicationStatus: text((row as any).publication_status, 32) || 'published',
   };
 }
 

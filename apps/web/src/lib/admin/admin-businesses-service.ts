@@ -422,6 +422,8 @@ export interface AdminBusiness360DTO {
     social_instagram?: string;
     logo_url?: string;
     cover_url?: string;
+    short_description?: string;
+    logo_background_color?: string;
     publication_status: 'draft' | 'pending_review' | 'published' | 'rejected' | 'suspended';
     is_active: boolean;
     is_founder: boolean;
@@ -626,6 +628,11 @@ export interface AdminBusiness360DTO {
     performed_by: string;
   }>;
   pedra_fundamental_count: number;
+  client_approval?: {
+    approved_at: string;
+    approved_by: string;
+    notes?: string | null;
+  };
 }
 
 export async function getAdminBusinessesListAction(params?: {
@@ -1030,6 +1037,75 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       }
     } catch (_e) { }
 
+    // Resgate de dados de afiliação maçônica do titular se o vínculo na empresa estiver sem o nome do irmão
+    if (b.owner_id && (!masonic_link_detail || !masonic_link_detail.reference_mason_name)) {
+      try {
+        const { data: aff } = await (supabase as any)
+          .from('masonic_affiliations')
+          .select('spouse_mason_name, status, lodge_name, cimb_code')
+          .eq('user_id', b.owner_id)
+          .maybeSingle();
+
+        if (aff) {
+          if (masonic_link_detail) {
+            if (!masonic_link_detail.reference_mason_name && aff.spouse_mason_name) {
+              masonic_link_detail.reference_mason_name = aff.spouse_mason_name;
+            }
+            if (!masonic_link_detail.reference_mason_cim && aff.cimb_code) {
+              masonic_link_detail.reference_mason_cim = aff.cimb_code;
+            }
+            if (!masonic_link_detail.eligibility_type) {
+              masonic_link_detail.eligibility_type =
+                aff.status === 'mason_wife'
+                  ? 'mason_spouse'
+                  : aff.status === 'demolay' || aff.status === 'job_daughter'
+                    ? 'mason_family'
+                    : 'mason';
+            }
+            if (!masonic_link_detail.family_relationship && aff.status === 'mason_wife') {
+              masonic_link_detail.family_relationship = 'esposa';
+            }
+          } else if (aff.spouse_mason_name || aff.lodge_name) {
+            masonic_link_detail = {
+              id: `aff-${b.owner_id}`,
+              status: 'pending',
+              organization_id: null,
+              lodge_name: aff.lodge_name || 'Loja informada no cadastro',
+              potency: 'Potência não informada',
+              link_type: 'owner',
+              eligibility_type:
+                aff.status === 'mason_wife'
+                  ? 'mason_spouse'
+                  : aff.status === 'demolay' || aff.status === 'job_daughter'
+                    ? 'mason_family'
+                    : 'mason',
+              reference_mason_name: aff.spouse_mason_name || null,
+              reference_mason_cim: aff.cimb_code || null,
+              family_relationship: aff.status === 'mason_wife' ? 'esposa' : null,
+              notes: 'Declarado pelo anunciante na afiliação inicial',
+              verified_at: null,
+              verified_by: null,
+            };
+          }
+        }
+      } catch (_e) { }
+    }
+
+    // Inferência por rótulo de comunidade do responsável se eligibility_type ainda estiver em branco
+    if (masonic_link_detail && !masonic_link_detail.eligibility_type) {
+      const commLabel = (respData?.community_label || '').toLowerCase();
+      if (commLabel.includes('cunhada')) {
+        masonic_link_detail.eligibility_type = 'mason_spouse';
+        if (!masonic_link_detail.family_relationship) masonic_link_detail.family_relationship = 'esposa';
+      } else if (commLabel.includes('sobrinha')) {
+        masonic_link_detail.eligibility_type = 'mason_family';
+        if (!masonic_link_detail.family_relationship) masonic_link_detail.family_relationship = 'sobrinha';
+      } else if (commLabel.includes('sobrinho')) {
+        masonic_link_detail.eligibility_type = 'mason_family';
+        if (!masonic_link_detail.family_relationship) masonic_link_detail.family_relationship = 'sobrinho';
+      }
+    }
+
     // 2. Mídias (Capa media_type = 'cover', Galeria media_type = 'gallery')
     let mediaList: any[] = [];
     try {
@@ -1370,6 +1446,31 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       }
     } catch (_e) { }
 
+    let shortDescription: string | undefined = undefined;
+    let logoBackgroundColor: string | undefined = undefined;
+    let clientApproval: AdminBusiness360DTO['client_approval'] = undefined;
+
+    try {
+      const { data: attrRows } = await (supabase as any)
+        .from('business_attributes')
+        .select('attribute_key, attribute_value')
+        .eq('business_id', businessId);
+
+      if (attrRows && Array.isArray(attrRows)) {
+        for (const attr of attrRows) {
+          if (attr.attribute_key === 'short_description') shortDescription = attr.attribute_value;
+          if (attr.attribute_key === 'logo_background_color' || attr.attribute_key === 'logo_bg_color') logoBackgroundColor = attr.attribute_value;
+          if (attr.attribute_key === 'client_approved_at') {
+            clientApproval = {
+              approved_at: attr.attribute_value,
+              approved_by: attrRows.find((a: any) => a.attribute_key === 'client_approved_by')?.attribute_value || 'Anunciante Titular',
+              notes: attrRows.find((a: any) => a.attribute_key === 'client_approval_notes')?.attribute_value || null,
+            };
+          }
+        }
+      }
+    } catch (_e) { }
+
     let commercialTermsDetail: AdminBusiness360DTO['commercial_terms'] = undefined;
     try {
       const { data: ctRow } = await (supabase as any)
@@ -1464,6 +1565,8 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
         youtube: contactsMap['youtube'] || b.youtube || undefined,
         logo_url: resolveLogoUrl(b.logo_url),
         cover_url: cover_item?.url || b.cover_url || undefined,
+        short_description: shortDescription,
+        logo_background_color: logoBackgroundColor,
         publication_status: (b.publication_status || 'published') as any,
         is_active: Boolean(b.is_active),
         is_founder: Boolean(b.is_founder),
@@ -1556,6 +1659,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       audit_timeline,
       pedra_fundamental_count: b.is_pedra_fundamental ? 1 : 0,
       commercial_terms: commercialTermsDetail,
+      client_approval: clientApproval,
     };
   } catch (_err) {
     return null;
@@ -1774,6 +1878,8 @@ export async function updateAdminBusinessDetailsAction(
     city?: string;
     state?: string;
     description?: string;
+    short_description?: string;
+    logo_background_color?: string;
     category_id?: string;
     category?: string;
     email?: string;
@@ -2219,6 +2325,41 @@ export async function updateAdminBusinessDetailsAction(
       }
     }
 
+    // Salva atributos complementares em business_attributes
+    try {
+      if (payload.short_description !== undefined) {
+        await (supabase as any)
+          .from('business_attributes')
+          .upsert(
+            {
+              business_id: businessId,
+              tenant_id: existing.tenant_id,
+              attribute_key: 'short_description',
+              attribute_value: payload.short_description.trim(),
+            },
+            { onConflict: 'business_id,attribute_key' }
+          )
+          .throwOnError();
+      }
+
+      if (payload.logo_background_color !== undefined) {
+        await (supabase as any)
+          .from('business_attributes')
+          .upsert(
+            {
+              business_id: businessId,
+              tenant_id: existing.tenant_id,
+              attribute_key: 'logo_background_color',
+              attribute_value: payload.logo_background_color.trim(),
+            },
+            { onConflict: 'business_id,attribute_key' }
+          )
+          .throwOnError();
+      }
+    } catch (_attrErr) {
+      console.warn('[updateAdminBusinessDetailsAction] Warning saving attributes:', _attrErr);
+    }
+
     await (supabase as any).from('admin_audit_logs').insert({
       tenant_id: existing.tenant_id,
       actor_id: user.id,
@@ -2245,6 +2386,8 @@ export async function updateAdminBusinessDetailsAction(
         whatsapp: payload.whatsapp || updated.phone,
         city: payload.city,
         state: payload.state,
+        short_description: payload.short_description,
+        logo_background_color: payload.logo_background_color,
         responsible: savedResponsible,
       },
     };
@@ -2647,7 +2790,11 @@ export async function upsertAdminMasonicLinkAction(
         finishPromises.push(
           (supabase as any)
             .from('business_responsibles')
-            .update({ organization: payload.lodge_name.trim(), updated_at: new Date().toISOString() })
+            .update({
+              organization: payload.lodge_name.trim(),
+              ...(payload.eligibility_type === 'mason_spouse' ? { community_label: 'Cunhada' } : payload.eligibility_type === 'mason_family' ? { community_label: 'Sobrinho(a)' } : payload.eligibility_type === 'mason' ? { community_label: 'Irmão' } : {}),
+              updated_at: new Date().toISOString()
+            })
             .eq('id', existingResp.id)
         );
       } else {
@@ -3211,6 +3358,99 @@ export async function confirmAdminCommercialTermsAction(
   }
 }
 
+/**
+ * Garante que a empresa possua uma assinatura ativa em public.subscriptions
+ * correspondente ao seu plan_tier (esquadro, compasso, acacia), evitando que
+ * triggers de quotas (como _trg_enforce_business_service_quota e _trg_enforce_business_benefit_quota)
+ * rejeitem a inserção com erro de "plano none (Máximo: 0)".
+ */
+async function ensureAdminActiveSubscription(
+  supabase: any,
+  tenantId: string,
+  businessId: string,
+  planCode: string
+): Promise<string | null> {
+  try {
+    const canonical = normalizeCanonicalPlanCode(planCode);
+    const codesToTry: string[] = [canonical];
+    if (canonical === 'acacia') codesToTry.push('ouro');
+    else if (canonical === 'compasso') codesToTry.push('prata');
+    else if (canonical === 'esquadro') codesToTry.push('bronze');
+
+    // 1. Busca se já existe assinatura ativa com o plano correto
+    const { data: existingSub } = await (supabase as any)
+      .from('subscriptions')
+      .select('id, status, plan_version_id, current_period_end, plan_versions(id, plans(code))')
+      .eq('tenant_id', tenantId)
+      .eq('business_id', businessId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const existingCode = existingSub?.plan_versions?.plans?.code?.toLowerCase();
+    const hasValidPeriod = existingSub?.current_period_end
+      ? new Date(existingSub.current_period_end).getTime() > Date.now()
+      : false;
+
+    if (existingSub?.id && existingSub.status === 'active' && existingCode && codesToTry.includes(existingCode) && hasValidPeriod) {
+      return existingSub.id;
+    }
+
+    // 2. Busca o plan_version_id correspondente
+    const { data: pvList } = await (supabase as any)
+      .from('plan_versions')
+      .select('id, version, plans(id, code)')
+      .order('version', { ascending: false });
+
+    const matchingPv = (pvList || []).find((pv: any) =>
+      codesToTry.includes(String(pv.plans?.code || '').toLowerCase())
+    ) || pvList?.[0];
+
+    const planVersionId = matchingPv?.id;
+    if (!planVersionId) return null;
+
+    const now = new Date().toISOString();
+    const oneYearLater = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+
+    if (existingSub?.id) {
+      await (supabase as any)
+        .from('subscriptions')
+        .update({
+          plan_version_id: planVersionId,
+          status: 'active',
+          current_period_start: now,
+          current_period_end: oneYearLater,
+          past_due_at: null,
+          grace_until: null,
+          canceled_at: null,
+          updated_at: now,
+        })
+        .eq('id', existingSub.id)
+        .throwOnError();
+      return existingSub.id;
+    } else {
+      const { data: inserted } = await (supabase as any)
+        .from('subscriptions')
+        .insert({
+          tenant_id: tenantId,
+          business_id: businessId,
+          plan_version_id: planVersionId,
+          status: 'active',
+          contract_term: 'annual',
+          payment_schedule: 'lump_sum',
+          current_period_start: now,
+          current_period_end: oneYearLater,
+        })
+        .select('id')
+        .maybeSingle();
+      return inserted?.id || null;
+    }
+  } catch (err) {
+    console.warn('[ensureAdminActiveSubscription] Erro ao sincronizar assinatura:', err);
+    return null;
+  }
+}
+
 export async function manageAdminServiceAction(
   businessId: string,
   action: 'create' | 'update' | 'toggle_active' | 'delete',
@@ -3241,6 +3481,11 @@ export async function manageAdminServiceAction(
       .in('status', ['active', 'trialing', 'past_due', 'canceled'])
       .order('created_at', { ascending: false }).limit(1).maybeSingle();
     const planCode = activeSubscription?.plan_versions?.plans?.code || biz.plan_tier || 'bronze';
+
+    if (action === 'create' || (action === 'update' && payload.is_active) || action === 'toggle_active') {
+      await ensureAdminActiveSubscription(supabase, biz.tenant_id, businessId, planCode);
+    }
+
     let savedService: AdminBusiness360DTO['services_items'][number] | undefined;
     if (action === 'create') {
       // Resolver cota de serviços via plan_entitlements (fonte canônica)
@@ -3404,6 +3649,11 @@ export async function manageAdminBenefitAction(
 
     if (businessLookupError) return { success: false, error: `Falha ao consultar empresa: ${businessLookupError.message}` };
     if (!biz) return { success: false, error: 'Empresa não localizada.' };
+
+    const planCode = biz.plan_tier || 'bronze';
+    if (action === 'create' || (action === 'update' && payload.is_active) || action === 'toggle_active') {
+      await ensureAdminActiveSubscription(supabase, biz.tenant_id, businessId, planCode);
+    }
 
     let savedBenefit: AdminBusiness360DTO['benefits_items'][number] | undefined;
 
@@ -3576,6 +3826,7 @@ export async function manageAdminMediaAction(
     url?: string;
     title?: string;
     direction?: 'up' | 'down';
+    logo_background_color?: string;
   }
 ): Promise<{ success: boolean; media?: AdminBusiness360DTO['gallery_items'][number]; error?: string }> {
   try {
@@ -3645,14 +3896,31 @@ export async function manageAdminMediaAction(
           action: 'DELETE_BUSINESS_VIDEO', entity_type: 'business_media', entity_id: existing.id,
           before_value: existing, reason: 'Vídeo institucional removido via Admin 360º' });
       }
-    } else if (action === 'update_logo' && payload.url) {
-      await (supabase as any)
-        .from('businesses')
-        .update({
-          logo_url: payload.url.trim(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', businessId).throwOnError();
+    } else if (action === 'update_logo') {
+      if (payload.url) {
+        await (supabase as any)
+          .from('businesses')
+          .update({
+            logo_url: payload.url.trim(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', businessId).throwOnError();
+      }
+
+      if (payload.logo_background_color) {
+        await (supabase as any)
+          .from('business_attributes')
+          .upsert(
+            {
+              business_id: businessId,
+              tenant_id: biz.tenant_id,
+              attribute_key: 'logo_background_color',
+              attribute_value: payload.logo_background_color.trim().toLowerCase(),
+            },
+            { onConflict: 'business_id,attribute_key' }
+          )
+          .throwOnError();
+      }
 
       await (supabase as any).from('admin_audit_logs').insert({
         tenant_id: biz.tenant_id,
@@ -3661,8 +3929,8 @@ export async function manageAdminMediaAction(
         entity_type: 'business',
         entity_id: businessId,
         before_value: { logo_url: biz.logo_url },
-        after_value: { logo_url: payload.url.trim() },
-        reason: 'Atualização da logo oficial via Admin 360º',
+        after_value: { logo_url: payload.url?.trim() || biz.logo_url, logo_background_color: payload.logo_background_color },
+        reason: 'Atualização da logo oficial e cor de fundo via Admin 360º',
       });
     } else if (action === 'update_cover' && payload.url) {
       const { data: existingCover } = await (supabase as any)
@@ -3898,6 +4166,8 @@ export async function updateAdminBusinessPlanAction(
       return { success: false, error: `Erro ao atualizar plano: ${updateErr.message}` };
     }
 
+    await ensureAdminActiveSubscription(supabase, bData.tenant_id, businessId, newPlanCode);
+
     await (supabase as any).from('admin_audit_logs').insert({
       tenant_id: bData.tenant_id,
       actor_id: user.id,
@@ -3967,5 +4237,84 @@ export async function locateBusinessAddressAction(input: {
   } catch (err) {
     console.error('[locateBusinessAddressAction]', err);
     return { success: false, error: 'Não foi possível localizar o endereço agora.' };
+  }
+}
+
+/**
+ * Registra a aprovação formal realizada pelo anunciante através do link de pré-visualização.
+ * Não exige sessão administrativa, utilizando o client seguro SSR/Admin com RLS/auditoria rigorosa.
+ */
+export async function approveBusinessByClientAction(params: {
+  businessId: string;
+  approverName?: string;
+  notes?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) {
+      return { success: false, error: 'Configuração do banco de dados indisponível.' };
+    }
+    const adminClient = createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const { data: biz, error: bizError } = await (adminClient as any)
+      .from('businesses')
+      .select('id, name, slug, tenant_id, publication_status')
+      .eq('id', params.businessId)
+      .single();
+
+    if (bizError || !biz) {
+      return { success: false, error: 'Empresa anunciante não localizada para confirmação.' };
+    }
+
+    const nowIso = new Date().toISOString();
+    const approver = params.approverName?.trim() || 'Anunciante Titular (Link de Prévia)';
+    const notes = params.notes?.trim() || 'Aprovação de pré-visualização confirmada pelo cliente.';
+
+    // 1. Grava atributos em business_attributes
+    await Promise.all([
+      (adminClient as any)
+        .from('business_attributes')
+        .upsert(
+          { business_id: biz.id, tenant_id: biz.tenant_id, attribute_key: 'client_approved_at', attribute_value: nowIso },
+          { onConflict: 'business_id,attribute_key' }
+        )
+        .throwOnError(),
+      (adminClient as any)
+        .from('business_attributes')
+        .upsert(
+          { business_id: biz.id, tenant_id: biz.tenant_id, attribute_key: 'client_approved_by', attribute_value: approver },
+          { onConflict: 'business_id,attribute_key' }
+        )
+        .throwOnError(),
+      (adminClient as any)
+        .from('business_attributes')
+        .upsert(
+          { business_id: biz.id, tenant_id: biz.tenant_id, attribute_key: 'client_approval_notes', attribute_value: notes },
+          { onConflict: 'business_id,attribute_key' }
+        )
+        .throwOnError(),
+    ]);
+
+    // 2. Registra na trilha de auditoria formal (admin_audit_logs)
+    await (adminClient as any).from('admin_audit_logs').insert({
+      tenant_id: biz.tenant_id,
+      entity_type: 'business',
+      entity_id: biz.id,
+      action: 'CLIENT_PREVIEW_APPROVAL',
+      reason: `Aprovação confirmada via link de pré-visualização por "${approver}". ${notes ? `Obs: ${notes}` : ''}`,
+      before_value: { publication_status: biz.publication_status },
+      after_value: { client_approved: true, client_approved_at: nowIso },
+      actor_id: 'client_preview_link',
+    });
+
+    revalidatePath(`/admin/empresas/${biz.id}`);
+    if (biz.slug) revalidatePath(`/guia/${biz.slug}`);
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Erro ao registrar aprovação do cliente.' };
   }
 }

@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { UserCheck, Building2, ZoomIn, ShieldCheck, MessageCircle } from 'lucide-react';
+import { UserCheck, Building2, ZoomIn, ShieldCheck, MessageCircle, Users } from 'lucide-react';
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
 import { ImageZoomModal } from '../shared/ImageZoomModal';
+
+import { resolveTreatmentLabel, resolveResponsibleGender } from '@/lib/business/responsible-role-resolver';
 
 type BusinessOwnerCardProps = {
   owner: PublicBusinessPresentation['owner'];
@@ -33,7 +35,34 @@ export function BusinessOwnerCard({
     logo?.url ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(owner.name || businessName)}&background=4B161B&color=F3EEDD`;
 
-  const displayName = `${owner.communityLabel ? `${owner.communityLabel} ` : ''}${owner.name}`;
+  const treatmentLabel = resolveTreatmentLabel({
+    communityLabel: owner.communityLabel,
+    eligibilityType: owner.eligibilityType,
+    familyRelationship: owner.familyRelationship,
+  });
+  const isCunhada = treatmentLabel === 'Cunhada';
+  const isSobrinha = treatmentLabel === 'Sobrinha';
+  const isSobrinho = treatmentLabel === 'Sobrinho';
+  const isFamilyOrSpouse = isCunhada || isSobrinha || isSobrinho;
+
+  const gender = resolveResponsibleGender({
+    communityLabel: owner.communityLabel,
+    eligibilityType: owner.eligibilityType,
+    familyRelationship: owner.familyRelationship,
+  });
+  const defaultProp = gender === 'feminino' ? 'Proprietária' : 'Proprietário';
+  const roleDisplay = owner.businessRole || defaultProp;
+
+  const displayName = `${treatmentLabel ? `${treatmentLabel} ` : ''}${owner.name}`;
+
+  const kinshipText = isCunhada
+    ? (owner.referenceMasonName ? `Cônjuge do Ir∴ ${owner.referenceMasonName}` : 'Cônjuge de Irmão Maçom')
+    : isSobrinha
+      ? (owner.referenceMasonName ? `${owner.familyRelationship ? `${owner.familyRelationship} do` : 'Filha do'} Ir∴ ${owner.referenceMasonName}` : 'Familiar de Irmão Maçom')
+      : isSobrinho
+        ? (owner.referenceMasonName ? `${owner.familyRelationship ? `${owner.familyRelationship} do` : 'Filho do'} Ir∴ ${owner.referenceMasonName}` : 'Familiar de Irmão Maçom')
+        : null;
+
   const whatsappDigits = owner.whatsapp?.replace(/\D/g, '') || '';
   const whatsappUrl = whatsappDigits
     ? `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(`Olá, ${owner.name}! Encontrei seu perfil no Guia Conexão Maçônica.`)}`
@@ -86,21 +115,26 @@ export function BusinessOwnerCard({
 
           <div className="space-y-1 min-w-0 flex-1">
             <h4 className="font-serif font-bold text-base text-stone-900 leading-snug truncate">
-              {displayName}
+              {owner.name}
             </h4>
 
-            {owner.businessRole && (
-              <p className="text-xs text-stone-600 font-medium truncate">
-                {owner.businessRole}
-              </p>
-            )}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-[#3B0B14]/10 text-[#3B0B14] font-bold text-[11px] border border-[#3B0B14]/20">
+                {treatmentLabel}
+              </span>
+              {roleDisplay && (
+                <span className="text-xs text-stone-600 font-medium">
+                  · {roleDisplay}
+                </span>
+              )}
+            </div>
 
             {whatsappUrl && (
               <a
                 href={whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex max-w-full items-center gap-1.5 text-xs font-bold text-emerald-700 transition-colors hover:text-emerald-800 hover:underline"
+                className="inline-flex max-w-full items-center gap-1.5 text-xs font-bold text-emerald-700 transition-colors hover:text-emerald-800 hover:underline pt-0.5"
                 aria-label={`Falar diretamente com ${owner.name} pelo WhatsApp`}
               >
                 <MessageCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
@@ -110,11 +144,22 @@ export function BusinessOwnerCard({
           </div>
         </div>
 
+        {/* Vínculo Maçônico Auditável (Cunhada ou Sobrinho(a)) */}
+        {isFamilyOrSpouse && (
+          <div className="text-xs bg-[#FDFBF7] border border-[#E8E5DF] rounded-xl p-2.5 text-stone-800 flex items-start gap-2 shadow-2xs">
+            <Users className="w-4 h-4 text-[#C9A227] shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <span className="text-stone-600">Vínculo maçônico: </span>
+              <strong className="text-[#3B0B14] font-bold">{kinshipText}</strong>
+            </div>
+          </div>
+        )}
+
         {owner.organization && (
-          <div className="text-xs text-stone-700 bg-[#FDFBF7] border border-[#E8E5DF] p-2.5 rounded-xl pt-2 flex items-center gap-2">
+          <div className="text-xs text-stone-700 bg-[#FDFBF7] border border-[#E8E5DF] p-2.5 rounded-xl flex items-center gap-2">
             <Building2 className="w-4 h-4 text-[#C9A227] shrink-0" />
             <span className="truncate">
-              Loja Maçônica: <strong className="text-[#4B161B] font-bold">{owner.organization}</strong>
+              Loja: <strong className="text-[#4B161B] font-bold">{owner.organization}</strong>
             </span>
           </div>
         )}
@@ -133,7 +178,7 @@ export function BusinessOwnerCard({
         onClose={() => setIsZoomOpen(false)}
         imageUrl={avatarUrl}
         altText={`Foto de ${owner.name}`}
-        title={`${displayName}  - ${owner.businessRole}`}
+        title={`${displayName}${roleDisplay ? ` - ${roleDisplay}` : ''}`}
         badge={`Loja Maçônica: ${owner.organization}`}
       />
     </>

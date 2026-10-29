@@ -25,7 +25,7 @@ const TITLE_MAX = 60;
 const DESCRIPTION_MAX = 155;
 
 function clean(value: string | null | undefined): string {
-  return (value ?? '').replace(/\s+/g, ' ').trim();
+  return (value ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 /** Corta sem partir palavra e sem deixar pontuação solta no fim. */

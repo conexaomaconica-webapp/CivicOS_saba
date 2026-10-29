@@ -37,7 +37,11 @@ import {
   Globe,
   ExternalLink,
   Pipette,
+  Copy,
+  Rocket,
 } from 'lucide-react';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { FormattedText } from '@/components/ui/formatted-text';
 import {
   upsertBusinessEventAction,
   deleteBusinessEventAction,
@@ -45,6 +49,7 @@ import {
   deleteBusinessPostAction,
 } from '@/app/actions/events-and-posts';
 import { contractTextForPlainDisplay } from '@/lib/contracts/contract-template-renderer';
+import { resolveProfessionFromCategory, resolveResponsibleRole } from '@/lib/business/responsible-role-resolver';
 import {
   AdminBusiness360DTO,
   togglePublicationStatusAction,
@@ -117,6 +122,7 @@ export default function Company360Client({ initialData }: Props) {
   const [name, setName] = useState(data.business.name || '');
   const [slug, setSlug] = useState(data.business.slug || '');
   const [legalName, setLegalName] = useState(data.business.legal_name || '');
+  const [shortDescription, setShortDescription] = useState(data.business.short_description || '');
   const [cnpjCpf, setCnpjCpf] = useState(formatCpfCnpj(data.business.cnpj_cpf || ''));
   const [phone, setPhone] = useState(formatPhone(data.business.phone || ''));
   const [whatsapp, setWhatsapp] = useState(formatPhone(data.business.whatsapp || ''));
@@ -197,8 +203,40 @@ export default function Company360Client({ initialData }: Props) {
   const contractSigned = data.commercial_activation.contract_signed;
   const paymentConfirmed = data.commercial_activation.payment_confirmed;
   const masonicLinkVerified = data.masonic_link_detail?.status === 'verified';
+  const commLabel = (respCommunityLabel || data.owner?.community_label || '').toLowerCase();
+  const isCunhada =
+    data.masonic_link_detail?.eligibility_type === 'mason_spouse' ||
+    commLabel.includes('cunhada');
+  const isSobrinha =
+    commLabel.includes('sobrinha') ||
+    (data.masonic_link_detail?.family_relationship || '').toLowerCase().includes('filha') ||
+    (data.masonic_link_detail?.family_relationship || '').toLowerCase().includes('sobrinha');
+  const isSobrinho =
+    !isSobrinha &&
+    (data.masonic_link_detail?.eligibility_type === 'mason_family' ||
+    commLabel.includes('sobrinho') ||
+    (data.masonic_link_detail?.family_relationship || '').toLowerCase().includes('filho'));
+  const hasReferenceMason = Boolean(data.masonic_link_detail?.reference_mason_name);
+  const isFamilyOrSpouse = isCunhada || isSobrinha || isSobrinho || hasReferenceMason;
+  const isFemale = isCunhada || isSobrinha;
+  const suggestedProfession = resolveProfessionFromCategory(category, isFemale ? 'feminino' : 'masculino');
   const [isUnlockingDossier, setIsUnlockingDossier] = useState(false);
   const [isAdvancingToReady, setIsAdvancingToReady] = useState(false);
+  const [copiedPreviewLink, setCopiedPreviewLink] = useState(false);
+
+  const handleCopyPreviewLink = () => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const url = `${origin}/guia/${data.business.slug || data.business.id}?preview=true`;
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+    }
+    setCopiedPreviewLink(true);
+    setTimeout(() => setCopiedPreviewLink(false), 2500);
+    setMessage({
+      type: 'success',
+      text: 'Link de pré-visualização copiado! Envie ao anunciante para aprovação via WhatsApp ou e-mail.'
+    });
+  };
 
   // Avaliação dinâmica de completude do perfil operacional
   const readiness = evaluateBusinessProfileReadiness({
@@ -424,6 +462,34 @@ export default function Company360Client({ initialData }: Props) {
   const [masonicLinkTypeInput, setMasonicLinkTypeInput] = useState('Proprietário Ir∴');
   const [masonicStatusInput, setMasonicStatusInput] = useState<'verified' | 'pending' | 'rejected'>('verified');
   const [masonicJustificationInput, setMasonicJustificationInput] = useState('');
+  const [masonicEligibilityTypeInput, setMasonicEligibilityTypeInput] = useState<string>('mason');
+  const [masonicReferenceMasonNameInput, setMasonicReferenceMasonNameInput] = useState('');
+  const [masonicReferenceMasonCimInput, setMasonicReferenceMasonCimInput] = useState('');
+  const [masonicFamilyRelationshipInput, setMasonicFamilyRelationshipInput] = useState('');
+
+  const openMasonicUpsertModal = () => {
+    setMasonicLodgeInput(data.masonic_link_detail?.lodge_name || '');
+    setMasonicPotencyInput(data.masonic_link_detail?.potency || '');
+    setMasonicLinkTypeInput(data.masonic_link_detail?.link_type || 'owner');
+    setMasonicStatusInput(data.masonic_link_detail?.status || 'verified');
+    setMasonicJustificationInput('');
+    const comm = (data.owner?.community_label || '').toLowerCase();
+    const defaultEligibility =
+      data.masonic_link_detail?.eligibility_type ||
+      (comm.includes('cunhada')
+        ? 'mason_spouse'
+        : comm.includes('sobrinho')
+          ? 'mason_family'
+          : 'mason');
+    setMasonicEligibilityTypeInput(defaultEligibility);
+    setMasonicReferenceMasonNameInput(data.masonic_link_detail?.reference_mason_name || '');
+    setMasonicReferenceMasonCimInput(data.masonic_link_detail?.reference_mason_cim || '');
+    setMasonicFamilyRelationshipInput(
+      data.masonic_link_detail?.family_relationship ||
+      (defaultEligibility === 'mason_spouse' ? 'Cônjuge / Esposa' : defaultEligibility === 'mason_family' ? 'Sobrinho(a)' : '')
+    );
+    setShowMasonicUpsertModal(true);
+  };
 
   // States para Gestão de Eventos
   const [showEventModal, setShowEventModal] = useState(false);
@@ -524,6 +590,10 @@ export default function Company360Client({ initialData }: Props) {
       lodge_name: masonicLodgeInput,
       potency: masonicPotencyInput,
       link_type: masonicLinkTypeInput,
+      eligibility_type: masonicEligibilityTypeInput,
+      reference_mason_name: masonicReferenceMasonNameInput.trim() || undefined,
+      reference_mason_cim: masonicReferenceMasonCimInput.trim() || undefined,
+      family_relationship: masonicFamilyRelationshipInput.trim() || undefined,
       status: masonicStatusInput,
       justification: masonicJustificationInput,
     });
@@ -533,12 +603,26 @@ export default function Company360Client({ initialData }: Props) {
       setShowMasonicUpsertModal(false);
       setData((prev) => ({
         ...prev,
+        owner: {
+          ...prev.owner,
+          community_label:
+            prev.owner?.community_label ||
+            (masonicEligibilityTypeInput === 'mason_spouse'
+              ? 'Cunhada'
+              : masonicEligibilityTypeInput === 'mason_family'
+                ? 'Sobrinho(a)'
+                : 'Irmão'),
+        },
         masonic_link_detail: {
           id: prev.masonic_link_detail?.id || `masonic-${Date.now()}`,
           organization_id: prev.masonic_link_detail?.organization_id || null,
           lodge_name: masonicLodgeInput,
           potency: masonicPotencyInput || 'GLEB / GOB / GLMMG',
           link_type: masonicLinkTypeInput,
+          eligibility_type: masonicEligibilityTypeInput,
+          reference_mason_name: masonicReferenceMasonNameInput.trim() || null,
+          reference_mason_cim: masonicReferenceMasonCimInput.trim() || null,
+          family_relationship: masonicFamilyRelationshipInput.trim() || null,
           status: masonicStatusInput,
           verified_at: masonicStatusInput === 'verified' ? new Date().toISOString() : null,
           verified_by: null,
@@ -582,7 +666,7 @@ export default function Company360Client({ initialData }: Props) {
     const signatureBlock = signatureSectionMatch
       ? signatureSectionMatch[0]
       : data.contract?.signature_image_data
-      ? `<div style="margin-top:28px;text-align:center;page-break-inside:avoid">
+        ? `<div style="margin-top:28px;text-align:center;page-break-inside:avoid">
           <p style="font-family:Georgia,serif;font-weight:bold;color:#3B0B14">ASSINATURA ELETRÔNICA DO REPRESENTANTE LEGAL</p>
           <img src="${data.contract.signature_image_data}" alt="Assinatura do representante legal" style="display:block;max-width:320px;max-height:130px;margin:12px auto 4px;object-fit:contain" />
           <div style="width:360px;max-width:100%;margin:0 auto;border-top:1px solid #333;padding-top:6px;font-size:11px;font-weight:bold">
@@ -590,7 +674,7 @@ export default function Company360Client({ initialData }: Props) {
             <div>REPRESENTANTE LEGAL: ${safeRepresentativeName}</div>` : ''}
           </div>
         </div>`
-      : '';
+        : '';
 
     const htmlContent = `<!DOCTYPE html>
 <html>
@@ -688,6 +772,25 @@ export default function Company360Client({ initialData }: Props) {
   const [businessVideoUrl, setBusinessVideoUrl] = useState(initialData.business_video?.url || '');
   const [savingBusinessVideo, setSavingBusinessVideo] = useState(false);
 
+  // Travar o scroll da página de fundo quando qualquer modal estiver aberto
+  useEffect(() => {
+    const isAnyModalOpen =
+      showServiceModal ||
+      showBenefitModal ||
+      showMediaModal ||
+      showMasonicModal ||
+      showMasonicUpsertModal ||
+      Boolean(pendingDelete);
+
+    if (isAnyModalOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [showServiceModal, showBenefitModal, showMediaModal, showMasonicModal, showMasonicUpsertModal, pendingDelete]);
+
   const handleBusinessVideo = async (remove = false) => {
     setSavingBusinessVideo(true);
     setMessage(null);
@@ -747,6 +850,8 @@ export default function Company360Client({ initialData }: Props) {
         name,
         slug,
         legal_name: legalName,
+        short_description: shortDescription,
+        logo_background_color: data.business.logo_background_color,
         cnpj_cpf: cnpjCpf,
         phone,
         whatsapp,
@@ -785,6 +890,8 @@ export default function Company360Client({ initialData }: Props) {
             name: res.data.name,
             slug: res.data.slug || slug,
             legal_name: res.data.legal_name,
+            short_description: res.data.short_description ?? shortDescription,
+            logo_background_color: res.data.logo_background_color ?? prev.business.logo_background_color,
             cnpj_cpf: savedCnpj,
             phone: res.data.phone,
 
@@ -1213,7 +1320,7 @@ export default function Company360Client({ initialData }: Props) {
   const [imageOffsetY, setImageOffsetY] = useState(50);
   const [imageZoom, setImageZoom] = useState(1.0);
   const [imageFitMode, setImageFitMode] = useState<'cover' | 'contain'>('cover');
-  const [imageBackgroundColor, setImageBackgroundColor] = useState('#ffffff');
+  const [imageBackgroundColor, setImageBackgroundColor] = useState(data.business.logo_background_color || '#ffffff');
   const [selectedFileForCrop, setSelectedFileForCrop] = useState<File | null>(null);
 
   const reprocessSelectedImage = (backgroundColor: string) => {
@@ -1287,17 +1394,17 @@ export default function Company360Client({ initialData }: Props) {
           });
 
           // Compress image client-side to WebP with position framing and zoom
-        const file = await compressImageOnClient(
-          rawFile,
-          1920,
-          0.82,
-          offsetYToUse / 100,
-          imageFitMode,
-          zoomToUse,
-          ['update_logo', 'update_cover'].includes(mediaMode)
-            ? (customBackgroundColor || imageBackgroundColor)
-            : undefined
-        );
+          const file = await compressImageOnClient(
+            rawFile,
+            1920,
+            0.82,
+            offsetYToUse / 100,
+            imageFitMode,
+            zoomToUse,
+            ['update_logo', 'update_cover'].includes(mediaMode)
+              ? (customBackgroundColor || imageBackgroundColor)
+              : undefined
+          );
 
           setUploadProgress({
             current: i + 1,
@@ -1420,12 +1527,17 @@ export default function Company360Client({ initialData }: Props) {
         media_id: editingMediaId,
         url: normalizedMediaUrl,
         title: mediaTitleInput,
+        logo_background_color: mediaMode === 'update_logo' ? imageBackgroundColor : undefined,
       });
       if (res.success) {
         if (mediaMode === 'update_logo') {
           setData((prev) => ({
             ...prev,
-            business: { ...prev.business, logo_url: normalizedMediaUrl },
+            business: {
+              ...prev.business,
+              logo_url: normalizedMediaUrl,
+              logo_background_color: imageBackgroundColor,
+            },
           }));
         } else if (mediaMode === 'update_cover') {
           setData((prev) => ({
@@ -1531,22 +1643,38 @@ export default function Company360Client({ initialData }: Props) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Link
             href={`/admin/empresas/${data.business.id}/contratacao`}
-            className="px-4 py-2 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl border border-[#C9A227]/40 transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl border border-[#C9A227]/40 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
             <FileText className="w-4 h-4" />
             <span>Acompanhar ativação</span>
           </Link>
           <Link
-            href={`/guia/${data.business.slug || data.business.id}`}
+            href={`/guia/${data.business.slug || data.business.id}?preview=true`}
             target="_blank"
-            className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-xs rounded-xl border border-stone-300 transition-all flex items-center gap-1.5 cursor-pointer"
+            rel="noopener noreferrer"
+            className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-xs rounded-xl border border-stone-300 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="Visualizar o anúncio no Guia em modo de pré-visualização e aprovação"
           >
-            <Eye className="w-4 h-4 text-stone-600" />
-            <span>Ver no Guia</span>
+            <Eye className="w-4 h-4 text-[#C9A227]" />
+            <span>Pré-visualizar para Aprovação</span>
+            <ExternalLink className="w-3.5 h-3.5 opacity-70" />
           </Link>
+          <button
+            type="button"
+            onClick={handleCopyPreviewLink}
+            className={`px-3.5 py-2 font-bold text-xs rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+              copiedPreviewLink
+                ? 'bg-emerald-700 text-white border-emerald-600'
+                : 'bg-white hover:bg-stone-50 text-stone-800 border-stone-300'
+            }`}
+            title="Copiar link completo de pré-visualização para envio ao cliente via WhatsApp ou e-mail"
+          >
+            {copiedPreviewLink ? <Check className="w-4 h-4 text-emerald-200 stroke-[3]" /> : <Copy className="w-4 h-4 text-[#C9A227]" />}
+            <span>{copiedPreviewLink ? 'Copiado!' : 'Copiar Link de Aprovação'}</span>
+          </button>
         </div>
       </div>
 
@@ -1577,327 +1705,487 @@ export default function Company360Client({ initialData }: Props) {
       )}
 
       {/* =================================================================== */}
+      {/* 6.3: CARD DE APROVAÇÃO DO ANUNCIANTE CONFIRMADA                   */}
+      {/* =================================================================== */}
+      {data.client_approval?.approved_at && (
+        <div
+          className={`rounded-2xl border-2 p-5 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all ${
+            data.business.publication_status === 'published'
+              ? 'border-emerald-200 bg-emerald-50/80 text-emerald-950'
+              : 'border-emerald-500 bg-gradient-to-r from-emerald-950 via-emerald-900 to-[#1e1014] text-white shadow-emerald-950/20'
+          }`}
+        >
+          <div className="flex items-start gap-3.5">
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                data.business.publication_status === 'published'
+                  ? 'bg-emerald-100 border border-emerald-300 text-emerald-700'
+                  : 'bg-emerald-500/20 border border-emerald-400/40 text-emerald-400'
+              }`}
+            >
+              <CheckCircle2 className="w-6 h-6 stroke-[2.5]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                    data.business.publication_status === 'published'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-emerald-400 text-stone-950'
+                  }`}
+                >
+                  ✓ Aprovação do Anunciante Confirmada
+                </span>
+                <span
+                  className={`text-xs font-semibold ${
+                    data.business.publication_status === 'published' ? 'text-emerald-800' : 'text-emerald-300'
+                  }`}
+                >
+                  {new Date(data.client_approval.approved_at).toLocaleString('pt-BR')}
+                </span>
+              </div>
+              <h3 className="text-sm sm:text-base font-bold mt-1">
+                {data.business.publication_status === 'published'
+                  ? 'Esta página foi formalmente aprovada pelo cliente e está ativa no Guia'
+                  : 'O cliente revisou e aprovou formalmente a página para publicação oficial'}
+              </h3>
+              <p
+                className={`text-xs mt-0.5 ${
+                  data.business.publication_status === 'published' ? 'text-emerald-900/80' : 'text-emerald-100/90'
+                }`}
+              >
+                Aprovado por: <strong>{data.client_approval.approved_by || 'Anunciante Titular'}</strong>
+                {data.client_approval.notes && (
+                  <span className="block mt-1 italic opacity-90">
+                    &quot;{data.client_approval.notes}&quot;
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          {data.business.publication_status !== 'published' && (
+            <div className="flex items-center gap-2.5 shrink-0 w-full md:w-auto">
+              <button
+                type="button"
+                disabled={!publicationGate.canPublish || isPublishing}
+                onClick={handlePublishBusiness}
+                className={`w-full md:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-xs font-bold transition shadow-lg ${
+                  publicationGate.canPublish
+                    ? 'bg-emerald-400 hover:bg-emerald-300 text-stone-950 cursor-pointer hover:scale-102 active:scale-98 font-black'
+                    : 'bg-stone-700 text-stone-400 cursor-not-allowed'
+                }`}
+                title={
+                  publicationGate.canPublish
+                    ? 'Publicar a empresa imediatamente no Guia Conexão Maçônica'
+                    : `Pendências: ${publicationGate.missing.join('; ')}`
+                }
+              >
+                {isPublishing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin text-stone-950" />
+                    <span>Publicando Anúncio...</span>
+                  </>
+                ) : (
+                  <>
+                    <Rocket className="h-4 w-4" />
+                    <span>Publicar Oficialmente Agora</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =================================================================== */}
       {/* 6.4: BANNER DE GOVERNANÇA DO PRONTUÁRIO 360                         */}
       {/* =================================================================== */}
       {(commercialStatus === 'pagamento_confirmado' ||
         commercialStatus === 'prontuario_em_configuracao' ||
         commercialStatus === 'pronto_para_publicar' ||
         commercialStatus === 'publicado') && (
-        <div className="rounded-2xl border-2 border-stone-200 bg-white p-6 shadow-sm space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-100 pb-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full bg-[#3B0B14] text-white text-[10px] font-bold uppercase tracking-wider">
-                  Prontuário 360
-                </span>
-                <span className="text-xs text-stone-500 font-semibold">
-                  Status Comercial:{' '}
-                  <strong className="text-stone-900">
-                    {commercialStatus === 'pagamento_confirmado'
-                      ? 'Pagamento Confirmado'
-                      : commercialStatus === 'prontuario_em_configuracao'
-                      ? 'Prontuário em Configuração'
-                      : commercialStatus === 'pronto_para_publicar'
-                      ? 'Pronto para Publicar'
-                      : 'Publicado'}
-                  </strong>
-                </span>
+          <div className="rounded-2xl border-2 border-stone-200 bg-white p-6 shadow-sm space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-100 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#3B0B14] text-white text-[10px] font-bold uppercase tracking-wider">
+                    Prontuário 360
+                  </span>
+                  <span className="text-xs text-stone-500 font-semibold">
+                    Status Comercial:{' '}
+                    <strong className="text-stone-900">
+                      {commercialStatus === 'pagamento_confirmado'
+                        ? 'Pagamento Confirmado'
+                        : commercialStatus === 'prontuario_em_configuracao'
+                          ? 'Prontuário em Configuração'
+                          : commercialStatus === 'pronto_para_publicar'
+                            ? 'Pronto para Publicar'
+                            : 'Publicado'}
+                    </strong>
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-semibold">
+                  <span className={`inline-flex items-center gap-1 border px-2.5 py-0.5 rounded-md ${masonicLinkVerified ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-stone-600 bg-stone-50 border-stone-200'}`}>
+                    {masonicLinkVerified ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Clock className="h-3.5 w-3.5" />}
+                    {masonicLinkVerified ? 'Vínculo validado' : 'Vínculo pendente'}
+                  </span>
+                  <span className={`inline-flex items-center gap-1 border px-2.5 py-0.5 rounded-md ${contractSigned ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-stone-600 bg-stone-50 border-stone-200'}`}>
+                    {contractSigned ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Clock className="h-3.5 w-3.5" />}
+                    {contractSigned ? 'Contrato assinado' : 'Assinatura pendente'}
+                  </span>
+                  <span className={`inline-flex items-center gap-1 border px-2.5 py-0.5 rounded-md ${paymentConfirmed ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-stone-600 bg-stone-50 border-stone-200'}`}>
+                    {paymentConfirmed ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Clock className="h-3.5 w-3.5" />}
+                    {paymentConfirmed ? 'Pagamento confirmado' : 'Pagamento pendente'}
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-semibold">
-                <span className={`inline-flex items-center gap-1 border px-2.5 py-0.5 rounded-md ${masonicLinkVerified ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-stone-600 bg-stone-50 border-stone-200'}`}>
-                  {masonicLinkVerified ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Clock className="h-3.5 w-3.5" />}
-                  {masonicLinkVerified ? 'Vínculo validado' : 'Vínculo pendente'}
-                </span>
-                <span className={`inline-flex items-center gap-1 border px-2.5 py-0.5 rounded-md ${contractSigned ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-stone-600 bg-stone-50 border-stone-200'}`}>
-                  {contractSigned ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Clock className="h-3.5 w-3.5" />}
-                  {contractSigned ? 'Contrato assinado' : 'Assinatura pendente'}
-                </span>
-                <span className={`inline-flex items-center gap-1 border px-2.5 py-0.5 rounded-md ${paymentConfirmed ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-stone-600 bg-stone-50 border-stone-200'}`}>
-                  {paymentConfirmed ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Clock className="h-3.5 w-3.5" />}
-                  {paymentConfirmed ? 'Pagamento confirmado' : 'Pagamento pendente'}
-                </span>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-3">
-              {commercialStatus === 'pagamento_confirmado' && (
-                <button
-                  type="button"
-                  disabled={isUnlockingDossier}
-                  onClick={handleUnlockDossierFrom360}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2.5 text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
-                >
-                  {isUnlockingDossier ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Liberando Prontuário...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4 text-emerald-300" />
-                      <span>Liberar Prontuário 360</span>
-                    </>
-                  )}
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                {commercialStatus === 'pagamento_confirmado' && (
+                  <button
+                    type="button"
+                    disabled={isUnlockingDossier}
+                    onClick={handleUnlockDossierFrom360}
+                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2.5 text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    {isUnlockingDossier ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Liberando Prontuário...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 text-emerald-300" />
+                        <span>Liberar Prontuário 360</span>
+                      </>
+                    )}
+                  </button>
+                )}
 
-              {commercialStatus === 'prontuario_em_configuracao' && (
-                <button
-                  type="button"
-                  disabled={!readiness.ready || isAdvancingToReady}
-                  onClick={handleAdvanceToReadyFrom360}
-                  title={!readiness.ready ? `Itens pendentes: ${readiness.missing_labels.join(', ')}` : 'Concluir prontuário'}
-                  className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition shadow-xs ${
-                    readiness.ready
+                {commercialStatus === 'prontuario_em_configuracao' && (
+                  <button
+                    type="button"
+                    disabled={!readiness.ready || isAdvancingToReady}
+                    onClick={handleAdvanceToReadyFrom360}
+                    title={!readiness.ready ? `Itens pendentes: ${readiness.missing_labels.join(', ')}` : 'Concluir prontuário'}
+                    className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition shadow-xs ${readiness.ready
                       ? 'bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer'
                       : 'bg-stone-200 text-stone-400 cursor-not-allowed'
-                  }`}
+                      }`}
+                  >
+                    {isAdvancingToReady ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Avançando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-4 w-4 stroke-[3]" />
+                        <span>Concluir Prontuário & Marcar como Pronto para Publicar</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {commercialStatus === 'pronto_para_publicar' && (
+                  <span className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 border border-blue-200 px-4 py-2 text-xs font-bold text-blue-900">
+                    <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                    Pronto para Publicação (Aguardando Gate Final)
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* PAINEL PERMANENTE DE PRÉ-VISUALIZAÇÃO & APROVAÇÃO DO ANÚNCIO (SEMPRE VISÍVEL) */}
+            <div className="rounded-xl border border-amber-200/90 bg-gradient-to-r from-amber-50/80 via-stone-50 to-emerald-50/50 p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-serif font-bold text-xs text-stone-900 flex items-center gap-1.5">
+                    <Eye className="w-4 h-4 text-[#C9A227]" />
+                    <span>Pré-visualização do Anúncio para Aprovação</span>
+                  </span>
+                  <span className={`text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full ${
+                    data.business.publication_status === 'published'
+                      ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                      : 'bg-amber-100 text-amber-900 border border-amber-300'
+                  }`}>
+                    {data.business.publication_status === 'published' ? '✓ Online no Guia' : '👁️ Modo Prévia (Rascunho)'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-600">
+                  {data.business.publication_status === 'published'
+                    ? 'O anúncio está público no Guia. Use os botões para conferir a visualização oficial ou copiar o link com modo de aprovação.'
+                    : 'Visualize como o anúncio será renderizado no Guia antes da publicação ou copie o link com modo de aprovação para enviar ao anunciante via WhatsApp ou e-mail.'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap shrink-0">
+                <Link
+                  href={`/guia/${data.business.slug || data.business.id}?preview=true`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-white border border-stone-300 hover:border-[#C9A227] px-3.5 py-2 text-xs font-bold text-stone-800 hover:bg-stone-50 shadow-xs transition-all cursor-pointer"
+                  title="Abrir pré-visualização do anúncio em nova aba"
                 >
-                  {isAdvancingToReady ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Avançando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="h-4 w-4 stroke-[3]" />
-                      <span>Concluir Prontuário & Marcar como Pronto para Publicar</span>
-                    </>
-                  )}
-                </button>
-              )}
+                  <Eye className="h-3.5 w-3.5 text-[#C9A227]" />
+                  <span>Pré-visualizar para Aprovação</span>
+                  <ExternalLink className="h-3.5 w-3.5 opacity-70" />
+                </Link>
 
-              {commercialStatus === 'pronto_para_publicar' && (
-                <span className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 border border-blue-200 px-4 py-2 text-xs font-bold text-blue-900">
-                  <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                  Pronto para Publicação (Aguardando Gate Final)
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* 6.4B: Checklist de Completude do Perfil Operacional */}
-          {commercialStatus === 'prontuario_em_configuracao' && (
-            <div className="space-y-3 pt-1">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-stone-700">
-                  Etapa atual: <span className="text-[#3B0B14]">Configuração do anúncio</span>
-                </span>
-                <span className="font-mono text-stone-500">
-                  Completude Obrigatória: <strong>{readiness.completion_percentage}%</strong>
-                </span>
-              </div>
-
-              {/* Grid do Checklist */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-xs">
-                <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.logo ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-[11px]">Logo</span>
-                    {readiness.details.logo ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
-                  </div>
-                  <span className="text-[10px] text-stone-500 mt-1">{readiness.details.logo ? 'Preenchido' : 'Pendente'}</span>
-                </div>
-
-                <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.nome ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-[11px]">Nome Fantasia</span>
-                    {readiness.details.nome ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
-                  </div>
-                  <span className="text-[10px] text-stone-500 mt-1">{readiness.details.nome ? 'Preenchido' : 'Pendente'}</span>
-                </div>
-
-                <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.descricao ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-[11px]">Descrição</span>
-                    {readiness.details.descricao ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
-                  </div>
-                  <span className="text-[10px] text-stone-500 mt-1">{readiness.details.descricao ? 'Preenchido' : 'Pendente'}</span>
-                </div>
-
-                <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.categoria ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-[11px]">Categoria</span>
-                    {readiness.details.categoria ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
-                  </div>
-                  <span className="text-[10px] text-stone-500 mt-1">{readiness.details.categoria ? 'Preenchido' : 'Pendente'}</span>
-                </div>
-
-                <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.localizacao ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-[11px]">Cidade / UF</span>
-                    {readiness.details.localizacao ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
-                  </div>
-                  <span className="text-[10px] text-stone-500 mt-1">{readiness.details.localizacao ? 'Preenchido' : 'Pendente'}</span>
-                </div>
-
-                <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.contato ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-[11px]">Telefone/WhatsApp</span>
-                    {readiness.details.contato ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
-                  </div>
-                  <span className="text-[10px] text-stone-500 mt-1">{readiness.details.contato ? 'Preenchido' : 'Pendente'}</span>
-                </div>
-              </div>
-
-              {/* Status de Aviso */}
-              {!readiness.ready ? (
-                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="block font-bold">Perfil ainda incompleto</strong>
-                    <span>Faltam preencher: {readiness.missing_labels.join(', ')}. Utilize as abas abaixo (Cadastro, Conteúdo, etc.) para completar as informações.</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                    <span><strong>Prontuário concluído ✓</strong> Todos os itens obrigatórios foram conferidos. Você já pode marcar o anúncio como <strong>Pronto para Publicar</strong>.</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Fase 7: Card de Revisão Final para Publicação */}
-          {commercialStatus === 'pronto_para_publicar' && (
-            <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-sm font-bold text-blue-950 flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-blue-700" />
-                    <span>Revisão Final para Publicação</span>
-                  </h4>
-                  <p className="text-xs text-blue-700 mt-0.5">
-                    Todos os requisitos contratuais, financeiros e operacionais devem ser rigorosamente validados antes da liberação do anúncio.
-                  </p>
-                </div>
                 <button
                   type="button"
-                  disabled={!publicationGate.canPublish || isPublishing}
-                  onClick={handlePublishBusiness}
-                  className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition shadow-sm ${
-                    publicationGate.canPublish
-                      ? 'bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer'
-                      : 'bg-stone-200 text-stone-400 cursor-not-allowed'
+                  onClick={handleCopyPreviewLink}
+                  className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold shadow-xs transition-all cursor-pointer ${
+                    copiedPreviewLink
+                      ? 'bg-emerald-700 text-white'
+                      : 'bg-[#3B0B14] hover:bg-[#520f1c] text-[#C9A227] border border-[#C9A227]/40'
                   }`}
+                  title="Copiar link de pré-visualização para enviar ao cliente via WhatsApp ou e-mail"
                 >
-                  {isPublishing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Validando e Publicando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Globe className="h-4 w-4" />
-                      <span>Publicar Empresa no Guia</span>
-                    </>
-                  )}
+                  {copiedPreviewLink ? <Check className="h-3.5 w-3.5 stroke-[3]" /> : <Copy className="h-3.5 w-3.5 text-[#C9A227]" />}
+                  <span>{copiedPreviewLink ? 'Link Copiado!' : 'Copiar Link de Aprovação'}</span>
                 </button>
               </div>
-
-              {/* Lista dos 4 Pilares de Validação do Gate */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
-                <div className={`p-2.5 rounded-xl border flex items-center justify-between ${publicationGate.reasons.masonicLinkVerified ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
-                  <span className="font-medium">✓ Vínculo maçônico verificado</span>
-                  {publicationGate.reasons.masonicLinkVerified ? <Check className="h-4 w-4 text-emerald-600 stroke-[3]" /> : <XCircle className="h-4 w-4 text-rose-600" />}
-                </div>
-
-                <div className={`p-2.5 rounded-xl border flex items-center justify-between ${publicationGate.reasons.contractSigned ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
-                  <span className="font-medium">✓ Contrato assinado</span>
-                  {publicationGate.reasons.contractSigned ? <Check className="h-4 w-4 text-emerald-600 stroke-[3]" /> : <XCircle className="h-4 w-4 text-rose-600" />}
-                </div>
-
-                <div className={`p-2.5 rounded-xl border flex items-center justify-between ${publicationGate.reasons.paymentConfirmed ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
-                  <span className="font-medium">✓ Pagamento confirmado</span>
-                  {publicationGate.reasons.paymentConfirmed ? <Check className="h-4 w-4 text-emerald-600 stroke-[3]" /> : <XCircle className="h-4 w-4 text-rose-600" />}
-                </div>
-
-                <div className={`p-2.5 rounded-xl border flex items-center justify-between ${publicationGate.reasons.profileReady ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
-                  <span className="font-medium">✓ Perfil obrigatório completo</span>
-                  {publicationGate.reasons.profileReady ? <Check className="h-4 w-4 text-emerald-600 stroke-[3]" /> : <XCircle className="h-4 w-4 text-rose-600" />}
-                </div>
-              </div>
-
-              {!publicationGate.canPublish && (
-                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="block font-bold">Publicação Bloqueada pelo Gate Final</strong>
-                    <span>Pendências: {publicationGate.missing.join('; ')}. Complete os itens para habilitar a publicação.</span>
-                  </div>
-                </div>
-              )}
             </div>
-          )}
 
-          {/* Fase 7: Card de Empresa Publicada / Gestão de Visibilidade */}
-          {commercialStatus === 'publicado' && (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center text-emerald-700 shrink-0">
-                    <Globe className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-bold text-emerald-950">Empresa publicada com sucesso ✓</h4>
-                      <span className={`text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full ${
-                        data.business.publication_status === 'published'
-                          ? 'bg-emerald-200 text-emerald-900'
-                          : 'bg-amber-200 text-amber-900'
-                      }`}>
-                        {data.business.publication_status === 'published' ? 'Online no Guia' : 'Rascunho (Despublicada)'}
-                      </span>
+            {/* 6.4B: Checklist de Completude do Perfil Operacional */}
+            {commercialStatus === 'prontuario_em_configuracao' && (
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-stone-700">
+                    Etapa atual: <span className="text-[#3B0B14]">Configuração do anúncio</span>
+                  </span>
+                  <span className="font-mono text-stone-500">
+                    Completude Obrigatória: <strong>{readiness.completion_percentage}%</strong>
+                  </span>
+                </div>
+
+                {/* Grid do Checklist */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-xs">
+                  <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.logo ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[11px]">Logo</span>
+                      {readiness.details.logo ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
                     </div>
-                    <p className="text-xs text-emerald-700 mt-0.5">
-                      {data.business.publication_status === 'published'
-                        ? 'O anúncio está público e indexável para membros e visitantes.'
-                        : 'A empresa concluiu todo o onboarding comercial, mas está temporariamente fora do ar como rascunho.'}
+                    <span className="text-[10px] text-stone-500 mt-1">{readiness.details.logo ? 'Preenchido' : 'Pendente'}</span>
+                  </div>
+
+                  <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.nome ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[11px]">Nome Fantasia</span>
+                      {readiness.details.nome ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
+                    </div>
+                    <span className="text-[10px] text-stone-500 mt-1">{readiness.details.nome ? 'Preenchido' : 'Pendente'}</span>
+                  </div>
+
+                  <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.descricao ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[11px]">Descrição</span>
+                      {readiness.details.descricao ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
+                    </div>
+                    <span className="text-[10px] text-stone-500 mt-1">{readiness.details.descricao ? 'Preenchido' : 'Pendente'}</span>
+                  </div>
+
+                  <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.categoria ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[11px]">Categoria</span>
+                      {readiness.details.categoria ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
+                    </div>
+                    <span className="text-[10px] text-stone-500 mt-1">{readiness.details.categoria ? 'Preenchido' : 'Pendente'}</span>
+                  </div>
+
+                  <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.localizacao ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[11px]">Cidade / UF</span>
+                      {readiness.details.localizacao ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
+                    </div>
+                    <span className="text-[10px] text-stone-500 mt-1">{readiness.details.localizacao ? 'Preenchido' : 'Pendente'}</span>
+                  </div>
+
+                  <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${readiness.details.contato ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[11px]">Telefone/WhatsApp</span>
+                      {readiness.details.contato ? <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" /> : <span className="h-2 w-2 rounded-full bg-rose-400" />}
+                    </div>
+                    <span className="text-[10px] text-stone-500 mt-1">{readiness.details.contato ? 'Preenchido' : 'Pendente'}</span>
+                  </div>
+                </div>
+
+                {/* Status de Aviso */}
+                {!readiness.ready ? (
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="block font-bold">Perfil ainda incompleto</strong>
+                      <span>Faltam preencher: {readiness.missing_labels.join(', ')}. Utilize as abas abaixo (Cadastro, Conteúdo, etc.) para completar as informações.</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span><strong>Prontuário concluído ✓</strong> Todos os itens obrigatórios foram conferidos. Você já pode marcar o anúncio como <strong>Pronto para Publicar</strong>.</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Fase 7: Card de Revisão Final para Publicação */}
+            {commercialStatus === 'pronto_para_publicar' && (
+              <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-bold text-blue-950 flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-blue-700" />
+                      <span>Revisão Final para Publicação</span>
+                    </h4>
+                    <p className="text-xs text-blue-700 mt-0.5">
+                      Todos os requisitos contratuais, financeiros e operacionais devem ser rigorosamente validados antes da liberação do anúncio.
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    disabled={!publicationGate.canPublish || isPublishing}
+                    onClick={handlePublishBusiness}
+                    className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition shadow-sm ${publicationGate.canPublish
+                      ? 'bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer'
+                      : 'bg-stone-200 text-stone-400 cursor-not-allowed'
+                      }`}
+                  >
+                    {isPublishing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Validando e Publicando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="h-4 w-4" />
+                        <span>Publicar Empresa no Guia</span>
+                      </>
+                    )}
+                  </button>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {data.business.publication_status === 'published' && data.business.slug && (
+                {/* Lista dos 4 Pilares de Validação do Gate */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+                  <div className={`p-2.5 rounded-xl border flex items-center justify-between ${publicationGate.reasons.masonicLinkVerified ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+                    <span className="font-medium">✓ Vínculo maçônico verificado</span>
+                    {publicationGate.reasons.masonicLinkVerified ? <Check className="h-4 w-4 text-emerald-600 stroke-[3]" /> : <XCircle className="h-4 w-4 text-rose-600" />}
+                  </div>
+
+                  <div className={`p-2.5 rounded-xl border flex items-center justify-between ${publicationGate.reasons.contractSigned ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+                    <span className="font-medium">✓ Contrato assinado</span>
+                    {publicationGate.reasons.contractSigned ? <Check className="h-4 w-4 text-emerald-600 stroke-[3]" /> : <XCircle className="h-4 w-4 text-rose-600" />}
+                  </div>
+
+                  <div className={`p-2.5 rounded-xl border flex items-center justify-between ${publicationGate.reasons.paymentConfirmed ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+                    <span className="font-medium">✓ Pagamento confirmado</span>
+                    {publicationGate.reasons.paymentConfirmed ? <Check className="h-4 w-4 text-emerald-600 stroke-[3]" /> : <XCircle className="h-4 w-4 text-rose-600" />}
+                  </div>
+
+                  <div className={`p-2.5 rounded-xl border flex items-center justify-between ${publicationGate.reasons.profileReady ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+                    <span className="font-medium">✓ Perfil obrigatório completo</span>
+                    {publicationGate.reasons.profileReady ? <Check className="h-4 w-4 text-emerald-600 stroke-[3]" /> : <XCircle className="h-4 w-4 text-rose-600" />}
+                  </div>
+                </div>
+
+                {!publicationGate.canPublish && (
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="block font-bold">Publicação Bloqueada pelo Gate Final</strong>
+                      <span>Pendências: {publicationGate.missing.join('; ')}. Complete os itens para habilitar a publicação.</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Fase 7: Card de Empresa Publicada / Gestão de Visibilidade */}
+            {commercialStatus === 'publicado' && (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center text-emerald-700 shrink-0">
+                      <Globe className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-emerald-950">Empresa publicada com sucesso ✓</h4>
+                        <span className={`text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full ${data.business.publication_status === 'published'
+                          ? 'bg-emerald-200 text-emerald-900'
+                          : 'bg-amber-200 text-amber-900'
+                          }`}>
+                          {data.business.publication_status === 'published' ? 'Online no Guia' : 'Rascunho (Despublicada)'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-700 mt-0.5">
+                        {data.business.publication_status === 'published'
+                          ? 'O anúncio está público e indexável para membros e visitantes.'
+                          : 'A empresa concluiu todo o onboarding comercial, mas está temporariamente fora do ar como rascunho.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Link
-                      href={`/guia/${data.business.slug}`}
+                      href={`/guia/${data.business.slug || data.business.id}?preview=true`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-white border border-emerald-300 px-3.5 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-50 shadow-sm"
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold shadow-sm transition-colors ${data.business.publication_status === 'published'
+                        ? 'bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-50'
+                        : 'bg-amber-50 border border-amber-300 text-amber-900 hover:bg-amber-100'
+                        }`}
+                      title="Pré-visualizar anúncio antes ou depois da publicação"
                     >
-                      <span>Ver no Guia</span>
+                      <Eye className="h-3.5 w-3.5 text-[#C9A227]" />
+                      <span>{data.business.publication_status === 'published' ? 'Ver no Guia' : 'Pré-visualizar para Aprovação'}</span>
                       <ExternalLink className="h-3.5 w-3.5" />
                     </Link>
-                  )}
 
-                  {data.business.publication_status === 'published' ? (
                     <button
                       type="button"
-                      disabled={isUnpublishing}
-                      onClick={handleUnpublishBusiness}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-amber-100 border border-amber-300 px-3.5 py-2 text-xs font-bold text-amber-900 hover:bg-amber-200 disabled:opacity-50 cursor-pointer"
+                      onClick={() => {
+                        const url = `${window.location.origin}/guia/${data.business.slug || data.business.id}?preview=true`;
+                        navigator.clipboard.writeText(url);
+                        setMessage({ type: 'success', text: 'Link de pré-visualização copiado! Envie ao anunciante para aprovação.' });
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-stone-100 border border-stone-300 px-3 py-2 text-xs font-bold text-stone-700 hover:bg-stone-200 transition-colors cursor-pointer"
+                      title="Copiar link de pré-visualização para enviar ao cliente via WhatsApp ou e-mail"
                     >
-                      {isUnpublishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                      <span>Despublicar (Tornar Rascunho)</span>
+                      <Copy className="h-3.5 w-3.5 text-stone-600" />
+                      <span>Copiar Link de Aprovação</span>
                     </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={isPublishing}
-                      onClick={handlePublishBusiness}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-50 shadow-sm cursor-pointer"
-                    >
-                      {isPublishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
-                      <span>Republicar no Guia</span>
-                    </button>
-                  )}
+
+                    {data.business.publication_status === 'published' ? (
+                      <button
+                        type="button"
+                        disabled={isUnpublishing}
+                        onClick={handleUnpublishBusiness}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-amber-100 border border-amber-300 px-3.5 py-2 text-xs font-bold text-amber-900 hover:bg-amber-200 disabled:opacity-50 cursor-pointer"
+                      >
+                        {isUnpublishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                        <span>Despublicar (Tornar Rascunho)</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={isPublishing}
+                        onClick={handlePublishBusiness}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-50 shadow-sm cursor-pointer"
+                      >
+                        {isPublishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
+                        <span>Republicar no Guia</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
 
       {/* =================================================================== */}
       {/* TOPO EXECUTIVO DE RESPOSTA RÁPIDA                                   */}
@@ -1917,9 +2205,25 @@ export default function Company360Client({ initialData }: Props) {
                 </span>
               )}
             </div>
-            <p className="text-xs text-stone-300 mt-1 line-clamp-1">
-              {data.business.category} • Responsável: {data.owner.full_name} ({data.owner.email})
-            </p>
+            <div className="text-xs text-stone-300 mt-1 flex items-center gap-1.5 flex-wrap">
+              <span>{data.business.category}</span>
+              <span>•</span>
+              <span>Responsável: <strong className="text-white">{data.owner.full_name}</strong></span>
+              <span className="px-2 py-0.5 rounded-full bg-white/10 text-[10px] text-[#C9A227] font-bold">
+                {data.owner.community_label || (isCunhada ? 'Cunhada' : isSobrinha ? 'Sobrinha' : isSobrinho ? 'Sobrinho' : 'Irmão')}
+              </span>
+              {isFamilyOrSpouse && (
+                <>
+                  <span>•</span>
+                  <span className="text-stone-300">
+                    Irmão Ref: <strong className="text-[#C9A227]">{data.masonic_link_detail?.reference_mason_name ? `Ir. ${data.masonic_link_detail.reference_mason_name}` : 'Pendente de cadastro'}</strong>
+                    {data.masonic_link_detail?.reference_mason_cim ? ` (CIM: ${data.masonic_link_detail.reference_mason_cim})` : ''}
+                  </span>
+                </>
+              )}
+              <span>•</span>
+              <span className="text-stone-400 font-mono text-[11px]">{data.owner.email}</span>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -1943,7 +2247,7 @@ export default function Company360Client({ initialData }: Props) {
             </div>
             {data.business.is_pedra_fundamental && (
               <div className="px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold">
-                Pedra Fundamental (Cota Pioneira)
+                Pedra Fundamental
               </div>
             )}
           </div>
@@ -1951,6 +2255,32 @@ export default function Company360Client({ initialData }: Props) {
 
         {/* AÇÕES DE GOVERNANÇA NO TOPO EXECUTIVO */}
         <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+          <Link
+            href={`/guia/${data.business.slug || data.business.id}?preview=true`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-[#C9A227] border border-[#C9A227]/40 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+            title="Pré-visualizar anúncio no Guia"
+          >
+            <Eye className="w-4 h-4 text-[#C9A227]" />
+            <span>Pré-visualizar para Aprovação</span>
+            <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+          </Link>
+
+          <button
+            type="button"
+            onClick={handleCopyPreviewLink}
+            className={`px-3.5 py-2 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md ${
+              copiedPreviewLink
+                ? 'bg-emerald-700 text-white'
+                : 'bg-stone-900/70 hover:bg-stone-900 text-stone-200 border border-stone-600'
+            }`}
+            title="Copiar link de pré-visualização para o WhatsApp ou e-mail do cliente"
+          >
+            {copiedPreviewLink ? <Check className="w-4 h-4 text-emerald-300 stroke-[3]" /> : <Copy className="w-4 h-4 text-[#C9A227]" />}
+            <span>{copiedPreviewLink ? 'Link Copiado!' : 'Copiar Link de Aprovação'}</span>
+          </button>
+
           {commercialStatus === 'publicado' && data.business.publication_status === 'published' && (
             <button
               type="button"
@@ -1974,6 +2304,51 @@ export default function Company360Client({ initialData }: Props) {
           </button>
         </div>
       </div>
+
+      {/* ALERTA DE APROVAÇÃO CONFIRMADA PELO CLIENTE NO LINK DE PRÉVIA */}
+      {data.client_approval?.approved_at && (
+        <div className="rounded-2xl border-2 border-emerald-500/80 bg-gradient-to-r from-emerald-950/95 via-stone-900/95 to-emerald-950/90 p-4 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-emerald-500/20 border border-emerald-500/40 rounded-2xl text-emerald-400 shrink-0">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <div className="space-y-0.5 text-left">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="font-serif font-bold text-sm text-white">
+                  Aprovação do Anunciante Confirmada!
+                </h4>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-stone-950 font-black text-[10px] uppercase tracking-wider">
+                  Revisado pelo Cliente
+                </span>
+              </div>
+              <p className="text-xs text-emerald-200/90">
+                Aprovado em <strong>{formatDateBR(data.client_approval.approved_at)}</strong> por <strong>{data.client_approval.approved_by}</strong>.
+                {data.client_approval.notes ? ` Obs: "${data.client_approval.notes}"` : ''}
+              </p>
+            </div>
+          </div>
+
+          {data.business.publication_status !== 'published' ? (
+            <button
+              type="button"
+              onClick={() => {
+                setTargetStatus('published');
+                setStatusJustification(`Publicação oficial aprovada pelo cliente (${data.client_approval?.approved_by || 'Anunciante'}) via link de pré-visualização.`);
+                setShowStatusModal(true);
+              }}
+              className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 shrink-0 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <Rocket className="w-4 h-4 text-white" />
+              <span>Publicar Oficialmente Agora</span>
+            </button>
+          ) : (
+            <div className="px-3 py-1.5 rounded-xl bg-emerald-900/50 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center gap-1.5 shrink-0">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span>Anúncio Oficialmente Publicado</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* =================================================================== */}
       {/* BARRA DE NAVEGAÇÃO STICKY POR ABAS                                  */}
@@ -2118,6 +2493,23 @@ export default function Company360Client({ initialData }: Props) {
                   placeholder="Razão Social completa"
                   className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
                 />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block font-bold text-stone-800 mb-1">
+                  Complemento / Descrição Curta do Cabeçalho (Opcional)
+                </label>
+                <input
+                  type="text"
+                  value={shortDescription}
+                  onChange={(e) => setShortDescription(e.target.value)}
+                  placeholder="Ex.: Advocacia e consultoria especializada"
+                  maxLength={120}
+                  className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                />
+                <p className="mt-1 text-[10px] text-stone-500">
+                  Exibido na 2ª linha do cabeçalho da página pública logo abaixo do nome, valorizando a especialidade ou ramo da empresa (Ex.: Nome: GB Gomes e Brasil | Complemento: Advocacia e consultoria especializada).
+                </p>
               </div>
 
               <div className="md:col-span-2">
@@ -2380,11 +2772,11 @@ export default function Company360Client({ initialData }: Props) {
 
               <div className="md:col-span-2">
                 <label className="block font-bold text-stone-800 mb-1">Descrição / Apresentação Comercial</label>
-                <textarea
-                  rows={3}
+                <RichTextEditor
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full p-3 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                  onChange={setDescription}
+                  placeholder="Apresentação institucional e comercial da empresa, história, diferenciais e serviços oferecidos..."
+                  minHeight="140px"
                 />
               </div>
 
@@ -2472,9 +2864,28 @@ export default function Company360Client({ initialData }: Props) {
                           type="text"
                           value={respRole}
                           onChange={(e) => setRespRole(e.target.value)}
-                          placeholder="Ex: Sócio Fundador / Diretor"
+                          placeholder={isFemale ? "Ex: Proprietária / Sócia / Médica / Advogada" : "Ex: Proprietário / Sócio / Médico / Advogado"}
                           className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-white text-stone-900 text-xs outline-none focus:ring-2 focus:ring-[#3B0B14]"
                         />
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className="text-[10px] text-stone-500 font-medium">Sugestões:</span>
+                          <button
+                            type="button"
+                            onClick={() => setRespRole(isFemale ? 'Proprietária' : 'Proprietário')}
+                            className="text-[10px] px-2 py-0.5 rounded-md bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold border border-stone-300 cursor-pointer"
+                          >
+                            {isFemale ? 'Proprietária' : 'Proprietário'}
+                          </button>
+                          {suggestedProfession && (
+                            <button
+                              type="button"
+                              onClick={() => setRespRole(suggestedProfession)}
+                              className="text-[10px] px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold border border-amber-300 cursor-pointer"
+                            >
+                              {suggestedProfession}
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div>
@@ -2483,9 +2894,39 @@ export default function Company360Client({ initialData }: Props) {
                           type="text"
                           value={respCommunityLabel}
                           onChange={(e) => setRespCommunityLabel(e.target.value)}
-                          placeholder="Ex: Irmão / Empresário"
+                          placeholder="Ex: Ir∴ / Cunhada / Sobrinho / Sobrinha"
                           className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-white text-stone-900 text-xs outline-none focus:ring-2 focus:ring-[#3B0B14]"
                         />
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          {['Ir∴', 'Cunhada', 'Sobrinho', 'Sobrinha'].map((lbl) => (
+                            <button
+                              key={lbl}
+                              type="button"
+                              onClick={() => {
+                                setRespCommunityLabel(lbl);
+                                const fem = lbl === 'Cunhada' || lbl === 'Sobrinha';
+                                const prof = resolveProfessionFromCategory(category, fem ? 'feminino' : 'masculino');
+                                if (!respRole || /^propriet[aá]ri[oa]$/i.test(respRole)) {
+                                  setRespRole(prof || (fem ? 'Proprietária' : 'Proprietário'));
+                                } else {
+                                  const adjusted = resolveResponsibleRole({
+                                    businessRole: respRole,
+                                    communityLabel: lbl,
+                                    category,
+                                  });
+                                  setRespRole(adjusted);
+                                }
+                              }}
+                              className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border transition-all cursor-pointer ${
+                                respCommunityLabel === lbl
+                                  ? 'bg-[#3B0B14] text-[#C9A227] border-[#C9A227]/40 font-bold'
+                                  : 'bg-stone-100 hover:bg-stone-200 text-stone-700 border-stone-300'
+                              }`}
+                            >
+                              {lbl}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
@@ -2501,16 +2942,46 @@ export default function Company360Client({ initialData }: Props) {
                       <p className="text-[10px] text-stone-500 mt-1">Exibido no card público do empresário(a), separado do WhatsApp comercial da empresa.</p>
                     </div>
 
-                    <div className="p-3 bg-white rounded-xl border border-stone-200 text-xs flex items-center justify-between gap-2 shadow-2xs">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Building2 className="w-4 h-4 text-[#C9A227] shrink-0" />
-                        <span className="truncate text-stone-700">
-                          Loja Maçônica: <strong className="text-[#3B0B14] font-bold">{data.masonic_link_detail?.lodge_name || 'Não configurada'}</strong>
+                    <div className="p-3 bg-white rounded-xl border border-stone-200 text-xs space-y-2 shadow-2xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Building2 className="w-4 h-4 text-[#C9A227] shrink-0" />
+                          <span className="truncate text-stone-700">
+                            Loja Maçônica: <strong className="text-[#3B0B14] font-bold">{data.masonic_link_detail?.lodge_name || 'Não configurada'}</strong>
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-stone-500 font-medium bg-stone-100 px-2 py-0.5 rounded-md shrink-0">
+                          {data.masonic_link_detail?.potency || 'Vínculo Oficial'}
                         </span>
                       </div>
-                      <span className="text-[10px] text-stone-500 font-medium bg-stone-100 px-2 py-0.5 rounded-md shrink-0">
-                        Gerenciada no Vínculo Maçônico
-                      </span>
+
+                      {isFamilyOrSpouse && (
+                        <div className="pt-2 border-t border-stone-100 space-y-1.5 text-[11px]">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="flex items-center gap-1.5 text-stone-700">
+                              <UserCheck className="w-3.5 h-3.5 text-[#3B0B14]" />
+                              <span>Vínculo Maçônico:</span>
+                              <strong className="text-[#3B0B14] font-serif">
+                                {isCunhada
+                                  ? (data.masonic_link_detail?.reference_mason_name ? `Cônjuge do Ir∴ ${data.masonic_link_detail.reference_mason_name}` : 'Cônjuge de Irmão Maçom')
+                                  : isSobrinho
+                                    ? (data.masonic_link_detail?.reference_mason_name ? `${data.masonic_link_detail?.family_relationship || 'Filho(a)'} do Ir∴ ${data.masonic_link_detail.reference_mason_name}` : 'Familiar de Irmão Maçom')
+                                    : 'Vínculo Familiar'}
+                              </strong>
+                            </span>
+                            {data.masonic_link_detail?.reference_mason_cim && (
+                              <span className="font-mono text-stone-500 font-bold bg-stone-100 px-1.5 py-0.5 rounded">
+                                CIM: {data.masonic_link_detail.reference_mason_cim}
+                              </span>
+                            )}
+                          </div>
+                          {!data.masonic_link_detail?.reference_mason_name && (
+                            <span className="text-[10px] text-amber-700 font-semibold block">
+                              ⚠️ Nome do Irmão de referência ainda não preenchido. Use o botão "Cadastrar/Editar Vínculo" abaixo para informar.
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2545,14 +3016,7 @@ export default function Company360Client({ initialData }: Props) {
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => {
-                    setMasonicLodgeInput(data.masonic_link_detail?.lodge_name || '');
-                    setMasonicPotencyInput(data.masonic_link_detail?.potency || '');
-                    setMasonicLinkTypeInput(data.masonic_link_detail?.link_type || 'Proprietário Ir∴');
-                    setMasonicStatusInput(data.masonic_link_detail?.status || 'verified');
-                    setMasonicJustificationInput('');
-                    setShowMasonicUpsertModal(true);
-                  }}
+                  onClick={openMasonicUpsertModal}
                   className="px-3.5 py-1.5 bg-[#3B0B14] hover:bg-[#520f1c] text-[#C9A227] font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer border border-[#C9A227]/40 shadow-xs"
                 >
                   <Plus className="w-4 h-4 text-[#C9A227]" />
@@ -2587,50 +3051,132 @@ export default function Company360Client({ initialData }: Props) {
             </div>
 
             {data.masonic_link_detail ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-xl">
-                  <span className="text-stone-500 block font-bold">Loja Declarada:</span>
-                  <strong className="text-stone-900 font-serif font-bold text-sm block mt-0.5">
-                    {data.masonic_link_detail.lodge_name}
-                  </strong>
-                  <span className="text-[11px] text-stone-500 font-mono">Potência: {data.masonic_link_detail.potency}</span>
-                </div>
+              <div className="space-y-4">
+                {/* DESTAQUE PARA CUNHADA / SOBRINHO / VÍNCULO FAMILIAR DE MAÇOM */}
+                {isFamilyOrSpouse && (
+                  <div className="p-4 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50/90 via-stone-50 to-amber-50/50 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#3B0B14] text-[#C9A227]">
+                          <UserCheck className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="font-bold text-xs text-[#3B0B14] uppercase tracking-wide">
+                          {isCunhada
+                            ? 'Vínculo de Cunhada (Esposa de Maçom)'
+                            : isSobrinho
+                              ? 'Vínculo de Sobrinho(a) / Familiar de Maçom'
+                              : 'Vínculo Maçônico por Referência Familiar'}
+                        </span>
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full bg-[#3B0B14] text-[#C9A227] text-[10px] font-bold">
+                        {isCunhada ? 'Esposa / Cunhada' : isSobrinho ? 'Sobrinho(a)' : 'Familiar'}
+                      </span>
+                    </div>
 
-                <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-xl">
-                  <span className="text-stone-500 block font-bold">Tipo de Relação:</span>
-                  <strong className="text-stone-900 font-bold block mt-0.5">
-                    {data.masonic_link_detail.link_type === 'owner'
-                      ? 'Proprietário / Sócio Diretor'
-                      : data.masonic_link_detail.link_type === 'equity_partner'
-                        ? 'Sócio Cotista'
-                        : data.masonic_link_detail.link_type === 'family_owner'
-                          ? 'Empresa Familiar'
-                          : data.masonic_link_detail.link_type === 'sales_representative'
-                            ? 'Representante Comercial'
-                            : data.masonic_link_detail.link_type === 'executive'
-                              ? 'Diretor Executivo'
-                              : data.masonic_link_detail.link_type === 'institutional_partner'
-                                ? 'Parceiro Institucional'
-                                : data.masonic_link_detail.link_type}
-                  </strong>
-                </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
+                      <div className="p-2.5 bg-white/90 rounded-lg border border-amber-200/60">
+                        <span className="text-stone-500 block text-[11px] font-medium">
+                          {isCunhada
+                            ? 'Nome do Cônjuge (Irmão Maçom):'
+                            : isSobrinho
+                              ? 'Nome do Pai / Parente (Irmão Maçom):'
+                              : 'Irmão Maçom de Referência:'}
+                        </span>
+                        <strong className="text-stone-900 text-sm font-serif block mt-0.5">
+                          {data.masonic_link_detail.reference_mason_name ? (
+                            `Ir. ${data.masonic_link_detail.reference_mason_name}`
+                          ) : (
+                            <span className="text-rose-600 font-sans font-bold flex items-center gap-1 text-xs">
+                              <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                              Pendente de cadastro
+                            </span>
+                          )}
+                        </strong>
+                      </div>
 
-                <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-xl">
-                  <span className="text-stone-500 block font-bold">Status Atual da Verificação:</span>
-                  <span
-                    className={`inline-block px-3 py-1 mt-1 rounded-full font-bold text-xs ${data.masonic_link_detail.status === 'verified'
-                      ? 'bg-emerald-100 text-emerald-900'
-                      : data.masonic_link_detail.status === 'rejected'
-                        ? 'bg-rose-100 text-rose-900'
-                        : 'bg-amber-100 text-amber-900'
-                      }`}
-                  >
-                    {data.masonic_link_detail.status === 'verified'
-                      ? '✓ Vínculo Verificado'
-                      : data.masonic_link_detail.status === 'rejected'
-                        ? '✕ Vínculo Rejeitado'
-                        : '⏳ Aguardando Verificação'}
-                  </span>
+                      <div className="p-2.5 bg-white/90 rounded-lg border border-amber-200/60">
+                        <span className="text-stone-500 block text-[11px] font-medium">CIM do Irmão Maçom:</span>
+                        <strong className="text-stone-900 font-mono text-sm block mt-0.5">
+                          {data.masonic_link_detail.reference_mason_cim || 'Não informado'}
+                        </strong>
+                      </div>
+
+                      <div className="p-2.5 bg-white/90 rounded-lg border border-amber-200/60">
+                        <span className="text-stone-500 block text-[11px] font-medium">Parentesco / Relação:</span>
+                        <strong className="text-stone-900 text-xs block mt-0.5">
+                          {data.masonic_link_detail.family_relationship || (isCunhada ? 'Cônjuge / Esposa' : isSobrinho ? 'Sobrinho(a)' : 'Familiar')}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {!data.masonic_link_detail.reference_mason_name && (
+                      <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-900 text-xs flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                          <span>
+                            <strong>Identificação Pendente:</strong> Por se tratar de {isCunhada ? 'Cunhada (esposa)' : 'Sobrinho(a)'}, é necessário registrar o nome e CIM do Irmão maçom para fundamentar a verificação institucional.
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={openMasonicUpsertModal}
+                          className="px-3 py-1 bg-rose-700 hover:bg-rose-800 text-white rounded-lg font-bold text-xs cursor-pointer shrink-0"
+                        >
+                          Cadastrar Nome do Irmão
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-xl">
+                    <span className="text-stone-500 block font-bold">Loja Declarada:</span>
+                    <strong className="text-stone-900 font-serif font-bold text-sm block mt-0.5">
+                      {data.masonic_link_detail.lodge_name}
+                    </strong>
+                    <span className="text-[11px] text-stone-500 font-mono">Potência: {data.masonic_link_detail.potency}</span>
+                  </div>
+
+                  <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-xl">
+                    <span className="text-stone-500 block font-bold">Tipo de Relação:</span>
+                    <strong className="text-stone-900 font-bold block mt-0.5">
+                      {data.masonic_link_detail.link_type === 'owner'
+                        ? 'Proprietário / Sócio Diretor'
+                        : data.masonic_link_detail.link_type === 'equity_partner'
+                          ? 'Sócio Cotista'
+                          : data.masonic_link_detail.link_type === 'family_owner'
+                            ? 'Empresa Familiar'
+                            : data.masonic_link_detail.link_type === 'sales_representative'
+                              ? 'Representante Comercial'
+                              : data.masonic_link_detail.link_type === 'executive'
+                                ? 'Diretor Executivo'
+                                : data.masonic_link_detail.link_type === 'institutional_partner'
+                                  ? 'Parceiro Institucional'
+                                  : data.masonic_link_detail.link_type}
+                    </strong>
+                    <span className="text-[11px] text-stone-500 block mt-0.5">
+                      Modalidade: {data.masonic_link_detail.eligibility_type === 'mason_spouse' ? 'Cunhada' : data.masonic_link_detail.eligibility_type === 'mason_family' ? 'Sobrinho(a)' : 'Irmão Maçom'}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-xl">
+                    <span className="text-stone-500 block font-bold">Status Atual da Verificação:</span>
+                    <span
+                      className={`inline-block px-3 py-1 mt-1 rounded-full font-bold text-xs ${data.masonic_link_detail.status === 'verified'
+                        ? 'bg-emerald-100 text-emerald-900'
+                        : data.masonic_link_detail.status === 'rejected'
+                          ? 'bg-rose-100 text-rose-900'
+                          : 'bg-amber-100 text-amber-900'
+                        }`}
+                    >
+                      {data.masonic_link_detail.status === 'verified'
+                        ? '✓ Vínculo Verificado'
+                        : data.masonic_link_detail.status === 'rejected'
+                          ? '✕ Vínculo Rejeitado'
+                          : '⏳ Aguardando Verificação'}
+                    </span>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -2643,14 +3189,7 @@ export default function Company360Client({ initialData }: Props) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setMasonicLodgeInput('');
-                    setMasonicPotencyInput('');
-                    setMasonicLinkTypeInput('Proprietário Ir∴');
-                    setMasonicStatusInput('verified');
-                    setMasonicJustificationInput('');
-                    setShowMasonicUpsertModal(true);
-                  }}
+                  onClick={openMasonicUpsertModal}
                   className="px-3.5 py-1.5 bg-[#3B0B14] hover:bg-[#520f1c] text-[#C9A227] font-bold text-xs rounded-xl shrink-0 cursor-pointer border border-[#C9A227]/40 shadow-xs"
                 >
                   + Cadastrar Vínculo
@@ -2664,6 +3203,45 @@ export default function Company360Client({ initialData }: Props) {
       {/* ABA 3: CONTEÚDO E MÍDIAS DA EMPRESA (GERENCIAMENTO REAL DE CONTEÚDO) */}
       {activeTab === 'conteudo' && (
         <div className="space-y-6 text-left">
+          {/* BARRA DE PRÉ-VISUALIZAÇÃO RÁPIDA NA ABA CONTEÚDO */}
+          <div className="bg-amber-50/70 border border-amber-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div>
+              <h4 className="font-serif font-bold text-xs text-[#3B0B14] flex items-center gap-1.5">
+                <Eye className="w-4 h-4 text-[#C9A227]" />
+                <span>Visualização e Aprovação do Conteúdo</span>
+              </h4>
+              <p className="text-[11px] text-stone-600 mt-0.5">
+                Conforme você edita a apresentação comercial, serviços e mídias, confira o resultado no Guia ou copie o link para o cliente.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap shrink-0">
+              <Link
+                href={`/guia/${data.business.slug || data.business.id}?preview=true`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-white border border-stone-300 hover:border-[#C9A227] px-3.5 py-2 text-xs font-bold text-stone-800 hover:bg-stone-50 shadow-xs transition-all cursor-pointer"
+                title="Abrir pré-visualização do anúncio em nova aba"
+              >
+                <Eye className="h-3.5 w-3.5 text-[#C9A227]" />
+                <span>Pré-visualizar para Aprovação</span>
+                <ExternalLink className="h-3.5 w-3.5 opacity-70" />
+              </Link>
+              <button
+                type="button"
+                onClick={handleCopyPreviewLink}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold shadow-xs transition-all cursor-pointer ${
+                  copiedPreviewLink
+                    ? 'bg-emerald-700 text-white'
+                    : 'bg-[#3B0B14] hover:bg-[#520f1c] text-[#C9A227] border border-[#C9A227]/40'
+                }`}
+                title="Copiar link de pré-visualização para a área de transferência"
+              >
+                {copiedPreviewLink ? <Check className="h-3.5 w-3.5 stroke-[3]" /> : <Copy className="h-3.5 w-3.5 text-[#C9A227]" />}
+                <span>{copiedPreviewLink ? 'Link Copiado!' : 'Copiar Link de Aprovação'}</span>
+              </button>
+            </div>
+          </div>
+
           {/* SEÇÃO 1: IDENTIDADE VISUAL (LOGO & CAPA) */}
           <div className="bg-white border border-stone-300 rounded-2xl p-6 shadow-xs space-y-4">
             <h3 className="font-serif font-bold text-base text-stone-900 border-b border-stone-200 pb-3 flex items-center gap-2">
@@ -2681,6 +3259,7 @@ export default function Company360Client({ initialData }: Props) {
                     onClick={() => {
                       setMediaMode('update_logo');
                       setMediaUrlInput(data.business.logo_url || '');
+                      setImageBackgroundColor(data.business.logo_background_color || '#ffffff');
                       setShowMediaModal(true);
                     }}
                     className="px-2.5 py-1 bg-[#3B0B14] hover:bg-[#5d1523] text-white font-bold rounded-lg flex items-center gap-1 text-[11px] cursor-pointer"
@@ -2694,7 +3273,8 @@ export default function Company360Client({ initialData }: Props) {
                     <img
                       src={data.business.logo_url}
                       alt="Logo Oficial"
-                      className="w-16 h-16 object-contain rounded-xl border border-stone-300 bg-white p-1"
+                      style={{ backgroundColor: data.business.logo_background_color || '#ffffff' }}
+                      className="w-16 h-16 object-contain rounded-xl border border-stone-300 p-1"
                     />
                   ) : (
                     <div className="w-16 h-16 rounded-xl border border-dashed border-stone-400 bg-stone-200 flex items-center justify-center text-stone-500 font-bold text-[10px]">
@@ -2934,7 +3514,14 @@ export default function Company360Client({ initialData }: Props) {
                       </span>
                     </div>
 
-                    {svc.description && <p className="text-stone-600 text-[11px] leading-relaxed">{svc.description}</p>}
+                    {svc.description && (
+                      <FormattedText
+                        content={svc.description}
+                        className="text-stone-600 text-[11px] leading-relaxed"
+                        collapsible
+                        maxCollapsedLength={160}
+                      />
+                    )}
 
                     <div className="flex items-center justify-between pt-2 border-t border-stone-200">
                       <div className="flex items-center gap-2">
@@ -3257,7 +3844,7 @@ export default function Company360Client({ initialData }: Props) {
           <div className="flex justify-between items-center border-b border-stone-200 pb-3">
             <div>
               <h3 className="font-serif font-bold text-base text-stone-900 flex items-center gap-2">
-              <Layers className="w-5 h-5 text-[#3B0B14]" /> Cotas e Direitos do Plano {getCommercialPlanName(data.subscription.plan_name)}
+                <Layers className="w-5 h-5 text-[#3B0B14]" /> Cotas e Direitos do Plano {getCommercialPlanName(data.subscription.plan_name)}
               </h3>
               <p className="text-xs text-stone-500">
                 Acompanhe as cotas cadastradas e gerencie upgrades ou downgrades comerciais do anunciante.
@@ -3283,7 +3870,7 @@ export default function Company360Client({ initialData }: Props) {
               </p>
             </div>
             <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl">
-              <span className="text-stone-500 block font-bold">Benefícios Fraternos:</span>
+              <span className="text-stone-500 block font-bold">Benefícios:</span>
               <p className="text-2xl font-serif font-bold text-stone-900 mt-1">
                 {data.content_summary.benefits_count} / {data.content_summary.benefits_limit}
               </p>
@@ -3653,35 +4240,35 @@ export default function Company360Client({ initialData }: Props) {
       {/* ABA 7: ANALYTICS */}
       {activeTab === 'analytics' && (
         <div className="space-y-6">
-        <div className="bg-white border border-stone-300 rounded-2xl p-6 shadow-xs space-y-4">
-          <h3 className="font-serif font-bold text-base text-stone-900 border-b border-stone-200 pb-3 flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-[#3B0B14]" /> Performance & Interações (Últimos 30 dias)
-          </h3>
+          <div className="bg-white border border-stone-300 rounded-2xl p-6 shadow-xs space-y-4">
+            <h3 className="font-serif font-bold text-base text-stone-900 border-b border-stone-200 pb-3 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-[#3B0B14]" /> Performance & Interações (Últimos 30 dias)
+            </h3>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
-            <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-2xl">
-              <span className="text-stone-500 block font-bold">Visualizações:</span>
-              <p className="text-2xl font-serif font-bold text-stone-900 mt-1">{data.analytics_summary.views_30d}</p>
-            </div>
-            <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-2xl">
-              <span className="text-stone-500 block font-bold">Interações:</span>
-              <p className="text-2xl font-serif font-bold text-stone-900 mt-1">{data.analytics_summary.interactions_30d}</p>
-            </div>
-            <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-2xl">
-              <span className="text-stone-500 block font-bold">Cliques WhatsApp:</span>
-              <p className="text-2xl font-serif font-bold text-emerald-800 mt-1">{data.analytics_summary.whatsapp_clicks_30d}</p>
-            </div>
-            <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-2xl">
-              <span className="text-stone-500 block font-bold">Solicitações Rota GPS:</span>
-              <p className="text-2xl font-serif font-bold text-stone-900 mt-1">{data.analytics_summary.route_clicks_30d}</p>
-            </div>
-            <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-2xl">
-              <span className="text-stone-500 block font-bold">Visitas ao Website:</span>
-              <p className="text-2xl font-serif font-bold text-stone-900 mt-1">{data.analytics_summary.website_clicks_30d}</p>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
+              <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-2xl">
+                <span className="text-stone-500 block font-bold">Visualizações:</span>
+                <p className="text-2xl font-serif font-bold text-stone-900 mt-1">{data.analytics_summary.views_30d}</p>
+              </div>
+              <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-2xl">
+                <span className="text-stone-500 block font-bold">Interações:</span>
+                <p className="text-2xl font-serif font-bold text-stone-900 mt-1">{data.analytics_summary.interactions_30d}</p>
+              </div>
+              <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-2xl">
+                <span className="text-stone-500 block font-bold">Cliques WhatsApp:</span>
+                <p className="text-2xl font-serif font-bold text-emerald-800 mt-1">{data.analytics_summary.whatsapp_clicks_30d}</p>
+              </div>
+              <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-2xl">
+                <span className="text-stone-500 block font-bold">Solicitações Rota GPS:</span>
+                <p className="text-2xl font-serif font-bold text-stone-900 mt-1">{data.analytics_summary.route_clicks_30d}</p>
+              </div>
+              <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-2xl">
+                <span className="text-stone-500 block font-bold">Visitas ao Website:</span>
+                <p className="text-2xl font-serif font-bold text-stone-900 mt-1">{data.analytics_summary.website_clicks_30d}</p>
+              </div>
             </div>
           </div>
-        </div>
-        <ConnectionMetricsCard businessId={data.business.id} />
+          <ConnectionMetricsCard businessId={data.business.id} />
         </div>
       )}
 
@@ -3995,6 +4582,63 @@ export default function Company360Client({ initialData }: Props) {
               </button>
             </div>
 
+            {/* AUDITORIA DO VÍNCULO */}
+            <div className="p-3 bg-stone-50 border border-stone-200 rounded-xl space-y-2 text-xs">
+              <div className="flex items-center justify-between border-b border-stone-200 pb-1.5">
+                <span className="text-stone-500 font-semibold">Anunciante / Titular:</span>
+                <strong className="text-stone-900">{data.owner?.full_name || data.business.name}</strong>
+              </div>
+              <div className="flex items-center justify-between border-b border-stone-200 pb-1.5">
+                <span className="text-stone-500 font-semibold">Loja / Potência:</span>
+                <strong className="text-stone-900">{data.masonic_link_detail?.lodge_name || 'Não informada'} ({data.masonic_link_detail?.potency || 'Potência não informada'})</strong>
+              </div>
+              <div className="flex items-center justify-between border-b border-stone-200 pb-1.5">
+                <span className="text-stone-500 font-semibold">Modalidade:</span>
+                <span className="font-bold text-[#3B0B14]">
+                  {isCunhada
+                    ? '👑 Cunhada (Esposa de Maçom)'
+                    : isSobrinho
+                      ? '🏛️ Sobrinho(a) / Familiar de Maçom'
+                      : '📐 Irmão Maçom'}
+                </span>
+              </div>
+              {isFamilyOrSpouse && (
+                <>
+                  <div className="flex items-center justify-between border-b border-stone-200 pb-1.5">
+                    <span className="text-stone-500 font-semibold">
+                      {isCunhada ? 'Irmão Cônjuge:' : 'Irmão Pai/Parente:'}
+                    </span>
+                    <strong className="text-[#3B0B14] font-serif">
+                      {data.masonic_link_detail?.reference_mason_name
+                        ? `Ir. ${data.masonic_link_detail.reference_mason_name}`
+                        : '⚠️ Não informado'}
+                    </strong>
+                  </div>
+                  {data.masonic_link_detail?.reference_mason_cim && (
+                    <div className="flex items-center justify-between border-b border-stone-200 pb-1.5">
+                      <span className="text-stone-500 font-semibold">CIM do Irmão:</span>
+                      <strong className="font-mono text-stone-900">{data.masonic_link_detail.reference_mason_cim}</strong>
+                    </div>
+                  )}
+                  {data.masonic_link_detail?.family_relationship && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-stone-500 font-semibold">Parentesco:</span>
+                      <span className="text-stone-800">{data.masonic_link_detail.family_relationship}</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {isFamilyOrSpouse && !data.masonic_link_detail?.reference_mason_name && (
+              <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Aviso Importante:</strong> O nome do irmão ({isCunhada ? 'cônjuge' : 'pai'}) não está registrado. Recomendamos fechar este modal, clicar em &quot;Editar Vínculo&quot; e registrar o nome e CIM antes de aprovar.
+                </span>
+              </div>
+            )}
+
             <p className="text-xs text-stone-600 leading-relaxed">
               Informe a justificativa ou nota de auditoria para {targetMasonicStatus === 'verified' ? 'verificar' : 'rejeitar'} este vínculo.
             </p>
@@ -4035,8 +4679,15 @@ export default function Company360Client({ initialData }: Props) {
 
       {/* MODAL: GERENCIAR SERVIÇO */}
       {showServiceModal && (
-        <div className="fixed inset-0 bg-stone-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleSaveService} className="bg-white border border-stone-300 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl text-left">
+        <div
+          className="fixed inset-0 bg-stone-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto overscroll-contain"
+          onWheel={(e) => e.stopPropagation()}
+        >
+          <form
+            onSubmit={handleSaveService}
+            onWheel={(e) => e.stopPropagation()}
+            className="bg-white border border-stone-300 rounded-2xl p-6 max-w-xl w-full space-y-4 shadow-2xl text-left max-h-[90vh] overflow-y-auto overscroll-contain"
+          >
             <div className="flex justify-between items-center border-b border-stone-200 pb-3">
               <h3 className="font-serif font-bold text-lg text-stone-900 flex items-center gap-2">
                 <Briefcase className="w-5 h-5 text-[#3B0B14]" />
@@ -4070,19 +4721,43 @@ export default function Company360Client({ initialData }: Props) {
                   type="text"
                   value={servicePrice}
                   onChange={(e) => setServicePrice(e.target.value)}
-                  placeholder="Ex: Sob consulta / R$ 150,00"
+                  placeholder="Ex: R$ 150,00 ou deixe em branco para NÃO exibir badge"
                   className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
                 />
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  <span className="text-[10px] text-stone-500 font-medium">Atalhos rápidos:</span>
+                  <button
+                    type="button"
+                    onClick={() => setServicePrice('')}
+                    className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border transition-all cursor-pointer ${
+                      !servicePrice ? 'bg-emerald-100 text-emerald-900 border-emerald-300' : 'bg-stone-100 hover:bg-stone-200 text-stone-700 border-stone-300'
+                    }`}
+                  >
+                    {!servicePrice ? '✓ Sem Preço (Sem Badge)' : 'Remover Badge (Deixar em branco)'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setServicePrice('Sob Consulta')}
+                    className="text-[10px] px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold border border-amber-300 cursor-pointer"
+                  >
+                    + "Sob Consulta"
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setServicePrice('A partir de R$ ')}
+                    className="text-[10px] px-2 py-0.5 rounded-md bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold border border-stone-300 cursor-pointer"
+                  >
+                    + "A partir de..."
+                  </button>
+                </div>
               </div>
 
               <div>
                 <label className="block font-bold text-stone-800 mb-1">Descrição</label>
-                <textarea
-                  rows={3}
+                <RichTextEditor
                   value={serviceDesc}
-                  onChange={(e) => setServiceDesc(e.target.value)}
-                  placeholder="Descrição detalhada do serviço prestado..."
-                  className="w-full p-3 bg-stone-50 border border-stone-300 rounded-xl text-xs text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                  onChange={setServiceDesc}
+                  placeholder="Descrição detalhada do serviço prestado, diferenciais e tópicos..."
                 />
               </div>
             </div>
@@ -4588,6 +5263,93 @@ export default function Company360Client({ initialData }: Props) {
             </div>
 
             <div className="space-y-3.5 text-xs">
+              <div>
+                <label className="block font-bold text-stone-800 mb-1">Vínculo com a Comunidade Maçônica *</label>
+                <select
+                  value={masonicEligibilityTypeInput}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setMasonicEligibilityTypeInput(val);
+                    if (val === 'mason_spouse' && !masonicFamilyRelationshipInput) {
+                      setMasonicFamilyRelationshipInput('Cônjuge / Esposa');
+                    } else if (val === 'mason_family' && !masonicFamilyRelationshipInput) {
+                      setMasonicFamilyRelationshipInput('Sobrinho(a)');
+                    }
+                  }}
+                  className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14] font-bold"
+                >
+                  <option value="mason">📐 Irmão Maçom (Membro Regular da Loja)</option>
+                  <option value="mason_spouse">👑 Cunhada (Esposa / Cônjuge de Maçom)</option>
+                  <option value="mason_family">🏛️ Sobrinho(a) / Familiar de Maçom</option>
+                </select>
+              </div>
+
+              {(masonicEligibilityTypeInput === 'mason_spouse' || masonicEligibilityTypeInput === 'mason_family') && (
+                <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-3">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-[#3B0B14]" />
+                    <span className="font-bold text-xs text-[#3B0B14]">
+                      {masonicEligibilityTypeInput === 'mason_spouse'
+                        ? 'Identificação do Cônjuge Maçom (Irmão)'
+                        : 'Identificação do Maçom de Referência (Pai / Familiar)'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-stone-800 mb-1">
+                      {masonicEligibilityTypeInput === 'mason_spouse'
+                        ? 'Nome do Marido / Cônjuge Maçom *'
+                        : 'Nome do Pai / Parente Maçom *'}
+                    </label>
+                    <input
+                      type="text"
+                      value={masonicReferenceMasonNameInput}
+                      onChange={(e) => setMasonicReferenceMasonNameInput(e.target.value)}
+                      placeholder="Nome completo do Irmão maçom"
+                      className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl bg-white text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-stone-800 mb-1">CIM do Irmão</label>
+                      <input
+                        type="text"
+                        value={masonicReferenceMasonCimInput}
+                        onChange={(e) => setMasonicReferenceMasonCimInput(e.target.value)}
+                        placeholder="Ex: 123456"
+                        className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl bg-white text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14] font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-stone-800 mb-1">Grau de Parentesco / Relação</label>
+                      <input
+                        type="text"
+                        value={masonicFamilyRelationshipInput}
+                        onChange={(e) => setMasonicFamilyRelationshipInput(e.target.value)}
+                        placeholder={masonicEligibilityTypeInput === 'mason_spouse' ? 'Ex: Esposa / Cônjuge' : 'Ex: Sobrinho, Filho...'}
+                        className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl bg-white text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {masonicEligibilityTypeInput === 'mason' && (
+                <div>
+                  <label className="block font-bold text-stone-800 mb-1">CIM do Irmão Titular (Opcional)</label>
+                  <input
+                    type="text"
+                    value={masonicReferenceMasonCimInput}
+                    onChange={(e) => setMasonicReferenceMasonCimInput(e.target.value)}
+                    placeholder="Ex: 123456"
+                    className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14] font-mono"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block font-bold text-stone-800 mb-1">Nome da Loja Maçônica *</label>
                 <AdminLodgeNameCombobox

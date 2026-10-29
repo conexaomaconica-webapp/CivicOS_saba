@@ -563,6 +563,7 @@ export async function getApprovalDossierAction(businessId: string) {
         affiliation_role: ma?.masonic_degree || bml?.role || null,
         lodge_name: ma?.lodge_name || bml?.lodge_name || null,
         potencia_name: ma?.potencia_name || bml?.potencia_name || null,
+        related_brother_name: bml?.reference_mason_name || ma?.spouse_mason_name || null,
         verification_status: canonical?.has_masonic_link || ma?.verification_status === 'verified' || bml?.verification_status === 'approved' ? 'verified' : 'pending',
         public_exposure_consent: true,
       },

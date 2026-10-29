@@ -23,6 +23,8 @@ import { createServerSideClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database.types';
 
 import { getInstitutionalRecognitionsAction } from '@/app/actions/institutional-recognitions';
+import { resolveResponsibleRole, resolveTreatmentLabel } from '@/lib/business/responsible-role-resolver';
+import { BusinessPreviewApprovalBar } from '@/components/public/business/preview/BusinessPreviewApprovalBar';
 
 type Props = { params: Promise<{ slug: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> };
 type DetailRow = Database['public']['Functions']['public_business_detail']['Returns'][number] & {
@@ -41,7 +43,7 @@ import { colunaHonraBusinessFixture } from '@/visual-lab/fixtures/coluna-honra-b
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const getPublicBusiness = cache(async (slug: string) => {
+const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false) => {
   if (slug === 'empresas' || slug === 'lojas') return null;
 
   const headerStore = await headers();
@@ -52,16 +54,17 @@ const getPublicBusiness = cache(async (slug: string) => {
   try {
     const supabase = await createServerSideClient();
 
-    // 1. Tenta via RPC public_business_detail (que ja aplica a tripla condicao no banco)
-    try {
-      const [detailResult, reviewsResult, recognitionsResult] = await Promise.all([
-        supabase.rpc('public_business_detail', { p_business_slug: slug, p_host: host }),
-        supabase.rpc('public_business_reviews', { p_host: host, p_business_slug: slug, p_limit: 50 }),
-        getInstitutionalRecognitionsAction(),
-      ]);
-      const detail: DetailRow | undefined = Array.isArray(detailResult.data) ? detailResult.data[0] : undefined;
-      const reviews: ReviewRow[] = Array.isArray(reviewsResult.data) ? reviewsResult.data : [];
-      const catalog = recognitionsResult?.data || undefined;
+    // 1. Tenta via RPC public_business_detail (que aplica a tripla condição no banco caso esteja publicado)
+    if (!isPreview) {
+      try {
+        const [detailResult, reviewsResult, recognitionsResult] = await Promise.all([
+          supabase.rpc('public_business_detail', { p_business_slug: slug, p_host: host }),
+          supabase.rpc('public_business_reviews', { p_host: host, p_business_slug: slug, p_limit: 50 }),
+          getInstitutionalRecognitionsAction(),
+        ]);
+        const detail: DetailRow | undefined = Array.isArray(detailResult.data) ? detailResult.data[0] : undefined;
+        const reviews: ReviewRow[] = Array.isArray(reviewsResult.data) ? reviewsResult.data : [];
+        const catalog = recognitionsResult?.data || undefined;
 
       if (detail && !detailResult.error) {
         const detailObj = detail as any;
@@ -83,20 +86,56 @@ const getPublicBusiness = cache(async (slug: string) => {
         }
 
         if (bizId) {
-          const { data: resp } = await (supabase as any)
-            .from('business_responsibles')
-            .select('name, business_role, community_label, organization, whatsapp, avatar_url')
-            .eq('business_id', bizId)
-            .maybeSingle();
+          const [{ data: resp }, { data: link }, { data: attrRows }] = await Promise.all([
+            (supabase as any)
+              .from('business_responsibles')
+              .select('name, business_role, community_label, organization, whatsapp, avatar_url')
+              .eq('business_id', bizId)
+              .maybeSingle(),
+            (supabase as any)
+              .from('business_masonic_links')
+              .select('status, eligibility_type, reference_mason_name, reference_mason_cim, family_relationship, organizations(name)')
+              .eq('business_id', bizId)
+              .maybeSingle(),
+            (supabase as any)
+              .from('business_attributes')
+              .select('attribute_key, attribute_value')
+              .eq('business_id', bizId),
+          ]);
+
+          if (attrRows && Array.isArray(attrRows)) {
+            for (const attr of attrRows) {
+              if (attr.attribute_key === 'short_description') (detailObj as any).short_description = attr.attribute_value;
+              if (attr.attribute_key === 'logo_background_color' || attr.attribute_key === 'logo_bg_color') (detailObj as any).logo_background_color = attr.attribute_value;
+              if (attr.attribute_key === 'client_approved_at') (detailObj as any).client_approved_at = attr.attribute_value;
+              if (attr.attribute_key === 'client_approved_by') (detailObj as any).client_approved_by = attr.attribute_value;
+            }
+          }
 
           if (resp) {
+            const isLinkApproved = link?.status === 'approved' || link?.status === 'active' || isPreview;
+            const categoryName = (detailObj as any).primary_category_name || null;
             detailObj.responsible = {
               name: resp.name,
-              business_role: resp.business_role || 'Proprietário',
-              community_label: resp.community_label || 'Ir.\'.',
-              organization: resp.organization,
+              business_role: resolveResponsibleRole({
+                businessRole: resp.business_role,
+                communityLabel: resp.community_label,
+                category: categoryName,
+                eligibilityType: link?.eligibility_type,
+                familyRelationship: link?.family_relationship,
+              }),
+              community_label: resolveTreatmentLabel({
+                communityLabel: resp.community_label,
+                eligibilityType: link?.eligibility_type,
+                familyRelationship: link?.family_relationship,
+              }),
+              organization: resp.organization || link?.organizations?.name || null,
               whatsapp: resp.whatsapp,
               avatar_url: resp.avatar_url,
+              reference_mason_name: isLinkApproved ? (link?.reference_mason_name || null) : null,
+              family_relationship: link?.family_relationship || null,
+              eligibility_type: link?.eligibility_type || null,
+              is_masonic_verified: isLinkApproved,
             };
           }
 
@@ -112,6 +151,7 @@ const getPublicBusiness = cache(async (slug: string) => {
               if (bFlags.is_coluna_honra !== undefined) detailObj.is_coluna_honra = Boolean(bFlags.is_coluna_honra);
               if (bFlags.is_verified !== undefined) detailObj.is_verified = Boolean(bFlags.is_verified);
               if (bFlags.plan_tier || bFlags.plan_code) detailObj.effective_plan_code = bFlags.plan_tier || bFlags.plan_code;
+              if (bFlags.publication_status) (detailObj as any).publication_status = bFlags.publication_status;
             }
           } catch (_e) {}
 
@@ -224,23 +264,35 @@ const getPublicBusiness = cache(async (slug: string) => {
           }
         } catch (_e) {}
 
-        return toPublicBusinessPresentation(detailObj, reviews, catalog);
+        const presentation = toPublicBusinessPresentation(detailObj, reviews, catalog);
+        presentation.isPreview = isPreview;
+        presentation.publicationStatus = (detailObj as any).publication_status || 'published';
+        (presentation as any).clientApprovedAt = (detailObj as any).client_approved_at || null;
+        (presentation as any).clientApprovedBy = (detailObj as any).client_approved_by || null;
+        (presentation as any).isClientApproved = Boolean((detailObj as any).client_approved_at);
+        return presentation;
       }
-
-
-
-
     } catch {
-      // Ignora e segue para consulta direta com tripla condicao
+      // Ignora e segue para consulta direta
+    }
+  }
+
+    // 2. BUSCA DIRETA DA TABELA BUSINESSES (PELO SLUG CANÔNICO OU ID)
+    let bizQuery = supabase
+      .from('businesses')
+      .select('*');
+
+    if (UUID_REGEX.test(slug)) {
+      bizQuery = bizQuery.eq('id', slug);
+    } else {
+      bizQuery = bizQuery.eq('slug', slug);
     }
 
-    // 2. BUSCA DIRETA DA TABELA BUSINESSES EXCLUSIVAMENTE PELO SLUG CANÔNICO
-    const { data: dbBiz } = await supabase
-      .from('businesses')
-      .select('*')
-      .eq('slug', slug)
-      .eq('is_active', true)
-      .maybeSingle();
+    if (!isPreview) {
+      bizQuery = bizQuery.eq('is_active', true);
+    }
+
+    const { data: dbBiz } = await bizQuery.maybeSingle();
 
     if (!dbBiz) {
       // Fallback amigável para homologação dos perfis de teste na rota pública real /guia/[slug]
@@ -265,21 +317,18 @@ const getPublicBusiness = cache(async (slug: string) => {
 
     const subStatus = subData?.status || bObj.subscription_status || 'active';
 
-    // TRIPLA CONDIÇÃO ESTRITA E POSITIVA FECHADA:
-    // 1. business.is_active = true (ja filtrado na query)
-    // 2. publication_status = 'published'
-    // 3. subscription_status em ('active', 'trialing', 'trailing')
+    // TRIPLA CONDIÇÃO ESTRITA E POSITIVA FECHADA (apenas para acesso público indexável, ignorada em pré-visualização):
     const isPublished = bObj.publication_status === 'published';
     const isSubscriptionActive = ['active', 'trialing', 'trailing'].includes(subStatus);
 
-    if (!isPublished || !isSubscriptionActive) {
+    if (!isPreview && (!isPublished || !isSubscriptionActive)) {
       // Rascunho, inadimplente (past_due), pendente ou suspenso -> Bloqueado (404 real)
       return null;
     }
 
     const bizId = bObj.id;
 
-    // Buscar mídias, serviços, benefícios, responsável, reconhecimentos e vínculo maçônico em paralelo
+    // Buscar mídias, serviços, benefícios, responsável, reconhecimentos, vínculo maçônico, localização e horários em paralelo
     const [
       { data: mediaRows },
       { data: servicesRows },
@@ -289,6 +338,9 @@ const getPublicBusiness = cache(async (slug: string) => {
       { data: recRows },
       { data: linkRow },
       { data: categoryRows },
+      { data: locationRow },
+      { data: hoursRows },
+      { data: attrRows },
     ] = await Promise.all([
       (supabase as any).from('business_media').select('*').eq('business_id', bizId).order('display_order', { ascending: true }),
       (supabase as any).from('business_services').select('*').eq('business_id', bizId).eq('is_active', true).order('display_order', { ascending: true }),
@@ -296,28 +348,73 @@ const getPublicBusiness = cache(async (slug: string) => {
       (supabase as any).from('business_contacts').select('*').eq('business_id', bizId),
       (supabase as any).from('business_responsibles').select('name, business_role, community_label, organization, whatsapp, avatar_url').eq('business_id', bizId).maybeSingle(),
       (supabase as any).from('business_recognitions').select('recognition_key, is_active').eq('business_id', bizId).eq('is_active', true),
-      (supabase as any).from('business_masonic_links').select('status, organizations(name)').eq('business_id', bizId).maybeSingle(),
+      (supabase as any).from('business_masonic_links').select('status, eligibility_type, reference_mason_name, reference_mason_cim, family_relationship, organizations(name)').eq('business_id', bizId).maybeSingle(),
       (supabase as any).from('business_categories').select('is_primary, categories(name)').eq('business_id', bizId).order('is_primary', { ascending: false }).limit(1),
+      (supabase as any).from('business_locations').select('city, state, address, street, number, postal_code, neighborhood, latitude, longitude').eq('business_id', bizId).maybeSingle(),
+      (supabase as any).from('business_hours').select('*').eq('business_id', bizId),
+      (supabase as any).from('business_attributes').select('attribute_key, attribute_value').eq('business_id', bizId),
     ]);
 
+    let shortDescription: string | null = null;
+    let logoBackgroundColor: string | null = null;
+    let clientApprovedAt: string | null = null;
+    let clientApprovedBy: string | null = null;
+
+    if (attrRows && Array.isArray(attrRows)) {
+      for (const attr of attrRows) {
+        if (attr.attribute_key === 'short_description') shortDescription = attr.attribute_value;
+        if (attr.attribute_key === 'logo_background_color' || attr.attribute_key === 'logo_bg_color') logoBackgroundColor = attr.attribute_value;
+        if (attr.attribute_key === 'client_approved_at') clientApprovedAt = attr.attribute_value;
+        if (attr.attribute_key === 'client_approved_by') clientApprovedBy = attr.attribute_value;
+      }
+    }
+
     const lodgeNameFromLink = linkRow?.organizations?.name || bObj.masonic_lodge || null;
+
+    const isVerified = linkRow?.status === 'approved' || linkRow?.status === 'active' || linkRow?.status === 'verified' || Boolean(bObj.is_verified) || isPreview;
+
+    const categoryName = categoryRows?.[0]?.categories?.name || bObj.category || null;
 
     const responsibleObj = respRow
       ? {
           name: respRow.name,
-          business_role: respRow.business_role || 'Proprietário',
-          community_label: respRow.community_label || 'Ir.\'.',
+          business_role: resolveResponsibleRole({
+            businessRole: respRow.business_role,
+            communityLabel: respRow.community_label,
+            category: categoryName,
+            eligibilityType: linkRow?.eligibility_type,
+            familyRelationship: linkRow?.family_relationship,
+          }),
+          community_label: resolveTreatmentLabel({
+            communityLabel: respRow.community_label,
+            eligibilityType: linkRow?.eligibility_type,
+            familyRelationship: linkRow?.family_relationship,
+          }),
           organization: respRow.organization || lodgeNameFromLink,
           whatsapp: respRow.whatsapp,
           avatar_url: respRow.avatar_url,
+          reference_mason_name: isVerified ? (linkRow?.reference_mason_name || null) : null,
+          family_relationship: linkRow?.family_relationship || null,
+          eligibility_type: linkRow?.eligibility_type || null,
+          is_masonic_verified: isVerified,
         }
       : bObj.owner_name
       ? {
           name: bObj.owner_name,
-          business_role: 'Proprietário',
+          business_role: resolveResponsibleRole({
+            businessRole: 'Proprietário',
+            communityLabel: 'Ir.\'.',
+            category: categoryName,
+            eligibilityType: linkRow?.eligibility_type,
+            familyRelationship: linkRow?.family_relationship,
+          }),
           community_label: 'Ir.\'.',
           organization: bObj.organization || lodgeNameFromLink,
           avatar_url: bObj.owner_avatar_url || null,
+          reference_mason_name: isVerified ? (linkRow?.reference_mason_name || null) : null,
+          family_relationship: linkRow?.family_relationship || null,
+          eligibility_type: linkRow?.eligibility_type || null,
+          is_masonic_verified: isVerified,
         }
       : null;
 
@@ -326,7 +423,6 @@ const getPublicBusiness = cache(async (slug: string) => {
     const activeRecKeys = (recRows || []).map((r: any) => r.recognition_key);
     const isPedraFund = activeRecKeys.includes('pedra_fundamental') || Boolean(bObj.is_pedra_fundamental);
     const isColunaHonra = activeRecKeys.includes('coluna_de_honra') || Boolean(bObj.is_founder);
-    const isVerified = linkRow?.status === 'approved' || linkRow?.status === 'active' || linkRow?.status === 'verified' || Boolean(bObj.is_verified);
 
     const detailObj: DetailRow = {
       business_id: bObj.id,
@@ -342,16 +438,17 @@ const getPublicBusiness = cache(async (slug: string) => {
       is_coluna_honra: isColunaHonra,
       lodge_name: lodgeNameFromLink,
       contacts: (contactsRows || []) as any,
-      // Localização real vem de business_locations (ver bloco de localização abaixo).
-      // Não há endereço padrão: sem localização cadastrada, nada é exibido.
-      locations: [] as any,
+      city: locationRow?.city || bObj.city || null,
+      state: locationRow?.state || bObj.state || null,
+      address: locationRow?.address || (locationRow?.street ? `${locationRow.street}${locationRow.number ? ', ' + locationRow.number : ''}` : null) || bObj.address || null,
+      locations: locationRow ? [locationRow] : [] as any,
       media: (mediaRows || []) as any,
       services: (servicesRows || []).map((s: any) => ({
         id: s.id,
         name: s.name,
         description: s.description,
         icon_name: s.icon_name || 'briefcase',
-        price_info: s.price_info || 'Sob Consulta',
+        price_info: s.price_info ? s.price_info.trim() : null,
       })) as any,
       benefits: (benefitsRows || []).map((b: any) => ({
         id: b.id,
@@ -361,10 +458,13 @@ const getPublicBusiness = cache(async (slug: string) => {
         discount_percentage: b.discount_percentage || 15,
         badge_text: b.benefit_type || 'Oferta Fraterna',
       })) as any,
-      business_hours: [] as any,
+      business_hours: (hoursRows || []) as any,
       responsible: responsibleObj as any,
       rating_average: null,
       rating_count: 0,
+      publication_status: bObj.publication_status,
+      short_description: shortDescription,
+      logo_background_color: logoBackgroundColor,
     } as any;
 
     try {
@@ -393,7 +493,13 @@ const getPublicBusiness = cache(async (slug: string) => {
     } catch (_e) {}
 
     const recognitionsResult = await getInstitutionalRecognitionsAction();
-    return toPublicBusinessPresentation(detailObj, [], recognitionsResult?.data);
+    const presentation = toPublicBusinessPresentation(detailObj, [], recognitionsResult?.data);
+    presentation.isPreview = isPreview;
+    presentation.publicationStatus = bObj.publication_status || dbBiz.publication_status || 'published';
+    (presentation as any).clientApprovedAt = clientApprovedAt;
+    (presentation as any).clientApprovedBy = clientApprovedBy;
+    (presentation as any).isClientApproved = Boolean(clientApprovedAt);
+    return presentation;
 
   } catch {
     return null;
@@ -433,7 +539,9 @@ async function resolveRenamedBusinessSlug(slug: string): Promise<string | null> 
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const hasFilters = Object.keys((await searchParams) ?? {}).length > 0;
+  const sp = searchParams ? await searchParams : {};
+  const isPreview = sp.preview === 'true' || sp.preview === '1' || sp.preview === 'draft';
+  const hasFilters = Object.keys(sp).length > 0;
   if (slug === 'empresas') {
     return {
       title: 'Empresas e Serviços Maçônicos | Conexão Maçônica',
@@ -450,8 +558,16 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
       robots: hasFilters ? { index: false, follow: true } : undefined,
     };
   }
-  const business = await getPublicBusiness(slug);
+  const business = await getPublicBusiness(slug, isPreview);
   if (!business) return { title: 'Empresa não encontrada', robots: { index: false, follow: false } };
+
+  if (isPreview || business.publicationStatus !== 'published') {
+    return {
+      title: `[Pré-visualização] ${business.identity.name} | Conexão Maçônica`,
+      description: `Pré-visualização da empresa ${business.identity.name} para aprovação antes da publicação.`,
+      robots: { index: false, follow: false },
+    };
+  }
 
   const overrides = await getBusinessSeoOverrides(slug);
   const seoInput = {
@@ -496,6 +612,9 @@ import '@/styles/directory-home.css';
 
 export default async function CompanyDetailsPage(props: Props & { searchParams?: any }) {
   const { slug } = await props.params;
+  const sp = props.searchParams ? await props.searchParams : {};
+  const isPreview = sp.preview === 'true' || sp.preview === '1' || sp.preview === 'draft';
+
   if (slug === 'empresas') {
     return await BusinessDirectoryPage({ searchParams: props.searchParams });
   }
@@ -513,21 +632,21 @@ export default async function CompanyDetailsPage(props: Props & { searchParams?:
       .maybeSingle();
 
     if (dbBiz?.slug) {
-      redirect(`/guia/${dbBiz.slug}`);
-    } else {
+      redirect(`/guia/${dbBiz.slug}${isPreview ? '?preview=true' : ''}`);
+    } else if (!isPreview) {
       notFound();
     }
   }
 
   // Endereço com maiúsculas (ex.: /guia/OpticaCirculo) é a mesma página: redireciona de forma permanente para a forma minúscula.
-  const lowercaseTarget = buildLowercaseSlugRedirect(slug, props.searchParams ? await props.searchParams : null);
+  const lowercaseTarget = buildLowercaseSlugRedirect(slug, sp);
   if (lowercaseTarget) permanentRedirect(lowercaseTarget);
 
-  const business = await getPublicBusiness(slug);
+  const business = await getPublicBusiness(slug, isPreview);
   if (!business) {
     // Empresa que mudou de endereço: redirect permanente para o slug atual.
     const renamedTo = await resolveRenamedBusinessSlug(slug);
-    if (renamedTo) permanentRedirect(`/guia/${renamedTo}`);
+    if (renamedTo) permanentRedirect(`/guia/${renamedTo}${isPreview ? '?preview=true' : ''}`);
     notFound();
   }
 
@@ -566,6 +685,17 @@ export default async function CompanyDetailsPage(props: Props & { searchParams?:
 
   return (
     <FavoritesProvider>
+      {/* Barra de pré-visualização para aprovação: exibida exclusivamente em empresas que ainda não foram publicadas */}
+      {business.publicationStatus !== 'published' && (
+        <BusinessPreviewApprovalBar
+          businessId={business.identity.id}
+          businessName={business.identity.name}
+          publicationStatus={business.publicationStatus}
+          isClientApproved={Boolean((business as any).isClientApproved || (business as any).clientApprovedAt)}
+          clientApprovedAt={(business as any).clientApprovedAt}
+          clientApprovedBy={(business as any).clientApprovedBy}
+        />
+      )}
       <StructuredData schema={breadcrumbSchema} />
       <StructuredData schema={businessSchema} />
       <DirectoryHeader

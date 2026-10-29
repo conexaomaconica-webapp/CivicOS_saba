@@ -226,7 +226,8 @@ export async function reconcileCommercialPaymentWebhook(
                     external_reference: externalReference,
                     status: 'Aguardando pagamento',
                   },
-                });
+                })
+                .throwOnError();
             } catch (_initAttErr) {
               console.warn('[ASAAS_WEBHOOK] Falha ao registrar payment_attempt inicial (não impeditivo):', _initAttErr);
             }
@@ -585,7 +586,8 @@ export async function reconcileCommercialPaymentWebhook(
                   reconciled_at: new Date().toISOString(),
                 },
               },
-            });
+            })
+            .throwOnError();
         } catch (_insAttErr) {
           console.warn('[ASAAS_WEBHOOK] Falha ao registrar payment_attempt retroativo (não impeditivo):', _insAttErr);
         }

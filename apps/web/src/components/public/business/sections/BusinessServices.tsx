@@ -1,6 +1,7 @@
 import React from 'react';
 import { Briefcase, CheckCircle2 } from 'lucide-react';
 import type { PublicBusinessService } from '@/lib/business/public-business-presentation';
+import { FormattedText } from '@/components/ui/formatted-text';
 
 type BusinessServicesProps = {
   services: PublicBusinessService[];
@@ -45,9 +46,12 @@ export function BusinessServices({
               </div>
 
               {service.description && (
-                <p className="text-xs text-stone-600 leading-relaxed line-clamp-2">
-                  {service.description}
-                </p>
+                <FormattedText
+                  content={service.description}
+                  className="text-xs text-stone-600 leading-relaxed"
+                  collapsible
+                  maxCollapsedLength={180}
+                />
               )}
             </div>
           </div>
@@ -56,3 +60,4 @@ export function BusinessServices({
     </section>
   );
 }
+

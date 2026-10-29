@@ -1,6 +1,7 @@
 import React from 'react';
 import { Info } from 'lucide-react';
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
+import { FormattedText } from '@/components/ui/formatted-text';
 
 type BusinessAboutProps = {
   identity: PublicBusinessPresentation['identity'];
@@ -23,9 +24,11 @@ export function BusinessAbout({
         </h2>
       </div>
 
-      <div className="text-stone-700 text-sm leading-relaxed whitespace-pre-line font-normal">
-        {identity.description}
-      </div>
+      <FormattedText
+        content={identity.description}
+        className="text-stone-700 text-sm leading-relaxed font-normal"
+      />
     </section>
   );
 }
+
