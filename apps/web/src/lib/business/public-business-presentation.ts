@@ -16,6 +16,9 @@ export type PublicMediaAsset = {
     y: number;
   };
   objectPosition?: string;
+  zoom?: number;
+  fitMode?: 'cover' | 'contain';
+  backgroundColor?: string;
   crop?: {
     sourceWidth: number;
     sourceHeight: number;
@@ -33,6 +36,34 @@ export function getObjectPosition(asset?: PublicMediaAsset | null): string | und
     return `${asset.focalPosition.x}% ${asset.focalPosition.y}%`;
   }
   return undefined;
+}
+
+export function getMediaFramingStyle(
+  asset?: PublicMediaAsset | null,
+  defaultObjectPosition = '50% 50%'
+): {
+  objectPosition: string;
+  objectFit?: 'cover' | 'contain';
+  transform?: string;
+  transformOrigin?: string;
+} {
+  const pos = getObjectPosition(asset) ?? defaultObjectPosition;
+  const style: {
+    objectPosition: string;
+    objectFit?: 'cover' | 'contain';
+    transform?: string;
+    transformOrigin?: string;
+  } = {
+    objectPosition: pos,
+  };
+  if (asset?.fitMode === 'cover' || asset?.fitMode === 'contain') {
+    style.objectFit = asset.fitMode;
+  }
+  if (typeof asset?.zoom === 'number' && Number.isFinite(asset.zoom) && asset.zoom !== 1) {
+    style.transform = `scale(${asset.zoom})`;
+    style.transformOrigin = pos;
+  }
+  return style;
 }
 
 export type PublicBusinessReview = {
@@ -369,7 +400,26 @@ export function toPublicBusinessPresentation(
   };
 
   const images = rawMedia.filter((item) => item.type === 'image');
-  const cover = images[0] ?? null;
+  const coverOffsetY = numeric((row as any).cover_offset_y);
+  const coverZoom = numeric((row as any).cover_zoom);
+  const rawCoverFit = text((row as any).cover_fit_mode, 16);
+  const coverFitMode: 'cover' | 'contain' | undefined =
+    rawCoverFit === 'contain' || rawCoverFit === 'cover' ? rawCoverFit : undefined;
+  const coverBackgroundColor = text((row as any).cover_background_color, 24) || undefined;
+
+  const baseCover = images[0] ?? null;
+  const cover: PublicMediaAsset | null = baseCover
+    ? {
+        ...baseCover,
+        objectPosition:
+          coverOffsetY !== null
+            ? `center ${Math.max(0, Math.min(100, coverOffsetY))}%`
+            : baseCover.objectPosition,
+        zoom: coverZoom !== null ? Math.max(0.4, Math.min(3.0, coverZoom)) : baseCover.zoom,
+        fitMode: coverFitMode ?? baseCover.fitMode,
+        backgroundColor: coverBackgroundColor ?? baseCover.backgroundColor,
+      }
+    : null;
   // Apply maxPhotos entitlement limit to gallery
   const gallery = images.slice(1, maxPhotos + 1);
   const video = maxVideos > 0 ? rawMedia.find((item) => item.type === 'video') ?? null : null;

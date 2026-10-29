@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Heart, Share2, Building2, Eye } from 'lucide-react';
 import { useFavorites } from '@/lib/directory/favorites-context';
 import type { PublicBusinessPresentation, PublicMediaAsset } from '@/lib/business/public-business-presentation';
-import { getObjectPosition } from '@/lib/business/public-business-presentation';
+import { getMediaFramingStyle, getObjectPosition } from '@/lib/business/public-business-presentation';
 import { ReferBusinessModal } from '../sections/ReferBusinessModal';
 import { InstitutionalBadges } from '../shared/InstitutionalBadges';
 import { QuickActionBar } from '../shared/BusinessActionButtons';
@@ -73,14 +73,17 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
           {renderActionOverlay()}
 
           {/* Foto Principal (~65% da altura) */}
-          <div className="relative flex-1 min-h-0 rounded-xl overflow-hidden group">
+          <div
+            className="relative flex-1 min-h-0 rounded-xl overflow-hidden group"
+            style={{ backgroundColor: imgMain.backgroundColor || undefined }}
+          >
             <img
               src={imgMain.url}
               alt={imgMain.alt || `Ambiente principal de ${identity.name}`}
               fetchPriority="high"
               decoding="async"
-              style={{ objectPosition: getObjectPosition(imgMain) }}
-              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+              style={getMediaFramingStyle(imgMain, '50% 50%')}
+              className={`w-full h-full ${imgMain.fitMode === 'contain' ? 'object-contain' : 'object-cover'} group-hover:scale-102 transition-transform duration-300`}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10 pointer-events-none" />
           </div>
@@ -112,14 +115,17 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
         <div className="relative w-full h-[320px] sm:h-[340px] xl:h-[360px] rounded-2xl overflow-hidden border border-[#E8E5DF] shadow-xs bg-stone-100 flex flex-col gap-1.5 p-1.5">
           {renderActionOverlay()}
 
-          <div className="relative flex-1 min-h-0 rounded-xl overflow-hidden group">
+          <div
+            className="relative flex-1 min-h-0 rounded-xl overflow-hidden group"
+            style={{ backgroundColor: imgMain.backgroundColor || undefined }}
+          >
             <img
               src={imgMain.url}
               alt={imgMain.alt || `Foto principal de ${identity.name}`}
               fetchPriority="high"
               decoding="async"
-              style={{ objectPosition: getObjectPosition(imgMain) }}
-              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+              style={getMediaFramingStyle(imgMain, '50% 50%')}
+              className={`w-full h-full ${imgMain.fitMode === 'contain' ? 'object-contain' : 'object-cover'} group-hover:scale-102 transition-transform duration-300`}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10 pointer-events-none" />
           </div>
@@ -150,12 +156,15 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
         <div className="relative w-full h-[320px] sm:h-[340px] xl:h-[360px] rounded-2xl overflow-hidden border border-[#E8E5DF] shadow-xs bg-stone-100 grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-1.5">
           {renderActionOverlay()}
 
-          <div className="relative rounded-xl overflow-hidden group h-full">
+          <div
+            className="relative rounded-xl overflow-hidden group h-full"
+            style={{ backgroundColor: img1.backgroundColor || undefined }}
+          >
             <img
               src={img1.url}
               alt={img1.alt || `Foto 1 de ${identity.name}`}
-              style={{ objectPosition: getObjectPosition(img1) }}
-              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+              style={getMediaFramingStyle(img1, '50% 50%')}
+              className={`w-full h-full ${img1.fitMode === 'contain' ? 'object-contain' : 'object-cover'} group-hover:scale-102 transition-transform duration-300`}
             />
           </div>
 
@@ -174,15 +183,18 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
     // COM SOMENTE 1 FOTO: Exibe uma única foto compacta em h-[320px] sm:h-[340px]
     const singleImg = images[0]!;
     return (
-      <div className="relative w-full h-[320px] sm:h-[340px] xl:h-[360px] rounded-2xl overflow-hidden border border-[#E8E5DF] shadow-xs bg-stone-100 group">
+      <div
+        className="relative w-full h-[320px] sm:h-[340px] xl:h-[360px] rounded-2xl overflow-hidden border border-[#E8E5DF] shadow-xs bg-stone-100 group"
+        style={{ backgroundColor: singleImg.backgroundColor || undefined }}
+      >
         {renderActionOverlay()}
         <img
           src={singleImg.url}
           alt={singleImg.alt || `Foto corporativa de ${identity.name}`}
           fetchPriority="high"
           decoding="async"
-          style={{ objectPosition: getObjectPosition(singleImg) }}
-          className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+          style={getMediaFramingStyle(singleImg, '50% 50%')}
+          className={`w-full h-full ${singleImg.fitMode === 'contain' ? 'object-contain' : 'object-cover'} group-hover:scale-102 transition-transform duration-300`}
         />
       </div>
     );

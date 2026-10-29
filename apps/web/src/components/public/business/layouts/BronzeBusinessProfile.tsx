@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Heart, Share2, Building2, Eye } from 'lucide-react';
 import { useFavorites } from '@/lib/directory/favorites-context';
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
-import { getObjectPosition } from '@/lib/business/public-business-presentation';
+import { getMediaFramingStyle } from '@/lib/business/public-business-presentation';
 import { ReferBusinessModal } from '../sections/ReferBusinessModal';
 import { InstitutionalBadges } from '../shared/InstitutionalBadges';
 import { QuickActionBar } from '../shared/BusinessActionButtons';
@@ -91,14 +91,17 @@ export function BronzeBusinessProfile({ profile }: BronzeBusinessProfileProps) {
             </div>
 
             {/* COLUNA DIREITA: Foto Corporativa da Empresa com Ações Sobrepostas (5 cols: ~42%) */}
-            <div className="lg:col-span-5 relative w-full h-48 sm:h-56 lg:h-full min-h-[200px] rounded-2xl overflow-hidden border border-[#E8E5DF] shadow-xs group bg-stone-100">
+            <div
+              className="lg:col-span-5 relative w-full h-48 sm:h-56 lg:h-full min-h-[200px] rounded-2xl overflow-hidden border border-[#E8E5DF] shadow-xs group bg-stone-100"
+              style={{ backgroundColor: media.cover?.backgroundColor || undefined }}
+            >
               <img
                 src={coverUrl}
                 alt={`Foto corporativa de ${identity.name}`}
                 fetchPriority="high"
                 decoding="async"
-                style={{ objectPosition: getObjectPosition(media.cover) }}
-                className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+                style={getMediaFramingStyle(media.cover, '50% 50%')}
+                className={`w-full h-full ${media.cover?.fitMode === 'contain' ? 'object-contain' : 'object-cover'} group-hover:scale-102 transition-transform duration-300`}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/20 pointer-events-none" />
 

@@ -19,6 +19,7 @@ import {
   isBusinessIndexable,
   type BusinessSeoOverrides,
 } from '@/lib/seo/business-seo';
+import { createClient } from '@supabase/supabase-js';
 import { createServerSideClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database.types';
 
@@ -53,6 +54,13 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
 
   try {
     const supabase = await createServerSideClient();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const dbReader = supabaseUrl && serviceRoleKey
+      ? createClient<Database>(supabaseUrl, serviceRoleKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        })
+      : supabase;
 
     // 1. Tenta via RPC public_business_detail (que aplica a tripla condição no banco caso esteja publicado)
     if (!isPreview) {
@@ -73,7 +81,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
         if (!bizId && (detailObj.business_slug || slug)) {
           try {
             const targetSlug = detailObj.business_slug || slug;
-            const { data: bRow } = await (supabase as any)
+            const { data: bRow } = await (dbReader as any)
               .from('businesses')
               .select('id')
               .eq('slug', targetSlug)
@@ -87,17 +95,17 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
 
         if (bizId) {
           const [{ data: resp }, { data: link }, { data: attrRows }] = await Promise.all([
-            (supabase as any)
+            (dbReader as any)
               .from('business_responsibles')
               .select('name, business_role, community_label, organization, whatsapp, avatar_url')
               .eq('business_id', bizId)
               .maybeSingle(),
-            (supabase as any)
+            (dbReader as any)
               .from('business_masonic_links')
               .select('status, eligibility_type, reference_mason_name, reference_mason_cim, family_relationship, organizations(name)')
               .eq('business_id', bizId)
               .maybeSingle(),
-            (supabase as any)
+            (dbReader as any)
               .from('business_attributes')
               .select('attribute_key, attribute_value')
               .eq('business_id', bizId),
@@ -107,6 +115,10 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
             for (const attr of attrRows) {
               if (attr.attribute_key === 'short_description') (detailObj as any).short_description = attr.attribute_value;
               if (attr.attribute_key === 'logo_background_color' || attr.attribute_key === 'logo_bg_color') (detailObj as any).logo_background_color = attr.attribute_value;
+              if (attr.attribute_key === 'cover_offset_y') (detailObj as any).cover_offset_y = attr.attribute_value;
+              if (attr.attribute_key === 'cover_zoom') (detailObj as any).cover_zoom = attr.attribute_value;
+              if (attr.attribute_key === 'cover_fit_mode') (detailObj as any).cover_fit_mode = attr.attribute_value;
+              if (attr.attribute_key === 'cover_background_color') (detailObj as any).cover_background_color = attr.attribute_value;
               if (attr.attribute_key === 'client_approved_at') (detailObj as any).client_approved_at = attr.attribute_value;
               if (attr.attribute_key === 'client_approved_by') (detailObj as any).client_approved_by = attr.attribute_value;
             }
@@ -227,7 +239,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
           } catch (_e) {}
 
           try {
-            const { data: bMedia } = await (supabase as any)
+            const { data: bMedia } = await (dbReader as any)
               .from('business_media')
               .select('*')
               .eq('business_id', bizId)
@@ -278,7 +290,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
   }
 
     // 2. BUSCA DIRETA DA TABELA BUSINESSES (PELO SLUG CANÔNICO OU ID)
-    let bizQuery = supabase
+    let bizQuery = dbReader
       .from('businesses')
       .select('*');
 
@@ -308,7 +320,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
     const bObj = dbBiz as any;
 
     // Buscar status da assinatura na tabela subscriptions
-    const { data: subData } = await supabase
+    const { data: subData } = await dbReader
       .from('subscriptions')
       .select('status')
       .eq('business_id', bObj.id)
@@ -342,21 +354,25 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
       { data: hoursRows },
       { data: attrRows },
     ] = await Promise.all([
-      (supabase as any).from('business_media').select('*').eq('business_id', bizId).order('display_order', { ascending: true }),
-      (supabase as any).from('business_services').select('*').eq('business_id', bizId).eq('is_active', true).order('display_order', { ascending: true }),
-      (supabase as any).from('business_benefits').select('*').eq('business_id', bizId).eq('is_active', true).order('display_order', { ascending: true }),
-      (supabase as any).from('business_contacts').select('*').eq('business_id', bizId),
-      (supabase as any).from('business_responsibles').select('name, business_role, community_label, organization, whatsapp, avatar_url').eq('business_id', bizId).maybeSingle(),
-      (supabase as any).from('business_recognitions').select('recognition_key, is_active').eq('business_id', bizId).eq('is_active', true),
-      (supabase as any).from('business_masonic_links').select('status, eligibility_type, reference_mason_name, reference_mason_cim, family_relationship, organizations(name)').eq('business_id', bizId).maybeSingle(),
-      (supabase as any).from('business_categories').select('is_primary, categories(name)').eq('business_id', bizId).order('is_primary', { ascending: false }).limit(1),
-      (supabase as any).from('business_locations').select('city, state, address, street, number, postal_code, neighborhood, latitude, longitude').eq('business_id', bizId).maybeSingle(),
-      (supabase as any).from('business_hours').select('*').eq('business_id', bizId),
-      (supabase as any).from('business_attributes').select('attribute_key, attribute_value').eq('business_id', bizId),
+      (dbReader as any).from('business_media').select('*').eq('business_id', bizId).order('display_order', { ascending: true }),
+      (dbReader as any).from('business_services').select('*').eq('business_id', bizId).eq('is_active', true).order('display_order', { ascending: true }),
+      (dbReader as any).from('business_benefits').select('*').eq('business_id', bizId).eq('is_active', true).order('display_order', { ascending: true }),
+      (dbReader as any).from('business_contacts').select('*').eq('business_id', bizId),
+      (dbReader as any).from('business_responsibles').select('name, business_role, community_label, organization, whatsapp, avatar_url').eq('business_id', bizId).maybeSingle(),
+      (dbReader as any).from('business_recognitions').select('recognition_key, is_active').eq('business_id', bizId).eq('is_active', true),
+      (dbReader as any).from('business_masonic_links').select('status, eligibility_type, reference_mason_name, reference_mason_cim, family_relationship, organizations(name)').eq('business_id', bizId).maybeSingle(),
+      (dbReader as any).from('business_categories').select('is_primary, categories(name)').eq('business_id', bizId).order('is_primary', { ascending: false }).limit(1),
+      (dbReader as any).from('business_locations').select('city, state, address, street, number, postal_code, neighborhood, latitude, longitude').eq('business_id', bizId).maybeSingle(),
+      (dbReader as any).from('business_hours').select('*').eq('business_id', bizId),
+      (dbReader as any).from('business_attributes').select('attribute_key, attribute_value').eq('business_id', bizId),
     ]);
 
     let shortDescription: string | null = null;
     let logoBackgroundColor: string | null = null;
+    let coverOffsetY: string | null = null;
+    let coverZoom: string | null = null;
+    let coverFitMode: string | null = null;
+    let coverBackgroundColor: string | null = null;
     let clientApprovedAt: string | null = null;
     let clientApprovedBy: string | null = null;
 
@@ -364,6 +380,10 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
       for (const attr of attrRows) {
         if (attr.attribute_key === 'short_description') shortDescription = attr.attribute_value;
         if (attr.attribute_key === 'logo_background_color' || attr.attribute_key === 'logo_bg_color') logoBackgroundColor = attr.attribute_value;
+        if (attr.attribute_key === 'cover_offset_y') coverOffsetY = attr.attribute_value;
+        if (attr.attribute_key === 'cover_zoom') coverZoom = attr.attribute_value;
+        if (attr.attribute_key === 'cover_fit_mode') coverFitMode = attr.attribute_value;
+        if (attr.attribute_key === 'cover_background_color') coverBackgroundColor = attr.attribute_value;
         if (attr.attribute_key === 'client_approved_at') clientApprovedAt = attr.attribute_value;
         if (attr.attribute_key === 'client_approved_by') clientApprovedBy = attr.attribute_value;
       }
@@ -465,6 +485,10 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
       publication_status: bObj.publication_status,
       short_description: shortDescription,
       logo_background_color: logoBackgroundColor,
+      cover_offset_y: coverOffsetY,
+      cover_zoom: coverZoom,
+      cover_fit_mode: coverFitMode,
+      cover_background_color: coverBackgroundColor,
     } as any;
 
     try {

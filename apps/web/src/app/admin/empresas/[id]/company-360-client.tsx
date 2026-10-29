@@ -1458,15 +1458,18 @@ export default function Company360Client({ initialData }: Props) {
           stepLabel: 'Otimizando e enquadrando imagem no navegador...',
         });
 
-        // Compress image client-side to WebP with position framing and zoom
+        // Para a capa (update_cover), enviamos a imagem limpa otimizada em WebP e aplicamos/persistimos
+        // o enquadramento (zoom, posição vertical, modo contain/cover e cor de fundo) via atributos da empresa,
+        // evitando duplo zoom e permitindo re-enquadrar capas já salvas sem reenviar arquivo.
+        const isCoverMode = mediaMode === 'update_cover';
         const file = await compressImageOnClient(
           rawFile,
           1920,
           0.82,
-          offsetYToUse / 100,
-          imageFitMode,
-          zoomToUse,
-          ['update_logo', 'update_cover'].includes(mediaMode)
+          isCoverMode ? 0.5 : offsetYToUse / 100,
+          isCoverMode ? 'cover' : imageFitMode,
+          isCoverMode ? 1.0 : zoomToUse,
+          mediaMode === 'update_logo'
             ? (customBackgroundColor || imageBackgroundColor)
             : undefined
         );
@@ -1528,6 +1531,10 @@ export default function Company360Client({ initialData }: Props) {
         url: normalizedMediaUrl,
         title: mediaTitleInput,
         logo_background_color: mediaMode === 'update_logo' ? imageBackgroundColor : undefined,
+        cover_offset_y: mediaMode === 'update_cover' ? imageOffsetY : undefined,
+        cover_zoom: mediaMode === 'update_cover' ? imageZoom : undefined,
+        cover_fit_mode: mediaMode === 'update_cover' ? imageFitMode : undefined,
+        cover_background_color: mediaMode === 'update_cover' ? imageBackgroundColor : undefined,
       });
       if (res.success) {
         if (mediaMode === 'update_logo') {
@@ -1542,7 +1549,19 @@ export default function Company360Client({ initialData }: Props) {
         } else if (mediaMode === 'update_cover') {
           setData((prev) => ({
             ...prev,
-            business: { ...prev.business, cover_url: normalizedMediaUrl },
+            business: {
+              ...prev.business,
+              cover_url: normalizedMediaUrl,
+              cover_offset_y: imageOffsetY,
+              cover_zoom: imageZoom,
+              cover_fit_mode: imageFitMode,
+              cover_background_color: imageBackgroundColor,
+            },
+            cover_item: {
+              id: prev.cover_item?.id || 'cover-0',
+              url: normalizedMediaUrl,
+              title: mediaTitleInput || prev.cover_item?.title || 'Imagem de Capa',
+            },
           }));
         } else if (mediaMode === 'add_gallery' && res.media) {
           setData((prev) => ({
@@ -3298,7 +3317,13 @@ export default function Company360Client({ initialData }: Props) {
                     type="button"
                     onClick={() => {
                       setMediaMode('update_cover');
-                      setMediaUrlInput(data.cover_item?.url || '');
+                      setMediaUrlInput(data.cover_item?.url || data.business.cover_url || '');
+                      setMediaTitleInput(data.cover_item?.title || 'Imagem de Capa');
+                      setImageOffsetY(data.business.cover_offset_y ?? 50);
+                      setImageZoom(data.business.cover_zoom ?? 1.0);
+                      setImageFitMode(data.business.cover_fit_mode ?? 'cover');
+                      setImageBackgroundColor(data.business.cover_background_color || '#3b0b14');
+                      setSelectedFileForCrop(null);
                       setShowMediaModal(true);
                     }}
                     className="px-2.5 py-1 bg-[#3B0B14] hover:bg-[#5d1523] text-white font-bold rounded-lg flex items-center gap-1 text-[11px] cursor-pointer"
@@ -3309,11 +3334,22 @@ export default function Company360Client({ initialData }: Props) {
 
                 <div className="flex items-center gap-4">
                   {data.cover_item?.url ? (
-                    <img
-                      src={data.cover_item.url}
-                      alt="Capa do Anúncio"
-                      className="w-28 h-16 object-cover rounded-xl border border-stone-300 bg-stone-200"
-                    />
+                    <div
+                      className="w-28 h-16 rounded-xl border border-stone-300 overflow-hidden shrink-0"
+                      style={{ backgroundColor: data.business.cover_background_color || '#3b0b14' }}
+                    >
+                      <img
+                        src={data.cover_item.url}
+                        alt="Capa do Anúncio"
+                        style={{
+                          transform: `scale(${data.business.cover_zoom ?? 1})`,
+                          transformOrigin: `center ${data.business.cover_offset_y ?? 50}%`,
+                          objectPosition: `center ${data.business.cover_offset_y ?? 50}%`,
+                          objectFit: data.business.cover_fit_mode || 'cover',
+                        }}
+                        className="w-full h-full"
+                      />
+                    </div>
                   ) : (
                     <div className="w-28 h-16 rounded-xl border border-dashed border-stone-400 bg-stone-200 flex items-center justify-center text-stone-500 font-bold text-[10px]">
                       Sem Capa
@@ -4968,7 +5004,7 @@ export default function Company360Client({ initialData }: Props) {
                                   type="button"
                                   onClick={() => {
                                     setImageZoom(0.7);
-                                    if (selectedFileForCrop) handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any, undefined, 0.7);
+                                    if (selectedFileForCrop && mediaMode !== 'update_cover') handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any, undefined, 0.7);
                                   }}
                                   className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${imageZoom === 0.7 ? 'bg-[#3B0B14] text-[#C9A227]' : 'bg-stone-200 hover:bg-stone-300 text-stone-800'
                                     }`}
@@ -4979,7 +5015,7 @@ export default function Company360Client({ initialData }: Props) {
                                   type="button"
                                   onClick={() => {
                                     setImageZoom(1.0);
-                                    if (selectedFileForCrop) handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any, undefined, 1.0);
+                                    if (selectedFileForCrop && mediaMode !== 'update_cover') handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any, undefined, 1.0);
                                   }}
                                   className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${imageZoom === 1.0 ? 'bg-[#3B0B14] text-[#C9A227]' : 'bg-stone-200 hover:bg-stone-300 text-stone-800'
                                     }`}
@@ -4990,7 +5026,7 @@ export default function Company360Client({ initialData }: Props) {
                                   type="button"
                                   onClick={() => {
                                     setImageZoom(1.5);
-                                    if (selectedFileForCrop) handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any, undefined, 1.5);
+                                    if (selectedFileForCrop && mediaMode !== 'update_cover') handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any, undefined, 1.5);
                                   }}
                                   className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${imageZoom === 1.5 ? 'bg-[#3B0B14] text-[#C9A227]' : 'bg-stone-200 hover:bg-stone-300 text-stone-800'
                                     }`}
@@ -5007,10 +5043,10 @@ export default function Company360Client({ initialData }: Props) {
                               value={imageZoom}
                               onChange={(e) => setImageZoom(Number(e.target.value))}
                               onMouseUp={() => {
-                                if (selectedFileForCrop) handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any);
+                                if (selectedFileForCrop && mediaMode !== 'update_cover') handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any);
                               }}
                               onTouchEnd={() => {
-                                if (selectedFileForCrop) handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any);
+                                if (selectedFileForCrop && mediaMode !== 'update_cover') handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any);
                               }}
                               className="w-full h-1.5 bg-stone-300 rounded-lg appearance-none cursor-pointer accent-[#3B0B14]"
                             />
@@ -5025,7 +5061,7 @@ export default function Company360Client({ initialData }: Props) {
                                   type="button"
                                   onClick={() => {
                                     setImageOffsetY(0);
-                                    if (selectedFileForCrop) handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any, 0);
+                                    if (selectedFileForCrop && mediaMode !== 'update_cover') handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any, 0);
                                   }}
                                   className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${imageOffsetY === 0 ? 'bg-[#3B0B14] text-[#C9A227]' : 'bg-stone-200 hover:bg-stone-300 text-stone-800'
                                     }`}
@@ -5036,7 +5072,7 @@ export default function Company360Client({ initialData }: Props) {
                                   type="button"
                                   onClick={() => {
                                     setImageOffsetY(50);
-                                    if (selectedFileForCrop) handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any, 50);
+                                    if (selectedFileForCrop && mediaMode !== 'update_cover') handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any, 50);
                                   }}
                                   className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${imageOffsetY === 50 ? 'bg-[#3B0B14] text-[#C9A227]' : 'bg-stone-200 hover:bg-stone-300 text-stone-800'
                                     }`}
@@ -5047,7 +5083,7 @@ export default function Company360Client({ initialData }: Props) {
                                   type="button"
                                   onClick={() => {
                                     setImageOffsetY(100);
-                                    if (selectedFileForCrop) handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any, 100);
+                                    if (selectedFileForCrop && mediaMode !== 'update_cover') handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any, 100);
                                   }}
                                   className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${imageOffsetY === 100 ? 'bg-[#3B0B14] text-[#C9A227]' : 'bg-stone-200 hover:bg-stone-300 text-stone-800'
                                     }`}
@@ -5063,10 +5099,10 @@ export default function Company360Client({ initialData }: Props) {
                               value={imageOffsetY}
                               onChange={(e) => setImageOffsetY(Number(e.target.value))}
                               onMouseUp={() => {
-                                if (selectedFileForCrop) handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any);
+                                if (selectedFileForCrop && mediaMode !== 'update_cover') handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any);
                               }}
                               onTouchEnd={() => {
-                                if (selectedFileForCrop) handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any);
+                                if (selectedFileForCrop && mediaMode !== 'update_cover') handleAdminFileUpload({ target: { files: [selectedFileForCrop] } } as any);
                               }}
                               className="w-full h-1.5 bg-stone-300 rounded-lg appearance-none cursor-pointer accent-[#3B0B14]"
                             />

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Heart, Share2, Building2, Eye } from 'lucide-react';
 import { useFavorites } from '@/lib/directory/favorites-context';
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
-import { getObjectPosition } from '@/lib/business/public-business-presentation';
+import { getMediaFramingStyle } from '@/lib/business/public-business-presentation';
 import { ReferBusinessModal } from '../sections/ReferBusinessModal';
 import { InstitutionalBadges } from '../shared/InstitutionalBadges';
 import { QuickActionBar } from '../shared/BusinessActionButtons';
@@ -35,14 +35,17 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
       {/* 1. HERO HEADER INTERATIVO DO PLANO ACÁCIA (Fundo Bordô Nobre Canônico #3B0B14) */}
       <section className="relative w-full bg-[#3B0B14] text-white overflow-hidden shadow-xl border-b-2 border-[#C9A227] min-h-[380px] sm:min-h-[420px] lg:min-h-[440px] flex flex-col justify-center">
         {/* Imagem de Capa Nítida: 100% fotográfica, sem véu translúcido lavando as pessoas e o banner */}
-        <div className="absolute inset-0 z-0">
+        <div
+          className="absolute inset-0 z-0 overflow-hidden"
+          style={{ backgroundColor: media.cover?.backgroundColor || '#3B0B14' }}
+        >
           <img
             src={coverUrl}
             alt={identity.name}
             fetchPriority="high"
             decoding="async"
-            style={{ objectPosition: getObjectPosition(media.cover) ?? '50% 35%' }}
-            className={`h-full w-full object-cover brightness-[1.15] saturate-[1.08] contrast-[1.03] ${hasCover ? 'opacity-100' : 'opacity-25'}`}
+            style={getMediaFramingStyle(media.cover, '50% 35%')}
+            className={`h-full w-full ${media.cover?.fitMode === 'contain' ? 'object-contain' : 'object-cover'} brightness-[1.15] saturate-[1.08] contrast-[1.03] ${hasCover ? 'opacity-100' : 'opacity-25'}`}
           />
           {hasCover ? (
             <>

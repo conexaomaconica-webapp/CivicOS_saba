@@ -424,6 +424,10 @@ export interface AdminBusiness360DTO {
     cover_url?: string;
     short_description?: string;
     logo_background_color?: string;
+    cover_offset_y?: number;
+    cover_zoom?: number;
+    cover_fit_mode?: 'cover' | 'contain';
+    cover_background_color?: string;
     publication_status: 'draft' | 'pending_review' | 'published' | 'rejected' | 'suspended';
     is_active: boolean;
     is_founder: boolean;
@@ -1448,6 +1452,10 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
 
     let shortDescription: string | undefined = undefined;
     let logoBackgroundColor: string | undefined = undefined;
+    let coverOffsetY: number | undefined = undefined;
+    let coverZoom: number | undefined = undefined;
+    let coverFitMode: 'cover' | 'contain' | undefined = undefined;
+    let coverBackgroundColor: string | undefined = undefined;
     let clientApproval: AdminBusiness360DTO['client_approval'] = undefined;
 
     try {
@@ -1460,6 +1468,20 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
         for (const attr of attrRows) {
           if (attr.attribute_key === 'short_description') shortDescription = attr.attribute_value;
           if (attr.attribute_key === 'logo_background_color' || attr.attribute_key === 'logo_bg_color') logoBackgroundColor = attr.attribute_value;
+          if (attr.attribute_key === 'cover_offset_y') {
+            const parsed = Number(attr.attribute_value);
+            if (Number.isFinite(parsed)) coverOffsetY = parsed;
+          }
+          if (attr.attribute_key === 'cover_zoom') {
+            const parsed = Number(attr.attribute_value);
+            if (Number.isFinite(parsed)) coverZoom = parsed;
+          }
+          if (attr.attribute_key === 'cover_fit_mode' && (attr.attribute_value === 'cover' || attr.attribute_value === 'contain')) {
+            coverFitMode = attr.attribute_value;
+          }
+          if (attr.attribute_key === 'cover_background_color') {
+            coverBackgroundColor = attr.attribute_value;
+          }
           if (attr.attribute_key === 'client_approved_at') {
             clientApproval = {
               approved_at: attr.attribute_value,
@@ -1567,6 +1589,10 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
         cover_url: cover_item?.url || b.cover_url || undefined,
         short_description: shortDescription,
         logo_background_color: logoBackgroundColor,
+        cover_offset_y: coverOffsetY,
+        cover_zoom: coverZoom,
+        cover_fit_mode: coverFitMode,
+        cover_background_color: coverBackgroundColor,
         publication_status: (b.publication_status || 'published') as any,
         is_active: Boolean(b.is_active),
         is_founder: Boolean(b.is_founder),
@@ -3827,6 +3853,10 @@ export async function manageAdminMediaAction(
     title?: string;
     direction?: 'up' | 'down';
     logo_background_color?: string;
+    cover_offset_y?: number;
+    cover_zoom?: number;
+    cover_fit_mode?: 'cover' | 'contain';
+    cover_background_color?: string;
   }
 ): Promise<{ success: boolean; media?: AdminBusiness360DTO['gallery_items'][number]; error?: string }> {
   try {
@@ -3842,7 +3872,7 @@ export async function manageAdminMediaAction(
 
     const { data: biz, error: businessLookupError } = await (supabase as any)
       .from('businesses')
-      .select('id, tenant_id, plan_tier, logo_url')
+      .select('id, slug, tenant_id, plan_tier, logo_url')
       .eq('id', businessId)
       .maybeSingle();
 
@@ -3933,23 +3963,35 @@ export async function manageAdminMediaAction(
         reason: 'Atualização da logo oficial e cor de fundo via Admin 360º',
       });
     } else if (action === 'update_cover' && payload.url) {
-      const { data: existingCover } = await (supabase as any)
+      const { data: existingCovers } = await (supabase as any)
         .from('business_media')
-        .select('id, url')
+        .select('id, url, media_type, display_order')
         .eq('business_id', businessId)
-        .eq('media_type', 'image')
+        .in('media_type', ['image', 'cover'])
         .eq('display_order', 0)
-        .maybeSingle();
+        .order('created_at', { ascending: true });
 
-      if (existingCover) {
+      const primaryCover = Array.isArray(existingCovers) && existingCovers.length > 0 ? existingCovers[0] : null;
+
+      if (primaryCover) {
         await (supabase as any)
           .from('business_media')
           .update({
             media_type: 'image',
             url: payload.url.trim(),
             title: payload.title || 'Imagem de Capa',
+            display_order: 0,
           })
-          .eq('id', existingCover.id).throwOnError();
+          .eq('id', primaryCover.id).throwOnError();
+
+        if (existingCovers.length > 1) {
+          const duplicateIds = existingCovers.slice(1).map((c: any) => c.id);
+          await (supabase as any)
+            .from('business_media')
+            .delete()
+            .in('id', duplicateIds)
+            .eq('business_id', businessId);
+        }
       } else {
         await (supabase as any)
           .from('business_media')
@@ -3963,14 +4005,67 @@ export async function manageAdminMediaAction(
           }).throwOnError();
       }
 
+      const coverAttributesToUpsert: Array<{
+        business_id: string;
+        tenant_id: string;
+        attribute_key: string;
+        attribute_value: string;
+      }> = [];
+
+      if (typeof payload.cover_offset_y === 'number' && Number.isFinite(payload.cover_offset_y)) {
+        coverAttributesToUpsert.push({
+          business_id: businessId,
+          tenant_id: biz.tenant_id,
+          attribute_key: 'cover_offset_y',
+          attribute_value: String(Math.max(0, Math.min(100, Math.round(payload.cover_offset_y)))),
+        });
+      }
+      if (typeof payload.cover_zoom === 'number' && Number.isFinite(payload.cover_zoom)) {
+        coverAttributesToUpsert.push({
+          business_id: businessId,
+          tenant_id: biz.tenant_id,
+          attribute_key: 'cover_zoom',
+          attribute_value: String(Math.max(0.4, Math.min(3.0, Number(payload.cover_zoom.toFixed(2))))),
+        });
+      }
+      if (payload.cover_fit_mode === 'cover' || payload.cover_fit_mode === 'contain') {
+        coverAttributesToUpsert.push({
+          business_id: businessId,
+          tenant_id: biz.tenant_id,
+          attribute_key: 'cover_fit_mode',
+          attribute_value: payload.cover_fit_mode,
+        });
+      }
+      if (payload.cover_background_color) {
+        coverAttributesToUpsert.push({
+          business_id: businessId,
+          tenant_id: biz.tenant_id,
+          attribute_key: 'cover_background_color',
+          attribute_value: payload.cover_background_color.trim().toLowerCase(),
+        });
+      }
+
+      if (coverAttributesToUpsert.length > 0) {
+        await (supabase as any)
+          .from('business_attributes')
+          .upsert(coverAttributesToUpsert, { onConflict: 'business_id,attribute_key' })
+          .throwOnError();
+      }
+
       await (supabase as any).from('admin_audit_logs').insert({
         tenant_id: biz.tenant_id,
         actor_id: user.id,
         action: 'UPDATE_BUSINESS_COVER',
         entity_type: 'business_media',
         entity_id: businessId,
-        after_value: { cover_url: payload.url.trim() },
-        reason: 'Atualização da imagem de capa via Admin 360º',
+        after_value: {
+          cover_url: payload.url.trim(),
+          cover_offset_y: payload.cover_offset_y,
+          cover_zoom: payload.cover_zoom,
+          cover_fit_mode: payload.cover_fit_mode,
+          cover_background_color: payload.cover_background_color,
+        },
+        reason: 'Atualização da imagem de capa e enquadramento via Admin 360º',
       });
     } else if (action === 'add_gallery' && payload.url) {
       // Resolver cota de galeria via plan_entitlements (fonte canônica)
@@ -4121,6 +4216,10 @@ export async function manageAdminMediaAction(
     }
 
     revalidatePath(`/admin/empresas/${businessId}`);
+    if (biz.slug) {
+      revalidatePath(`/guia/${biz.slug}`);
+    }
+    revalidatePath('/guia', 'layout');
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao gerenciar mídia.' };
