@@ -78,6 +78,7 @@ import {
   evaluateBusinessProfileReadiness,
   validateBusinessPublicationGate,
 } from '@/lib/admin/admin-commercial-dossier-readiness';
+import { formatDateBR, formatDateTimeBR } from '@/lib/format/datetime-br';
 
 
 interface Props {
@@ -1926,9 +1927,9 @@ export default function Company360Client({ initialData }: Props) {
               Plano: <strong className="text-[#C9A227]">{getCommercialPlanName(data.business.plan_code)}</strong>
             </div>
             <div className="px-3 py-1.5 rounded-xl bg-stone-900/60 border border-stone-700 text-stone-200">
-              Vigência: <strong className="text-emerald-400">
+              Vigência: <strong className="text-emerald-400" suppressHydrationWarning>
                 {data.subscription.next_billing_date
-                  ? `Até ${new Date(data.subscription.next_billing_date).toLocaleDateString('pt-BR')}`
+                  ? `Até ${formatDateBR(data.subscription.next_billing_date)}`
                   : 'Não disponível'}
               </strong>
             </div>
@@ -3126,8 +3127,8 @@ export default function Company360Client({ initialData }: Props) {
                     </div>
 
                     <div className="text-stone-600 text-[11px] space-y-1">
-                      <div>📅 <strong>Início:</strong> {new Date(ev.starts_at).toLocaleString('pt-BR')}</div>
-                      {ev.ends_at && <div>🏁 <strong>Término:</strong> {new Date(ev.ends_at).toLocaleString('pt-BR')}</div>}
+                      <div>📅 <strong>Início:</strong> <span suppressHydrationWarning>{formatDateTimeBR(ev.starts_at)}</span></div>
+                      {ev.ends_at && <div>🏁 <strong>Término:</strong> <span suppressHydrationWarning>{formatDateTimeBR(ev.ends_at)}</span></div>}
                       {ev.location_name && <div>📍 <strong>Local:</strong> {ev.location_name}</div>}
                       {ev.description && <p className="text-stone-700 mt-1 italic">{ev.description}</p>}
                     </div>
@@ -3212,7 +3213,7 @@ export default function Company360Client({ initialData }: Props) {
 
                     {post.summary && <p className="text-stone-700 font-semibold text-[11px]">{post.summary}</p>}
                     <p className="text-stone-600 text-[11px] line-clamp-3">{post.content}</p>
-                    <span className="text-[10px] text-stone-400 block">Publicado em: {new Date(post.created_at).toLocaleDateString('pt-BR')}</span>
+                    <span className="text-[10px] text-stone-400 block" suppressHydrationWarning>Publicado em: {formatDateBR(post.created_at)}</span>
 
                     <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-200">
                       <button
@@ -3445,9 +3446,9 @@ export default function Company360Client({ initialData }: Props) {
             </div>
             <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl space-y-1">
               <span className="text-stone-500 font-bold block">Data e Hora da Assinatura:</span>
-              <strong className="text-stone-900 font-mono text-xs block">
+              <strong className="text-stone-900 font-mono text-xs block" suppressHydrationWarning>
                 {data.contract?.signed_at
-                  ? `${new Date(data.contract.signed_at).toLocaleDateString('pt-BR')} às ${new Date(data.contract.signed_at).toLocaleTimeString('pt-BR')}`
+                  ? formatDateTimeBR(data.contract.signed_at)
                   : 'Ainda não assinado'}
               </strong>
             </div>
@@ -3516,8 +3517,8 @@ export default function Company360Client({ initialData }: Props) {
                   <div className="border-t border-stone-700 pt-1.5 text-xs font-semibold text-stone-900">
                     {data.contract.signer_name || data.business.name}
                   </div>
-                  <p className="text-[10px] text-stone-500">
-                    Registrada em {data.contract.signed_at ? new Date(data.contract.signed_at).toLocaleString('pt-BR') : 'data não disponível'}
+                  <p className="text-[10px] text-stone-500" suppressHydrationWarning>
+                    Registrada em {data.contract.signed_at ? formatDateTimeBR(data.contract.signed_at) : 'data não disponível'}
                   </p>
                 </div>
               )}
@@ -3530,7 +3531,7 @@ export default function Company360Client({ initialData }: Props) {
                 <div>• <strong>Empresa Signatária:</strong> {data.business.name} ({data.business.legal_name || data.business.name})</div>
                 <div>• <strong>Documento CNPJ/CPF:</strong> {data.business.cnpj_cpf || 'Registrado na Plataforma'}</div>
                 <div>• <strong>Status Jurídico:</strong> {contractSigned ? 'CONTRATO ASSINADO E HOMOLOGADO' : 'AGUARDANDO ASSINATURA'}</div>
-                <div>• <strong>Data/Hora de Aceite:</strong> {data.contract.signed_at ? new Date(data.contract.signed_at).toLocaleString('pt-BR') : 'Ainda não assinado'}</div>
+                <div suppressHydrationWarning>• <strong>Data/Hora de Aceite:</strong> {data.contract.signed_at ? formatDateTimeBR(data.contract.signed_at) : 'Ainda não assinado'}</div>
                 <div className="truncate" title={data.contract.sha256_hash}>• <strong>Hash SHA-256:</strong> {data.contract.sha256_hash}</div>
               </div>
             </div>
@@ -3574,16 +3575,16 @@ export default function Company360Client({ initialData }: Props) {
 
             <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl space-y-1">
               <span className="text-stone-500 font-bold block">Início da vigência:</span>
-              <strong className="text-stone-900 font-serif text-sm block">
-                {data.subscription.start_date ? new Date(data.subscription.start_date).toLocaleString('pt-BR') : 'Não disponível'}
+              <strong className="text-stone-900 font-serif text-sm block" suppressHydrationWarning>
+                {data.subscription.start_date ? formatDateTimeBR(data.subscription.start_date) : 'Não disponível'}
               </strong>
               <span className="text-stone-500 text-[11px] block">Período registrado na assinatura</span>
             </div>
 
             <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl space-y-1">
               <span className="text-stone-500 font-bold block">Próximo Vencimento / Renovação:</span>
-              <strong className="text-stone-900 font-serif text-sm block">
-                {data.subscription.next_billing_date ? new Date(data.subscription.next_billing_date).toLocaleDateString('pt-BR') : 'Não disponível'}
+              <strong className="text-stone-900 font-serif text-sm block" suppressHydrationWarning>
+                {data.subscription.next_billing_date ? formatDateBR(data.subscription.next_billing_date) : 'Não disponível'}
               </strong>
               <span className="text-stone-500 text-[11px] block">Fim do período vigente</span>
             </div>
@@ -3614,8 +3615,8 @@ export default function Company360Client({ initialData }: Props) {
                         <td className="py-3.5 px-4 font-bold text-stone-900">
                           {pay.invoice_number}
                         </td>
-                        <td className="py-3.5 px-4 text-stone-700">
-                          {pay.date ? new Date(pay.date).toLocaleString('pt-BR') : `Sem pagamento (vence em ${new Date(`${pay.due_date}T12:00:00`).toLocaleDateString('pt-BR')})`}
+                        <td className="py-3.5 px-4 text-stone-700" suppressHydrationWarning>
+                          {pay.date ? formatDateTimeBR(pay.date) : `Sem pagamento (vence em ${formatDateBR(pay.due_date ? `${pay.due_date}T12:00:00` : null)})`}
                         </td>
                         <td className="py-3.5 px-4">
                           {pay.payment_method ? (
@@ -3775,8 +3776,8 @@ export default function Company360Client({ initialData }: Props) {
                 <div>
                   <div className="flex items-center gap-2">
                     <strong className="text-stone-900 font-bold">{log.action}</strong>
-                    <span className="text-[10px] text-stone-400 font-mono">
-                      {new Date(log.date).toLocaleString('pt-BR')}
+                    <span className="text-[10px] text-stone-400 font-mono" suppressHydrationWarning>
+                      {formatDateTimeBR(log.date)}
                     </span>
                   </div>
                   <p className="text-stone-600 mt-0.5">{log.description}</p>

@@ -92,12 +92,20 @@ export default function BusinessSeoPanel({ data }: { data: AdminBusinessSeoData 
 
         <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-stone-500">Descrição SEO (aparece no Google)</p>
         <ul className="mt-1 space-y-1">
-          {data.suggestions.descriptions.map((text) => (
-            <li key={text} className="flex items-start justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
-              <span>{text} <span className="text-xs text-stone-400">({text.length})</span></span>
-              <button type="button" className="shrink-0 text-xs font-bold text-[#5d1523] hover:underline" onClick={() => setValues({ ...values, seo_description: text })}>Usar</button>
-            </li>
-          ))}
+          {data.suggestions.descriptions.map((text, idx) => {
+            const labels = ['Foco em Especialidades', 'Síntese Institucional', 'Busca Local e Contato'];
+            return (
+              <li key={text} className="flex items-start justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
+                <div>
+                  <span className="mb-1 inline-block rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-bold text-stone-600">
+                    {labels[idx] || `Opção ${idx + 1}`}
+                  </span>
+                  <p>{text} <span className="text-xs text-stone-400">({text.length})</span></p>
+                </div>
+                <button type="button" className="shrink-0 text-xs font-bold text-[#5d1523] hover:underline" onClick={() => setValues({ ...values, seo_description: text })}>Usar</button>
+              </li>
+            );
+          })}
         </ul>
 
         {data.suggestions.longDescription ? (

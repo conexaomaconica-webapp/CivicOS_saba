@@ -96,6 +96,7 @@ export interface AdvertiserProfileDTO {
     cover_url?: string;
     completeness_percent: number;
     missing_fields: Array<{ fieldKey: string; label: string; action_url: string }>;
+    services?: string[];
   };
   quotas: {
     photos_used: number;
@@ -149,10 +150,11 @@ export async function getAdvertiserProfileDataAction(): Promise<AdvertiserProfil
       // Compatibilidade com ambientes legados/mocks sem a nova consulta; usa o limite canônico.
     }
 
-    // Contatos e horário reais: é daqui que o Guia lê (business_contacts e business_hours), não das colunas antigas.
-    const [{ data: contactRows }, { data: hourRows }, features] = await Promise.all([
+    // Contatos, horário e serviços reais: é daqui que o Guia e o gerador de SEO leem.
+    const [{ data: contactRows }, { data: hourRows }, { data: serviceRows }, features] = await Promise.all([
       reader.from('business_contacts').select('type, value').eq('business_id', businessId),
       reader.from('business_hours').select('day_of_week, open_time, close_time, is_closed').eq('business_id', businessId),
+      reader.from('business_services').select('name').eq('business_id', businessId).eq('is_active', true),
       getAdvertiserFeaturesAction(),
     ]);
     const contacts: Record<string, string> = {};
@@ -211,6 +213,7 @@ export async function getAdvertiserProfileDataAction(): Promise<AdvertiserProfil
         cover_url: resolvedCoverUrl,
         completeness_percent: Math.max(0, 100 - missing_fields.length * 14),
         missing_fields,
+        services: (serviceRows || []).map((s: any) => String(s.name ?? '')).filter(Boolean),
       },
       quotas: {
         photos_used: realGallery.length,

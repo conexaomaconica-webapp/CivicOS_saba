@@ -78,7 +78,7 @@ export function buildBusinessDescription(input: BusinessSeoInput, overrides?: Bu
   const category = clean(input.category);
   const lead = category ? `${name}: ${category.toLowerCase()}${where}.` : `Conheça ${name}${where}.`;
   return truncateAtWord(
-    `${lead} Veja serviços, localização, contatos, fotos e ofertas no Conexão Maçônica.`,
+    `${lead} Veja serviços, localização, contatos, horários e informações de atendimento.`,
     DESCRIPTION_MAX
   );
 }

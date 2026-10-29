@@ -33,6 +33,7 @@ import {
   uploadSurveyBrandAssetAction,
 } from '@/app/actions/surveys';
 import { optimizeImageForUpload } from '@/lib/media/optimize-image';
+import { formatDateBR } from '@/lib/format/datetime-br';
 
 interface Props {
   initialSurveys: Survey[];
@@ -345,9 +346,9 @@ export function AdminSurveysListClient({ initialSurveys }: Props) {
                 <div className="asl-card-meta">
                   <div className="asl-meta-item">
                     <Calendar size={13} />
-                    <span>
+                    <span suppressHydrationWarning>
                       {survey.created_at
-                        ? new Date(survey.created_at).toLocaleDateString('pt-BR')
+                        ? formatDateBR(survey.created_at)
                         : 'Recente'}
                     </span>
                   </div>

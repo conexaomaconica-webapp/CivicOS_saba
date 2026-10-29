@@ -3223,14 +3223,16 @@ export async function manageAdminServiceAction(
   }
 ): Promise<{ success: boolean; data?: AdminBusiness360DTO['services_items'][number]; error?: string }> {
   try {
-    const { supabase, user } = await assertPlatformAdminAccess();
+    const { supabase: sessionClient, user } = await assertPlatformAdminAccess();
+    const supabase: any = createServiceRoleClient() ?? sessionClient;
 
-    const { data: biz } = await (supabase as any)
+    const { data: biz, error: businessLookupError } = await (supabase as any)
       .from('businesses')
-      .select('id, tenant_id, plan_tier, plan_code')
+      .select('id, tenant_id, plan_tier')
       .eq('id', businessId)
-      .single();
+      .maybeSingle();
 
+    if (businessLookupError) return { success: false, error: `Falha ao consultar empresa: ${businessLookupError.message}` };
     if (!biz) return { success: false, error: 'Empresa não localizada.' };
 
     const { data: activeSubscription } = await (supabase as any).from('subscriptions')
@@ -3238,7 +3240,7 @@ export async function manageAdminServiceAction(
       .eq('tenant_id', biz.tenant_id).eq('business_id', businessId)
       .in('status', ['active', 'trialing', 'past_due', 'canceled'])
       .order('created_at', { ascending: false }).limit(1).maybeSingle();
-    const planCode = activeSubscription?.plan_versions?.plans?.code || biz.plan_tier || biz.plan_code || 'bronze';
+    const planCode = activeSubscription?.plan_versions?.plans?.code || biz.plan_tier || 'bronze';
     let savedService: AdminBusiness360DTO['services_items'][number] | undefined;
     if (action === 'create') {
       // Resolver cota de serviços via plan_entitlements (fonte canônica)
@@ -3391,14 +3393,16 @@ export async function manageAdminBenefitAction(
   }
 ): Promise<{ success: boolean; data?: AdminBusiness360DTO['benefits_items'][number]; error?: string }> {
   try {
-    const { supabase, user } = await assertPlatformAdminAccess();
+    const { supabase: sessionClient, user } = await assertPlatformAdminAccess();
+    const supabase: any = createServiceRoleClient() ?? sessionClient;
 
-    const { data: biz } = await (supabase as any)
+    const { data: biz, error: businessLookupError } = await (supabase as any)
       .from('businesses')
       .select('id, tenant_id, plan_tier')
       .eq('id', businessId)
-      .single();
+      .maybeSingle();
 
+    if (businessLookupError) return { success: false, error: `Falha ao consultar empresa: ${businessLookupError.message}` };
     if (!biz) return { success: false, error: 'Empresa não localizada.' };
 
     let savedBenefit: AdminBusiness360DTO['benefits_items'][number] | undefined;

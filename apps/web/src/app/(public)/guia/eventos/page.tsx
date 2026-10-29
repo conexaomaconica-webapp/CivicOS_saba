@@ -9,6 +9,7 @@ import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { DirectoryFavoritesModal } from '@/components/public/directory/DirectoryFavoritesModal';
 import { StructuredData } from '@/components/seo/StructuredData';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
+import { formatDateBR } from '@/lib/format/datetime-br';
 import '@/styles/directory-home.css';
 
 export async function generateMetadata({ searchParams }: { searchParams?: Promise<Record<string, unknown>> }): Promise<Metadata> {
@@ -200,7 +201,7 @@ export default async function PublicEventsDirectoryPage({ searchParams }: Props)
               {items.map((event) => {
                 const isLodge = event.organizer_type === 'lodge';
                 const dateFormatted = event.event_date
-                  ? new Date(event.event_date).toLocaleDateString('pt-BR', {
+                  ? formatDateBR(event.event_date, {
                       day: '2-digit',
                       month: 'long',
                       year: 'numeric',

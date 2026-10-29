@@ -5,6 +5,7 @@ import { CalendarDays, Check, Download, Loader2, Sparkles, Tag, X } from 'lucide
 import type { PublicBusinessBenefit } from '@/lib/business/public-business-presentation';
 import { redeemBenefitAction } from '@/lib/business/benefit-redemption-service';
 import { useBusinessAnalytics } from '@/components/public/business/BusinessContactTracker';
+import { formatDateBR } from '@/lib/format/datetime-br';
 
 type BusinessBenefitsProps = {
   benefits: PublicBusinessBenefit[];
@@ -20,7 +21,7 @@ type RedemptionCard = {
 
 const inPortuguese = (value: string) => value.replace(/\bOFF\b/gi, 'Desconto');
 const formatExpiration = (value: string | null | undefined) => value
-  ? new Date(value).toLocaleDateString('pt-BR')
+  ? formatDateBR(value)
   : 'Consulte as condições da oferta';
 
 export function BusinessBenefits({ benefits, businessName, className = '' }: BusinessBenefitsProps) {

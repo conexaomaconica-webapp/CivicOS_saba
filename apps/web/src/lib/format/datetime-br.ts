@@ -3,14 +3,32 @@
  * Componentes de cliente renderizam primeiro no servidor (UTC) e depois no navegador (fuso de quem acessa); formatar sem
  * fuso fixo gera textos diferentes e o erro de hidratação do React (#418).
  */
-const TZ = 'America/Sao_Paulo';
+export const SAO_PAULO_TZ = 'America/Sao_Paulo';
 
-export function formatDateBR(value: string | number | Date | null | undefined): string {
+export function formatDateBR(
+  value: string | number | Date | null | undefined,
+  options?: Intl.DateTimeFormatOptions
+): string {
   if (!value) return '';
-  return new Date(value).toLocaleDateString('pt-BR', { timeZone: TZ });
+  try {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('pt-BR', { timeZone: SAO_PAULO_TZ, ...options });
+  } catch {
+    return '';
+  }
 }
 
-export function formatDateTimeBR(value: string | number | Date | null | undefined): string {
+export function formatDateTimeBR(
+  value: string | number | Date | null | undefined,
+  options?: Intl.DateTimeFormatOptions
+): string {
   if (!value) return '';
-  return new Date(value).toLocaleString('pt-BR', { timeZone: TZ });
+  try {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleString('pt-BR', { timeZone: SAO_PAULO_TZ, ...options });
+  } catch {
+    return '';
+  }
 }

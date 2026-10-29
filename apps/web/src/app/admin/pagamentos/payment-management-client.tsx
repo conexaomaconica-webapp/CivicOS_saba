@@ -26,6 +26,7 @@ import {
 } from '@/lib/admin/admin-payments-service';
 import { getCommercialPlanName } from '@/lib/admin/approval-display';
 import { systemConfirm } from '@/components/system/SystemFeedback';
+import { formatDateBR } from '@/lib/format/datetime-br';
 
 export interface PaymentManagementClientProps {
   isAsaasConfigured: boolean;
@@ -332,7 +333,7 @@ export default function PaymentManagementClient({
 
                     {/* VENCIMENTO */}
                     <td className="py-3.5 px-4 text-center font-mono text-stone-700">
-                      {new Date(item.due_date).toLocaleDateString('pt-BR')}
+                      {formatDateBR(item.due_date)}
                     </td>
 
                     {/* STATUS */}

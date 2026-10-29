@@ -65,7 +65,7 @@ export default async function RootLayout({
           />
         ) : null}
       </head>
-      <body className="min-h-screen font-sans antialiased">
+      <body className="min-h-screen font-sans antialiased" suppressHydrationWarning>
         <Providers bootData={bootData}>
           <PwaRegister />
           {children}

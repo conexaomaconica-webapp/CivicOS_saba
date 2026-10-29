@@ -16,6 +16,7 @@ import {
   AdminAuditDashboardDTO,
   AdminAuditLogItem,
 } from '@/lib/admin/admin-audit-service';
+import { formatDateTimeBR } from '@/lib/format/datetime-br';
 
 export default function AuditManagementClient() {
   const [data, setData] = useState<AdminAuditDashboardDTO | null>(null);
@@ -171,7 +172,7 @@ export default function AuditManagementClient() {
                   <tr key={log.id} className="hover:bg-stone-50/80 transition-colors">
                     {/* DATA / HORA */}
                     <td className="py-3.5 px-4 font-mono text-stone-600 text-[11px]">
-                      {new Date(log.created_at).toLocaleString('pt-BR')}
+                      {formatDateTimeBR(log.created_at)}
                     </td>
 
                     {/* OPERADOR */}
@@ -269,7 +270,7 @@ export default function AuditManagementClient() {
               </div>
               <div className="flex justify-between">
                 <span className="text-stone-600">Data / IP:</span>
-                <strong className="font-mono">{new Date(selectedAuditLog.created_at).toLocaleString('pt-BR')} • IP {selectedAuditLog.ip_address}</strong>
+                <strong className="font-mono">{formatDateTimeBR(selectedAuditLog.created_at)} • IP {selectedAuditLog.ip_address}</strong>
               </div>
               <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 mt-2">
                 <span className="font-bold block">Justificativa Oficial Registrada:</span>

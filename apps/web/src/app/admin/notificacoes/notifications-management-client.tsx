@@ -23,6 +23,7 @@ import {
   reprocessNotificationAction,
   type OperationalNotificationItem,
 } from '@/lib/notifications/notification-service';
+import { formatDateTimeBR } from '@/lib/format/datetime-br';
 
 export default function NotificationsManagementClient() {
   const [loading, setLoading] = useState(true);
@@ -257,7 +258,7 @@ export default function NotificationsManagementClient() {
 
                     {/* DATA / HORA */}
                     <td className="py-3.5 px-4 text-center font-mono text-stone-700">
-                      {new Date(item.created_at).toLocaleString('pt-BR')}
+                      {formatDateTimeBR(item.created_at)}
                     </td>
 
                     {/* AÇÃO */}
@@ -316,7 +317,7 @@ export default function NotificationsManagementClient() {
               </div>
               <div className="flex justify-between">
                 <span className="text-stone-600">Data de Envio:</span>
-                <strong className="font-mono">{new Date(selectedNotif.created_at).toLocaleString('pt-BR')}</strong>
+                <strong className="font-mono">{formatDateTimeBR(selectedNotif.created_at)}</strong>
               </div>
 
               {selectedNotif.error_details && (

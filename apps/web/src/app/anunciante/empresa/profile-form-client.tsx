@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { BrazilianLocationFields } from '@/components/admin/BrazilianLocationFields';
 import Link from 'next/link';
@@ -22,6 +22,7 @@ import {
   type AdvertiserHourRow,
   updateAdvertiserProfileFieldsAction,
 } from '@/lib/advertiser/advertiser-profile-service';
+import { suggestDescriptions } from '@/lib/seo/seo-suggestions';
 import type { ChangeRequestItem } from '@/lib/advertiser/change-requests-service';
 import { PendingChangesNotice } from '@/components/advertiser/PendingChangesNotice';
 
@@ -81,6 +82,22 @@ export default function AdvertiserProfileFormClient({
 
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number | null>(null);
+
+  const seoSuggestions = useMemo(() => {
+    return suggestDescriptions({
+      slug: business.slug || 'empresa',
+      name: formData.name || business.name || 'Sua Empresa',
+      category: formData.category || business.category || null,
+      city: formData.city || business.city || null,
+      state: formData.state || business.state || null,
+      description: formData.description || null,
+      services: business.services || [],
+      hasHours: hours.some((h) => !h.is_closed && (h.open_time || h.close_time)),
+      hasPhone: Boolean(formData.phone),
+      hasWhatsapp: Boolean(formData.whatsapp),
+    });
+  }, [formData.name, formData.category, formData.city, formData.state, formData.description, formData.phone, formData.whatsapp, business, hours]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -271,18 +288,91 @@ export default function AdvertiserProfileFormClient({
               )}
             </div>
 
-            <div className="md:col-span-2 space-y-1">
-              <label className="font-bold text-stone-800 flex items-center justify-between">
-                <span>Descrição Comercial (Sobre a Empresa)</span>
-                <ReviewTag />
-              </label>
+            <div className="md:col-span-2 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-1">
+                <label className="font-bold text-stone-800 flex items-center gap-2">
+                  <span>Descrição Comercial (Sobre a Empresa)</span>
+                  <ReviewTag />
+                </label>
+                <span className="text-[11px] text-stone-500 font-mono">
+                  {formData.description.length} caracteres {formData.description.length >= 150 ? '· (excelente para SEO)' : '· (150+ recomendados)'}
+                </span>
+              </div>
               <textarea
                 rows={4}
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, description: e.target.value });
+                  setSelectedSuggestionIndex(null);
+                }}
                 className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
                 placeholder="Descreva a empresa, diferenciais e serviços oferecidos..."
               />
+
+              {/* Assistente de SEO: 3 sugestões baseadas nos dados reais */}
+              <div className="mt-2 rounded-2xl border border-amber-200/80 bg-linear-to-b from-amber-50/60 to-white p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[#C9A227]" />
+                    <span className="text-xs font-bold text-stone-900">Sugestões de Descrição para o Google (SEO)</span>
+                  </div>
+                  <span className="text-[11px] text-stone-500">
+                    {business.services && business.services.length > 0
+                      ? `${business.services.length} serviços cadastrados utilizados`
+                      : 'Cadastre serviços para personalizar ainda mais'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-600 leading-relaxed">
+                  Três alternativas exclusivas geradas a partir das suas informações reais (serviço principal, especialidades, cidade e contato). Selecione uma sugestão para aplicar ou personalize livremente no campo acima.
+                </p>
+
+                <div className="grid gap-2">
+                  {seoSuggestions.map((sug, idx) => {
+                    const angles = [
+                      { label: 'Foco em Especialidades', desc: 'Nome + serviço principal + especialidades + cidade + contato' },
+                      { label: 'Síntese Institucional', desc: 'Apresentação de escopo e proposta de valor no mercado local' },
+                      { label: 'Busca Local e Contato', desc: 'Foco na intenção de pesquisa do cliente e ação imediata' },
+                    ];
+                    const angle = angles[idx] || { label: `Opção ${idx + 1}`, desc: '' };
+                    const isSelected = selectedSuggestionIndex === idx || formData.description === sug;
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`rounded-xl border p-3 text-xs transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                          isSelected ? 'border-amber-400 bg-amber-50/40 ring-1 ring-amber-300' : 'border-stone-200 bg-white hover:border-stone-300'
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-bold text-stone-700">
+                              {angle.label}
+                            </span>
+                            <span className="text-[10px] text-stone-400 font-mono">
+                              {sug.length} caracteres
+                            </span>
+                          </div>
+                          <p className="text-stone-800 leading-relaxed font-normal">{sug}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({ ...formData, description: sug });
+                            setSelectedSuggestionIndex(idx);
+                          }}
+                          className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
+                            isSelected
+                              ? 'bg-emerald-700 text-white hover:bg-emerald-800'
+                              : 'bg-[#5d1523] text-white hover:bg-[#4B161B]'
+                          }`}
+                        >
+                          {isSelected ? 'Opção selecionada' : 'Usar esta opção'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -49,17 +49,45 @@ describe('sugestões de título', () => {
 });
 
 describe('sugestões de descrição', () => {
-  it('cabem no limite do Google e mencionam só serviços cadastrados', () => {
+  it('cabem no limite do Google e utilizam serviço principal e especialidades reais sem repetir a marca', () => {
     const list = suggestDescriptions(facts);
-    expect(list.length).toBeGreaterThan(0);
-    for (const text of list) expect(text.length).toBeLessThanOrEqual(DESCRIPTION_MAX);
-    const withServices = list.find((t) => t.includes('Serviços:'));
-    expect(withServices).toContain('Exame de vista');
+    expect(list.length).toBe(3);
+    for (const text of list) {
+      expect(text.length).toBeLessThanOrEqual(DESCRIPTION_MAX);
+      expect(text).not.toContain('Conexão Maçônica');
+    }
+    // A primeira opção foca em operacional e especialidades
+    expect(list[0]).toContain('Exame de vista');
+    expect(list[0]).toContain('Lentes de contato');
+    expect(list[0]).toContain('Feira de Santana - BA');
+
+    // As três opções devem ser distintas entre si (ângulos diferentes)
+    const uniqueOptions = new Set(list);
+    expect(uniqueOptions.size).toBe(3);
   });
 
-  it('sem serviços cadastrados não inventa nenhum', () => {
+  it('substitui termos genéricos pelo serviço principal da empresa', () => {
+    const legalFacts: SuggestionFacts = {
+      ...facts,
+      name: 'Silva Advocacia',
+      category: 'Jurídico',
+      services: ['Direito Tributário', 'Defesa Fiscal'],
+    };
+    const list = suggestDescriptions(legalFacts);
+    for (const text of list) {
+      expect(text).toContain('Direito Tributário');
+      expect(text.toLowerCase()).not.toContain('jurídico');
+    }
+  });
+
+  it('sem serviços cadastrados não inventa nenhum e usa a categoria naturalmente', () => {
     const list = suggestDescriptions({ ...facts, services: [] });
-    list.forEach((t) => expect(t).not.toContain('Serviços:'));
+    for (const text of list) {
+      expect(text).not.toContain('Exame de vista');
+      expect(text).not.toContain('Lentes de contato');
+      expect(text).not.toContain('Conexão Maçônica');
+      expect(text.length).toBeLessThanOrEqual(DESCRIPTION_MAX);
+    }
   });
 
   it('só oferece WhatsApp quando a empresa tem WhatsApp', () => {

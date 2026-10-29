@@ -4,6 +4,8 @@ import {
   getAdminBusiness360Action,
   togglePublicationStatusAction,
   toggleRecognitionAction,
+  manageAdminServiceAction,
+  manageAdminBenefitAction,
 } from '../src/lib/admin/admin-businesses-service';
 
 vi.mock('next/headers', () => ({
@@ -16,11 +18,15 @@ const mockBiz = {
   name: 'Comandos - Terceirização e Segurança Eletrônica',
   category: 'Segurança Eletrônica & Terceirização',
   publication_status: 'published',
-  plan_code: 'ouro',
+  plan_tier: 'ouro',
   is_founder: true,
   is_pedra_fundamental: true,
   is_coluna_honra: true,
 };
+
+vi.mock('../src/lib/supabase/service-role', () => ({
+  createServiceRoleClient: () => null,
+}));
 
 vi.mock('../src/lib/supabase/server', () => ({
   createServerSideClient: vi.fn().mockImplementation(() => {
@@ -50,6 +56,55 @@ vi.mock('../src/lib/supabase/server', () => ({
           };
           return chain;
         }
+        if (table === 'business_services') {
+          const chain: any = {
+            select: () => chain,
+            insert: (payload: any) => ({
+              select: () => ({
+                single: () => Promise.resolve({
+                  data: {
+                    id: 'svc-100',
+                    name: payload.name,
+                    description: payload.description,
+                    price_info: payload.price_info,
+                    is_active: true,
+                    display_order: 0,
+                    created_at: new Date().toISOString(),
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+            eq: () => chain,
+            maybeSingle: () => Promise.resolve({ data: null, error: null }),
+            then: (resolve: any) => resolve({ data: [], count: 0, error: null }),
+          };
+          return chain;
+        }
+        if (table === 'business_benefits') {
+          const chain: any = {
+            select: () => chain,
+            insert: (payload: any) => ({
+              select: () => ({
+                single: () => Promise.resolve({
+                  data: {
+                    id: 'ben-100',
+                    title: payload.title,
+                    description: payload.description,
+                    discount_percentage: payload.discount_percentage,
+                    is_active: true,
+                    created_at: new Date().toISOString(),
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+            eq: () => chain,
+            maybeSingle: () => Promise.resolve({ data: null, error: null }),
+            then: (resolve: any) => resolve({ data: [], count: 0, error: null }),
+          };
+          return chain;
+        }
         if (table === 'analytics_events') {
           const chain: any = {
             select: () => chain,
@@ -71,9 +126,12 @@ vi.mock('../src/lib/supabase/server', () => ({
           select: () => defaultChain,
           update: () => defaultChain,
           eq: () => defaultChain,
+          in: () => defaultChain,
           order: () => defaultChain,
+          limit: () => defaultChain,
           maybeSingle: () => Promise.resolve({ data: null, error: null }),
-          then: (resolve: any) => resolve({ data: [], error: null }),
+          single: () => Promise.resolve({ data: null, error: null }),
+          then: (resolve: any) => resolve({ data: [], count: 0, error: null }),
         };
         return defaultChain;
       }),
@@ -118,5 +176,25 @@ describe('Gestão de Carteira e Prontuário 360º de Empresas (/admin/empresas)'
       'Concessão pioneira Pedra Fundamental'
     );
     expect(res.success).toBe(true);
+  });
+
+  it('5. Criação de Serviço no Prontuário 360º não falha por empresa não localizada', async () => {
+    const res = await manageAdminServiceAction('00000000-0000-0000-0000-000000000001', 'create', {
+      name: 'Monitoramento 24h',
+      description: 'Central de alarme e CFTV integrada',
+      price_info: 'Sob consulta',
+    });
+    expect(res.success).toBe(true);
+    expect(res.data?.name).toBe('Monitoramento 24h');
+  });
+
+  it('6. Criação de Benefício no Prontuário 360º não falha por empresa não localizada', async () => {
+    const res = await manageAdminBenefitAction('00000000-0000-0000-0000-000000000001', 'create', {
+      title: 'Desconto Fraterno 15%',
+      description: 'Válido para serviços de instalação',
+      discount_percentage: 15,
+    });
+    expect(res.success).toBe(true);
+    expect(res.data?.title).toBe('Desconto Fraterno 15%');
   });
 });

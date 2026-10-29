@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { CheckCircle2, Loader2, Search, TicketCheck } from 'lucide-react';
 import { confirmRedemptionUseAction, lookupRedemptionByCodeAction, type BenefitLookupResult } from '@/lib/advertiser/benefit-validation-service';
+import { formatDateTimeBR } from '@/lib/format/datetime-br';
 
 export default function BenefitValidationClient() {
   const [code, setCode] = useState('');
@@ -58,7 +59,7 @@ export default function BenefitValidationClient() {
             <div><p className="text-xs font-bold uppercase text-stone-500">Benefício</p><h2 className="font-serif text-lg font-bold text-stone-900">{String(redemption.benefit_snapshot?.title || 'Benefício')}</h2></div>
             <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-bold uppercase text-stone-700">{redemption.status}</span>
           </div>
-          <dl className="grid grid-cols-2 gap-3 text-sm"><div><dt className="text-stone-500">Cliente</dt><dd className="font-bold">{redemption.user_display_name}</dd></div><div><dt className="text-stone-500">Resgatado em</dt><dd className="font-bold">{new Date(redemption.redeemed_at).toLocaleString('pt-BR')}</dd></div></dl>
+          <dl className="grid grid-cols-2 gap-3 text-sm"><div><dt className="text-stone-500">Cliente</dt><dd className="font-bold">{redemption.user_display_name}</dd></div><div><dt className="text-stone-500">Resgatado em</dt><dd className="font-bold">{formatDateTimeBR(redemption.redeemed_at)}</dd></div></dl>
           {redemption.status === 'redeemed' && (
             <div className="space-y-3 border-t border-stone-200 pt-4">
               <label className="block text-xs font-bold text-stone-600">Valor da venda (opcional)<input value={saleAmount} onChange={(event) => setSaleAmount(event.target.value)} inputMode="decimal" placeholder="0,00" className="mt-1 block w-full rounded-xl border border-stone-300 px-3 py-2 text-sm" /></label>
