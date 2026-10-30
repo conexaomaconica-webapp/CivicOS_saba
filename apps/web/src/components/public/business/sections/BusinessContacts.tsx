@@ -197,7 +197,7 @@ export function BusinessContacts({
         Contato
       </h3>
 
-      <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
         {items.map((item, index) => {
           const Icon = item.icon;
           return (
@@ -206,14 +206,14 @@ export function BusinessContacts({
               href={item.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-2.5 rounded-xl bg-[#FDFBF7] border border-[#E8E5DF] hover:border-[#C9A227]/60 transition-all flex items-center gap-3 shadow-xs group"
+              className="p-2.5 rounded-xl bg-[#FDFBF7] border border-[#E8E5DF] hover:border-[#C9A227]/60 transition-all flex items-center gap-2.5 shadow-xs group h-full min-h-[54px]"
             >
               <div className="p-2 rounded-lg bg-white border border-stone-200 shrink-0 shadow-2xs">
                 <Icon className={`w-4 h-4 ${item.color}`} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] text-stone-500 font-medium">{item.label}</p>
-                <p className="text-xs font-bold text-stone-900 group-hover:text-[#4B161B] transition-colors truncate">
+                <p className="text-[11px] text-stone-500 font-medium leading-tight">{item.label}</p>
+                <p className="text-xs font-bold text-stone-900 group-hover:text-[#4B161B] transition-colors truncate mt-0.5">
                   {item.value}
                 </p>
               </div>

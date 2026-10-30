@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { Heart, MapPin, User, Menu, X, PlusCircle, LogOut, UserPlus } from 'lucide-react';
+import { Heart, MapPin, User, Menu, X, PlusCircle, LogOut, UserPlus, Landmark, ShieldCheck, Compass, Scale, Calendar, Store } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useFavorites } from '@/lib/directory/favorites-context';
 import { CategoryIcon, APP_CATEGORIES } from '@/components/landing/LandingMobileTopBar';
@@ -17,7 +17,36 @@ type DirectoryHeaderProps = {
   availableCities?: string[];
   onCityChange?: (city: string) => void;
   categories?: Array<{ id?: string; slug: string; name: string; icon_name?: string | null; business_count?: number }>;
+  potencies?: Array<{ id?: string; slug: string; name: string; abbreviation?: string }>;
 };
+
+const DEFAULT_HEADER_POTENCIES = [
+  { key: '', label: 'Todas', code: '' },
+  { key: 'GOB', label: 'GOB', code: 'GOB' },
+  { key: 'CMSB', label: 'CMSB', code: 'CMSB' },
+  { key: 'COMAB', label: 'COMAB', code: 'COMAB' },
+];
+
+const EVENT_HEADER_FILTERS = [
+  { key: 'all', label: 'Todos', type: 'all' },
+  { key: 'empresas', label: 'Empresas', type: 'empresas' },
+  { key: 'lojas', label: 'Lojas Maçônicas', type: 'lojas' },
+] as const;
+
+function EventHeaderIcon({ type }: { type: string }) {
+  if (type === 'empresas') return <Store className="h-5 w-5" />;
+  if (type === 'lojas') return <Landmark className="h-5 w-5" />;
+  return <Calendar className="h-5 w-5" />;
+}
+
+function PotencyHeaderIcon({ code }: { code: string }) {
+  const upper = code.toUpperCase();
+  if (!upper) return <Landmark className="h-5 w-5" />;
+  if (upper.includes('GOB')) return <ShieldCheck className="h-5 w-5" />;
+  if (upper.includes('CMSB')) return <Compass className="h-5 w-5" />;
+  if (upper.includes('COMAB')) return <Scale className="h-5 w-5" />;
+  return <Landmark className="h-5 w-5" />;
+}
 
 export function DirectoryHeader({
   appName = 'Conexão Maçônica',
@@ -26,6 +55,7 @@ export function DirectoryHeader({
   availableCities = [],
   onCityChange,
   categories = [],
+  potencies = [],
 }: DirectoryHeaderProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -103,6 +133,80 @@ export function DirectoryHeader({
   };
 
   const currentCat = searchParams ? (searchParams.get('cat') || searchParams.get('category') || '') : '';
+  const currentPotency = searchParams ? (searchParams.get('potency') || '') : '';
+  const currentEventType = searchParams ? (searchParams.get('type') || 'all') : 'all';
+  const isLodgesSection = Boolean(pathname?.startsWith('/guia/lojas'));
+  const isBenefitsSection = Boolean(pathname?.startsWith('/guia/beneficios'));
+  const isEventsSection = Boolean(pathname?.startsWith('/guia/eventos') || pathname?.startsWith('/eventos'));
+
+  const headerSearchMode: 'businesses' | 'lodges' | 'benefits' | 'events' = isLodgesSection
+    ? 'lodges'
+    : isBenefitsSection
+    ? 'benefits'
+    : isEventsSection
+    ? 'events'
+    : 'businesses';
+
+  const headerPlaceholder = isLodgesSection
+    ? 'Buscar lojas, cidade, potência ou dia...'
+    : isBenefitsSection
+    ? 'Buscar benefícios, descontos ou empresas...'
+    : isEventsSection
+    ? 'Buscar eventos, palestras ou comunicados...'
+    : 'Buscar empresas ou serviços...';
+
+  const headerActionUrl = isLodgesSection
+    ? '/guia/lojas'
+    : isBenefitsSection
+    ? '/guia/beneficios'
+    : isEventsSection
+    ? '/guia/eventos'
+    : '/guia/empresas';
+
+  const headerPotencies = React.useMemo(() => {
+    const base = [...DEFAULT_HEADER_POTENCIES];
+    const seen = new Set(base.map((p) => p.code.toUpperCase()));
+    for (const p of potencies || []) {
+      const code = (p.abbreviation || p.slug || p.name || '').trim();
+      const upper = code.toUpperCase();
+      if (!code || seen.has(upper)) continue;
+      seen.add(upper);
+      base.push({
+        key: p.slug || code,
+        label: p.abbreviation || p.name,
+        code: p.slug || code,
+      });
+    }
+    return base;
+  }, [potencies]);
+
+  const handlePotencyClick = (potencyCode: string) => {
+    const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
+    const isSame =
+      (!potencyCode && !currentPotency) ||
+      (potencyCode && currentPotency.toUpperCase() === potencyCode.toUpperCase());
+
+    if (!potencyCode || isSame) {
+      params.delete('potency');
+    } else {
+      params.set('potency', potencyCode);
+    }
+    params.delete('page');
+    const qs = params.toString();
+    router.push(`/guia/lojas${qs ? `?${qs}` : ''}`);
+  };
+
+  const handleEventTypeClick = (eventType: string) => {
+    const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
+    if (!eventType || eventType === 'all' || currentEventType === eventType) {
+      params.delete('type');
+    } else {
+      params.set('type', eventType);
+    }
+    params.delete('page');
+    const qs = params.toString();
+    router.push(`/guia/eventos${qs ? `?${qs}` : ''}`);
+  };
 
   const headerCategories = React.useMemo(() => {
     if (categories && categories.length > 0) {
@@ -330,64 +434,154 @@ export function DirectoryHeader({
           </div>
         </div>
 
-        {/* Linha 2: Campo Buscar empresas ou serviços com busca ao vivo / autocomplete */}
+        {/* Linha 2: Campo Buscar contextual conforme a página atual */}
         <DirectoryLiveSearchBox
           variant="header"
-          placeholder="Buscar empresas ou serviços..."
+          searchMode={headerSearchMode}
+          placeholder={headerPlaceholder}
           selectedCity={activeCity}
+          selectedPotency={isLodgesSection ? currentPotency : undefined}
           availableCities={citiesToDisplay}
           categories={headerCategories.map((c) => ({ id: 'id' in c ? c.id : undefined, slug: c.slug, name: c.name }))}
           initialQuery={searchParams ? (searchParams.get('q') || '') : ''}
-          actionUrl="/guia/empresas"
+          actionUrl={headerActionUrl}
         />
 
-        {/* Linha 3: Slider Horizontal de Ícones de Categorias (Categorias do catálogo preferencialmente) */}
-        <div className="relative -mx-3 px-3 overflow-x-auto scrollbar-none py-1" role="region" aria-label="Categorias em destaque">
+        {/* Linha 3: Slider Horizontal de Ícones (Potências em /guia/lojas, Tipos de Evento em /guia/eventos ou Categorias nas demais rotas) */}
+        <div
+          className="relative -mx-3 px-3 overflow-x-auto scrollbar-none py-1"
+          role="region"
+          aria-label={
+            isLodgesSection
+              ? 'Potências Maçônicas'
+              : isEventsSection
+              ? 'Filtrar eventos por origem'
+              : 'Categorias em destaque'
+          }
+        >
           <div className="flex gap-2.5 w-max">
-            {headerCategories.map((cat) => {
-              const isActive = currentCat === cat.slug;
-              const hasCount = ('business_count' in cat && (cat.business_count ?? 0) > 0) || Boolean((cat as any).isCatalog);
-              return (
-                <button
-                  key={cat.slug}
-                  type="button"
-                  onClick={() => handleCategoryClick(cat.slug)}
-                  className={`flex flex-col items-center gap-1 w-[60px] shrink-0 text-center transition-all ${
-                    isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
-                  }`}
-                >
-                  <div
-                    className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
-                      isActive
-                        ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
-                        : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
-                    }`}
-                  >
-                    <CategoryIcon slug={cat.slug} name={cat.name} />
-                    {hasCount && (
+            {isLodgesSection
+              ? headerPotencies.map((pot) => {
+                  const isActive =
+                    (!pot.code && !currentPotency) ||
+                    Boolean(pot.code && currentPotency.toUpperCase() === pot.code.toUpperCase());
+                  return (
+                    <button
+                      key={pot.key || 'all-potencies'}
+                      type="button"
+                      onClick={() => handlePotencyClick(pot.code)}
+                      className={`flex flex-col items-center gap-1 w-[64px] shrink-0 text-center transition-all ${
+                        isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
+                      }`}
+                    >
+                      <div
+                        className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
+                          isActive
+                            ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
+                            : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
+                        }`}
+                      >
+                        <PotencyHeaderIcon code={pot.code} />
+                        {pot.code && (
+                          <span
+                            className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
+                            title={`Filtrar por ${pot.label}`}
+                          />
+                        )}
+                      </div>
                       <span
-                        className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
-                        title="Ativo no Catálogo"
-                      />
-                    )}
-                  </div>
-                  <span
-                    className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
-                      isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
-                    }`}
-                  >
-                    {cat.name}
-                  </span>
-                </button>
-              );
-            })}
+                        className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
+                          isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
+                        }`}
+                      >
+                        {pot.label}
+                      </span>
+                    </button>
+                  );
+                })
+              : isEventsSection
+              ? EVENT_HEADER_FILTERS.map((evFilter) => {
+                  const isActive =
+                    (evFilter.type === 'all' && (!currentEventType || currentEventType === 'all')) ||
+                    currentEventType === evFilter.type;
+                  return (
+                    <button
+                      key={evFilter.key}
+                      type="button"
+                      onClick={() => handleEventTypeClick(evFilter.type)}
+                      className={`flex flex-col items-center gap-1 w-[76px] shrink-0 text-center transition-all ${
+                        isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
+                      }`}
+                    >
+                      <div
+                        className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
+                          isActive
+                            ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
+                            : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
+                        }`}
+                      >
+                        <EventHeaderIcon type={evFilter.type} />
+                        {evFilter.type !== 'all' && (
+                          <span
+                            className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
+                            title={`Eventos de ${evFilter.label}`}
+                          />
+                        )}
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
+                          isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
+                        }`}
+                      >
+                        {evFilter.label}
+                      </span>
+                    </button>
+                  );
+                })
+              : headerCategories.map((cat) => {
+                  const isActive = currentCat === cat.slug;
+                  const hasCount = ('business_count' in cat && (cat.business_count ?? 0) > 0) || Boolean((cat as any).isCatalog);
+                  return (
+                    <button
+                      key={cat.slug}
+                      type="button"
+                      onClick={() => handleCategoryClick(cat.slug)}
+                      className={`flex flex-col items-center gap-1 w-[60px] shrink-0 text-center transition-all ${
+                        isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
+                      }`}
+                    >
+                      <div
+                        className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
+                          isActive
+                            ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
+                            : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
+                        }`}
+                      >
+                        <CategoryIcon slug={cat.slug} name={cat.name} />
+                        {hasCount && (
+                          <span
+                            className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
+                            title="Ativo no Catálogo"
+                          />
+                        )}
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
+                          isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
+                        }`}
+                      >
+                        {cat.name}
+                      </span>
+                    </button>
+                  );
+                })}
           </div>
         </div>
       </div>
 
       {/* Mobile Drawer Menu Overlay */}
       {mobileMenuOpen && (
-        <div className="animate-fadeIn border-b border-[#c59b27]/25 bg-[#3b0b14]/98 px-4 py-5 shadow-2xl backdrop-blur-xl transition-all md:hidden">
+        <div className="animate-fadeIn border-b border-[#c9a227]/40 bg-[#4b161b] px-4 py-5 shadow-2xl transition-all md:hidden">
           <nav className="flex flex-col gap-3 mb-5">
             {navLinks.map((link) => {
               const active = isLinkActive(link.href, link.exact);

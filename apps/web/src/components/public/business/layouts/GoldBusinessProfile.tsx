@@ -32,12 +32,12 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
   return (
     <div className="min-h-screen overflow-x-clip bg-[#F8F7F5] pb-16 font-sans text-stone-900">
 
-      {/* 1. HERO HEADER INTERATIVO DO PLANO ACÁCIA (Fundo Bordô Nobre Canônico #3B0B14) */}
-      <section className="relative w-full bg-[#3B0B14] text-white overflow-hidden shadow-xl border-b-2 border-[#C9A227] min-h-[380px] sm:min-h-[420px] lg:min-h-[440px] flex flex-col justify-center">
+      {/* 1. HERO HEADER INTERATIVO DO PLANO ACÁCIA (Fundo Bordô Nobre Canônico #4B161B) */}
+      <section className="relative w-full bg-[#4B161B] text-white overflow-hidden shadow-xl border-b-2 border-[#C9A227] min-h-[380px] sm:min-h-[420px] lg:min-h-[440px] flex flex-col justify-center">
         {/* Imagem de Capa Nítida: 100% fotográfica, sem véu translúcido lavando as pessoas e o banner */}
         <div
           className="absolute inset-0 z-0 overflow-hidden"
-          style={{ backgroundColor: media.cover?.backgroundColor || '#3B0B14' }}
+          style={{ backgroundColor: media.cover?.backgroundColor || '#4B161B' }}
         >
           <img
             src={coverUrl}
@@ -45,19 +45,20 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
             fetchPriority="high"
             decoding="async"
             style={getMediaFramingStyle(media.cover, '50% 35%')}
-            className={`h-full w-full ${media.cover?.fitMode === 'contain' ? 'object-contain' : 'object-cover'} brightness-[1.15] saturate-[1.08] contrast-[1.03] ${hasCover ? 'opacity-100' : 'opacity-25'}`}
+            className={`h-full w-full ${media.cover?.fitMode === 'contain' ? 'object-contain' : 'object-cover'} brightness-100 md:brightness-[1.15] saturate-[1.08] contrast-[1.03] ${hasCover ? 'opacity-100' : 'opacity-25'}`}
           />
           {hasCover ? (
             <>
-              {/* Celular: escurecimento suave para legibilidade das informações sobrepostas */}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#25050C]/85 via-[#25050C]/40 to-transparent md:hidden" />
+              {/* Celular: Gradiente Bordô Nobre Canônico (#4B161B) marcante para preservar a identidade do Plano Acácia e garantir leitura nítida */}
+              <div className="absolute inset-0 bg-gradient-to-t from-[#3B0B14] from-0% via-[#4B161B]/90 via-52% to-[#4B161B]/45 to-100% md:hidden" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#4B161B]/65 via-[#4B161B]/25 to-transparent md:hidden" />
 
               {/* Tablet/Desktop: Fundo Bordô Nobre Canônico suave apenas sob a coluna de informações (0-22%), liberando total claridade e nitidez da foto do centro para a direita */}
-              <div className="absolute inset-0 hidden md:block bg-gradient-to-r from-[#3B0B14]/90 from-0% via-[#3B0B14]/75 via-22% via-[#3B0B14]/20 via-34% to-transparent to-44%" />
+              <div className="absolute inset-0 hidden md:block bg-gradient-to-r from-[#4B161B]/92 from-0% via-[#4B161B]/78 via-22% via-[#4B161B]/20 via-34% to-transparent to-44%" />
             </>
           ) : (
             /* Sem imagem de capa: Cabeçalho 100% Bordô Nobre Canônico do Plano Acácia */
-            <div className="absolute inset-0 bg-gradient-to-br from-[#4B161B] via-[#3B0B14] to-[#25050C]" />
+            <div className="absolute inset-0 bg-gradient-to-br from-[#5d1523] via-[#4B161B] to-[#3B0B14]" />
           )}
         </div>
 

@@ -2,7 +2,7 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { appUrl } from '@/lib/seo/app-url';
 import Link from 'next/link';
-import { ChevronRight, Award, Tag, Sparkles, ArrowRight, Store } from 'lucide-react';
+import { ChevronRight, Award, Tag, Sparkles, ArrowRight, Store, Search } from 'lucide-react';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
@@ -17,12 +17,28 @@ export const metadata: Metadata = {
   alternates: { canonical: appUrl('/guia/beneficios') },
 };
 
-export default async function PublicBenefitsDirectoryPage() {
+type Props = {
+  searchParams?: Promise<{
+    q?: string;
+    city?: string;
+    cat?: string;
+  }>;
+};
+
+export default async function PublicBenefitsDirectoryPage({ searchParams }: Props) {
+  const params = (await searchParams) ?? {};
+  const q = params.q?.trim() || '';
+  const city = params.city?.trim() || '';
+  const cat = params.cat?.trim() || '';
+
   const supabase = await createServerSideClient();
 
   // Fetch businesses with active benefits via RPC
   const { data: searchRes } = await (supabase as any).rpc('public_businesses_search', {
     p_host: 'localhost',
+    p_query: q || null,
+    p_city: city || null,
+    p_category_slug: cat || null,
     p_has_benefits: true,
     p_page: 1,
     p_page_size: 24,
@@ -62,10 +78,10 @@ export default async function PublicBenefitsDirectoryPage() {
       <StructuredData schema={listSchema} />
       <div className="min-h-screen bg-[#faf7f2] text-[#1f1914] font-sans antialiased relative">
 
-        <DirectoryHeader />
+        <DirectoryHeader selectedCity={city} />
 
         {/* Sub-Hero Header com Paleta Bordô & Dourada do Sistema */}
-        <section className="bg-gradient-to-b from-[#3b0b14] via-[#3b0b14] to-[#2b060d] text-white py-10 px-4 relative overflow-hidden border-b border-[#c59b27]/30 shadow-lg">
+        <section className="bg-gradient-to-b from-[#4b161b] via-[#4b161b] to-[#3b0b14] text-white py-10 px-4 relative overflow-hidden border-b border-[#c59b27]/30 shadow-lg">
           <div className="dh-container relative z-10">
             {/* Breadcrumb */}
             <nav className="flex items-center gap-2 text-xs text-amber-200/80 mb-3" aria-label="Breadcrumb">
@@ -87,6 +103,26 @@ export default async function PublicBenefitsDirectoryPage() {
             <p className="text-xs md:text-sm text-amber-100/90 max-w-2xl mt-2 leading-relaxed">
               Condições diferenciadas, descontos especiais e atendimento exclusivo oferecidos por empresários cadastrados na rede Conexão Maçônica.
             </p>
+
+            {/* Barra de Busca Principal (Desktop; no mobile fica exclusivamente no header) */}
+            <div className="hidden md:block">
+              <form action="/guia/beneficios" method="GET" className="dh-search-box mt-8 max-w-3xl">
+                <Sparkles className="w-5 h-5 text-amber-500 ml-3 shrink-0" />
+                <input
+                  type="text"
+                  name="q"
+                  defaultValue={q}
+                  placeholder="Buscar benefícios, descontos ou empresas..."
+                  className="dh-search-box__input text-gray-900"
+                />
+                {city && <input type="hidden" name="city" value={city} />}
+                {cat && <input type="hidden" name="cat" value={cat} />}
+                <button type="submit" className="dh-search-box__btn">
+                  <Search className="w-4 h-4" />
+                  <span>Buscar</span>
+                </button>
+              </form>
+            </div>
           </div>
         </section>
 

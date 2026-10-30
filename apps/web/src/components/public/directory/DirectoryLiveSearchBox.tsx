@@ -12,6 +12,8 @@ export type SearchResultItem = {
   name: string;
   logo_url?: string | null;
   category_name?: string | null;
+  potency?: string | null;
+  code_number?: number | null;
   city?: string | null;
   state?: string | null;
   is_verified?: boolean;
@@ -40,9 +42,11 @@ type DirectoryLiveSearchBoxProps = {
   initialQuery?: string;
   placeholder?: string;
   selectedCity?: string | null;
+  selectedPotency?: string | null;
   availableCities?: string[];
   categories?: Array<{ id?: string; slug: string; name: string }>;
   actionUrl?: string;
+  searchMode?: 'businesses' | 'lodges' | 'benefits' | 'events';
   className?: string;
   buttonLabel?: string;
   iconType?: 'sparkles' | 'search';
@@ -53,9 +57,11 @@ export function DirectoryLiveSearchBox({
   initialQuery = '',
   placeholder = 'Digite o nome da empresa, serviço ou especialidade...',
   selectedCity,
+  selectedPotency,
   availableCities = [],
   categories = [],
   actionUrl = '/guia/empresas',
+  searchMode = 'businesses',
   className = '',
   buttonLabel = 'Buscar',
   iconType = 'search',
@@ -74,13 +80,17 @@ export function DirectoryLiveSearchBox({
     setQuery(initialQuery);
   }, [initialQuery]);
 
+  const isLodgesMode = searchMode === 'lodges';
+  const isBenefitsMode = searchMode === 'benefits';
+  const isEventsMode = searchMode === 'events';
+
   // Identifica correspondência direta com categoria ou cidade conhecida
   const categoryPool = (categories && categories.length > 0)
     ? categories.map((c) => ({ label: c.name, slug: c.slug }))
     : DEFAULT_SEARCH_CATEGORIES;
 
   const normalizedQ = normalizeSearchTerm(query).toLowerCase();
-  const matchedCategory = normalizedQ.length >= 2
+  const matchedCategory = (!isLodgesMode && !isEventsMode && normalizedQ.length >= 2)
     ? categoryPool.find((cat) => {
         const normLabel = normalizeSearchTerm(cat.label).toLowerCase();
         const normSlug = cat.slug.toLowerCase();
@@ -113,6 +123,88 @@ export function DirectoryLiveSearchBox({
     const timer = setTimeout(async () => {
       try {
         let items: SearchResultItem[] = [];
+
+        if (isLodgesMode) {
+          const supabase = createClient();
+          const host = typeof window !== 'undefined' ? window.location.host : 'localhost:3000';
+          const { data, error } = await (supabase as any).rpc('public_lodges_search', {
+            p_host: host,
+            p_query: query.trim(),
+            p_state: null,
+            p_city: selectedCity || null,
+            p_potency: selectedPotency || null,
+            p_rite: null,
+            p_meeting_day: null,
+            p_sort: 'name',
+            p_page: 1,
+            p_page_size: 6,
+          });
+          if (!error && Array.isArray(data?.items)) {
+            items = data.items.map((lodge: any) => ({
+              id: lodge.id,
+              slug: lodge.slug,
+              name: lodge.code_number ? `${lodge.name} Nº ${lodge.code_number}` : lodge.name,
+              logo_url: lodge.logo_url,
+              category_name: lodge.potency || lodge.potency_name || 'Loja Maçônica',
+              potency: lodge.potency,
+              code_number: lodge.code_number,
+              city: lodge.city,
+              state: lodge.state,
+            }));
+          }
+          setResults(items);
+          return;
+        }
+
+        if (isEventsMode) {
+          const supabase = createClient();
+          const { data, error } = await (supabase as any)
+            .from('events_and_posts')
+            .select('id, slug, title, organizer_name, organizer_type, location')
+            .eq('is_published', true)
+            .ilike('title', `%${query.trim()}%`)
+            .order('event_date', { ascending: true })
+            .limit(6);
+
+          if (!error && Array.isArray(data)) {
+            items = data.map((ev: any) => ({
+              id: ev.id,
+              slug: ev.slug || '',
+              name: ev.title,
+              category_name: ev.organizer_name || (ev.organizer_type === 'lodge' ? 'Loja Maçônica' : 'Evento da Rede'),
+              city: ev.location || null,
+            }));
+          }
+          setResults(items);
+          return;
+        }
+
+        if (isBenefitsMode) {
+          const supabase = createClient();
+          const host = typeof window !== 'undefined' ? window.location.host : 'localhost:3000';
+          const { data, error } = await (supabase as any).rpc('public_businesses_search', {
+            p_host: host,
+            p_query: resolved,
+            p_city: selectedCity || null,
+            p_has_benefits: true,
+            p_page: 1,
+            p_page_size: 6,
+          });
+          if (!error && Array.isArray(data?.items)) {
+            items = data.items.map((biz: any) => ({
+              id: biz.id || biz.business_id,
+              slug: biz.slug || biz.business_slug,
+              name: biz.name || biz.business_name,
+              logo_url: biz.logo_url,
+              category_name: biz.category_name || biz.primary_category_name || 'Benefício Ativo',
+              city: biz.city,
+              state: biz.state,
+              is_verified: biz.is_verified,
+            }));
+          }
+          setResults(items);
+          return;
+        }
 
         // 1. Consulta o endpoint inteligente que busca por nome, categoria, descrição E maçom/cunhada/sobrinho
         try {
@@ -189,7 +281,7 @@ export function DirectoryLiveSearchBox({
     }, 220);
 
     return () => clearTimeout(timer);
-  }, [query, selectedCity, matchedCityName]);
+  }, [query, selectedCity, selectedPotency, matchedCityName, isLodgesMode, isBenefitsMode, isEventsMode]);
 
   // Fecha o dropdown ao clicar ou tocar fora
   useEffect(() => {
@@ -206,8 +298,20 @@ export function DirectoryLiveSearchBox({
     };
   }, []);
 
-  const handleSelectBusiness = (slug: string) => {
+  const handleSelectBusiness = (slug: string, itemName?: string) => {
     setIsOpen(false);
+    if (isLodgesMode) {
+      router.push(`/guia/lojas/${slug}`);
+      return;
+    }
+    if (isEventsMode) {
+      if (slug) {
+        router.push(`/eventos/${slug}`);
+      } else {
+        router.push(`/guia/eventos?q=${encodeURIComponent(itemName || query.trim())}`);
+      }
+      return;
+    }
     router.push(`/guia/${slug}?src=text_search`);
   };
 
@@ -225,6 +329,9 @@ export function DirectoryLiveSearchBox({
     setIsOpen(false);
     const params = new URLSearchParams();
     params.set('city', city);
+    if (isLodgesMode && selectedPotency) {
+      params.set('potency', selectedPotency);
+    }
     router.push(`${actionUrl}?${params.toString()}`);
   };
 
@@ -233,13 +340,20 @@ export function DirectoryLiveSearchBox({
     setIsOpen(false);
     const trimmed = query.trim();
     if (!trimmed) {
-      router.push(actionUrl);
+      const params = new URLSearchParams();
+      if (selectedCity) params.set('city', selectedCity);
+      if (isLodgesMode && selectedPotency) params.set('potency', selectedPotency);
+      const qs = params.toString();
+      router.push(`${actionUrl}${qs ? `?${qs}` : ''}`);
       return;
     }
     const params = new URLSearchParams();
     params.set('q', trimmed);
     if (selectedCity) {
       params.set('city', selectedCity);
+    }
+    if (isLodgesMode && selectedPotency) {
+      params.set('potency', selectedPotency);
     }
     router.push(`${actionUrl}?${params.toString()}`);
   };
@@ -328,7 +442,15 @@ export function DirectoryLiveSearchBox({
           {isLoading && results.length === 0 ? (
             <div className="p-4 text-center text-xs text-gray-500 flex items-center justify-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin text-amber-900" />
-              <span>Buscando empresas...</span>
+              <span>
+                {isLodgesMode
+                  ? 'Buscando lojas...'
+                  : isEventsMode
+                  ? 'Buscando eventos...'
+                  : isBenefitsMode
+                  ? 'Buscando benefícios...'
+                  : 'Buscando empresas...'}
+              </span>
             </div>
           ) : results.length > 0 || matchedCategory || matchedCityName ? (
             <div className="overflow-y-auto divide-y divide-gray-100">
@@ -348,7 +470,9 @@ export function DirectoryLiveSearchBox({
                       <span className="text-xs font-bold text-amber-950">
                         Categoria: {matchedCategory.label}
                       </span>
-                      <p className="text-[10px] text-amber-800">Ver todas as empresas nesta categoria</p>
+                      <p className="text-[10px] text-amber-800">
+                        {isBenefitsMode ? 'Ver benefícios nesta categoria' : 'Ver todas as empresas nesta categoria'}
+                      </p>
                     </div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-amber-700 group-hover:translate-x-0.5 transition-transform shrink-0" />
@@ -371,27 +495,43 @@ export function DirectoryLiveSearchBox({
                       <span className="text-xs font-bold text-amber-950">
                         Cidade: {matchedCityName}
                       </span>
-                      <p className="text-[10px] text-amber-800">Filtrar empresas nesta localidade</p>
+                      <p className="text-[10px] text-amber-800">
+                        {isLodgesMode
+                          ? 'Filtrar lojas nesta localidade'
+                          : isEventsMode
+                          ? 'Filtrar eventos nesta localidade'
+                          : isBenefitsMode
+                          ? 'Filtrar benefícios nesta localidade'
+                          : 'Filtrar empresas nesta localidade'}
+                      </p>
                     </div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-amber-700 group-hover:translate-x-0.5 transition-transform shrink-0" />
                 </button>
               )}
 
-              {/* Cabeçalho de Resultados de Empresas */}
+              {/* Cabeçalho de Resultados */}
               {results.length > 0 && (
                 <div className="px-4 py-2 bg-amber-50/50 text-[11px] font-bold text-amber-900 uppercase tracking-wider flex items-center justify-between">
-                  <span>Empresas Encontradas ({results.length})</span>
+                  <span>
+                    {isLodgesMode
+                      ? `Lojas Encontradas (${results.length})`
+                      : isEventsMode
+                      ? `Eventos Encontrados (${results.length})`
+                      : isBenefitsMode
+                      ? `Benefícios Encontrados (${results.length})`
+                      : `Empresas Encontradas (${results.length})`}
+                  </span>
                   <span className="text-[10px] text-gray-400 font-normal">Resultado instantâneo</span>
                 </div>
               )}
 
-              {/* Lista de Empresas */}
+              {/* Lista de Resultados */}
               {results.map((biz) => (
                 <button
                   key={biz.id}
                   type="button"
-                  onClick={() => handleSelectBusiness(biz.slug)}
+                  onClick={() => handleSelectBusiness(biz.slug, biz.name)}
                   className="w-full p-3 flex items-center justify-between hover:bg-amber-50/80 transition-colors text-left group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -461,13 +601,29 @@ export function DirectoryLiveSearchBox({
                 className="w-full p-3 text-center text-xs font-bold text-amber-900 bg-amber-50/70 hover:bg-amber-100 transition-colors flex items-center justify-center gap-1.5"
               >
                 <Search className="w-3.5 h-3.5" />
-                <span>Ver todos os resultados no Guia Comercial →</span>
+                <span>
+                  {isLodgesMode
+                    ? 'Ver todas as lojas encontradas →'
+                    : isEventsMode
+                    ? 'Ver todos os eventos encontrados →'
+                    : isBenefitsMode
+                    ? 'Ver todos os benefícios encontrados →'
+                    : 'Ver todos os resultados no Guia Comercial →'}
+                </span>
               </button>
             </div>
           ) : query.trim().length >= 2 ? (
             <div className="p-6 text-center text-xs text-gray-500">
               <Building2 className="w-8 h-8 text-amber-900/30 mx-auto mb-2" />
-              <p className="font-semibold text-gray-800">Nenhuma empresa encontrada</p>
+              <p className="font-semibold text-gray-800">
+                {isLodgesMode
+                  ? 'Nenhuma loja encontrada'
+                  : isEventsMode
+                  ? 'Nenhum evento encontrado'
+                  : isBenefitsMode
+                  ? 'Nenhum benefício encontrado'
+                  : 'Nenhuma empresa encontrada'}
+              </p>
               <p className="text-[11px] text-gray-500 mt-0.5">
                 Não encontramos resultados diretos para &quot;{query}&quot;. Pressione &quot;Buscar&quot; para pesquisar em todo o catálogo.
               </p>

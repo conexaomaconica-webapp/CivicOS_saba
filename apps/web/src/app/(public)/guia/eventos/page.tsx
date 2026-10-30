@@ -96,7 +96,7 @@ export default async function PublicEventsDirectoryPage({ searchParams }: Props)
         <DirectoryHeader selectedCity={selectedCity} />
 
         {/* Sub-Hero Header com Paleta Bordô & Dourada do Sistema */}
-        <section className="bg-gradient-to-b from-[#3b0b14] via-[#3b0b14] to-[#2b060d] text-white py-10 px-4 relative overflow-hidden border-b border-[#c59b27]/30 shadow-lg">
+        <section className="bg-gradient-to-b from-[#4b161b] via-[#4b161b] to-[#3b0b14] text-white py-10 px-4 relative overflow-hidden border-b border-[#c59b27]/30 shadow-lg">
           <div className="dh-container relative z-10">
             {/* Breadcrumb */}
             <nav className="flex items-center gap-2 text-xs text-amber-200/80 mb-3" aria-label="Breadcrumb">
@@ -119,30 +119,32 @@ export default async function PublicEventsDirectoryPage({ searchParams }: Props)
               Calendário completo com encontros de negócios de empresas parceiras e comunicados/sessões institucionais de Lojas Maçônicas.
             </p>
 
-            {/* Barra de Filtro e Busca */}
-            <form action="/guia/eventos" method="GET" className="dh-search-box mt-8 max-w-3xl">
-              <Search className="w-5 h-5 text-[#c59b27] ml-3 shrink-0" />
-              <input
-                type="text"
-                name="q"
-                defaultValue={q}
-                placeholder="Buscar evento, palestra ou comunicado..."
-                className="dh-search-box__input text-gray-900"
-              />
-              <select
-                name="type"
-                defaultValue={typeFilter}
-                className="bg-[#faf7f2] text-[#1f1914] text-xs font-semibold rounded-lg px-3 py-2 border border-[#e8e2d9] outline-none cursor-pointer hidden md:block"
-              >
-                <option value="all">Todos os Eventos</option>
-                <option value="empresas">Empresas Parceiras</option>
-                <option value="lojas">Lojas Maçônicas</option>
-              </select>
-              <button type="submit" className="dh-search-box__btn">
-                <Filter className="w-4 h-4" />
-                <span>Filtrar</span>
-              </button>
-            </form>
+            {/* Barra de Filtro e Busca (Desktop; no mobile fica no header) */}
+            <div className="hidden md:block">
+              <form action="/guia/eventos" method="GET" className="dh-search-box mt-8 max-w-3xl">
+                <Search className="w-5 h-5 text-[#c59b27] ml-3 shrink-0" />
+                <input
+                  type="text"
+                  name="q"
+                  defaultValue={q}
+                  placeholder="Buscar evento, palestra ou comunicado..."
+                  className="dh-search-box__input text-gray-900"
+                />
+                <select
+                  name="type"
+                  defaultValue={typeFilter}
+                  className="bg-[#faf7f2] text-[#1f1914] text-xs font-semibold rounded-lg px-3 py-2 border border-[#e8e2d9] outline-none cursor-pointer hidden md:block"
+                >
+                  <option value="all">Todos os Eventos</option>
+                  <option value="empresas">Empresas Parceiras</option>
+                  <option value="lojas">Lojas Maçônicas</option>
+                </select>
+                <button type="submit" className="dh-search-box__btn">
+                  <Filter className="w-4 h-4" />
+                  <span>Filtrar</span>
+                </button>
+              </form>
+            </div>
           </div>
         </section>
 

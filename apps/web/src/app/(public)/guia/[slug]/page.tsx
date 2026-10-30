@@ -252,7 +252,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
 
           // Contagem de visualizações da página da empresa por atualização (event_name = 'view')
           try {
-            const { count: vCount } = await (supabase as any)
+            const { count: vCount } = await (dbReader as any)
               .from('analytics_events')
               .select('id', { count: 'exact', head: true })
               .eq('business_id', bizId)
@@ -507,7 +507,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
 
     // Contagem de visualizações da página da empresa por atualização (event_name = 'view')
     try {
-      const { count: vCount } = await (supabase as any)
+      const { count: vCount } = await (dbReader as any)
         .from('analytics_events')
         .select('id', { count: 'exact', head: true })
         .eq('business_id', bizId)

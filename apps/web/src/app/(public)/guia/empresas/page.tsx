@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { appUrl } from '@/lib/seo/app-url';
 import Link from 'next/link';
 import { cookies, headers } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
 import { ChevronRight, Search, Sparkles } from 'lucide-react';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
@@ -305,7 +306,13 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
     try {
       const bizIds = businessItems.map((b) => b.id).filter(Boolean);
       if (bizIds.length > 0) {
-        const { data: viewEvents } = await (supabase as any)
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        const dbReader = supabaseUrl && serviceRoleKey
+          ? createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } })
+          : supabase;
+
+        const { data: viewEvents } = await (dbReader as any)
           .from('analytics_events')
           .select('business_id')
           .in('business_id', bizIds)
@@ -382,7 +389,7 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
         />
 
         {/* Breadcrumb & Sub-Hero */}
-        <section className="bg-gradient-to-b from-[#3b0b14] to-[#2b060d] text-white py-10 px-4 relative overflow-hidden">
+        <section className="bg-gradient-to-b from-[#4b161b] to-[#3b0b14] text-white py-10 px-4 relative overflow-hidden">
           <div className="dh-container relative z-10">
             {/* Breadcrumb */}
             <nav className="flex items-center gap-2 text-xs text-amber-200/80 mb-3" aria-label="Breadcrumb">
@@ -403,22 +410,24 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
             </p>
 
             {/* Barra de Busca Principal (Apenas Desktop/Tablet — No mobile fica exclusivamente no header) */}
-            <form action="/guia/empresas" method="GET" className="dh-search-box mt-8 max-w-3xl hidden md:flex">
-              <Sparkles className="w-5 h-5 text-amber-500 ml-3 shrink-0" />
-              <input
-                type="text"
-                name="q"
-                defaultValue={q}
-                placeholder="Busque por empresa, serviço, profissional ou especialidade..."
-                className="dh-search-box__input text-gray-900"
-              />
-              {city && <input type="hidden" name="city" value={city} />}
-              {cat && <input type="hidden" name="cat" value={cat} />}
-              <button type="submit" className="dh-search-box__btn">
-                <Search className="w-4 h-4" />
-                <span>Buscar</span>
-              </button>
-            </form>
+            <div className="hidden md:block">
+              <form action="/guia/empresas" method="GET" className="dh-search-box mt-8 max-w-3xl">
+                <Sparkles className="w-5 h-5 text-amber-500 ml-3 shrink-0" />
+                <input
+                  type="text"
+                  name="q"
+                  defaultValue={q}
+                  placeholder="Busque por empresa, serviço, profissional ou especialidade..."
+                  className="dh-search-box__input text-gray-900"
+                />
+                {city && <input type="hidden" name="city" value={city} />}
+                {cat && <input type="hidden" name="cat" value={cat} />}
+                <button type="submit" className="dh-search-box__btn">
+                  <Search className="w-4 h-4" />
+                  <span>Buscar</span>
+                </button>
+              </form>
+            </div>
           </div>
         </section>
 

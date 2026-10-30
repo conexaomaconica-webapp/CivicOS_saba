@@ -20,26 +20,18 @@ const SECTION = 'mx-auto w-full max-w-6xl px-4 sm:px-6';
 const EYEBROW = 'text-xs font-bold uppercase tracking-[0.2em] text-[#8a6d12]';
 const H2 = 'mt-2 text-3xl font-extrabold tracking-tight text-[#2a0a10] sm:text-4xl';
 const CTA_PRIMARY =
-  'inline-flex items-center justify-center rounded-xl bg-[#5d1523] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#5d1523]/20 transition hover:bg-[#4B161B]';
+  'inline-flex items-center justify-center rounded-xl bg-[#4B161B] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#4B161B]/20 transition hover:bg-[#3B0B14]';
 const CTA_GHOST =
-  'inline-flex items-center justify-center rounded-xl border border-[#5d1523]/25 bg-white px-6 py-3 text-sm font-bold text-[#5d1523] transition hover:border-[#5d1523]/50';
+  'inline-flex items-center justify-center rounded-xl border border-[#4B161B]/25 bg-white px-6 py-3 text-sm font-bold text-[#4B161B] transition hover:border-[#4B161B]/50';
 
-/** "#5d1523" -> "rgba(93,21,35,0.88)"; cor inválida cai no vinho padrão. */
-function withAlpha(hex: string | null | undefined, alpha: number): string {
-  const m = /^#([0-9a-f]{6})$/i.exec(hex ?? '');
-  const [rr, gg, bb] = m ? [0, 2, 4].map((i) => parseInt(m[1]!.slice(i, i + 2), 16)) : [93, 21, 35];
-  return `rgba(${rr},${gg},${bb},${alpha})`;
-}
-
-export function LandingHeader({ primaryColor }: { primaryColor?: string | null }) {
+export function LandingHeader({ primaryColor: _primaryColor }: { primaryColor?: string | null }) {
   return (
     <>
       {/* Espaçador responsivo para compensar o header fixo da landing */}
       <div aria-hidden className="h-[64px] sm:h-[72px]" />
 
       <header
-        className="fixed inset-x-0 top-0 z-50 border-b border-[#C9A227]/40 shadow-lg backdrop-blur-md"
-        style={{ backgroundColor: withAlpha(primaryColor, 0.88) }}
+        className="fixed inset-x-0 top-0 z-50 border-b border-[#C9A227]/40 bg-[#4B161B] shadow-lg"
       >
         <div className={`${SECTION} flex items-center justify-between gap-4 py-2`}>
           <Link href="/" aria-label="Conexão Maçônica — página inicial">
@@ -123,7 +115,7 @@ export function LandingHero() {
 
 export function LandingLaunchSection() {
   return (
-    <section id="lancamento" className="scroll-mt-24 bg-[#2a0a10] py-14 text-white sm:py-20">
+    <section id="lancamento" className="scroll-mt-24 bg-[#4B161B] py-14 text-white sm:py-20">
       <div className={`${SECTION} grid items-center gap-8 lg:grid-cols-[1.2fr_0.8fr]`}>
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C9A227]">Lançamento oficial</p>
@@ -330,7 +322,7 @@ export function LandingPlansSection({ plans }: { plans: CommercialPlan[] }) {
 
 export function LandingPedraSection() {
   return (
-    <section id="pedra-fundamental" className="scroll-mt-24 bg-gradient-to-br from-[#2a0a10] to-[#5d1523] py-16 text-white sm:py-24">
+    <section id="pedra-fundamental" className="scroll-mt-24 bg-gradient-to-br from-[#4B161B] to-[#3B0B14] py-16 text-white sm:py-24">
       <div className={`${SECTION} grid items-center gap-10 lg:grid-cols-[0.8fr_1.2fr]`}>
         <div className="mx-auto w-full max-w-xs rounded-3xl bg-white/5 p-8 ring-1 ring-[#C9A227]/40">
           <Image

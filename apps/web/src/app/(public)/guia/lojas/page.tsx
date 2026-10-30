@@ -262,10 +262,11 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
           logoUrl={tenantBrand?.logoUrl}
           selectedCity={city}
           availableCities={availableCities}
+          potencies={potencies}
         />
 
         {/* Breadcrumb & Sub-Hero */}
-        <section className="bg-gradient-to-b from-[#3b0b14] to-[#2b060d] text-white py-10 px-4 relative overflow-hidden">
+        <section className="bg-gradient-to-b from-[#4b161b] to-[#3b0b14] text-white py-10 px-4 relative overflow-hidden">
           <div className="dh-container relative z-10">
             {/* Breadcrumb */}
             <nav className="flex items-center gap-2 text-xs text-amber-200/80 mb-3" aria-label="Breadcrumb">
@@ -288,23 +289,25 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
               Pesquise por cidade, estado, potência, rito e dia de reunião para planejar sua visita
             </p>
 
-            {/* Barra de Busca Principal */}
-            <form action="/guia/lojas" method="GET" className="dh-search-box mt-8 max-w-3xl">
-              <Sparkles className="w-5 h-5 text-amber-500 ml-3 shrink-0" />
-              <input
-                type="text"
-                name="q"
-                defaultValue={q}
-                placeholder="Busca inteligente: ex. feira de santana sexta · GOB quarta · loja 1842"
-                className="dh-search-box__input text-gray-900"
-              />
-              {city && <input type="hidden" name="city" value={city} />}
-              {potency && <input type="hidden" name="potency" value={potency} />}
-              <button type="submit" className="dh-search-box__btn">
-                <Search className="w-4 h-4" />
-                <span>Buscar</span>
-              </button>
-            </form>
+            {/* Barra de Busca Principal (Desktop; no mobile a busca já fica no cabeçalho) */}
+            <div className="hidden md:block">
+              <form action="/guia/lojas" method="GET" className="dh-search-box mt-8 max-w-3xl">
+                <Sparkles className="w-5 h-5 text-amber-500 ml-3 shrink-0" />
+                <input
+                  type="text"
+                  name="q"
+                  defaultValue={q}
+                  placeholder="Busca inteligente: ex. feira de santana sexta · GOB quarta · loja 1842"
+                  className="dh-search-box__input text-gray-900"
+                />
+                {city && <input type="hidden" name="city" value={city} />}
+                {potency && <input type="hidden" name="potency" value={potency} />}
+                <button type="submit" className="dh-search-box__btn">
+                  <Search className="w-4 h-4" />
+                  <span>Buscar</span>
+                </button>
+              </form>
+            </div>
 
             {interpreted && q.trim() && describeInterpretation(interpreted).length > 0 && (
               <div className="mt-3 max-w-3xl flex flex-wrap items-center gap-1.5 text-[11px]" aria-live="polite">

@@ -66,7 +66,7 @@ export function LandingMobileBottomNav() {
     >
       <nav
         aria-label="Atalhos da página"
-        className="relative flex h-16 w-full items-center justify-around border-t border-[#C59B27]/30 bg-[#4A0E1A]/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-md shadow-[0_-4px_24px_rgba(0,0,0,0.4)]"
+        className="relative flex h-16 w-full items-center justify-around border-t border-[#c9a227]/40 bg-[#4b161b] px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_24px_rgba(0,0,0,0.4)]"
       >
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;

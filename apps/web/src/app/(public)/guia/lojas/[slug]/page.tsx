@@ -188,7 +188,7 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
       />
 
       {/* Top Hero Banner */}
-      <section className="bg-gradient-to-b from-[#3b0b14] via-[#4d101c] to-[#2b060d] text-white py-12 px-4 relative overflow-hidden">
+      <section className="bg-gradient-to-b from-[#4b161b] via-[#4b161b] to-[#3b0b14] text-white py-12 px-4 relative overflow-hidden">
         <div className="dh-container relative z-10">
           <nav className="flex items-center gap-2 text-xs text-amber-200/80 mb-4">
             <Link href="/guia" className="hover:text-amber-300 transition-colors">

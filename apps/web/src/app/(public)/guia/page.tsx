@@ -2,6 +2,7 @@ import { needsDividerBetween, normalizeHomeSections } from '@/lib/directory/home
 import React from 'react';
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { StructuredData } from '@/components/seo/StructuredData';
@@ -492,7 +493,13 @@ export default async function GuiaPage({ searchParams }: Props) {
 
   if (allCardBizIds.length > 0) {
     try {
-      const { data: viewEvents } = await (supabase as any)
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const dbReader = supabaseUrl && serviceRoleKey
+        ? createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } })
+        : supabase;
+
+      const { data: viewEvents } = await (dbReader as any)
         .from('analytics_events')
         .select('business_id')
         .in('business_id', allCardBizIds)

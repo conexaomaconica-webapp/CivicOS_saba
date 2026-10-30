@@ -4,7 +4,7 @@ import { CookiePreferencesButton } from '@/components/analytics/CookiePreference
 
 export function PublicFooter() {
   return (
-    <footer className="bg-[#140305] border-t border-[#4B161B] text-slate-300 pt-10 pb-24 md:pb-10 relative z-20">
+    <footer className="bg-[#4B161B] border-t border-[#C9A227]/40 text-stone-200 pt-10 pb-24 md:pb-10 relative z-20">
       <div className="container mx-auto px-4 max-w-6xl flex flex-col md:flex-row items-center justify-between gap-8">
         
         {/* Direitos e Segurança */}

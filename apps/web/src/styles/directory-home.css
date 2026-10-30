@@ -3,8 +3,8 @@
    ============================================================================ */
 
 :root {
-  --dh-wine-dark: #2b060d;
-  --dh-wine-main: #3b0b14;
+  --dh-wine-dark: #4b161b;
+  --dh-wine-main: #4b161b;
   --dh-wine-light: #5d1523;
   --dh-gold-main: #c59b27;
   --dh-gold-hover: #b0881e;
@@ -24,13 +24,11 @@
   padding-inline: 20px;
 }
 
-/* Glassmorphism Header Navbar */
+/* Header Navbar (#4b161b uniforme entre Web, Mobile Web e App) */
 .dh-header {
-  background: rgba(74, 14, 26, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: #4b161b;
   color: #ffffff;
-  border-bottom: 1px solid rgba(197, 155, 39, 0.25);
+  border-bottom: 1px solid rgba(201, 162, 39, 0.4);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
   position: sticky;
   top: 0;
@@ -486,11 +484,11 @@
 
 /* Footer Section */
 .dh-footer {
-  background: var(--dh-wine-dark);
+  background: #4b161b;
   color: #ffffff;
   margin-top: 112px;
   padding: 48px 20px 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(201, 162, 39, 0.35);
 }
 .dh-footer__trust-bar {
   display: flex;
@@ -523,6 +521,7 @@
 
 @media (max-width: 768px) {
   .dh-container { padding-inline: 14px; }
+  .dh-search-box.hidden { display: none !important; }
   .dh-header { padding: 0 !important; }
   .dh-header__inner { display: none !important; }
   .dh-header__brand { min-width: 0; }

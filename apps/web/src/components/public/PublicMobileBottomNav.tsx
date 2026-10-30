@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   Home,
@@ -157,14 +158,28 @@ export function PublicMobileBottomNav() {
           />
 
           {/* Bottom Sheet com cantos arredondados */}
-          <div className="fixed inset-x-0 bottom-0 z-[75] max-h-[85vh] overflow-y-auto rounded-t-3xl border-t border-[#C59B27]/40 bg-[#4A0E1A] p-5 pb-[calc(2.5rem+env(safe-area-inset-bottom))] text-white shadow-2xl animate-in slide-in-from-bottom duration-300">
+          <div className="fixed inset-x-0 bottom-0 z-[75] max-h-[85vh] overflow-y-auto rounded-t-3xl border-t border-[#c9a227]/40 bg-[#4b161b] p-5 pb-[calc(2.5rem+env(safe-area-inset-bottom))] text-white shadow-2xl animate-in slide-in-from-bottom duration-300">
             {/* Indicador de arrasto no topo */}
             <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-white/20" aria-hidden="true" />
 
             {/* Cabeçalho do Menu */}
             <div className="mb-5 flex items-center justify-between border-b border-white/10 pb-4">
-              <div className="flex items-center gap-2">
-                <span className="font-serif text-lg font-bold text-[#F3CE61]">◈ Conexão Maçônica</span>
+              <div className="flex items-center gap-2.5">
+                <Link
+                  href="/guia"
+                  onClick={() => setMenuOpen(false)}
+                  className="inline-flex items-center"
+                  aria-label="Conexão Maçônica — início"
+                >
+                  <Image
+                    src="/logoconexao_red_vert.png"
+                    alt="Conexão Maçônica"
+                    width={160}
+                    height={56}
+                    className="h-9 w-auto object-contain brightness-110"
+                    unoptimized
+                  />
+                </Link>
                 <span className="rounded-full bg-[#C9A227]/15 px-2 py-0.5 text-[10px] font-semibold text-[#F3CE61] border border-[#C9A227]/30">
                   Portal
                 </span>
@@ -363,7 +378,7 @@ export function PublicMobileBottomNav() {
       >
         <nav
           aria-label="Navegação rápida"
-          className="relative flex h-16 w-full items-center justify-around border-t border-[#C59B27]/30 bg-[#4A0E1A]/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-md shadow-[0_-4px_24px_rgba(0,0,0,0.4)]"
+          className="relative flex h-16 w-full items-center justify-around border-t border-[#c9a227]/40 bg-[#4b161b] px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_24px_rgba(0,0,0,0.4)]"
         >
           {/* 1. INÍCIO */}
           <Link
