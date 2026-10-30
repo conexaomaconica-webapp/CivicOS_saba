@@ -132,7 +132,7 @@ button, input { font: inherit; }
 .category-item-btn.active .category-item-label { color: #dfbd58; font-weight: 850; }
 .main-content { max-width: 760px; margin: 0 auto; overflow: hidden; }
 .city-selector { display: none; }
-.hero { padding: 38px 20px 32px; background: radial-gradient(circle at 50% 20%, #5d1523 0%, #2b060d 78%); color: #f3eedd; }
+.hero { padding: 38px 20px 32px; background: radial-gradient(circle at 50% 20%, #4b161b 0%, #3b0b14 78%); color: #f3eedd; }
 .hero h1 { max-width: 620px; margin: 7px 0 13px; font: 700 clamp(1.9rem, 8vw, 3.2rem)/1.07 Georgia, serif; letter-spacing: -.025em; }
 .hero > p:not(.eyebrow) { max-width: 600px; margin-bottom: 22px; color: #eaded1; font-size: .96rem; line-height: 1.58; }
 .eyebrow { margin: 0 0 6px; color: #916724; font-size: .7rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
@@ -643,7 +643,7 @@ button, input { font: inherit; }
 .detail-logo-white-box {
   width: 76px;
   height: 76px;
-  background: #ffffff !important;
+  background: #ffffff;
   border-radius: 18px;
   border: 2.5px solid #ffffff;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
@@ -736,7 +736,7 @@ button, input { font: inherit; }
   flex-direction: column;
   align-items: center;
   text-align: center;
-  background: #ffffff !important;
+  background: #ffffff;
   color: #3b0b14 !important;
   border-bottom: 2px solid #e7dacd !important;
   border-radius: 26px 26px 0 0 !important;
@@ -4950,3 +4950,153 @@ button, input { font: inherit; }
 }
 
 
+
+/* ==========================================================================
+   PADRONIZAÇÃO BORDÔ #4B161B, CONTATOS 2 COLUNAS, BENEFÍCIOS, MENU E EVENTOS
+   ========================================================================== */
+.topbar,
+.dh-footer,
+.bottom-nav {
+  background: #4b161b !important;
+}
+
+.contacts-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+.card-views-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #6b5e57;
+  background: #faf6f0;
+  border: 1px solid #ebd9c8;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+
+.detail-views-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 750;
+  background: rgba(201, 162, 39, 0.14);
+  border: 1px solid rgba(201, 162, 39, 0.4);
+  color: #8c671d;
+  position: relative;
+  z-index: 2;
+}
+
+.detail-header-card.header-card-acacia .detail-views-badge {
+  background: rgba(201, 162, 39, 0.2);
+  border-color: rgba(201, 162, 39, 0.55);
+  color: #f3cf68;
+}
+
+.mais-brand-card {
+  background: #4b161b;
+  border: 1.5px solid rgba(201, 162, 39, 0.5);
+  border-radius: 20px;
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  box-shadow: 0 8px 24px rgba(75, 22, 27, 0.22);
+}
+
+.mais-brand-logo {
+  height: 52px;
+  width: auto;
+  max-width: 200px;
+  object-fit: contain;
+}
+
+.mais-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.mais-menu-item-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 12px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1.5px solid #ebd9c8;
+  color: #4b161b;
+  font-size: 0.82rem;
+  font-weight: 750;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: 0 3px 10px rgba(75, 22, 27, 0.05);
+  transition: transform 140ms ease, border-color 140ms ease;
+}
+
+.mais-menu-item-btn:active {
+  transform: scale(0.98);
+  border-color: #c9a227;
+}
+
+.mais-menu-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: #fbf4ea;
+  border: 1px solid #ebd9c8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.event-card-mobile {
+  background: #ffffff;
+  border: 1.5px solid #ebd9c8;
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(75, 22, 27, 0.06);
+}
+
+.event-origin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.event-origin-badge.lodge {
+  background: #fbf5e6;
+  border: 1px solid #c9a227;
+  color: #78350f;
+}
+
+.event-origin-badge.business {
+  background: #f5ebe6;
+  border: 1px solid #d6b8ac;
+  color: #4b161b;
+}

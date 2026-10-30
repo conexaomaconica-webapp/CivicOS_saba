@@ -353,11 +353,11 @@ function PedraFundamentalSealBadge({
 }
 
 function LogoZoomModal({
-  logoUrl,
+  logoUrl, backgroundColor,
   businessName,
   onClose,
 }: {
-  logoUrl: string | null;
+  logoUrl: string | null; backgroundColor?: string | null;
   businessName: string;
   onClose: () => void;
 }) {
@@ -373,7 +373,7 @@ function LogoZoomModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="logo-zoom-card">
+      <div className="logo-zoom-card" style={backgroundColor ? { backgroundColor } : undefined}>
         <button
           type="button"
           className="modal-close-btn"
@@ -384,10 +384,10 @@ function LogoZoomModal({
           ✕
         </button>
         <img src={logoUrl} alt={businessName} className="logo-zoom-img" />
-        <h4 style={{ margin: '14px 0 2px', font: '750 1.05rem/1.2 Georgia, serif', color: '#4b161b', textAlign: 'center' }}>
+        <h4 style={{ margin: '14px 0 2px', font: '750 1.05rem/1.2 Georgia, serif', color: backgroundColor && backgroundColor.toLowerCase() !== '#ffffff' && backgroundColor.toLowerCase() !== '#fff' ? '#f3eedd' : '#4b161b', textAlign: 'center' }}>
           {businessName}
         </h4>
-        <span style={{ fontSize: '.72rem', color: '#8c671d', fontWeight: 700 }}>Logomarca Oficial</span>
+        <span style={{ fontSize: '.72rem', color: backgroundColor && backgroundColor.toLowerCase() !== '#ffffff' && backgroundColor.toLowerCase() !== '#fff' ? '#c9a227' : '#8c671d', fontWeight: 700 }}>Logomarca Oficial</span>
       </div>
     </div>
   );
@@ -1686,25 +1686,29 @@ function ShareExperienceModal({
 }
 
 function BusinessCard({
-
   business,
   onSelect,
   onZoomLogo,
   isFavorited,
   onToggleFavorite,
   onRefer,
+  showBenefitBadge = false,
 }: {
   business: MobileGuideSponsoredBusiness;
   onSelect?: (slug: string) => void;
-  onZoomLogo?: (logoUrl: string, name: string) => void;
+  onZoomLogo?: (logoUrl: string, name: string, backgroundColor?: string | null) => void;
   isFavorited?: boolean;
   onToggleFavorite?: (slug: string, name?: string) => void;
   onRefer?: (name: string, slug: string) => void;
+  showBenefitBadge?: boolean;
 }) {
   const [imgError, setImgError] = useState(false);
   const [coverError, setCoverError] = useState(false);
   const location = [business.city, business.state].filter(Boolean).join(', ');
   const coverSrc = (!coverError && business.cover_url) ? business.cover_url : '/capafallback.png';
+  const coverOffsetY = typeof business.cover_offset_y === 'number' ? business.cover_offset_y : 50;
+  const coverZoom = typeof business.cover_zoom === 'number' && business.cover_zoom >= 100 ? business.cover_zoom : 100;
+  const coverFitMode = business.cover_fit_mode === 'contain' ? 'contain' : 'cover';
 
   return (
     <article
@@ -1721,14 +1725,43 @@ function BusinessCard({
       }}
     >
       {/* 1. Capa / Banner do Card */}
-      <div className="card-cover-container">
+      <div
+        className="card-cover-container"
+        style={business.cover_background_color ? { background: business.cover_background_color } : undefined}
+      >
         <img
           src={coverSrc}
           alt={business.name}
           className="card-cover-img"
           loading="lazy"
           onError={() => setCoverError(true)}
+          style={{
+            objectFit: coverFitMode,
+            objectPosition: `center ${coverOffsetY}%`,
+            transform: coverZoom > 100 ? `scale(${coverZoom / 100})` : undefined,
+            transformOrigin: `center ${coverOffsetY}%`,
+          }}
         />
+        {showBenefitBadge && (
+          <span
+            style={{
+              position: 'absolute',
+              top: 10,
+              left: 10,
+              zIndex: 5,
+              background: 'linear-gradient(135deg, #c9a227, #9b751e)',
+              color: '#ffffff',
+              fontSize: '0.68rem',
+              fontWeight: 800,
+              padding: '4px 10px',
+              borderRadius: 999,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.28)',
+              letterSpacing: '0.03em',
+            }}
+          >
+            🎁 Benefício Exclusivo
+          </span>
+        )}
         {/* Ações Flutuantes Discretas (Favoritar / Compartilhar como Indicação) */}
         <div className="card-cover-actions">
           <button
@@ -1778,10 +1811,11 @@ function BusinessCard({
         {/* Logo da Empresa */}
         <div
           className="card-logo-box"
+          style={business.logo_background_color ? { background: business.logo_background_color } : undefined}
           onClick={(e) => {
             if (business.logo_url) {
               e.stopPropagation();
-              onZoomLogo?.(business.logo_url, business.name);
+              onZoomLogo?.(business.logo_url, business.name, business.logo_background_color);
             }
           }}
           title="Toque para ampliar a logomarca"
@@ -1837,6 +1871,18 @@ function BusinessCard({
               <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
             </svg>
             <span>{business.category_name}</span>
+          </div>
+        )}
+
+        {typeof business.views_count === 'number' && (
+          <div className="card-info-line" style={{ marginTop: 2 }}>
+            <span className="card-views-pill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#8c671d" strokeWidth="2" width="13" height="13">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              <span>{business.views_count} {business.views_count === 1 ? 'visualização' : 'visualizações'}</span>
+            </span>
           </div>
         )}
       </div>
@@ -1905,6 +1951,9 @@ function AnuncioModal({
     (c) => c.type.toLowerCase().includes('email') || c.type.toLowerCase().includes('e-mail')
   );
   const instagramContact = contacts.find((c) => c.type.toLowerCase().includes('instagram'));
+  const facebookContact = contacts.find((c) => c.type.toLowerCase().includes('facebook'));
+  const linkedinContact = contacts.find((c) => c.type.toLowerCase().includes('linkedin'));
+  const youtubeContact = contacts.find((c) => c.type.toLowerCase().includes('youtube'));
   const websiteContact = contacts.find(
     (c) =>
       c.type.toLowerCase().includes('site') ||
@@ -2176,7 +2225,7 @@ function AnuncioModal({
           </div>
 
           {/* Redes Sociais & Web */}
-          {(instagramContact || websiteContact) && (
+          {(instagramContact || websiteContact || facebookContact || linkedinContact || youtubeContact) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span className="anuncio-actions-title">Redes Sociais & Web</span>
               <div className="contacts-grid">
@@ -2210,6 +2259,51 @@ function AnuncioModal({
                     <span>Site Oficial</span>
                   </a>
                 )}
+                {facebookContact && (
+                  <a
+                    href={
+                      facebookContact.value.startsWith('http')
+                        ? facebookContact.value
+                        : `https://facebook.com/${facebookContact.value.replace(/^@/, '')}`
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    className="contact-item-btn"
+                  >
+                    <span>📘</span>
+                    <span>Facebook</span>
+                  </a>
+                )}
+                {linkedinContact && (
+                  <a
+                    href={
+                      linkedinContact.value.startsWith('http')
+                        ? linkedinContact.value
+                        : `https://linkedin.com/in/${linkedinContact.value.replace(/^@/, '')}`
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    className="contact-item-btn"
+                  >
+                    <span>💼</span>
+                    <span>LinkedIn</span>
+                  </a>
+                )}
+                {youtubeContact && (
+                  <a
+                    href={
+                      youtubeContact.value.startsWith('http')
+                        ? youtubeContact.value
+                        : `https://youtube.com/${youtubeContact.value}`
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    className="contact-item-btn"
+                  >
+                    <span>▶️</span>
+                    <span>YouTube</span>
+                  </a>
+                )}
               </div>
             </div>
           )}
@@ -2230,7 +2324,7 @@ function BusinessDetailModal({
 }: {
   slug: string | null;
   onClose: () => void;
-  onZoomLogo?: (url: string, name: string) => void;
+  onZoomLogo?: (url: string, name: string, backgroundColor?: string | null) => void;
   isFavorited?: boolean;
   onToggleFavorite?: (slug: string, name?: string) => void;
   onRefer?: (name: string, slug: string) => void;
@@ -2309,6 +2403,9 @@ function BusinessDetailModal({
     (c) => c.type.toLowerCase().includes('email') || c.type.toLowerCase().includes('e-mail')
   );
   const instagramContact = contacts.find((c) => c.type.toLowerCase().includes('instagram'));
+  const facebookContact = contacts.find((c) => c.type.toLowerCase().includes('facebook'));
+  const linkedinContact = contacts.find((c) => c.type.toLowerCase().includes('linkedin'));
+  const youtubeContact = contacts.find((c) => c.type.toLowerCase().includes('youtube'));
   const websiteContact = contacts.find(
     (c) =>
       c.type.toLowerCase().includes('site') ||
@@ -2433,9 +2530,22 @@ function BusinessDetailModal({
             {detail && !loading && (
               <>
                 {/* Capa com padrão visual de acordo com o plano (Acácia ganha hero bordô premium) */}
-                <div className={`detail-hero-banner hero-${plan} ${isAcacia ? 'hero-acacia-premium' : ''}`}>
+                <div
+                  className={`detail-hero-banner hero-${plan} ${isAcacia ? 'hero-acacia-premium' : ''}`}
+                  style={detail.cover_background_color ? { background: detail.cover_background_color } : undefined}
+                >
                   {heroCoverUrl ? (
-                    <img src={heroCoverUrl} alt="" loading="lazy" />
+                    <img
+                      src={heroCoverUrl}
+                      alt=""
+                      loading="lazy"
+                      style={{
+                        objectFit: detail.cover_fit_mode === 'contain' ? 'contain' : 'cover',
+                        objectPosition: `center ${typeof detail.cover_offset_y === 'number' ? detail.cover_offset_y : 50}%`,
+                        transform: typeof detail.cover_zoom === 'number' && detail.cover_zoom > 100 ? `scale(${detail.cover_zoom / 100})` : undefined,
+                        transformOrigin: `center ${typeof detail.cover_offset_y === 'number' ? detail.cover_offset_y : 50}%`,
+                      }}
+                    />
                   ) : null}
                   <div className="detail-hero-overlay" />
                 </div>
@@ -2443,12 +2553,15 @@ function BusinessDetailModal({
                 {/* Informações da Marca e Cabeçalho: Bordô nobre para Acácia, Branco para Compasso e Esquadro */}
                 <div className={`detail-header-card ${isAcacia ? 'header-card-acacia' : 'header-card-standard'}`}>
                   {/* Caixa Branca Centralizada da Logomarca */}
-                  <div className="detail-logo-white-box">
+                  <div
+                    className="detail-logo-white-box"
+                    style={detail.logo_background_color ? { backgroundColor: detail.logo_background_color } : undefined}
+                  >
                     {detail.logo_url ? (
                       <button
                         type="button"
                         className="detail-logo-inner-btn"
-                        onClick={() => onZoomLogo?.(detail.logo_url!, detail.business_name)}
+                        onClick={() => onZoomLogo?.(detail.logo_url!, detail.business_name, detail.logo_background_color)}
                         title="Toque para ampliar a logomarca"
                       >
                         <img
@@ -2517,6 +2630,17 @@ function BusinessDetailModal({
                   {locationText && (
                     <p className="header-location-line">{locationText}</p>
                   )}
+
+                  <div className="detail-views-badge" title="Total de visualizações da página">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    <span>
+                      {typeof detail.views_count === 'number' && detail.views_count > 0 ? detail.views_count : 1}{' '}
+                      {(detail.views_count ?? 1) === 1 ? 'visualização' : 'visualizações'}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Ações de Contato Direto */}
@@ -2668,6 +2792,74 @@ function BusinessDetailModal({
                       >
                         <span>🌐</span>
                         <span>Site Oficial</span>
+                      </a>
+                    )}
+                    {facebookContact && (
+                      <a
+                        href={
+                          facebookContact.value.startsWith('http')
+                            ? facebookContact.value
+                            : `https://facebook.com/${facebookContact.value.replace(/^@/, '')}`
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        className="contact-item-btn"
+                      >
+                        <span>📘</span>
+                        <span>Facebook</span>
+                      </a>
+                    )}
+                    {linkedinContact && (
+                      <a
+                        href={
+                          linkedinContact.value.startsWith('http')
+                            ? linkedinContact.value
+                            : `https://linkedin.com/in/${linkedinContact.value.replace(/^@/, '')}`
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        className="contact-item-btn"
+                      >
+                        <span>💼</span>
+                        <span>LinkedIn</span>
+                      </a>
+                    )}
+                    {youtubeContact && (
+                      <a
+                        href={
+                          youtubeContact.value.startsWith('http')
+                            ? youtubeContact.value
+                            : `https://youtube.com/${youtubeContact.value}`
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        className="contact-item-btn"
+                      >
+                        <span>▶️</span>
+                        <span>YouTube</span>
+                      </a>
+                    )}
+                    {(detail.address || detail.city) && (
+                      <a
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+                          `${detail.business_name} ${detail.address || ''} ${detail.city || ''}`
+                        )}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="contact-item-btn"
+                        onClick={() => {
+                          if (detail.business_id) {
+                            trackMobileEvent({
+                              businessId: detail.business_id,
+                              eventType: 'route',
+                              city: detail.city,
+                              state: detail.state,
+                            });
+                          }
+                        }}
+                      >
+                        <span>📍</span>
+                        <span>Como Chegar</span>
                       </a>
                     )}
                   </div>
@@ -3049,25 +3241,491 @@ function BusinessDetailModal({
   );
 }
 
+const DEFAULT_COMMUNITY_EVENTS = [
+  {
+    id: 'ev-1',
+    title: 'Encontro de Negócios & Fraternidade — Rede Conexão Maçônica',
+    summary: 'Rodada de networking, apresentação de empresas Pedra Fundamental e fortalecimento de parcerias comerciais entre irmãos e familiares.',
+    event_date: 'Agenda Permanente',
+    city: 'Feira de Santana',
+    state: 'BA',
+    organizer_name: 'Conexão Maçônica',
+    organizer_type: 'business' as const,
+  },
+  {
+    id: 'ev-2',
+    title: 'Sessão Pública & Palestra Institucional das Oficinas Regulares',
+    summary: 'Calendário integrado de sessões magnas brancas, palestras culturais e ações filantrópicas das Lojas Maçônicas parceiras.',
+    event_date: 'Mensal',
+    city: 'Salvador',
+    state: 'BA',
+    organizer_name: 'Lojas Maçônicas da Rede',
+    organizer_type: 'lodge' as const,
+  },
+  {
+    id: 'ev-3',
+    title: 'Semana de Benefícios Exclusivos da Família Maçônica',
+    summary: 'Condições diferenciadas de atendimento e vantagens em saúde, óptica, gastronomia, segurança e serviços profissionais.',
+    event_date: 'Em andamento',
+    city: 'Todo o Brasil',
+    state: 'BR',
+    organizer_name: 'Empresas Parceiras',
+    organizer_type: 'business' as const,
+  },
+];
+
+function BeneficiosScreen({
+  search,
+  city,
+  selectedCategory,
+  onSelectCategory,
+  onSelectCity,
+  onOpenLocationModal,
+  onSelectBusiness,
+  onZoomLogo,
+  isFavorite,
+  onToggleFavorite,
+  onRefer,
+  favoritesCount,
+  onLoadedData,
+}: {
+  search: string;
+  city: string;
+  selectedCategory: string;
+  onSelectCategory: (catSlug: string) => void;
+  onSelectCity: (city: string) => void;
+  onOpenLocationModal: () => void;
+  onSelectBusiness: (slug: string) => void;
+  onZoomLogo?: (logoUrl: string, name: string, backgroundColor?: string | null) => void;
+  isFavorite?: (slug: string) => boolean;
+  onToggleFavorite?: (slug: string, name?: string) => void;
+  onRefer?: (name: string, slug: string) => void;
+  favoritesCount?: number;
+  onLoadedData?: (data: MobileGuideHomeData) => void;
+}) {
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [guideData, setGuideData] = useState<MobileGuideHomeData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const guideServiceRef = useRef(createMobileGuideService());
+
+  const fetchBenefitBusinesses = (q = search, c = city, cat = selectedCategory) => {
+    setLoading(true);
+    guideServiceRef.current
+      .loadHome({ query: q, city: c, category: cat, hasBenefits: true })
+      .then(async (data) => {
+        if (data.businesses.length > 0) {
+          setGuideData(data);
+          onLoadedData?.(data);
+        } else {
+          const allData = await guideServiceRef.current.loadHome({ query: q, city: c, category: cat });
+          setGuideData(allData);
+          onLoadedData?.(allData);
+        }
+      })
+      .catch(() => {
+        //Mantém fallback local se offline
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    fetchBenefitBusinesses(search, city, selectedCategory);
+  }, [search, city, selectedCategory]);
+
+  const rawList = guideData?.businesses?.length ? guideData.businesses : DEFAULT_BUSINESSES;
+  const sorted = sortBusinessesByTier(rawList);
+  const displayedBusinesses = onlyFavorites
+    ? sorted.filter((b) => isFavorite?.(b.slug))
+    : sorted;
+
+  return (
+    <div className="directory-screen">
+      <div className="directory-header">
+        <p className="eyebrow">Clube de Vantagens da Rede</p>
+        <h1>Benefícios Exclusivos</h1>
+        <p>Condições especiais, descontos e atendimento prioritário oferecidos pelas empresas da Conexão Maçônica.</p>
+      </div>
+
+      <div className="directory-controls">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="location-pill-btn"
+            onClick={onOpenLocationModal}
+            style={{ background: '#fffdfa', color: '#4b161b', borderColor: '#c9a227', height: 38 }}
+            aria-label={`Localização: ${city || 'Brasil'}`}
+          >
+            <FeatureIcon name="map" />
+            <span>{city ? `Cidade: ${city}` : 'Brasil (Todas as cidades)'}</span>
+            <span style={{ fontSize: '.75rem', color: '#8c671d' }}>▾</span>
+          </button>
+          {city && (
+            <button
+              type="button"
+              onClick={() => onSelectCity('')}
+              style={{
+                border: 0,
+                background: 'transparent',
+                color: '#8c671d',
+                fontSize: '.75rem',
+                fontWeight: 750,
+                cursor: 'pointer',
+                textDecoration: 'underline',
+              }}
+            >
+              Ver todo o Brasil
+            </button>
+          )}
+          <button
+            type="button"
+            className={`filter-favorite-toggle-btn ${onlyFavorites ? 'active' : ''}`}
+            onClick={() => setOnlyFavorites((prev) => !prev)}
+            aria-pressed={onlyFavorites}
+          >
+            <span>{onlyFavorites ? '❤️' : '🤍'}</span>
+            <span>{onlyFavorites ? 'Exibindo Favoritas' : typeof favoritesCount === 'number' && favoritesCount > 0 ? `Favoritas (${favoritesCount})` : 'Filtrar Favoritas'}</span>
+          </button>
+        </div>
+
+        {Boolean(guideData?.categories?.length) && (
+          <div className="category-pills" role="tablist" aria-label="Categorias de Benefícios">
+            <button
+              type="button"
+              className={`category-pill ${!selectedCategory ? 'active' : ''}`}
+              onClick={() => onSelectCategory('')}
+            >
+              Todas
+            </button>
+            {guideData?.categories.map((cat) => (
+              <button
+                type="button"
+                key={cat.id}
+                className={`category-pill ${selectedCategory === cat.slug ? 'active' : ''}`}
+                onClick={() => onSelectCategory(selectedCategory === cat.slug ? '' : cat.slug)}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="results-counter" role="status">
+        {loading
+          ? 'Buscando benefícios...'
+          : `${displayedBusinesses.length} ${displayedBusinesses.length === 1 ? 'empresa parceira encontrada' : 'empresas parceiras encontradas'}${search ? ` para "${search}"` : ''}`}
+      </div>
+
+      {!loading && displayedBusinesses.length === 0 ? (
+        <div className="empty-results">
+          <b>Nenhum benefício encontrado para este filtro</b>
+          <p>Tente alterar o termo de busca ou limpar os filtros selecionados.</p>
+          <button
+            type="button"
+            className="action-button"
+            style={{ marginTop: 12 }}
+            onClick={() => {
+              onSelectCategory('');
+              onSelectCity('');
+              setOnlyFavorites(false);
+            }}
+          >
+            Ver todos os benefícios
+          </button>
+        </div>
+      ) : (
+        <div className="business-list">
+          {displayedBusinesses.map((biz) => (
+            <BusinessCard
+              key={biz.id}
+              business={biz}
+              onSelect={onSelectBusiness}
+              onZoomLogo={onZoomLogo}
+              isFavorited={isFavorite?.(biz.slug)}
+              onToggleFavorite={onToggleFavorite}
+              onRefer={onRefer}
+              showBenefitBadge
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EmptyScreen({
   route,
   favoritesCount = 0,
   onGoToFavorites,
+  memberUser,
+  onOpenMemberLogin,
+  onLogoutMember,
+  onStartShareExperience,
+  maisSubView = 'menu',
+  onChangeMaisSubView,
+  eventTypeFilter = 'all',
+  onChangeEventTypeFilter,
+  searchQuery = '',
 }: {
   route: Exclude<Route, 'inicio' | 'empresas'>;
   favoritesCount?: number;
   onGoToFavorites?: () => void;
+  memberUser?: { id: string; name: string; email: string } | null;
+  onOpenMemberLogin?: () => void;
+  onLogoutMember?: () => void;
+  onStartShareExperience?: () => void;
+  maisSubView?: 'menu' | 'eventos';
+  onChangeMaisSubView?: (view: 'menu' | 'eventos') => void;
+  eventTypeFilter?: 'all' | 'empresas' | 'lojas';
+  onChangeEventTypeFilter?: (filter: 'all' | 'empresas' | 'lojas') => void;
+  searchQuery?: string;
 }) {
   if (route === 'mais') {
+    if (maisSubView === 'eventos') {
+      const qClean = searchQuery.trim().toLowerCase();
+      const filteredEvents = DEFAULT_COMMUNITY_EVENTS.filter((ev) => {
+        if (eventTypeFilter === 'empresas' && ev.organizer_type !== 'business') return false;
+        if (eventTypeFilter === 'lojas' && ev.organizer_type !== 'lodge') return false;
+        if (qClean) {
+          const matchTitle = ev.title.toLowerCase().includes(qClean);
+          const matchSummary = ev.summary.toLowerCase().includes(qClean);
+          const matchCity = ev.city.toLowerCase().includes(qClean);
+          if (!matchTitle && !matchSummary && !matchCity) return false;
+        }
+        return true;
+      });
+
+      return (
+        <div className="directory-screen">
+          <div style={{ marginBottom: 12 }}>
+            <button
+              type="button"
+              onClick={() => onChangeMaisSubView?.('menu')}
+              style={{
+                background: 'transparent',
+                border: 0,
+                color: '#8c671d',
+                fontWeight: 800,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                padding: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              ← Voltar ao Menu
+            </button>
+          </div>
+
+          <div className="directory-header">
+            <p className="eyebrow">Agenda Integrada da Rede Fraterna</p>
+            <h1>Eventos & Comunicados</h1>
+            <p>Encontros de negócios de empresas parceiras e sessões/comunicados de Lojas Maçônicas.</p>
+          </div>
+
+          <div className="category-pills" role="tablist" aria-label="Filtrar eventos por origem" style={{ marginBottom: 14 }}>
+            <button
+              type="button"
+              className={`category-pill ${eventTypeFilter === 'all' ? 'active' : ''}`}
+              onClick={() => onChangeEventTypeFilter?.('all')}
+            >
+              📅 Todos os Eventos
+            </button>
+            <button
+              type="button"
+              className={`category-pill ${eventTypeFilter === 'empresas' ? 'active' : ''}`}
+              onClick={() => onChangeEventTypeFilter?.('empresas')}
+            >
+              🏢 Eventos de Empresas
+            </button>
+            <button
+              type="button"
+              className={`category-pill ${eventTypeFilter === 'lojas' ? 'active' : ''}`}
+              onClick={() => onChangeEventTypeFilter?.('lojas')}
+            >
+              🏛️ Eventos de Lojas Maçônicas
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {filteredEvents.map((ev) => (
+              <article key={ev.id} className="event-card-mobile">
+                <span className={`event-origin-badge ${ev.organizer_type}`}>
+                  {ev.organizer_type === 'lodge' ? '🏛️ Loja Maçônica' : '🏢 Empresa Parceira'}
+                </span>
+                <h3 style={{ margin: '2px 0', font: '750 1.05rem/1.3 Georgia, serif', color: '#4b161b' }}>
+                  {ev.title}
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#57534e', lineHeight: 1.5 }}>
+                  {ev.summary}
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 6, fontSize: '0.76rem', color: '#78716c', fontWeight: 650 }}>
+                  <span>🗓️ {ev.event_date}</span>
+                  <span>📍 {ev.city} - {ev.state}</span>
+                  <span>👤 {ev.organizer_name}</span>
+                </div>
+              </article>
+            ))}
+
+            {filteredEvents.length === 0 && (
+              <div className="empty-results">
+                <b>Nenhum evento encontrado</b>
+                <p>Tente alterar o filtro entre Todos, Empresas ou Lojas Maçônicas.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="home-content" style={{ padding: '20px 16px' }}>
-        <section className="hero" style={{ marginBottom: 18 }}>
-          <p className="eyebrow">Recursos & Conexões</p>
-          <h1>Minha Conexão</h1>
-          <p>Gerencie suas empresas favoritas e suas recomendações na comunidade.</p>
+        {/* Bloco Institucional com a Logomarca Oficial da Conexão Maçônica */}
+        <section className="mais-brand-card" aria-label="Conexão Maçônica">
+          <img
+            src="/logoconexao_red_vert.png"
+            alt="Conexão Maçônica"
+            className="mais-brand-logo"
+            onError={(e) => {
+              e.currentTarget.src = './logo_conexao.svg';
+            }}
+          />
+          <p style={{ margin: 0, fontSize: '0.82rem', color: '#f3eedd', lineHeight: 1.45, maxWidth: 420 }}>
+            Plataforma oficial de negócios, lojas maçônicas, benefícios exclusivos e conexões fraternas.
+          </p>
         </section>
 
+        {/* Atalhos Rápidos do Menu */}
+        <div className="mais-menu-grid">
+          <button
+            type="button"
+            className="mais-menu-item-btn"
+            onClick={() => onChangeMaisSubView?.('eventos')}
+          >
+            <span className="mais-menu-icon">📅</span>
+            <div>
+              <div style={{ fontWeight: 800 }}>Eventos</div>
+              <small style={{ fontSize: '0.68rem', color: '#7a6e67', fontWeight: 600 }}>Empresas & Lojas</small>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            className="mais-menu-item-btn"
+            onClick={onGoToFavorites}
+          >
+            <span className="mais-menu-icon">❤️</span>
+            <div>
+              <div style={{ fontWeight: 800 }}>Favoritos ({favoritesCount})</div>
+              <small style={{ fontSize: '0.68rem', color: '#7a6e67', fontWeight: 600 }}>Salvos no app</small>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            className="mais-menu-item-btn"
+            onClick={() => {
+              window.location.hash = routeHref('beneficios');
+            }}
+          >
+            <span className="mais-menu-icon">🎁</span>
+            <div>
+              <div style={{ fontWeight: 800 }}>Benefícios</div>
+              <small style={{ fontSize: '0.68rem', color: '#7a6e67', fontWeight: 600 }}>Clube de vantagens</small>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            className="mais-menu-item-btn"
+            onClick={() => {
+              window.location.hash = routeHref('lojas');
+            }}
+          >
+            <span className="mais-menu-icon">🏛️</span>
+            <div>
+              <div style={{ fontWeight: 800 }}>Lojas Maçônicas</div>
+              <small style={{ fontSize: '0.68rem', color: '#7a6e67', fontWeight: 600 }}>Guia de oficinas</small>
+            </div>
+          </button>
+
+          <a
+            href="https://conexaomaconica.com.br/anunciar"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mais-menu-item-btn"
+          >
+            <span className="mais-menu-icon">🚀</span>
+            <div>
+              <div style={{ fontWeight: 800 }}>Anunciar</div>
+              <small style={{ fontSize: '0.68rem', color: '#7a6e67', fontWeight: 600 }}>Cadastrar empresa</small>
+            </div>
+          </a>
+
+          <button
+            type="button"
+            className="mais-menu-item-btn"
+            onClick={() => onStartShareExperience?.()}
+          >
+            <span className="mais-menu-icon">🤝</span>
+            <div>
+              <div style={{ fontWeight: 800 }}>Mural da Rede</div>
+              <small style={{ fontSize: '0.68rem', color: '#7a6e67', fontWeight: 600 }}>Relatar experiência</small>
+            </div>
+          </button>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Identificação do Membro */}
+          <div className="refer-explanation-box" style={{ background: '#ffffff', border: '1.5px solid #ebd9c8' }}>
+            <h4 className="refer-explanation-title" style={{ fontSize: '0.88rem' }}>
+              <span>👤</span> {memberUser ? `Membro Identificado: ${memberUser.name}` : 'Acesso do Membro da Rede'}
+            </h4>
+            <p className="refer-explanation-text" style={{ marginBottom: 12 }}>
+              {memberUser
+                ? `Conectado com o e-mail ${memberUser.email}. Seu nome já fica preenchido nas indicações fraternas e no Mural de Conexões.`
+                : 'Identifique-se para registrar experiências no Mural de Conexões e personalizar suas indicações fraternas.'}
+            </p>
+            {memberUser ? (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button
+                  className="action-button"
+                  onClick={() => onStartShareExperience?.()}
+                  style={{ flex: 1, marginTop: 0, minHeight: 40, fontSize: '0.82rem' }}
+                >
+                  Compartilhar Experiência
+                </Button>
+                <button
+                  type="button"
+                  onClick={onLogoutMember}
+                  style={{
+                    padding: '0 14px',
+                    borderRadius: 12,
+                    border: '1px solid #d1d5db',
+                    background: '#ffffff',
+                    color: '#4b5563',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Sair
+                </button>
+              </div>
+            ) : (
+              <Button
+                className="action-button"
+                onClick={onOpenMemberLogin}
+                style={{ width: '100%', marginTop: 0, minHeight: 42, fontSize: '0.85rem' }}
+              >
+                Identificar Membro / Entrar
+              </Button>
+            )}
+          </div>
+
           {/* Card de Favoritos */}
           <div className="refer-explanation-box" style={{ background: '#ffffff', border: '1.5px solid #ebd9c8' }}>
             <h4 className="refer-explanation-title" style={{ fontSize: '0.88rem' }}>
@@ -3099,37 +3757,7 @@ function EmptyScreen({
     );
   }
 
-  const descriptions: Record<Exclude<Route, 'inicio' | 'empresas'>, string> = {
-    beneficios: 'Os benefícios públicos serão conectados com segurança na Fase 2.',
-    lojas: 'O Guia de Lojas Maçônicas será conectado na Fase 2.',
-    mais: 'Login e recursos privados permanecem desativados nesta fundação.',
-  };
-  return (
-    <section className="empty-state" aria-labelledby="empty-title">
-      <span className="state-icon" aria-hidden="true">
-        <FeatureIcon
-          name={
-            route === 'beneficios'
-              ? 'benefits'
-              : route === 'lojas'
-                ? 'lodges'
-                : 'connections'
-          }
-        />
-      </span>
-      <p className="eyebrow">Fundação mobile</p>
-      <h2 id="empty-title">{routeLabels[route]}</h2>
-      <p>{descriptions[route]}</p>
-      <Button
-        className="action-button"
-        onClick={() => {
-          window.location.hash = routeHref('inicio');
-        }}
-      >
-        Voltar ao início
-      </Button>
-    </section>
-  );
+  return null;
 }
 
 function LocationModal({
@@ -4054,13 +4682,27 @@ function HomeLodgesSection({
 
 function LojasScreen({
   onSelectLodge,
+  externalSearch = '',
+  externalPotency = '',
+  onChangeExternalPotency,
 }: {
   onSelectLodge?: (slug: string) => void;
+  externalSearch?: string;
+  externalPotency?: string;
+  onChangeExternalPotency?: (pot: string) => void;
 }) {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(externalSearch);
   const [state, setState] = useState('');
   const [city, setCity] = useState('');
-  const [potency, setPotency] = useState('');
+  const [potency, setPotency] = useState(externalPotency);
+
+  useEffect(() => {
+    setSearch(externalSearch);
+  }, [externalSearch]);
+
+  useEffect(() => {
+    setPotency(externalPotency);
+  }, [externalPotency]);
   const [rite, setRite] = useState('');
   const [day, setDay] = useState('');
   const [lodges, setLodges] = useState<MobileLodgeCardData[]>(DEFAULT_LODGES);
@@ -4131,13 +4773,14 @@ function LojasScreen({
 
   useEffect(() => {
     performSearch();
-  }, [state, city, potency, rite, day]);
+  }, [search, state, city, potency, rite, day]);
 
   const handleClearFilters = () => {
     setSearch('');
     setState('');
     setCity('');
     setPotency('');
+    onChangeExternalPotency?.('');
     setRite('');
     setDay('');
   };
@@ -4734,7 +5377,7 @@ function EmpresasScreen({
   onSelectCity: (city: string) => void;
   onOpenLocationModal: () => void;
   onSelectBusiness: (slug: string) => void;
-  onZoomLogo?: (logoUrl: string, name: string) => void;
+  onZoomLogo?: (logoUrl: string, name: string, backgroundColor?: string | null) => void;
   isFavorite?: (slug: string) => boolean;
   onToggleFavorite?: (slug: string, name?: string) => void;
   onRefer?: (name: string, slug: string) => void;
@@ -4990,7 +5633,7 @@ function ExploreNoMapaSection({
   categories?: Array<{ id: string; name: string; slug: string }>;
   selectedCity?: string;
   onSelectBusiness: (slug: string) => void;
-  onZoomLogo?: (logoUrl: string, name: string) => void;
+  onZoomLogo?: (logoUrl: string, name: string, backgroundColor?: string | null) => void;
   isFavorite?: (slug: string) => boolean;
   onToggleFavorite?: (slug: string, name?: string) => void;
   onRefer?: (name: string, slug: string) => void;
@@ -5319,7 +5962,7 @@ function ExploreNoMapaSection({
               <div
                 className="map-preview-logo-box"
                 onClick={() => {
-                  if (selectedBiz.logo_url) onZoomLogo?.(selectedBiz.logo_url, selectedBiz.name);
+                  if (selectedBiz.logo_url) onZoomLogo?.(selectedBiz.logo_url, selectedBiz.name, selectedBiz.logo_background_color);
                 }}
               >
                 {selectedBiz.logo_url ? (
@@ -5506,7 +6149,7 @@ function Home({
   onLoadedData?: (data: MobileGuideHomeData) => void;
   onSelectBusiness: (slug: string) => void;
   onSelectLodge?: (slug: string) => void;
-  onZoomLogo?: (logoUrl: string, name: string) => void;
+  onZoomLogo?: (logoUrl: string, name: string, backgroundColor?: string | null) => void;
   isFavorite?: (slug: string) => boolean;
   onToggleFavorite?: (slug: string, name?: string) => void;
   onRefer?: (name: string, slug: string) => void;
@@ -6020,12 +6663,15 @@ export function App() {
   const [search, setSearch] = useState('');
   const [city, setCity] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedPotency, setSelectedPotency] = useState('');
+  const [maisSubView, setMaisSubView] = useState<'menu' | 'eventos'>('menu');
+  const [eventTypeFilter, setEventTypeFilter] = useState<'all' | 'empresas' | 'lojas'>('all');
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [availableCities, setAvailableCities] = useState<string[]>(['Feira de Santana']);
   const [serverCategories, setServerCategories] = useState<Array<{ id?: string; name: string; slug: string; business_count?: number }>>([]);
   const [selectedBusinessSlug, setSelectedBusinessSlug] = useState<string | null>(null);
   const [selectedLodgeSlug, setSelectedLodgeSlug] = useState<string | null>(null);
-  const [zoomLogo, setZoomLogo] = useState<{ url: string; name: string } | null>(null);
+  const [zoomLogo, setZoomLogo] = useState<{ url: string; name: string; backgroundColor?: string | null } | null>(null);
   const [referModal, setReferModal] = useState<{ businessName: string; businessSlug: string } | null>(null);
   const [memberUser, setMemberUser] = useState<{ id: string; name: string; email: string } | null>(() => {
     try {
@@ -6091,8 +6737,24 @@ export function App() {
 
   if (showLaunch) return <LaunchExperience onComplete={() => setShowLaunch(false)} />;
 
+  const isDetailOpen = Boolean(selectedBusinessSlug || selectedLodgeSlug);
+  const isEventosView = route === 'mais' && maisSubView === 'eventos';
+  const isMaisMenuOnly = route === 'mais' && maisSubView === 'menu';
+
+  const searchPlaceholder =
+    route === 'lojas'
+      ? 'Buscar loja por nome, número ou cidade...'
+      : route === 'beneficios'
+        ? 'Buscar benefícios ou empresas parceiras...'
+        : isEventosView
+          ? 'Buscar evento, palestra ou comunicado...'
+          : 'Buscar empresas ou serviços...';
+
   const handleSearchSubmit = (event: FormEvent) => {
     event.preventDefault();
+    if (route === 'lojas' || route === 'beneficios' || isEventosView) {
+      return;
+    }
     window.location.hash = routeHref('empresas');
   };
 
@@ -6101,7 +6763,7 @@ export function App() {
   const handleCategoryClick = (catSlug: string) => {
     const next = selectedCategory === catSlug ? '' : catSlug;
     setSelectedCategory(next);
-    if (route !== 'empresas') {
+    if (route !== 'empresas' && route !== 'beneficios') {
       window.location.hash = routeHref('empresas');
     }
   };
@@ -6129,42 +6791,112 @@ export function App() {
           </button>
         </div>
 
-        <div className="topbar-tools">
-          <form className="search-form" role="search" onSubmit={handleSearchSubmit}>
-            <FeatureIcon name="search" />
-            <label className="sr-only" htmlFor="topbar-search">
-              Buscar empresas ou serviços
-            </label>
-            <input
-              id="topbar-search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar empresas ou serviços..."
-            />
-            <button type="submit" aria-label="Buscar">
-              Buscar
-            </button>
-          </form>
-        </div>
-
-        <div className="categories-slider-bar" role="region" aria-label="Categorias em destaque">
-          <div className="categories-slider-track">
-            {displayCategories.map((cat) => (
-              <button
-                key={cat.slug}
-                type="button"
-                className={`category-item-btn ${selectedCategory === cat.slug ? 'active' : ''}`}
-                onClick={() => handleCategoryClick(cat.slug)}
-                title={cat.name}
-              >
-                <span className="category-item-icon">
-                  <CategoryIcon slug={cat.slug} name={cat.name} />
-                </span>
-                <span className="category-item-label">{cat.name}</span>
+        {!isDetailOpen && !isMaisMenuOnly && (
+          <div className="topbar-tools">
+            <form className="search-form" role="search" onSubmit={handleSearchSubmit}>
+              <FeatureIcon name="search" />
+              <label className="sr-only" htmlFor="topbar-search">
+                {searchPlaceholder}
+              </label>
+              <input
+                id="topbar-search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={searchPlaceholder}
+              />
+              <button type="submit" aria-label="Buscar">
+                Buscar
               </button>
-            ))}
+            </form>
           </div>
-        </div>
+        )}
+
+        {!isDetailOpen && !isMaisMenuOnly && (
+          <div className="categories-slider-bar" role="region" aria-label="Filtros rápidos no topo">
+            <div className="categories-slider-track">
+              {route === 'lojas' ? (
+                <>
+                  <button
+                    type="button"
+                    className={`category-item-btn ${!selectedPotency ? 'active' : ''}`}
+                    onClick={() => setSelectedPotency('')}
+                    title="Todas as Potências"
+                  >
+                    <span className="category-item-icon">
+                      <FeatureIcon name="lodges" />
+                    </span>
+                    <span className="category-item-label">Todas</span>
+                  </button>
+                  {DEFAULT_POTENCIES.map((pot) => (
+                    <button
+                      key={pot.slug}
+                      type="button"
+                      className={`category-item-btn ${selectedPotency === pot.slug ? 'active' : ''}`}
+                      onClick={() => setSelectedPotency(selectedPotency === pot.slug ? '' : pot.slug)}
+                      title={pot.name}
+                    >
+                      <span className="category-item-icon">
+                        <FeatureIcon name="lodges" />
+                      </span>
+                      <span className="category-item-label">{pot.abbreviation}</span>
+                    </button>
+                  ))}
+                </>
+              ) : isEventosView ? (
+                <>
+                  <button
+                    type="button"
+                    className={`category-item-btn ${eventTypeFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setEventTypeFilter('all')}
+                    title="Todos os Eventos"
+                  >
+                    <span className="category-item-icon">
+                      <FeatureIcon name="events" />
+                    </span>
+                    <span className="category-item-label">Todos</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`category-item-btn ${eventTypeFilter === 'empresas' ? 'active' : ''}`}
+                    onClick={() => setEventTypeFilter('empresas')}
+                    title="Eventos de Empresas"
+                  >
+                    <span className="category-item-icon">
+                      <FeatureIcon name="companies" />
+                    </span>
+                    <span className="category-item-label">Empresas</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`category-item-btn ${eventTypeFilter === 'lojas' ? 'active' : ''}`}
+                    onClick={() => setEventTypeFilter('lojas')}
+                    title="Eventos de Lojas Maçônicas"
+                  >
+                    <span className="category-item-icon">
+                      <FeatureIcon name="lodges" />
+                    </span>
+                    <span className="category-item-label">Lojas Maçônicas</span>
+                  </button>
+                </>
+              ) : (
+                displayCategories.map((cat) => (
+                  <button
+                    key={cat.slug}
+                    type="button"
+                    className={`category-item-btn ${selectedCategory === cat.slug ? 'active' : ''}`}
+                    onClick={() => handleCategoryClick(cat.slug)}
+                    title={cat.name}
+                  >
+                    <span className="category-item-icon">
+                      <CategoryIcon slug={cat.slug} name={cat.name} />
+                    </span>
+                    <span className="category-item-label">{cat.name}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </header>
 
       <main className="main-content">
@@ -6178,7 +6910,7 @@ export function App() {
             }}
             onSelectBusiness={(slug) => setSelectedBusinessSlug(slug)}
             onSelectLodge={(slug) => setSelectedLodgeSlug(slug)}
-            onZoomLogo={(url, name) => setZoomLogo({ url, name })}
+            onZoomLogo={(url, name, backgroundColor) => setZoomLogo({ url, name, backgroundColor })}
             isFavorite={isFavorite}
             onToggleFavorite={handleToggleFavorite}
             onRefer={handleOpenRefer}
@@ -6206,7 +6938,7 @@ export function App() {
             onSelectCity={(newCity) => setCity(newCity)}
             onOpenLocationModal={() => setIsLocationModalOpen(true)}
             onSelectBusiness={(slug) => setSelectedBusinessSlug(slug)}
-            onZoomLogo={(url, name) => setZoomLogo({ url, name })}
+            onZoomLogo={(url, name, backgroundColor) => setZoomLogo({ url, name, backgroundColor })}
             isFavorite={isFavorite}
             onToggleFavorite={handleToggleFavorite}
             onRefer={handleOpenRefer}
@@ -6225,9 +6957,38 @@ export function App() {
               }
             }}
           />
+        ) : route === 'beneficios' ? (
+          <BeneficiosScreen
+            search={search}
+            city={city}
+            selectedCategory={selectedCategory}
+            onSelectCategory={(catSlug) => setSelectedCategory(catSlug)}
+            onSelectCity={(newCity) => setCity(newCity)}
+            onOpenLocationModal={() => setIsLocationModalOpen(true)}
+            onSelectBusiness={(slug) => setSelectedBusinessSlug(slug)}
+            onZoomLogo={(url, name, backgroundColor) => setZoomLogo({ url, name, backgroundColor })}
+            isFavorite={isFavorite}
+            onToggleFavorite={handleToggleFavorite}
+            onRefer={handleOpenRefer}
+            favoritesCount={favorites.length}
+            onLoadedData={(data) => {
+              if (data.available_cities?.length) {
+                setAvailableCities(data.available_cities);
+              }
+              if (data.categories?.length) {
+                setServerCategories(data.categories);
+              }
+              if (data.businesses?.length) {
+                setServerBusinesses(data.businesses);
+              }
+            }}
+          />
         ) : route === 'lojas' ? (
           <LojasScreen
             onSelectLodge={(slug) => setSelectedLodgeSlug(slug)}
+            externalSearch={search}
+            externalPotency={selectedPotency}
+            onChangeExternalPotency={(pot) => setSelectedPotency(pot)}
           />
         ) : (
           <EmptyScreen
@@ -6236,6 +6997,20 @@ export function App() {
             onGoToFavorites={() => {
               window.location.hash = routeHref('empresas');
             }}
+            memberUser={memberUser}
+            onOpenMemberLogin={() => setIsMemberLoginModalOpen(true)}
+            onLogoutMember={() => {
+              setMemberUser(null);
+              try {
+                localStorage.removeItem('cm_mobile_member_user');
+              } catch {}
+            }}
+            onStartShareExperience={() => handleStartShareExperience()}
+            maisSubView={maisSubView}
+            onChangeMaisSubView={(view) => setMaisSubView(view)}
+            eventTypeFilter={eventTypeFilter}
+            onChangeEventTypeFilter={(f) => setEventTypeFilter(f)}
+            searchQuery={search}
           />
         )}
       </main>
@@ -6264,7 +7039,7 @@ export function App() {
       <BusinessDetailModal
         slug={selectedBusinessSlug}
         onClose={() => setSelectedBusinessSlug(null)}
-        onZoomLogo={(url, name) => setZoomLogo({ url, name })}
+        onZoomLogo={(url, name, backgroundColor) => setZoomLogo({ url, name, backgroundColor })}
         isFavorited={selectedBusinessSlug ? isFavorite(selectedBusinessSlug) : false}
         onToggleFavorite={handleToggleFavorite}
         onRefer={handleOpenRefer}
@@ -6281,7 +7056,7 @@ export function App() {
 
       <LogoZoomModal
         logoUrl={zoomLogo?.url ?? null}
-        businessName={zoomLogo?.name ?? ''}
+        businessName={zoomLogo?.name ?? ''} backgroundColor={zoomLogo?.backgroundColor}
         onClose={() => setZoomLogo(null)}
       />
 

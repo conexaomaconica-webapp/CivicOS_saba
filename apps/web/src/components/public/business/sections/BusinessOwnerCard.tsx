@@ -90,6 +90,7 @@ export function BusinessOwnerCard({
             type="button"
             onClick={() => setIsZoomOpen(true)}
             title="Clique para ampliar a foto do representante"
+            style={isUsingLogoFallback && logo?.backgroundColor ? { backgroundColor: logo.backgroundColor } : undefined}
             className="w-16 h-16 rounded-xl bg-[#FDFBF7] border border-[#E8E5DF] overflow-hidden shrink-0 shadow-xs relative flex items-center justify-center p-0.5 group cursor-pointer transition-transform hover:scale-105 hover:border-[#C9A227]"
           >
             <img
@@ -180,6 +181,7 @@ export function BusinessOwnerCard({
         altText={`Foto de ${owner.name}`}
         title={`${displayName}${roleDisplay ? ` - ${roleDisplay}` : ''}`}
         badge={`Loja Maçônica: ${owner.organization}`}
+        backgroundColor={isUsingLogoFallback ? logo?.backgroundColor : undefined}
       />
     </>
   );

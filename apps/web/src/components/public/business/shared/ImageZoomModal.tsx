@@ -12,6 +12,7 @@ interface ImageZoomModalProps {
   title?: string;
   badge?: string;
   imageOnly?: boolean;
+  backgroundColor?: string;
 }
 
 export function ImageZoomModal({
@@ -22,6 +23,7 @@ export function ImageZoomModal({
   title = 'Visualização da Imagem',
   badge = 'Fotografia Autêntica',
   imageOnly = false,
+  backgroundColor,
 }: ImageZoomModalProps) {
   useEffect(() => {
     if (!isOpen) return;
@@ -40,7 +42,8 @@ export function ImageZoomModal({
       onClick={onClose}
     >
       <div
-        className={`relative max-w-3xl w-full overflow-hidden shadow-2xl flex flex-col items-center cursor-default ${imageOnly ? 'bg-white rounded-3xl' : 'bg-[#1C0D11] border border-[#C9A227]/40 rounded-3xl p-4 sm:p-6'}`}
+        className={`relative max-w-3xl w-full overflow-hidden shadow-2xl flex flex-col items-center cursor-default ${imageOnly ? 'bg-white rounded-3xl border border-[#C9A227]/30' : 'bg-[#1C0D11] border border-[#C9A227]/40 rounded-3xl p-4 sm:p-6'}`}
+        style={imageOnly && backgroundColor ? { backgroundColor } : undefined}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Botão Fechar X */}
@@ -54,7 +57,10 @@ export function ImageZoomModal({
         </button>
 
         {/* Container da Imagem */}
-        <div className={`w-full flex items-center justify-center overflow-hidden max-h-[85vh] ${imageOnly ? 'p-8' : 'rounded-2xl bg-stone-950/80 p-2 border border-stone-800'}`}>
+        <div
+          className={`w-full flex items-center justify-center overflow-hidden max-h-[85vh] ${imageOnly ? 'p-8' : 'rounded-2xl bg-stone-950/80 p-2 border border-stone-800'}`}
+          style={!imageOnly && backgroundColor ? { backgroundColor } : undefined}
+        >
           <img
             src={imageUrl}
             alt={altText}

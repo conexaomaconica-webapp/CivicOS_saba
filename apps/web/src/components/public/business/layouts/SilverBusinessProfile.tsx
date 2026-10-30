@@ -5,7 +5,7 @@ import { Heart, Share2, Building2, Eye } from 'lucide-react';
 import { useFavorites } from '@/lib/directory/favorites-context';
 import type { PublicBusinessPresentation, PublicMediaAsset } from '@/lib/business/public-business-presentation';
 import { getMediaFramingStyle, getObjectPosition } from '@/lib/business/public-business-presentation';
-import { ReferBusinessModal } from '../sections/ReferBusinessModal';
+import { ReferBusinessModal } from '../sections/ReferBusinessModal'; import { BusinessAdModal } from '../sections/BusinessAdModal';
 import { InstitutionalBadges } from '../shared/InstitutionalBadges';
 import { QuickActionBar } from '../shared/BusinessActionButtons';
 import { CompanyLogoWithZoom } from '../shared/CompanyLogoWithZoom';
@@ -17,7 +17,7 @@ type SilverBusinessProfileProps = {
 
 export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
   const [activeTab, setActiveTab] = useState('visao-geral');
-  const [referOpen, setReferOpen] = useState(false);
+  const [referOpen, setReferOpen] = useState(false); const [adModalOpen, setAdModalOpen] = useState(false);
   const { isFavorite, toggleFavorite } = useFavorites();
 
   const { identity, recognition, location, contacts, owner, media } = profile;
@@ -55,7 +55,7 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
         }`}
       >
         <Heart className={`w-3.5 h-3.5 ${isFavorited ? 'fill-white text-white' : 'text-stone-600'}`} />
-        <span className="hidden sm:inline">{isFavorited ? 'Favoritado' : 'Favoritar'}</span>
+        <span className="hidden sm:inline">{isFavorited ? 'Favoritado' : 'Favoritar'}</span></button><button type="button" onClick={() => setAdModalOpen(true)} title="Ver anúncio com capa, contatos e traçar rota" className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#f5d76e] bg-gradient-to-r from-[#d4af37] to-[#b5891c] px-3 text-xs font-extrabold text-[#2b060d] shadow-md transition-all hover:brightness-105 sm:h-auto sm:px-3 sm:py-1.5 cursor-pointer"><span>🪧</span><span>Ver Anúncio</span>
       </button>
     </div>
   );
@@ -220,7 +220,7 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
               <div className="flex min-w-0 items-start gap-3 sm:gap-5">
                 
                 {/* Logo da Empresa com Ampliação em Lightbox */}
-                <CompanyLogoWithZoom logo={identity.logo} businessName={identity.name} />
+                <CompanyLogoWithZoom logo={identity.logo} businessName={identity.name} backgroundColor={identity.logoBgColor || '#ffffff'} />
 
                 <div className="space-y-1.5 min-w-0 flex-1">
                   <h1 className="break-words font-serif text-2xl font-bold leading-tight tracking-tight text-stone-900 sm:text-3xl lg:text-4xl">
@@ -306,7 +306,7 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
 
 
       {referOpen && (
-        <ReferBusinessModal businessName={identity.name} businessSlug={identity.slug} onClose={() => setReferOpen(false)} />
+        <ReferBusinessModal businessName={identity.name} businessSlug={identity.slug} onClose={() => setReferOpen(false)} /> )} <BusinessAdModal isOpen={adModalOpen} onClose={() => setAdModalOpen(false)} profile={profile} isFavorited={isFavorited} onToggleFavorite={() => toggleFavorite(identity.slug)} onRefer={() => { setAdModalOpen(false); setReferOpen(true); }} /> {false && ( <div />
       )}
     </div>
   );

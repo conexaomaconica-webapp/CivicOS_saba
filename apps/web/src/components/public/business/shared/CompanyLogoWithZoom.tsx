@@ -25,6 +25,7 @@ export function CompanyLogoWithZoom({
 
   const logoUrl = logo?.url || '/logofallback.png';
   const altText = logo?.alt || `Logomarca Oficial — ${businessName}`;
+  const resolvedBgColor = backgroundColor || logo?.backgroundColor || '#ffffff';
 
   return (
     <>
@@ -32,7 +33,7 @@ export function CompanyLogoWithZoom({
         type="button"
         onClick={() => setIsOpen(true)}
         title="Clique para ampliar a logomarca da empresa"
-        style={backgroundColor ? { backgroundColor } : undefined}
+        style={{ backgroundColor: resolvedBgColor }}
         className={`${className} transition-all hover:scale-[1.03] hover:border-[#C9A227]`}
       >
         <img src={logoUrl} alt={altText} className={imgClassName} />
@@ -50,6 +51,7 @@ export function CompanyLogoWithZoom({
         imageUrl={logoUrl}
         altText={altText}
         imageOnly
+        backgroundColor={resolvedBgColor}
       />
     </>
   );

@@ -18,6 +18,7 @@ type DirectoryHeaderProps = {
   onCityChange?: (city: string) => void;
   categories?: Array<{ id?: string; slug: string; name: string; icon_name?: string | null; business_count?: number }>;
   potencies?: Array<{ id?: string; slug: string; name: string; abbreviation?: string }>;
+  hideMobileSearchAndCategories?: boolean;
 };
 
 const DEFAULT_HEADER_POTENCIES = [
@@ -56,6 +57,7 @@ export function DirectoryHeader({
   onCityChange,
   categories = [],
   potencies = [],
+  hideMobileSearchAndCategories = false,
 }: DirectoryHeaderProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -138,6 +140,17 @@ export function DirectoryHeader({
   const isLodgesSection = Boolean(pathname?.startsWith('/guia/lojas'));
   const isBenefitsSection = Boolean(pathname?.startsWith('/guia/beneficios'));
   const isEventsSection = Boolean(pathname?.startsWith('/guia/eventos') || pathname?.startsWith('/eventos'));
+  const isEmpresasListing = Boolean(pathname === '/guia/empresas' || pathname?.startsWith('/guia/empresas/'));
+  const isGuiaHome = Boolean(pathname === '/guia' || pathname === '/guia/');
+  const isBusinessProfilePage = Boolean(
+    hideMobileSearchAndCategories ||
+      (pathname?.startsWith('/guia/') &&
+        !isGuiaHome &&
+        !isEmpresasListing &&
+        !isLodgesSection &&
+        !isBenefitsSection &&
+        !isEventsSection)
+  );
 
   const headerSearchMode: 'businesses' | 'lodges' | 'benefits' | 'events' = isLodgesSection
     ? 'lodges'
@@ -434,149 +447,153 @@ export function DirectoryHeader({
           </div>
         </div>
 
-        {/* Linha 2: Campo Buscar contextual conforme a página atual */}
-        <DirectoryLiveSearchBox
-          variant="header"
-          searchMode={headerSearchMode}
-          placeholder={headerPlaceholder}
-          selectedCity={activeCity}
-          selectedPotency={isLodgesSection ? currentPotency : undefined}
-          availableCities={citiesToDisplay}
-          categories={headerCategories.map((c) => ({ id: 'id' in c ? c.id : undefined, slug: c.slug, name: c.name }))}
-          initialQuery={searchParams ? (searchParams.get('q') || '') : ''}
-          actionUrl={headerActionUrl}
-        />
+        {!isBusinessProfilePage && (
+          <>
+            {/* Linha 2: Campo Buscar contextual conforme a página atual */}
+            <DirectoryLiveSearchBox
+              variant="header"
+              searchMode={headerSearchMode}
+              placeholder={headerPlaceholder}
+              selectedCity={activeCity}
+              selectedPotency={isLodgesSection ? currentPotency : undefined}
+              availableCities={citiesToDisplay}
+              categories={headerCategories.map((c) => ({ id: 'id' in c ? c.id : undefined, slug: c.slug, name: c.name }))}
+              initialQuery={searchParams ? (searchParams.get('q') || '') : ''}
+              actionUrl={headerActionUrl}
+            />
 
-        {/* Linha 3: Slider Horizontal de Ícones (Potências em /guia/lojas, Tipos de Evento em /guia/eventos ou Categorias nas demais rotas) */}
-        <div
-          className="relative -mx-3 px-3 overflow-x-auto scrollbar-none py-1"
-          role="region"
-          aria-label={
-            isLodgesSection
-              ? 'Potências Maçônicas'
-              : isEventsSection
-              ? 'Filtrar eventos por origem'
-              : 'Categorias em destaque'
-          }
-        >
-          <div className="flex gap-2.5 w-max">
-            {isLodgesSection
-              ? headerPotencies.map((pot) => {
-                  const isActive =
-                    (!pot.code && !currentPotency) ||
-                    Boolean(pot.code && currentPotency.toUpperCase() === pot.code.toUpperCase());
-                  return (
-                    <button
-                      key={pot.key || 'all-potencies'}
-                      type="button"
-                      onClick={() => handlePotencyClick(pot.code)}
-                      className={`flex flex-col items-center gap-1 w-[64px] shrink-0 text-center transition-all ${
-                        isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
-                      }`}
-                    >
-                      <div
-                        className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
-                          isActive
-                            ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
-                            : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
-                        }`}
-                      >
-                        <PotencyHeaderIcon code={pot.code} />
-                        {pot.code && (
+            {/* Linha 3: Slider Horizontal de Ícones (Potências em /guia/lojas, Tipos de Evento em /guia/eventos ou Categorias nas demais rotas) */}
+            <div
+              className="relative -mx-3 px-3 overflow-x-auto scrollbar-none py-1"
+              role="region"
+              aria-label={
+                isLodgesSection
+                  ? 'Potências Maçônicas'
+                  : isEventsSection
+                  ? 'Filtrar eventos por origem'
+                  : 'Categorias em destaque'
+              }
+            >
+              <div className="flex gap-2.5 w-max">
+                {isLodgesSection
+                  ? headerPotencies.map((pot) => {
+                      const isActive =
+                        (!pot.code && !currentPotency) ||
+                        Boolean(pot.code && currentPotency.toUpperCase() === pot.code.toUpperCase());
+                      return (
+                        <button
+                          key={pot.key || 'all-potencies'}
+                          type="button"
+                          onClick={() => handlePotencyClick(pot.code)}
+                          className={`flex flex-col items-center gap-1 w-[64px] shrink-0 text-center transition-all ${
+                            isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
+                          }`}
+                        >
+                          <div
+                            className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
+                              isActive
+                                ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
+                                : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
+                            }`}
+                          >
+                            <PotencyHeaderIcon code={pot.code} />
+                            {pot.code && (
+                              <span
+                                className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
+                                title={`Filtrar por ${pot.label}`}
+                              />
+                            )}
+                          </div>
                           <span
-                            className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
-                            title={`Filtrar por ${pot.label}`}
-                          />
-                        )}
-                      </div>
-                      <span
-                        className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
-                          isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
-                        }`}
-                      >
-                        {pot.label}
-                      </span>
-                    </button>
-                  );
-                })
-              : isEventsSection
-              ? EVENT_HEADER_FILTERS.map((evFilter) => {
-                  const isActive =
-                    (evFilter.type === 'all' && (!currentEventType || currentEventType === 'all')) ||
-                    currentEventType === evFilter.type;
-                  return (
-                    <button
-                      key={evFilter.key}
-                      type="button"
-                      onClick={() => handleEventTypeClick(evFilter.type)}
-                      className={`flex flex-col items-center gap-1 w-[76px] shrink-0 text-center transition-all ${
-                        isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
-                      }`}
-                    >
-                      <div
-                        className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
-                          isActive
-                            ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
-                            : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
-                        }`}
-                      >
-                        <EventHeaderIcon type={evFilter.type} />
-                        {evFilter.type !== 'all' && (
+                            className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
+                              isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
+                            }`}
+                          >
+                            {pot.label}
+                          </span>
+                        </button>
+                      );
+                    })
+                  : isEventsSection
+                  ? EVENT_HEADER_FILTERS.map((evFilter) => {
+                      const isActive =
+                        (evFilter.type === 'all' && (!currentEventType || currentEventType === 'all')) ||
+                        currentEventType === evFilter.type;
+                      return (
+                        <button
+                          key={evFilter.key}
+                          type="button"
+                          onClick={() => handleEventTypeClick(evFilter.type)}
+                          className={`flex flex-col items-center gap-1 w-[76px] shrink-0 text-center transition-all ${
+                            isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
+                          }`}
+                        >
+                          <div
+                            className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
+                              isActive
+                                ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
+                                : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
+                            }`}
+                          >
+                            <EventHeaderIcon type={evFilter.type} />
+                            {evFilter.type !== 'all' && (
+                              <span
+                                className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
+                                title={`Eventos de ${evFilter.label}`}
+                              />
+                            )}
+                          </div>
                           <span
-                            className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
-                            title={`Eventos de ${evFilter.label}`}
-                          />
-                        )}
-                      </div>
-                      <span
-                        className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
-                          isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
-                        }`}
-                      >
-                        {evFilter.label}
-                      </span>
-                    </button>
-                  );
-                })
-              : headerCategories.map((cat) => {
-                  const isActive = currentCat === cat.slug;
-                  const hasCount = ('business_count' in cat && (cat.business_count ?? 0) > 0) || Boolean((cat as any).isCatalog);
-                  return (
-                    <button
-                      key={cat.slug}
-                      type="button"
-                      onClick={() => handleCategoryClick(cat.slug)}
-                      className={`flex flex-col items-center gap-1 w-[60px] shrink-0 text-center transition-all ${
-                        isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
-                      }`}
-                    >
-                      <div
-                        className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
-                          isActive
-                            ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
-                            : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
-                        }`}
-                      >
-                        <CategoryIcon slug={cat.slug} name={cat.name} />
-                        {hasCount && (
+                            className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
+                              isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
+                            }`}
+                          >
+                            {evFilter.label}
+                          </span>
+                        </button>
+                      );
+                    })
+                  : headerCategories.map((cat) => {
+                      const isActive = currentCat === cat.slug;
+                      const hasCount = ('business_count' in cat && (cat.business_count ?? 0) > 0) || Boolean((cat as any).isCatalog);
+                      return (
+                        <button
+                          key={cat.slug}
+                          type="button"
+                          onClick={() => handleCategoryClick(cat.slug)}
+                          className={`flex flex-col items-center gap-1 w-[60px] shrink-0 text-center transition-all ${
+                            isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
+                          }`}
+                        >
+                          <div
+                            className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
+                              isActive
+                                ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
+                                : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
+                            }`}
+                          >
+                            <CategoryIcon slug={cat.slug} name={cat.name} />
+                            {hasCount && (
+                              <span
+                                className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
+                                title="Ativo no Catálogo"
+                              />
+                            )}
+                          </div>
                           <span
-                            className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
-                            title="Ativo no Catálogo"
-                          />
-                        )}
-                      </div>
-                      <span
-                        className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
-                          isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
-                        }`}
-                      >
-                        {cat.name}
-                      </span>
-                    </button>
-                  );
-                })}
-          </div>
-        </div>
+                            className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
+                              isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
+                            }`}
+                          >
+                            {cat.name}
+                          </span>
+                        </button>
+                      );
+                    })}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Mobile Drawer Menu Overlay */}

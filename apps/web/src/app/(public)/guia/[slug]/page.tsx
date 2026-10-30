@@ -725,6 +725,7 @@ export default async function CompanyDetailsPage(props: Props & { searchParams?:
       <DirectoryHeader
         selectedCity={business.location?.city || ''}
         availableCities={business.location?.city ? [business.location.city] : []}
+        hideMobileSearchAndCategories
       />
       <BusinessBreadcrumb items={breadcrumbItems} />
       <BusinessContactTracker

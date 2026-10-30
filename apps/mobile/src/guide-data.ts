@@ -30,6 +30,12 @@ export type MobileGuideSponsoredBusiness = {
   plan_tier: string | null;
   is_featured: boolean;
   is_pedra_fundamental?: boolean;
+  views_count?: number;
+  cover_offset_y?: number | null;
+  cover_zoom?: number | null;
+  cover_fit_mode?: 'cover' | 'contain' | null;
+  cover_background_color?: string | null;
+  logo_background_color?: string | null;
 };
 
 export type MobileGuideHomeData = {
@@ -113,9 +119,9 @@ function parseHomeData(value: unknown, activeCategoriesList?: unknown[]): Mobile
     if (aCount > 0 && bCount > 0) return bCount - aCount;
     return 0;
   });
-  const parseBusinesses = (items: unknown[]) =>
+  const parseBusinesses = (items: unknown[]): MobileGuideSponsoredBusiness[] =>
     items
-      .map((item) => {
+      .map((item): MobileGuideSponsoredBusiness => {
         const row = asRecord(item);
         return {
           id: String(row.id ?? ''),
@@ -154,6 +160,27 @@ function parseHomeData(value: unknown, activeCategoriesList?: unknown[]): Mobile
           address: typeof row.address === 'string' ? row.address : null,
           is_featured: row.is_featured === true,
           is_pedra_fundamental: row.is_pedra_fundamental === true,
+          views_count: typeof row.views_count === 'number' ? row.views_count : undefined,
+          cover_offset_y:
+            typeof row.cover_offset_y === 'number'
+              ? row.cover_offset_y
+              : typeof row.cover_offset_y === 'string' && !isNaN(Number(row.cover_offset_y))
+                ? Number(row.cover_offset_y)
+                : null,
+          cover_zoom:
+            typeof row.cover_zoom === 'number'
+              ? row.cover_zoom
+              : typeof row.cover_zoom === 'string' && !isNaN(Number(row.cover_zoom))
+                ? Number(row.cover_zoom)
+                : null,
+          cover_fit_mode:
+            row.cover_fit_mode === 'contain' || row.cover_fit_mode === 'cover'
+              ? row.cover_fit_mode
+              : null,
+          cover_background_color:
+            typeof row.cover_background_color === 'string' ? row.cover_background_color : null,
+          logo_background_color:
+            typeof row.logo_background_color === 'string' ? row.logo_background_color : null,
         };
       })
       .filter((item) => item.id && item.name);
@@ -187,6 +214,7 @@ async function loadFromDirectSupabase(
   let cityParam: string | null = null;
   let queryParam: string | null = null;
   let categoryParam: string | null = null;
+  let hasBenefitsParam: boolean | null = null;
 
   if (typeof filters === 'string') {
     cityParam = filters.trim() || null;
@@ -194,6 +222,7 @@ async function loadFromDirectSupabase(
     cityParam = filters.city?.trim() || null;
     queryParam = filters.query?.trim() || null;
     categoryParam = filters.category?.trim() || null;
+    hasBenefitsParam = filters.hasBenefits === true ? true : null;
   }
 
   const headers = {
@@ -202,7 +231,14 @@ async function loadFromDirectSupabase(
     'Content-Type': 'application/json',
   };
 
-  const [homeRes, searchRes, categoriesRes] = await Promise.all([
+  const bffUrl = new URL('https://conexaomaconica.com.br/api/mobile/guide');
+  if (cityParam) bffUrl.searchParams.set('city', cityParam);
+  if (queryParam) bffUrl.searchParams.set('q', queryParam);
+  if (categoryParam) bffUrl.searchParams.set('category', categoryParam);
+  if (hasBenefitsParam) bffUrl.searchParams.set('has_benefits', 'true');
+  bffUrl.searchParams.set('page_size', '100');
+
+  const [homeRes, searchRes, categoriesRes, bffRes] = await Promise.all([
     fetchImpl(`${supabaseUrl}/rest/v1/rpc/public_directory_home_data`, {
       method: 'POST',
       headers,
@@ -217,7 +253,7 @@ async function loadFromDirectSupabase(
         p_city: cityParam,
         p_category_slug: categoryParam,
         p_verified: null,
-        p_has_benefits: null,
+        p_has_benefits: hasBenefitsParam,
         p_sort: 'relevance',
         p_page: 1,
         p_page_size: 100,
@@ -228,17 +264,42 @@ async function loadFromDirectSupabase(
       headers,
       body: JSON.stringify({ p_host: host }),
     }).catch(() => null),
+    fetchWithTimeout(fetchImpl, bffUrl.toString(), { headers: { Accept: 'application/json' } }, 1800).catch(() => null),
   ]);
 
   if (!homeRes.ok) throw new MobileGuideServiceError(`Guia indisponível (${homeRes.status})`);
   const homePayload = await homeRes.json();
   const searchPayload = searchRes.ok ? await searchRes.json() : { items: [] };
   const categoriesPayload = categoriesRes && categoriesRes.ok ? await categoriesRes.json() : [];
+  const bffPayload = bffRes && bffRes.ok ? await bffRes.json().catch(() => null) : null;
+
+  const extraById = new Map<string, Record<string, unknown>>();
+  if (bffPayload && typeof bffPayload === 'object') {
+    const bffBizs = [
+      ...(Array.isArray(bffPayload.businesses) ? bffPayload.businesses : []),
+      ...(Array.isArray(bffPayload.sponsored) ? bffPayload.sponsored : []),
+    ];
+    for (const item of bffBizs) {
+      if (item && typeof item === 'object' && typeof item.id === 'string') {
+        extraById.set(item.id, item as Record<string, unknown>);
+      }
+    }
+  }
+
+  const mergeExtra = (list: unknown[]) =>
+    list.map((item) => {
+      if (!item || typeof item !== 'object') return item;
+      const row = item as Record<string, unknown>;
+      const id = typeof row.id === 'string' ? row.id : '';
+      const extra = id ? extraById.get(id) : undefined;
+      return extra ? { ...row, ...extra } : row;
+    });
 
   return parseHomeData(
     {
       ...homePayload,
-      businesses: Array.isArray(searchPayload?.items) ? searchPayload.items : [],
+      sponsored: mergeExtra(Array.isArray(homePayload?.sponsored) ? homePayload.sponsored : []),
+      businesses: mergeExtra(Array.isArray(searchPayload?.items) ? searchPayload.items : []),
     },
     Array.isArray(categoriesPayload) ? categoriesPayload : [],
   );
@@ -248,6 +309,7 @@ export type GuideFilters = {
   city?: string;
   query?: string;
   category?: string;
+  hasBenefits?: boolean;
 };
 
 export type MobileBusinessDetail = {
@@ -262,6 +324,12 @@ export type MobileBusinessDetail = {
   description: string | null;
   logo_url: string | null;
   cover_url?: string | null;
+  cover_offset_y?: number | null;
+  cover_zoom?: number | null;
+  cover_fit_mode?: 'cover' | 'contain' | null;
+  cover_background_color?: string | null;
+  logo_background_color?: string | null;
+  views_count?: number;
   is_pedra_fundamental: boolean;
   is_coluna_honra: boolean;
   is_founder: boolean;
@@ -359,6 +427,21 @@ export type MobileLodgeFilterState = {
   query?: string;
 };
 
+export type MobileEventItem = {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string | null;
+  event_date: string | null;
+  location_label: string | null;
+  city: string | null;
+  state: string | null;
+  organizer_name: string | null;
+  organizer_type: 'business' | 'lodge';
+  cover_url: string | null;
+  cta_url: string | null;
+};
+
 async function fetchWithTimeout(
   fetchImpl: typeof fetch,
   input: RequestInfo | URL,
@@ -387,20 +470,28 @@ export async function loadBusinessDetailFromDirectSupabase(
   const host = 'localhost:3000';
 
   try {
-    const res = await fetchImpl(`${supabaseUrl}/rest/v1/rpc/public_business_detail`, {
-      method: 'POST',
-      headers: {
-        apikey: anonKey,
-        Authorization: `Bearer ${anonKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ p_host: host, p_business_slug: slug }),
-    });
+    const bffDetailUrl = `https://conexaomaconica.com.br/api/mobile/guide?slug=${encodeURIComponent(slug)}`;
+    const [res, bffRes] = await Promise.all([
+      fetchImpl(`${supabaseUrl}/rest/v1/rpc/public_business_detail`, {
+        method: 'POST',
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ p_host: host, p_business_slug: slug }),
+      }),
+      fetchWithTimeout(fetchImpl, bffDetailUrl, { headers: { Accept: 'application/json' } }, 1800).catch(() => null),
+    ]);
 
     if (!res.ok) return null;
     const list = await res.json();
     if (!Array.isArray(list) || !list[0]) return null;
-    const b = list[0];
+    const bffJson = bffRes && bffRes.ok ? await bffRes.json().catch(() => null) : null;
+    const b = {
+      ...list[0],
+      ...(bffJson?.detail && typeof bffJson.detail === 'object' ? bffJson.detail : {}),
+    };
 
     return {
       business_id: String(b.business_id || ''),
@@ -414,6 +505,25 @@ export async function loadBusinessDetailFromDirectSupabase(
       description: typeof b.description === 'string' ? b.description : null,
       logo_url: typeof b.logo_url === 'string' ? b.logo_url : null,
       cover_url: typeof b.cover_url === 'string' ? b.cover_url : null,
+      cover_offset_y:
+        typeof b.cover_offset_y === 'number'
+          ? b.cover_offset_y
+          : typeof b.cover_offset_y === 'string' && !isNaN(Number(b.cover_offset_y))
+            ? Number(b.cover_offset_y)
+            : null,
+      cover_zoom:
+        typeof b.cover_zoom === 'number'
+          ? b.cover_zoom
+          : typeof b.cover_zoom === 'string' && !isNaN(Number(b.cover_zoom))
+            ? Number(b.cover_zoom)
+            : null,
+      cover_fit_mode:
+        b.cover_fit_mode === 'contain' || b.cover_fit_mode === 'cover' ? b.cover_fit_mode : null,
+      cover_background_color:
+        typeof b.cover_background_color === 'string' ? b.cover_background_color : null,
+      logo_background_color:
+        typeof b.logo_background_color === 'string' ? b.logo_background_color : null,
+      views_count: typeof b.views_count === 'number' ? b.views_count : undefined,
       is_pedra_fundamental: b.is_pedra_fundamental === true,
       is_coluna_honra: b.is_coluna_honra === true,
       is_founder: b.is_founder === true,
@@ -588,6 +698,7 @@ export function createMobileGuideService(
         let cityParam: string | undefined;
         let queryParam: string | undefined;
         let categoryParam: string | undefined;
+        let hasBenefitsParam: boolean | undefined;
 
         if (typeof filters === 'string') {
           cityParam = filters;
@@ -595,11 +706,13 @@ export function createMobileGuideService(
           cityParam = filters.city;
           queryParam = filters.query;
           categoryParam = filters.category;
+          hasBenefitsParam = filters.hasBenefits;
         }
 
         if (cityParam?.trim()) url.searchParams.set('city', cityParam.trim());
         if (queryParam?.trim()) url.searchParams.set('q', queryParam.trim());
         if (categoryParam?.trim()) url.searchParams.set('category', categoryParam.trim());
+        if (hasBenefitsParam) url.searchParams.set('has_benefits', 'true');
 
         const response = await fetchWithTimeout(fetchImpl, url, { headers: { Accept: 'application/json' } }, 1500);
         if (!response.ok) {

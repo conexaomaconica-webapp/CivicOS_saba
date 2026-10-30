@@ -80,7 +80,7 @@ export function QuickActionBar({
     <div className={`bg-white border border-[#E8E5DF] rounded-2xl shadow-xs p-3 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5 ${className}`}>
       
       {/* Botões de Ação Rápida (Contatos e Redes Sociais alinhados em 2 colunas) */}
-      <div className="grid grid-cols-2 gap-2 w-full lg:w-auto lg:min-w-[320px] text-xs font-medium text-stone-700">
+      <div className="grid grid-cols-2 gap-2 w-full md:flex md:flex-wrap md:items-center lg:w-auto text-xs font-medium text-stone-700">
         
         {/* WhatsApp */}
         {whatsappUrl && (
@@ -90,7 +90,7 @@ export function QuickActionBar({
             data-cm-tracked
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-emerald-50 hover:border-emerald-200 text-stone-800 transition-colors w-full"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-emerald-50 hover:border-emerald-200 text-stone-800 transition-colors w-full md:w-auto"
           >
             <span className="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center text-white shrink-0 shadow-xs">
               <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
@@ -107,7 +107,7 @@ export function QuickActionBar({
             href={phoneUrl}
             onClick={() => track('phone_click', 'business_profile')}
             data-cm-tracked
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-amber-50 hover:border-amber-200 text-stone-800 transition-colors w-full"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-amber-50 hover:border-amber-200 text-stone-800 transition-colors w-full md:w-auto"
           >
             <span className="w-7 h-7 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-[#C9A227] shrink-0">
               <Phone className="w-3.5 h-3.5" />
@@ -123,7 +123,7 @@ export function QuickActionBar({
             rel="noopener noreferrer"
             onClick={() => track('website_click', 'business_profile')}
             data-cm-tracked
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-blue-50 hover:border-blue-200 text-stone-800 transition-colors w-full"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-blue-50 hover:border-blue-200 text-stone-800 transition-colors w-full md:w-auto"
           >
             <span className="w-7 h-7 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700 shrink-0">
               <Globe className="w-3.5 h-3.5" />
@@ -136,7 +136,7 @@ export function QuickActionBar({
         {contacts.email && (
           <a
             href={`mailto:${contacts.email}`}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-amber-50 hover:border-amber-200 text-stone-800 transition-colors w-full"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-amber-50 hover:border-amber-200 text-stone-800 transition-colors w-full md:w-auto"
           >
             <span className="w-7 h-7 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-[#C9A227] shrink-0">
               <Mail className="w-3.5 h-3.5" />
@@ -153,7 +153,7 @@ export function QuickActionBar({
             data-cm-tracked
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-amber-50 hover:border-amber-200 text-stone-800 transition-colors w-full"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-amber-50 hover:border-amber-200 text-stone-800 transition-colors w-full md:w-auto"
           >
             <span className="w-7 h-7 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-[#C9A227] shrink-0">
               <MapPin className="w-3.5 h-3.5" />
@@ -168,7 +168,7 @@ export function QuickActionBar({
             href={instagramUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-pink-50 hover:border-pink-200 text-stone-800 transition-colors w-full"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-pink-50 hover:border-pink-200 text-stone-800 transition-colors w-full md:w-auto"
           >
             <span className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-xs">
               <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
@@ -185,7 +185,7 @@ export function QuickActionBar({
             href={facebookUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-blue-50 hover:border-blue-200 text-stone-800 transition-colors w-full"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-blue-50 hover:border-blue-200 text-stone-800 transition-colors w-full md:w-auto"
           >
             <span className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0 shadow-xs">
               <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
@@ -202,7 +202,7 @@ export function QuickActionBar({
             href={linkedinUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-sky-50 hover:border-sky-200 text-stone-800 transition-colors w-full"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-sky-50 hover:border-sky-200 text-stone-800 transition-colors w-full md:w-auto"
           >
             <span className="w-7 h-7 rounded-full bg-sky-700 flex items-center justify-center text-white shrink-0 shadow-xs">
               <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
@@ -219,7 +219,7 @@ export function QuickActionBar({
             href={youtubeUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-rose-50 hover:border-rose-200 text-stone-800 transition-colors w-full"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200/80 bg-stone-50/60 hover:bg-rose-50 hover:border-rose-200 text-stone-800 transition-colors w-full md:w-auto"
           >
             <span className="w-7 h-7 rounded-full bg-rose-600 flex items-center justify-center text-white shrink-0 shadow-xs">
               <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">

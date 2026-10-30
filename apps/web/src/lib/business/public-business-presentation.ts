@@ -541,7 +541,7 @@ export function toPublicBusinessPresentation(
       shortDescription: text((row as any).short_description, 160) || null,
       category: row.primary_category_name,
       description: row.description,
-      logo: publicAsset(row.logo_url, `Logotipo de ${row.business_name}`),
+      logo: (() => { const asset = publicAsset(row.logo_url, `Logotipo de ${row.business_name}`); const bg = text((row as any).logo_background_color || (row as any).logo_bg_color, 24) || undefined; return asset && bg ? { ...asset, backgroundColor: bg } : asset; })(),
       logoBgColor: text((row as any).logo_background_color || (row as any).logo_bg_color, 24) || null,
     },
     authority: {

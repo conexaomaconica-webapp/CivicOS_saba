@@ -6,6 +6,7 @@ import { useFavorites } from '@/lib/directory/favorites-context';
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
 import { getMediaFramingStyle } from '@/lib/business/public-business-presentation';
 import { ReferBusinessModal } from '../sections/ReferBusinessModal';
+import { BusinessAdModal } from '../sections/BusinessAdModal';
 import { InstitutionalBadges } from '../shared/InstitutionalBadges';
 import { QuickActionBar } from '../shared/BusinessActionButtons';
 import { CompanyLogoWithZoom } from '../shared/CompanyLogoWithZoom';
@@ -18,6 +19,7 @@ type GoldBusinessProfileProps = {
 export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
   const [activeTab, setActiveTab] = useState('visao-geral');
   const [referOpen, setReferOpen] = useState(false);
+  const [adModalOpen, setAdModalOpen] = useState(false);
   const { isFavorite, toggleFavorite } = useFavorites();
 
   const { identity, recognition, location, contacts, owner, media } = profile;
@@ -50,11 +52,22 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
           {hasCover ? (
             <>
               {/* Celular: Gradiente Bordô Nobre Canônico (#4B161B) marcante para preservar a identidade do Plano Acácia e garantir leitura nítida */}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#3B0B14] from-0% via-[#4B161B]/90 via-52% to-[#4B161B]/45 to-100% md:hidden" />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#4B161B]/65 via-[#4B161B]/25 to-transparent md:hidden" />
+              <div
+                className="absolute inset-0 md:hidden"
+                style={{
+                  background:
+                    'linear-gradient(0deg, rgba(59, 11, 20, 0.96) 0%, rgba(75, 22, 27, 0.88) 54%, rgba(75, 22, 27, 0.45) 100%)',
+                }}
+              />
 
-              {/* Tablet/Desktop: Fundo Bordô Nobre Canônico suave apenas sob a coluna de informações (0-22%), liberando total claridade e nitidez da foto do centro para a direita */}
-              <div className="absolute inset-0 hidden md:block bg-gradient-to-r from-[#4B161B]/92 from-0% via-[#4B161B]/78 via-22% via-[#4B161B]/20 via-34% to-transparent to-44%" />
+              {/* Tablet/Desktop: Gradiente Bordô Nobre Canônico (#4B161B) premium na coluna de informações à esquerda com transição suave para a foto à direita */}
+              <div
+                className="absolute inset-0 hidden md:block"
+                style={{
+                  background:
+                    'linear-gradient(90deg, rgba(59, 11, 20, 0.96) 0%, rgba(75, 22, 27, 0.92) 28%, rgba(75, 22, 27, 0.72) 44%, rgba(75, 22, 27, 0.25) 60%, rgba(75, 22, 27, 0) 78%), linear-gradient(0deg, rgba(59, 11, 20, 0.65) 0%, rgba(59, 11, 20, 0) 34%)',
+                }}
+              />
             </>
           ) : (
             /* Sem imagem de capa: Cabeçalho 100% Bordô Nobre Canônico do Plano Acácia */
@@ -63,11 +76,11 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
         </div>
 
           {/* Botões de Ação Flutuantes (Canto Superior Direito) */}
-          <div className="absolute top-4 right-4 z-30 flex items-center gap-2.5 text-xs font-medium sm:top-6 sm:right-8">
+          <div className="absolute top-4 right-4 z-30 flex items-center gap-2 text-xs font-medium sm:top-6 sm:right-8">
             <button
               type="button"
               onClick={handleShare}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/20 bg-black/40 px-2.5 font-semibold text-white shadow-xs backdrop-blur-md transition-all hover:bg-black/60 sm:h-auto sm:px-3.5 sm:py-1.5"
+              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/20 bg-black/40 px-2.5 font-semibold text-white shadow-xs backdrop-blur-md transition-all hover:bg-black/60 sm:h-auto sm:px-3.5 sm:py-1.5 cursor-pointer"
             >
               <Share2 className="w-3.5 h-3.5 text-white" />
               <span className="hidden sm:inline">Indicar</span>
@@ -76,13 +89,23 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
             <button
               type="button"
               onClick={() => toggleFavorite(identity.slug)}
-              className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 shadow-xs backdrop-blur-md transition-all sm:h-auto sm:px-3.5 sm:py-1.5 ${isFavorited
+              className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 shadow-xs backdrop-blur-md transition-all sm:h-auto sm:px-3.5 sm:py-1.5 cursor-pointer ${isFavorited
                 ? 'bg-rose-600 text-white border-rose-500 font-bold'
                 : 'bg-black/40 hover:bg-black/60 text-white font-semibold border-white/20'
                 }`}
             >
               <Heart className={`w-3.5 h-3.5 ${isFavorited ? 'fill-white text-white' : 'text-white'}`} />
               <span className="hidden sm:inline">{isFavorited ? 'Favoritado' : 'Favoritar'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAdModalOpen(true)}
+              title="Ver anúncio com capa, contatos e traçar rota"
+              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#f5d76e] bg-gradient-to-r from-[#d4af37] to-[#b5891c] px-3 font-extrabold text-[#2b060d] shadow-md transition-all hover:brightness-105 sm:h-auto sm:px-3.5 sm:py-1.5 cursor-pointer"
+            >
+              <span>🪧</span>
+              <span>Ver Anúncio</span>
             </button>
           </div>
 
@@ -190,6 +213,18 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
       {referOpen && (
         <ReferBusinessModal businessName={identity.name} businessSlug={identity.slug} onClose={() => setReferOpen(false)} />
       )}
+
+      <BusinessAdModal
+        isOpen={adModalOpen}
+        onClose={() => setAdModalOpen(false)}
+        profile={profile}
+        isFavorited={isFavorited}
+        onToggleFavorite={() => toggleFavorite(identity.slug)}
+        onRefer={() => {
+          setAdModalOpen(false);
+          setReferOpen(true);
+        }}
+      />
     </div>
   );
 }
