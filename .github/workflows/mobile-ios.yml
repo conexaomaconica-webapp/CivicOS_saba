@@ -3,8 +3,11 @@ name: iOS Build
 on:
   workflow_dispatch:
   push:
-    tags:
-      - 'v*ios*'
+    branches:
+      - main
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/mobile-ios.yml'
 
 jobs:
   build-ios:
@@ -26,6 +29,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -33,30 +37,41 @@ jobs:
       - name: Build Web Assets
         run: pnpm --filter @saas/mobile build
 
-      - name: Sync Capacitor iOS
+      - name: Setup and Sync Capacitor iOS
         run: |
           cd apps/mobile
-          npx cap sync ios
+          if [ ! -d "ios" ]; then
+            echo "Criando pasta nativa iOS com Capacitor..."
+            npx cap add ios
+          else
+            echo "Sincronizando pasta nativa iOS..."
+            npx cap sync ios
+          fi
+          echo "Aplicando overrides do iOS..."
+          node scripts/apply-ios-overrides.mjs
 
-      - name: Install CocoaPods
+      - name: Ensure CocoaPods Dependencies
         run: |
           cd apps/mobile/ios/App
-          pod install
+          pod install --repo-update
 
-      - name: Build Xcode Project
+      - name: Build Xcode Project (Unsigned Validation)
         run: |
           cd apps/mobile/ios/App
+          set -o pipefail
           xcodebuild -workspace App.xcworkspace \
             -scheme App \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -allowProvisioningUpdates \
             CODE_SIGNING_ALLOWED=NO \
-            build
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            clean build 2>&1 | tee xcodebuild.log
 
-      - name: Archive build artifacts
+      - name: Archive xcodebuild logs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-app-build
-          path: apps/mobile/ios/App/build
-
+          name: ios-xcodebuild-log
+          path: apps/mobile/ios/App/xcodebuild.log
+          if-no-files-found: warn
