@@ -5,7 +5,7 @@
   "description": "Interface mobile local da Conexão Maçônica (iOS/Android)",
   "scripts": {
     "dev": "vite",
-    "sync": "pnpm build && cap sync && node scripts/apply-android-overrides.mjs",
+    "sync": "pnpm build && cap sync && node scripts/apply-android-overrides.mjs && node scripts/apply-ios-overrides.mjs",
     "open:android": "npx cap open android",
     "open:ios": "npx cap open ios",
     "typecheck": "tsc --noEmit",

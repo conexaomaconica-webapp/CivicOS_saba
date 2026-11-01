@@ -53,11 +53,8 @@ session-ses_*.md
 COMPATIBILITY_ANALYSIS_*.md
 scratch/
 
-
 .pnpm-store/
 .npmrc
-.gradle-home/
-.gradle/
 *.tmp
 .augment/
 .cursor/
@@ -67,5 +64,4 @@ scratch/
 .roo/
 .vscode/
 .github/instructions/
-
 .idea/

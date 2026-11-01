@@ -1,0 +1,62 @@
+name: iOS Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*ios*'
+
+jobs:
+  build-ios:
+    name: Build iOS Project (macOS)
+    runs-on: macos-14
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Web Assets
+        run: pnpm --filter @saas/mobile build
+
+      - name: Sync Capacitor iOS
+        run: |
+          cd apps/mobile
+          npx cap sync ios
+
+      - name: Install CocoaPods
+        run: |
+          cd apps/mobile/ios/App
+          pod install
+
+      - name: Build Xcode Project
+        run: |
+          cd apps/mobile/ios/App
+          xcodebuild -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -allowProvisioningUpdates \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app-build
+          path: apps/mobile/ios/App/build
+
