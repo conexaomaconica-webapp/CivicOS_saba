@@ -17,6 +17,7 @@ import { visibleHomeSections, type HomeSectionId } from './home-sections';
 import { claimColdLaunch } from './launch-session';
 import { trackMobileEvent, resetMobileCycleId } from './mobile-analytics';
 import { routeFromHash, routeHref, routeLabels, routes, type Route } from './navigation';
+import { setupPushNotifications, sendTokenToSupabase } from './push-service';
 
 const launchOnThisBoot = claimColdLaunch(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
@@ -4177,6 +4178,36 @@ const STATE_NAMES: Record<string, string> = {
   SC: 'Santa Catarina', SP: 'São Paulo', SE: 'Sergipe', TO: 'Tocantins',
 };
 
+const LODGE_CITIES_BY_STATE: Record<string, string[]> = {
+  AC: ['Rio Branco', 'Cruzeiro do Sul', 'Sena Madureira'],
+  AL: ['Maceió', 'Arapiraca', 'Palmeira dos Índios', 'Rio Largo'],
+  AP: ['Macapá', 'Santana', 'Laranjal do Jari'],
+  AM: ['Manaus', 'Parintins', 'Itacoatiara', 'Manacapuru'],
+  BA: ['Feira de Santana', 'Salvador', 'Itapebi', 'Riachão do Jacuípe', 'Santo Amaro', 'São Sebastião do Passé', 'Vitória da Conquista', 'Camaçari', 'Itabuna', 'Ilhéus', 'Juazeiro', 'Porto Seguro', 'Barreiras', 'Jequié', 'Alagoinhas', 'Teixeira de Freitas'],
+  CE: ['Fortaleza', 'Caucaia', 'Juazeiro do Norte', 'Maracanaú', 'Sobral', 'Crato'],
+  DF: ['Brasília', 'Ceilândia', 'Taguatinga', 'Samambaia', 'Plano Piloto', 'Águas Claras', 'Gama'],
+  ES: ['Barra de São Francisco', 'Ecoporanga', 'Venda Nova do Imigrante', 'Viana', 'Vitória', 'Vila Velha', 'Serra', 'Cariacica', 'Cachoeiro de Itapemirim', 'Linhares', 'São Mateus', 'Colatina', 'Guarapari'],
+  GO: ['Goiânia', 'Aparecida de Goiânia', 'Anápolis', 'Rio Verde', 'Luziânia', 'Águas Lindas de Goiás', 'Valparaíso de Goiás'],
+  MA: ['São Luís', 'Imperatriz', 'São José de Ribamar', 'Timon', 'Caxias'],
+  MT: ['Porto Esperidião', 'Tangará da Serra', 'Cuiabá', 'Várzea Grande', 'Rondonópolis', 'Sinop', 'Sorriso'],
+  MS: ['Ivinhema', 'Mundo Novo', 'Campo Grande', 'Dourados', 'Três Lagoas', 'Corumbá', 'Ponta Porã'],
+  MG: ['Belo Horizonte', 'Uberlândia', 'Contagem', 'Juiz de Fora', 'Betim', 'Montes Claros', 'Ribeirão das Neves', 'Uberaba', 'Governador Valadares', 'Ipatinga', 'Sete Lagoas', 'Divinópolis'],
+  PA: ['Belém', 'Ananindeua', 'Santarém', 'Marabá', 'Parauapebas', 'Castanhal'],
+  PB: ['João Pessoa', 'Piancó', 'Campina Grande', 'Santa Rita', 'Patos', 'Bayeux', 'Sousa', 'Cajazeiras'],
+  PR: ['Curitiba', 'Maringá', 'Toledo', 'Londrina', 'Ponta Grossa', 'Cascavel', 'São José dos Pinhais', 'Foz do Iguaçu'],
+  PE: ['Gravatá', 'Olinda', 'Recife', 'Jaboatão dos Guararapes', 'Caruaru', 'Petrolina', 'Paulista', 'Cabo de Santo Agostinho'],
+  PI: ['Teresina', 'Parnaíba', 'Picos', 'Piripiri', 'Floriano'],
+  RJ: ['Rio de Janeiro', 'Vassouras', 'São Gonçalo', 'Duque de Caxias', 'Nova Iguaçu', 'Niterói', 'Belford Roxo', 'Campos dos Goytacazes', 'São João de Meriti', 'Petrópolis', 'Volta Redonda', 'Macaé', 'Magé', 'Itaboraí', 'Cabo Frio', 'Angra dos Reis', 'Nova Friburgo', 'Barra Mansa', 'Mesquita', 'Teresópolis'],
+  RN: ['Pau dos Ferros', 'Natal', 'Mossoró', 'Parnamirim', 'São Gonçalo do Amarante', 'Ceará-Mirim', 'Macaíba', 'Caicó'],
+  RS: ['Porto Alegre', 'Caxias do Sul', 'Canoas', 'Pelotas', 'Santa Maria', 'Gravataí', 'Viamão', 'Novo Hamburgo', 'São Leopoldo', 'Rio Grande', 'Passo Fundo'],
+  RO: ['Colorado do Oeste', 'Porto Velho', 'Ji-Paraná', 'Ariquemes', 'Vilhena', 'Cacoal'],
+  RR: ['Boa Vista', 'Caracaraí', 'Rorainópolis'],
+  SC: ['Florianópolis', 'Joinville', 'Blumenau', 'São José', 'Chapecó', 'Itajaí', 'Criciúma', 'Jaraguá do Sul', 'Palhoça', 'Lages', 'Balneário Camboriú', 'Brusque'],
+  SP: ['Andradina', 'Capão Bonito', 'Catanduva', 'Espírito Santo do Pinhal', 'Itirapina', 'Juquiá', 'Pradópolis', 'São Paulo', 'Tatuí', 'Teodoro Sampaio', 'Guarulhos', 'Campinas', 'São Bernardo do Campo', 'Santo André', 'São José dos Campos', 'Osasco', 'Ribeirão Preto', 'Sorocaba', 'Santos', 'São José do Rio Preto', 'Mogi das Cruzes', 'Jundiaí', 'Piracicaba', 'Bauru', 'Franca', 'Itaquaquecetuba', 'São Vicente', 'Carapicuíba', 'Praia Grande'],
+  SE: ['Aracaju', 'Nossa Senhora do Socorro', 'Lagarto', 'Itabaiana', 'São Cristóvão', 'Estância'],
+  TO: ['Palmas', 'Araguaína', 'Gurupi', 'Porto Nacional'],
+};
+
 const DAYS_OF_WEEK = [
   { value: 'segunda', label: 'Segunda-feira' },
   { value: 'terca', label: 'Terça-feira' },
@@ -4607,6 +4638,15 @@ function HomeLodgesSection({
 
   const hasFilter = Boolean(state || city || potency || rite || day);
 
+  const availableCities = useMemo(() => {
+    if (state && LODGE_CITIES_BY_STATE[state]) {
+      return LODGE_CITIES_BY_STATE[state];
+    }
+    const all = new Set<string>();
+    Object.values(LODGE_CITIES_BY_STATE).forEach((cities) => cities.forEach((c) => all.add(c)));
+    return Array.from(all).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [state]);
+
   const handleClear = () => {
     setState('');
     setCity('');
@@ -4685,7 +4725,14 @@ function HomeLodgesSection({
               id="home-lodge-state"
               className="lodges-filter-select"
               value={state}
-              onChange={(e) => setState(e.target.value)}
+              onChange={(e) => {
+                const nextState = e.target.value;
+                setState(nextState);
+                if (nextState && city) {
+                  const allowed = LODGE_CITIES_BY_STATE[nextState] || [];
+                  if (!allowed.includes(city)) setCity('');
+                }
+              }}
             >
               <option value="">Todos os Estados</option>
               {Object.entries(STATE_NAMES).map(([uf, name]) => (
@@ -4698,15 +4745,19 @@ function HomeLodgesSection({
 
           <div className="lodges-filter-field">
             <label className="lodges-filter-label" htmlFor="home-lodge-city">Cidade</label>
-            <input
+            <select
               id="home-lodge-city"
-              type="text"
               className="lodges-filter-select"
-              placeholder="Ex: Feira de Santana"
               value={city}
               onChange={(e) => setCity(e.target.value)}
-              style={{ backgroundImage: 'none', paddingRight: 9 }}
-            />
+            >
+              <option value="">{state ? `Todas as Cidades (${state})` : 'Todas as Cidades'}</option>
+              {availableCities.map((cityName) => (
+                <option key={cityName} value={cityName}>
+                  {cityName}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="lodges-filter-field">
@@ -4985,6 +5036,15 @@ function LojasScreen({
     performSearch();
   }, [search, state, city, potency, rite, day]);
 
+  const availableCities = useMemo(() => {
+    if (state && LODGE_CITIES_BY_STATE[state]) {
+      return LODGE_CITIES_BY_STATE[state];
+    }
+    const all = new Set<string>();
+    Object.values(LODGE_CITIES_BY_STATE).forEach((cities) => cities.forEach((c) => all.add(c)));
+    return Array.from(all).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [state]);
+
   const handleClearFilters = () => {
     setSearch('');
     setState('');
@@ -5054,7 +5114,14 @@ function LojasScreen({
                 id="lojas-filter-state"
                 className="lodges-filter-select"
                 value={state}
-                onChange={(e) => setState(e.target.value)}
+                onChange={(e) => {
+                  const nextState = e.target.value;
+                  setState(nextState);
+                  if (nextState && city) {
+                    const allowed = LODGE_CITIES_BY_STATE[nextState] || [];
+                    if (!allowed.includes(city)) setCity('');
+                  }
+                }}
               >
                 <option value="">Todos os Estados</option>
                 {Object.entries(STATE_NAMES).map(([uf, name]) => (
@@ -5067,15 +5134,19 @@ function LojasScreen({
 
             <div className="lodges-filter-field">
               <label className="lodges-filter-label" htmlFor="lojas-filter-city">Cidade</label>
-              <input
+              <select
                 id="lojas-filter-city"
-                type="text"
                 className="lodges-filter-select"
-                placeholder="Ex: Feira de Santana"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                style={{ backgroundImage: 'none', paddingRight: 9 }}
-              />
+              >
+                <option value="">{state ? `Todas as Cidades (${state})` : 'Todas as Cidades'}</option>
+                {availableCities.map((cityName) => (
+                  <option key={cityName} value={cityName}>
+                    {cityName}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="lodges-filter-field">
@@ -6619,8 +6690,8 @@ function Home({
             <h2 id="sponsored-title">Empresas — Pedra Fundamental</h2>
           </div>
           <div className="pedra-marquee-container" aria-label="Marcas Pedra Fundamental">
-            <div className="pedra-marquee-track">
-              {[...displayBizs, ...displayBizs].map((biz, idx) => (
+            <div className={`pedra-marquee-track ${displayBizs.length < 4 ? 'no-animation' : ''}`}>
+              {(displayBizs.length >= 4 ? [...displayBizs, ...displayBizs] : displayBizs).map((biz, idx) => (
                 <button
                   type="button"
                   key={`${biz.id}-${idx}`}
@@ -6955,6 +7026,10 @@ export function App() {
     try {
       localStorage.setItem('cm_mobile_member_user', JSON.stringify(user));
       localStorage.setItem('cm_mobile_referrer_name', user.name);
+      const cachedToken = localStorage.getItem('cm_fcm_device_token');
+      if (cachedToken) {
+        sendTokenToSupabase({ token: cachedToken, memberEmail: user.email, memberId: user.id });
+      }
     } catch {}
     setIsMemberLoginModalOpen(false);
     if (openShareAfterLogin) {
@@ -6986,6 +7061,25 @@ export function App() {
     setToastMsg('Sua conta e seus dados foram excluídos com sucesso.');
     toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 3000);
   };
+
+  useEffect(() => {
+    setupPushNotifications({
+      onNotificationReceived: (notification) => {
+        if (notification.title) {
+          if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+          setToastMsg(`🔔 ${notification.title}: ${notification.body || ''}`);
+          toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 4000);
+        }
+      },
+      onActionPerformed: (action) => {
+        const targetRoute = action.notification?.data?.route;
+        if (targetRoute && typeof targetRoute === 'string') {
+          window.location.hash = targetRoute.startsWith('#') ? targetRoute : `#/${targetRoute}`;
+        }
+      },
+      getMemberUser: () => memberUser,
+    });
+  }, [memberUser]);
 
   useEffect(() => {
     const onHashChange = () => setRoute(routeFromHash(window.location.hash));

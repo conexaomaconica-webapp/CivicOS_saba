@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "241555772461",
+    "project_id": "conexao-maconica",
+    "storage_bucket": "conexao-maconica.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:241555772461:android:8988347aab2d284fd054a4",
+        "android_client_info": {
+          "package_name": "com.conexaomaconica.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB1oV-LTcGa4an3em3KEMu9uQuKdUz7LAU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
