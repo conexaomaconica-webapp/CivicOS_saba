@@ -34,8 +34,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build Web Assets
-        run: pnpm --filter @saas/mobile build
+      - name: Build Web Assets and Monorepo Dependencies
+        run: pnpm turbo run build --filter=@saas/mobile...
 
       - name: Setup and Sync Capacitor iOS
         run: |
