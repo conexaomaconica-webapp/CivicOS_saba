@@ -542,6 +542,18 @@ export async function loadBusinessDetailFromDirectSupabase(
   }
 }
 
+function resolveDbPotency(code?: string | null): string | null {
+  const c = String(code ?? '').trim().toUpperCase();
+  if (!c) return null;
+  if (c === 'CMSB' || c === 'GLEB' || c === 'GLMMG' || c === 'GLESP' || c === 'GLMERJ' || c === 'GLSC') {
+    return 'GRANDE LOJA - CMSB';
+  }
+  if (c === 'GOB') return 'GRANDE ORIENTE DO BRASIL – GOB';
+  if (c === 'COMAB' || c === 'GOP') return 'GRANDE ORIENTE - COMAB';
+  if (c === 'GOSP') return 'GRANDE ORIENTE DE SÃO PAULO - GOSP';
+  return code?.trim() || null;
+}
+
 export async function loadLodgesFromDirectSupabase(
   fetchImpl: typeof fetch,
   filters?: MobileLodgeFilterState,
@@ -566,9 +578,10 @@ export async function loadLodgesFromDirectSupabase(
         },
         body: JSON.stringify({
           p_host: host,
+          p_query: filters?.query?.trim() || null,
           p_state: filters?.state?.trim() || null,
           p_city: filters?.city?.trim() || null,
-          p_potency: filters?.potency?.trim() || null,
+          p_potency: resolveDbPotency(filters?.potency),
           p_rite: filters?.rite?.trim() || null,
           p_meeting_day: filters?.meetingDay?.trim() || null,
           p_sort: 'name',
@@ -585,7 +598,7 @@ export async function loadLodgesFromDirectSupabase(
 
     const payload = await res.json();
     const rawItems = Array.isArray(payload?.items) ? payload.items : [];
-    const items: MobileLodgeCardData[] = rawItems.map((item: Record<string, unknown>) => ({
+    let items: MobileLodgeCardData[] = rawItems.map((item: Record<string, unknown>) => ({
       id: String(item.id || ''),
       slug: String(item.slug || ''),
       name: String(item.name || ''),
@@ -605,6 +618,44 @@ export async function loadLodgesFromDirectSupabase(
       primary_meeting: (item.primary_meeting && typeof item.primary_meeting === 'object') ? (item.primary_meeting as MobileLodgeMeetingData) : null,
       is_featured: item.is_featured === true,
     }));
+
+    if (items.length > 0 && items.some((i) => !i.primary_meeting)) {
+      try {
+        const idsParam = items.map((i) => i.id).filter(Boolean).join(',');
+        if (idsParam) {
+          const meetRes = await fetchWithTimeout(
+            fetchImpl,
+            `${supabaseUrl}/rest/v1/organization_meetings?select=organization_id,meeting_day,meeting_time,label,sort_order&organization_id=in.(${idsParam})&is_public=eq.true&order=sort_order.asc`,
+            {
+              headers: {
+                apikey: anonKey,
+                Authorization: `Bearer ${anonKey}`,
+              },
+            },
+            2000,
+          );
+          if (meetRes.ok) {
+            const meetRows = await meetRes.json();
+            if (Array.isArray(meetRows)) {
+              const firstByOrg = new Map<string, MobileLodgeMeetingData>();
+              for (const r of meetRows) {
+                if (r && typeof r === 'object' && r.organization_id && !firstByOrg.has(String(r.organization_id))) {
+                  firstByOrg.set(String(r.organization_id), {
+                    day: typeof r.meeting_day === 'string' ? r.meeting_day : null,
+                    time: typeof r.meeting_time === 'string' ? r.meeting_time : null,
+                    label: typeof r.label === 'string' ? r.label : null,
+                  });
+                }
+              }
+              items = items.map((it) => ({
+                ...it,
+                primary_meeting: it.primary_meeting ?? firstByOrg.get(it.id) ?? null,
+              }));
+            }
+          }
+        }
+      } catch {}
+    }
 
     return {
       items,
@@ -678,6 +729,133 @@ export async function loadLodgeDetailFromDirectSupabase(
   }
 }
 
+export type MobileConnectionFeedItem = {
+  id: string;
+  connection_type: 'compra' | 'servico' | 'parceria' | 'visita';
+  item_description: string | null;
+  message: string | null;
+  photo_url: string | null;
+  member_first_name: string;
+  business_name: string;
+  business_slug: string;
+  like_count: number;
+  liked_by_me: boolean;
+};
+
+export async function loadConnectionsFeedFromDirectSupabase(
+  fetchImpl: typeof fetch,
+  limit = 6,
+): Promise<{ items: MobileConnectionFeedItem[]; confirmedTotal: number }> {
+  const supabaseUrl = 'https://rwvztwsjcjljphqttiws.supabase.co';
+  const anonKey =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3dnp0d3NqY2psanBocXR0aXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3ODk4MTIsImV4cCI6MjEwMTM2NTgxMn0.1p7e82BNjYQBKkOdbSlXZ0WLiV-Hl8T-IGicUTn9GHc';
+  const host = 'localhost';
+
+  try {
+    const [feedRes, countRes] = await Promise.all([
+      fetchWithTimeout(
+        fetchImpl,
+        `${supabaseUrl}/rest/v1/rpc/public_connections_feed`,
+        {
+          method: 'POST',
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${anonKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            p_host: host,
+            p_limit: limit,
+            p_only_with_photo: false,
+          }),
+        },
+        2500,
+      ).catch(() => null),
+      fetchWithTimeout(
+        fetchImpl,
+        `${supabaseUrl}/rest/v1/rpc/public_confirmed_connections_count`,
+        {
+          method: 'POST',
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${anonKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ p_host: host }),
+        },
+        2500,
+      ).catch(() => null),
+    ]);
+
+    const rawFeed = feedRes && feedRes.ok ? await feedRes.json().catch(() => []) : [];
+    const rawCount = countRes && countRes.ok ? await countRes.json().catch(() => 0) : 0;
+
+    const items: MobileConnectionFeedItem[] = (Array.isArray(rawFeed) ? rawFeed : []).map((r: Record<string, unknown>) => ({
+      id: String(r.id || ''),
+      connection_type:
+        r.connection_type === 'servico' || r.connection_type === 'parceria' || r.connection_type === 'visita'
+          ? r.connection_type
+          : 'compra',
+      item_description: typeof r.item_description === 'string' ? r.item_description : null,
+      message: typeof r.message === 'string' ? r.message : null,
+      photo_url: typeof r.photo_url === 'string' ? r.photo_url : null,
+      member_first_name: String(r.member_first_name || 'Ir.'),
+      business_name: String(r.business_name || 'Empresa'),
+      business_slug: String(r.business_slug || ''),
+      like_count: Number(r.like_count ?? 0),
+      liked_by_me: Boolean(r.liked_by_me),
+    }));
+
+    return {
+      items,
+      confirmedTotal: Number(rawCount ?? items.length) || 0,
+    };
+  } catch {
+    return { items: [], confirmedTotal: 0 };
+  }
+}
+
+export async function loadEventsFromDirectSupabase(
+  fetchImpl: typeof fetch,
+): Promise<MobileEventItem[]> {
+  const supabaseUrl = 'https://rwvztwsjcjljphqttiws.supabase.co';
+  const anonKey =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3dnp0d3NqY2psanBocXR0aXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3ODk4MTIsImV4cCI6MjEwMTM2NTgxMn0.1p7e82BNjYQBKkOdbSlXZ0WLiV-Hl8T-IGicUTn9GHc';
+
+  try {
+    const res = await fetchWithTimeout(
+      fetchImpl,
+      `${supabaseUrl}/rest/v1/events_and_posts?select=*&is_published=eq.true&order=event_date.asc&limit=30`,
+      {
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+        },
+      },
+      2500,
+    );
+    if (!res.ok) return [];
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return [];
+    return rows.map((row: Record<string, unknown>): MobileEventItem => ({
+      id: String(row.id || ''),
+      slug: String(row.slug || ''),
+      title: String(row.title || ''),
+      summary: typeof row.description === 'string' ? row.description : typeof row.summary === 'string' ? row.summary : null,
+      event_date: typeof row.event_date === 'string' ? row.event_date : null,
+      location_label: typeof row.location_name === 'string' ? row.location_name : null,
+      city: typeof row.city === 'string' ? row.city : typeof row.location_name === 'string' ? row.location_name : null,
+      state: typeof row.state === 'string' ? row.state : null,
+      organizer_name: typeof row.organizer_name === 'string' ? row.organizer_name : null,
+      organizer_type: row.organizer_type === 'lodge' ? 'lodge' : 'business',
+      cover_url: typeof row.cover_url === 'string' ? row.cover_url : null,
+      cta_url: typeof row.cta_url === 'string' ? row.cta_url : null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export function createMobileGuideService(
   fetchImpl: typeof fetch = fetch,
   endpoint = ((import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_MOBILE_GUIDE_API_URL)?.trim() || '',
@@ -735,6 +913,14 @@ export function createMobileGuideService(
 
     async loadLodgeDetail(slug: string): Promise<MobileLodgeDetail | null> {
       return await loadLodgeDetailFromDirectSupabase(fetchImpl, slug);
+    },
+
+    async loadConnectionsFeed(limit = 6) {
+      return await loadConnectionsFeedFromDirectSupabase(fetchImpl, limit);
+    },
+
+    async loadEvents() {
+      return await loadEventsFromDirectSupabase(fetchImpl);
     },
   };
 }

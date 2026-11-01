@@ -5,6 +5,8 @@ import { LaunchExperience } from './LaunchExperience';
 import {
   createMobileGuideService,
   type MobileBusinessDetail,
+  type MobileConnectionFeedItem,
+  type MobileEventItem,
   type MobileGuideBanner,
   type MobileGuideHomeData,
   type MobileGuideSponsoredBusiness,
@@ -981,11 +983,25 @@ function MuralDeConexoesSection({
   onOpenShareExperience: () => void;
   onSelectBusiness?: (slug: string) => void;
 }) {
-  const [likes, setLikes] = useState<Record<string, { count: number; liked: boolean }>>({
-    'conn-1': { count: 8, liked: false },
-    'conn-2': { count: 14, liked: true },
-    'conn-3': { count: 5, liked: false },
-  });
+  const [feedItems, setFeedItems] = useState<MobileConnectionFeedItem[]>([]);
+  const [confirmedTotal, setConfirmedTotal] = useState<number>(0);
+  const [likes, setLikes] = useState<Record<string, { count: number; liked: boolean }>>({});
+  const guideServiceRef = useRef(createMobileGuideService());
+
+  useEffect(() => {
+    guideServiceRef.current
+      .loadConnectionsFeed(6)
+      .then((res) => {
+        setFeedItems(res.items || []);
+        setConfirmedTotal(res.confirmedTotal || 0);
+        const initialLikes: Record<string, { count: number; liked: boolean }> = {};
+        for (const item of res.items || []) {
+          initialLikes[item.id] = { count: item.like_count ?? 0, liked: Boolean(item.liked_by_me) };
+        }
+        setLikes(initialLikes);
+      })
+      .catch(() => {});
+  }, []);
 
   const toggleLike = (id: string) => {
     setLikes((prev) => {
@@ -1001,38 +1017,12 @@ function MuralDeConexoesSection({
     });
   };
 
-  const sampleConnections = [
-    {
-      id: 'conn-1',
-      memberName: 'Ir. Fernando',
-      actionVerb: 'comprou produtos na',
-      businessName: 'Óptica e Relojoaria Aliança',
-      businessSlug: 'optica-alianca',
-      item: 'óculos solar e armação de grau',
-      message: 'Atendimento fraterno exemplar e cumprimento pontual do benefício exclusivo da rede. Recomendo com toda certeza!',
-      confirmed: true,
-    },
-    {
-      id: 'conn-2',
-      memberName: 'Ir. Carlos Alberto',
-      actionVerb: 'contratou serviços na',
-      businessName: 'Oficina & Centro Automotivo Fraternidade',
-      businessSlug: 'oficina-fraternidade',
-      item: 'revisão completa e alinhamento',
-      message: 'Serviço executado com excelência, clareza no orçamento e transparência impecável. Fortalecendo quem fortalece a nossa rede.',
-      confirmed: true,
-    },
-    {
-      id: 'conn-3',
-      memberName: 'Ir. Marcos',
-      actionVerb: 'firmou parceria com',
-      businessName: 'Construtora & Engenharia Acácia',
-      businessSlug: 'construtora-acacia',
-      item: 'fornecimento de esquadrias',
-      message: 'Parceria frutífera realizada através do ecossistema Conexão Maçônica. Confiança mútua do início ao fim.',
-      confirmed: true,
-    },
-  ];
+  const verbForType = (type: MobileConnectionFeedItem['connection_type']) => {
+    if (type === 'servico') return 'contratou em';
+    if (type === 'parceria') return 'firmou parceria com';
+    if (type === 'visita') return 'visitou';
+    return 'comprou em';
+  };
 
   return (
     <section className="guide-section section-soft mural-section-wrapper" aria-labelledby="mural-title">
@@ -1052,9 +1042,11 @@ function MuralDeConexoesSection({
             Conexões reais de quem comprou, contratou, fez parceria ou visitou empresas da plataforma. Cada registro é confirmado pela empresa.
           </p>
         </div>
-        <span className="mural-confirmed-badge">
-          <span>✓</span> 42 confirmadas
-        </span>
+        {confirmedTotal > 0 && (
+          <span className="mural-confirmed-badge">
+            <span>✓</span> {confirmedTotal} {confirmedTotal === 1 ? 'confirmada' : 'confirmadas'}
+          </span>
+        )}
       </div>
 
       {/* Card Principal em Destaque (Formato Web Fiel) */}
@@ -1121,51 +1113,53 @@ function MuralDeConexoesSection({
       </div>
 
       {/* Feed com registros confirmados pela comunidade */}
-      <div className="mural-feed-list" aria-label="Depoimentos recentes do Mural">
-        {sampleConnections.map((item) => {
-          const likeState = likes[item.id] || { count: 0, liked: false };
-          return (
-            <article key={item.id} className="mural-feed-card">
-              <div className="mural-feed-card-header">
-                <span className="mural-feed-member-info">
-                  <strong>{item.memberName}</strong> {item.actionVerb}{' '}
-                  <a
-                    href={`#/empresas`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (onSelectBusiness) onSelectBusiness(item.businessSlug);
-                    }}
-                  >
-                    {item.businessName}
-                  </a>
-                  {item.item && <span style={{ color: '#6b7280' }}> ({item.item})</span>}
-                </span>
-              </div>
-
-              {item.message && (
-                <div className="mural-feed-body">
-                  <p className="mural-feed-quote">&ldquo;{item.message}&rdquo;</p>
+      {feedItems.length > 0 && (
+        <div className="mural-feed-list" aria-label="Depoimentos recentes do Mural">
+          {feedItems.map((item) => {
+            const likeState = likes[item.id] || { count: item.like_count ?? 0, liked: false };
+            return (
+              <article key={item.id} className="mural-feed-card">
+                <div className="mural-feed-card-header">
+                  <span className="mural-feed-member-info">
+                    <strong>{item.member_first_name}</strong> {verbForType(item.connection_type)}{' '}
+                    <a
+                      href="#/empresas"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (onSelectBusiness) onSelectBusiness(item.business_slug);
+                      }}
+                    >
+                      {item.business_name}
+                    </a>
+                    {item.item_description && <span style={{ color: '#6b7280' }}> ({item.item_description})</span>}
+                  </span>
                 </div>
-              )}
 
-              <div className="mural-feed-card-footer">
-                <span className="mural-feed-verified-badge">
-                  <span>✓</span> Confirmado pela empresa
-                </span>
-                <button
-                  type="button"
-                  className={`mural-feed-like-btn ${likeState.liked ? 'liked' : ''}`}
-                  onClick={() => toggleLike(item.id)}
-                  title={likeState.liked ? 'Descurtir' : 'Apoiar e curtir'}
-                >
-                  <span>{likeState.liked ? '❤️' : '🤍'}</span>
-                  <span>{likeState.count}</span>
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
+                {item.message && (
+                  <div className="mural-feed-body">
+                    <p className="mural-feed-quote">&ldquo;{item.message}&rdquo;</p>
+                  </div>
+                )}
+
+                <div className="mural-feed-card-footer">
+                  <span className="mural-feed-verified-badge">
+                    <span>✓</span> Confirmado pela empresa
+                  </span>
+                  <button
+                    type="button"
+                    className={'mural-feed-like-btn ' + (likeState.liked ? 'liked' : '')}
+                    onClick={() => toggleLike(item.id)}
+                    title={likeState.liked ? 'Descurtir' : 'Apoiar e curtir'}
+                  >
+                    <span>{likeState.liked ? '❤️' : '🤍'}</span>
+                    <span>{likeState.count}</span>
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
@@ -1179,26 +1173,38 @@ function MemberLoginModal({
   onClose: () => void;
   onLoginSuccess: (user: { id: string; name: string; email: string }) => void;
 }) {
-  const [email, setEmail] = useState('membro@conexaomaconica.com.br');
-  const [password, setPassword] = useState('12345678');
-  const [memberName, setMemberName] = useState(() => {
-    try {
-      return localStorage.getItem('cm_mobile_referrer_name') || 'Ir. Membro';
-    } catch {
-      return 'Ir. Membro';
-    }
-  });
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
+  const deriveMemberName = (rawEmail: string) => {
+    const localPart = rawEmail.split('@')[0] || 'Membro';
+    const cleaned = localPart.replace(/[._-]+/g, ' ').trim();
+    if (!cleaned) return 'Membro';
+    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  };
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !email.includes('@')) {
-      setError('Por favor, informe um e-mail válido de membro.');
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setError('Por favor, informe um e-mail válido.');
       return;
     }
+    if (!password || password.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+    if (mode === 'register' && password !== confirmPassword) {
+      setError('As senhas informadas não conferem.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -1206,11 +1212,18 @@ function MemberLoginModal({
       setLoading(false);
       const user = {
         id: 'member-' + Date.now(),
-        name: memberName.trim() || 'Ir. Membro',
-        email: email.trim(),
+        name: deriveMemberName(cleanEmail),
+        email: cleanEmail,
       };
+      try {
+        const rawList = localStorage.getItem('cm_mobile_registered_members');
+        const list: Array<{ id: string; name: string; email: string }> = rawList ? JSON.parse(rawList) : [];
+        const filtered = list.filter((u) => u.email !== cleanEmail);
+        filtered.push(user);
+        localStorage.setItem('cm_mobile_registered_members', JSON.stringify(filtered));
+      } catch {}
       onLoginSuccess(user);
-    }, 400);
+    }, 350);
   };
 
   return (
@@ -1218,7 +1231,7 @@ function MemberLoginModal({
       className="refer-modal-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Acesso Exclusivo de Membro"
+      aria-label="Acesso de Membro"
       onClick={(e) => {
         if (e.target === e.currentTarget && !loading) onClose();
       }}
@@ -1236,31 +1249,77 @@ function MemberLoginModal({
         </button>
 
         <div className="member-login-badge">
-          <span>🔒</span> Área Exclusiva para Membros
+          <span>🔒</span> Área de Membros
         </div>
 
-        <h3 className="refer-title" style={{ fontSize: '1.25rem', marginBottom: 4 }}>
-          Acesse sua conta
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 6,
+            background: '#f5f0e8',
+            padding: 4,
+            borderRadius: 10,
+            marginBottom: 14,
+          }}
+          role="tablist"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'login'}
+            onClick={() => {
+              setMode('login');
+              setError(null);
+            }}
+            style={{
+              padding: '8px 10px',
+              borderRadius: 8,
+              border: 'none',
+              background: mode === 'login' ? '#4b161b' : 'transparent',
+              color: mode === 'login' ? '#ffffff' : '#4b161b',
+              fontWeight: 700,
+              fontSize: '0.8rem',
+              cursor: 'pointer',
+            }}
+          >
+            Entrar
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'register'}
+            onClick={() => {
+              setMode('register');
+              setError(null);
+            }}
+            style={{
+              padding: '8px 10px',
+              borderRadius: 8,
+              border: 'none',
+              background: mode === 'register' ? '#4b161b' : 'transparent',
+              color: mode === 'register' ? '#ffffff' : '#4b161b',
+              fontWeight: 700,
+              fontSize: '0.8rem',
+              cursor: 'pointer',
+            }}
+          >
+            Cadastrar
+          </button>
+        </div>
+
+        <h3 className="refer-title" style={{ fontSize: '1.2rem', marginBottom: 4 }}>
+          {mode === 'login' ? 'Acesse sua conta' : 'Criar conta de membro'}
         </h3>
-        <p className="refer-subtitle" style={{ maxWidth: '100%', marginBottom: 16 }}>
-          Para registrar e compartilhar sua experiência no Mural de Conexões, confirme seu acesso como membro da comunidade.
+        <p className="refer-subtitle" style={{ maxWidth: '100%', marginBottom: 14 }}>
+          {mode === 'login'
+            ? 'Informe seu e-mail e senha para acessar a área de membros.'
+            : 'Cadastre seu e-mail e crie uma senha para acessar e registrar experiências na rede.'}
         </p>
 
         <form onSubmit={handleSubmit}>
           <label className="experience-field-label">
-            Nome do Irmão / Membro:
-          </label>
-          <input
-            type="text"
-            className="member-login-input"
-            value={memberName}
-            onChange={(e) => setMemberName(e.target.value)}
-            placeholder="Ex.: Ir. Carlos Alberto"
-            required
-          />
-
-          <label className="experience-field-label">
-            E-mail cadastrado:
+            E-mail:
           </label>
           <input
             type="email"
@@ -1268,6 +1327,7 @@ function MemberLoginModal({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="seu.email@dominio.com"
+            autoComplete="email"
             required
           />
 
@@ -1280,8 +1340,26 @@ function MemberLoginModal({
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
+            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             required
           />
+
+          {mode === 'register' && (
+            <>
+              <label className="experience-field-label">
+                Confirmar Senha:
+              </label>
+              <input
+                type="password"
+                className="member-login-input"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                required
+              />
+            </>
+          )}
 
           {error && (
             <p style={{ color: '#be123c', fontSize: '0.78rem', margin: '4px 0 10px' }}>
@@ -1294,8 +1372,35 @@ function MemberLoginModal({
             className="member-login-submit-btn"
             disabled={loading}
           >
-            {loading ? 'Validando acesso...' : 'Acessar como Membro'}
+            {loading
+              ? 'Processando...'
+              : mode === 'login'
+                ? 'Entrar'
+                : 'Criar conta e acessar'}
           </button>
+
+          <div style={{ textAlign: 'center', marginTop: 12 }}>
+            <button
+              type="button"
+              onClick={() => {
+                setMode(mode === 'login' ? 'register' : 'login');
+                setError(null);
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#8c671d',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                textDecoration: 'underline',
+              }}
+            >
+              {mode === 'login'
+                ? 'Ainda não tem conta? Cadastre-se para acessar'
+                : 'Já possui cadastro? Entrar com e-mail e senha'}
+            </button>
+          </div>
 
           <p className="member-login-note">
             Ambiente protegido e confidencial. Dados preservados conforme regras fraternais e LGPD.
@@ -3241,38 +3346,7 @@ function BusinessDetailModal({
   );
 }
 
-const DEFAULT_COMMUNITY_EVENTS = [
-  {
-    id: 'ev-1',
-    title: 'Encontro de Negócios & Fraternidade — Rede Conexão Maçônica',
-    summary: 'Rodada de networking, apresentação de empresas Pedra Fundamental e fortalecimento de parcerias comerciais entre irmãos e familiares.',
-    event_date: 'Agenda Permanente',
-    city: 'Feira de Santana',
-    state: 'BA',
-    organizer_name: 'Conexão Maçônica',
-    organizer_type: 'business' as const,
-  },
-  {
-    id: 'ev-2',
-    title: 'Sessão Pública & Palestra Institucional das Oficinas Regulares',
-    summary: 'Calendário integrado de sessões magnas brancas, palestras culturais e ações filantrópicas das Lojas Maçônicas parceiras.',
-    event_date: 'Mensal',
-    city: 'Salvador',
-    state: 'BA',
-    organizer_name: 'Lojas Maçônicas da Rede',
-    organizer_type: 'lodge' as const,
-  },
-  {
-    id: 'ev-3',
-    title: 'Semana de Benefícios Exclusivos da Família Maçônica',
-    summary: 'Condições diferenciadas de atendimento e vantagens em saúde, óptica, gastronomia, segurança e serviços profissionais.',
-    event_date: 'Em andamento',
-    city: 'Todo o Brasil',
-    state: 'BR',
-    organizer_name: 'Empresas Parceiras',
-    organizer_type: 'business' as const,
-  },
-];
+const DEFAULT_COMMUNITY_EVENTS: MobileEventItem[] = [];
 
 function BeneficiosScreen({
   search,
@@ -3462,6 +3536,7 @@ function EmptyScreen({
   memberUser,
   onOpenMemberLogin,
   onLogoutMember,
+  onDeleteMemberAccount,
   onStartShareExperience,
   maisSubView = 'menu',
   onChangeMaisSubView,
@@ -3475,6 +3550,7 @@ function EmptyScreen({
   memberUser?: { id: string; name: string; email: string } | null;
   onOpenMemberLogin?: () => void;
   onLogoutMember?: () => void;
+  onDeleteMemberAccount?: () => void;
   onStartShareExperience?: () => void;
   maisSubView?: 'menu' | 'eventos';
   onChangeMaisSubView?: (view: 'menu' | 'eventos') => void;
@@ -3482,16 +3558,32 @@ function EmptyScreen({
   onChangeEventTypeFilter?: (filter: 'all' | 'empresas' | 'lojas') => void;
   searchQuery?: string;
 }) {
+  const [eventsList, setEventsList] = useState<MobileEventItem[]>(DEFAULT_COMMUNITY_EVENTS);
+  const [loadingEvents, setLoadingEvents] = useState(false);
+  const [confirmingDeleteAccount, setConfirmingDeleteAccount] = useState(false);
+  const guideServiceRef = useRef(createMobileGuideService());
+
+  useEffect(() => {
+    if (route === 'mais' && maisSubView === 'eventos') {
+      setLoadingEvents(true);
+      guideServiceRef.current
+        .loadEvents()
+        .then((items) => setEventsList(items || []))
+        .catch(() => setEventsList([]))
+        .finally(() => setLoadingEvents(false));
+    }
+  }, [route, maisSubView]);
+
   if (route === 'mais') {
     if (maisSubView === 'eventos') {
       const qClean = searchQuery.trim().toLowerCase();
-      const filteredEvents = DEFAULT_COMMUNITY_EVENTS.filter((ev) => {
+      const filteredEvents = eventsList.filter((ev) => {
         if (eventTypeFilter === 'empresas' && ev.organizer_type !== 'business') return false;
         if (eventTypeFilter === 'lojas' && ev.organizer_type !== 'lodge') return false;
         if (qClean) {
-          const matchTitle = ev.title.toLowerCase().includes(qClean);
-          const matchSummary = ev.summary.toLowerCase().includes(qClean);
-          const matchCity = ev.city.toLowerCase().includes(qClean);
+          const matchTitle = (ev.title || '').toLowerCase().includes(qClean);
+          const matchSummary = (ev.summary || '').toLowerCase().includes(qClean);
+          const matchCity = (ev.city || '').toLowerCase().includes(qClean);
           if (!matchTitle && !matchSummary && !matchCity) return false;
         }
         return true;
@@ -3570,10 +3662,10 @@ function EmptyScreen({
               </article>
             ))}
 
-            {filteredEvents.length === 0 && (
+            {!loadingEvents && filteredEvents.length === 0 && (
               <div className="empty-results">
-                <b>Nenhum evento encontrado</b>
-                <p>Tente alterar o filtro entre Todos, Empresas ou Lojas Maçônicas.</p>
+                <b>Nenhum evento ou comunicado publicado no momento</b>
+                <p>Novos eventos de empresas parceiras e Lojas Maçônicas aparecerão nesta agenda assim que publicados.</p>
               </div>
             )}
           </div>
@@ -3690,30 +3782,109 @@ function EmptyScreen({
                 : 'Identifique-se para registrar experiências no Mural de Conexões e personalizar suas indicações fraternas.'}
             </p>
             {memberUser ? (
-              <div style={{ display: 'flex', gap: 8 }}>
-                <Button
-                  className="action-button"
-                  onClick={() => onStartShareExperience?.()}
-                  style={{ flex: 1, marginTop: 0, minHeight: 40, fontSize: '0.82rem' }}
-                >
-                  Compartilhar Experiência
-                </Button>
-                <button
-                  type="button"
-                  onClick={onLogoutMember}
-                  style={{
-                    padding: '0 14px',
-                    borderRadius: 12,
-                    border: '1px solid #d1d5db',
-                    background: '#ffffff',
-                    color: '#4b5563',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Sair
-                </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Button
+                    className="action-button"
+                    onClick={() => onStartShareExperience?.()}
+                    style={{ flex: 1, marginTop: 0, minHeight: 40, fontSize: '0.82rem' }}
+                  >
+                    Compartilhar Experiência
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmingDeleteAccount(false);
+                      onLogoutMember?.();
+                    }}
+                    style={{
+                      padding: '0 14px',
+                      borderRadius: 12,
+                      border: '1px solid #d1d5db',
+                      background: '#ffffff',
+                      color: '#4b5563',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Sair
+                  </button>
+                </div>
+
+                {!confirmingDeleteAccount ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingDeleteAccount(true)}
+                    style={{
+                      alignSelf: 'flex-start',
+                      background: 'none',
+                      border: 'none',
+                      padding: '4px 0',
+                      color: '#b91c1c',
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    Excluir minha conta
+                  </button>
+                ) : (
+                  <div
+                    style={{
+                      background: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      borderRadius: 12,
+                      padding: '12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#7f1d1d', lineHeight: 1.4, fontWeight: 600 }}>
+                      Tem certeza que deseja excluir sua conta? Seus dados de acesso salvos neste aplicativo serão removidos permanentemente.
+                    </p>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmingDeleteAccount(false);
+                          onDeleteMemberAccount?.();
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          borderRadius: 8,
+                          border: 'none',
+                          background: '#dc2626',
+                          color: '#ffffff',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Confirmar exclusão
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingDeleteAccount(false)}
+                        style={{
+                          padding: '8px 12px',
+                          borderRadius: 8,
+                          border: '1px solid #d1d5db',
+                          background: '#ffffff',
+                          color: '#374151',
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <Button
@@ -3721,7 +3892,7 @@ function EmptyScreen({
                 onClick={onOpenMemberLogin}
                 style={{ width: '100%', marginTop: 0, minHeight: 42, fontSize: '0.85rem' }}
               >
-                Identificar Membro / Entrar
+                Entrar ou Cadastrar Membro
               </Button>
             )}
           </div>
@@ -4018,14 +4189,9 @@ const DAYS_OF_WEEK = [
 
 const DEFAULT_POTENCIES = [
   { slug: 'GOB', name: 'Grande Oriente do Brasil (GOB)', abbreviation: 'GOB' },
-  { slug: 'GLEB', name: 'Grande Loja Maçônica da Bahia (GLEB)', abbreviation: 'GLEB' },
-  { slug: 'CMSB', name: 'Grandes Lojas (CMSB)', abbreviation: 'CMSB' },
-  { slug: 'COMAB', name: 'Grandes Orientes Independentes (COMAB)', abbreviation: 'COMAB' },
-  { slug: 'GLMMG', name: 'Grande Loja de Minas Gerais (GLMMG)', abbreviation: 'GLMMG' },
-  { slug: 'GLESP', name: 'Grande Loja de São Paulo (GLESP)', abbreviation: 'GLESP' },
-  { slug: 'GOP', name: 'Grande Oriente Paulista (GOP)', abbreviation: 'GOP' },
-  { slug: 'GLMERJ', name: 'Grande Loja do Rio de Janeiro (GLMERJ)', abbreviation: 'GLMERJ' },
-  { slug: 'GLSC', name: 'Grande Loja de Santa Catarina (GLSC)', abbreviation: 'GLSC' },
+  { slug: 'CMSB', name: 'Confederação da Maçonaria Simbólica do Brasil (CMSB)', abbreviation: 'CMSB' },
+  { slug: 'COMAB', name: 'Confederação Maçônica do Brasil (COMAB)', abbreviation: 'COMAB' },
+  { slug: 'GOSP', name: 'Grande Oriente de São Paulo (GOSP)', abbreviation: 'GOSP' },
 ];
 
 const DEFAULT_RITES = [
@@ -4038,14 +4204,22 @@ const DEFAULT_RITES = [
 ];
 
 function canonicalPotencyCode(raw?: string | null): string {
-  const text = String(raw ?? '')
+  const original = String(raw ?? '').trim();
+  if (!original) return '';
+  const upper = original.toUpperCase();
+  if (upper.includes('MESTRE') || upper.includes('APRENDIZ') || upper.includes('COMPANHEIRO')) return '';
+  if (upper.includes('CMSB') || upper.includes('GLEB') || upper.includes('GLMMG') || upper.includes('GLESP') || upper.includes('GLMERJ') || upper.includes('GLSC') || upper.includes('GRANDE LOJA')) return 'CMSB';
+  if (upper.includes('GOSP') || upper.includes('GRANDE ORIENTE DE SÃO PAULO') || upper.includes('GRANDE ORIENTE DE SAO PAULO')) return 'GOSP';
+  if (upper.includes('COMAB') || upper.includes('GOP') || upper.includes('GRANDE ORIENTE - COMAB')) return 'COMAB';
+  if (upper.includes('GOB') || upper.includes('GRANDE ORIENTE DO BRASIL')) return 'GOB';
+  const text = original
     .replace(/\s*\([^)]*\)?\s*$/, '')
     .replace(/\s*\)+\s*$/, '')
     .replace(/\s*[-–—]\s*$/, '')
     .trim();
   if (!text) return '';
   const ufs = 'AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO';
-  const ufSuffix = new RegExp(`^(.+?)[\\s/\\-–]+(?:${ufs})\\s*$`, 'i');
+  const ufSuffix = new RegExp('^(.+?)[\\s/\\-–]+(?:' + ufs + ')\\s*$', 'i');
   const base = text.match(ufSuffix)?.[1]?.trim() || text;
   return /^[A-Za-zÀ-ÿ0-9.]+$/.test(base) ? base.toUpperCase() : base;
 }
@@ -4726,40 +4900,76 @@ function LojasScreen({
         query: search || undefined,
       }, 1, 24);
 
-      if (res && res.items.length > 0) {
-        setLodges(res.items);
-        setTotal(res.total);
-      } else {
+      const filterLocalLodges = () => {
         const queryClean = search.trim().toLowerCase();
-        const filtered = DEFAULT_LODGES.filter((lodge) => {
-          if (queryClean) {
-            const matchName = lodge.name.toLowerCase().includes(queryClean);
-            const matchNumber = String(lodge.code_number || '').includes(queryClean);
-            const matchCity = (lodge.city || '').toLowerCase().includes(queryClean);
-            if (!matchName && !matchNumber && !matchCity) return false;
+        const terms = queryClean.split(/\s+/).filter(Boolean);
+        return DEFAULT_LODGES.filter((lodge) => {
+          if (terms.length > 0) {
+            const haystack = [
+              lodge.name,
+              String(lodge.code_number || ''),
+              lodge.city || '',
+              lodge.state || '',
+              lodge.potency || '',
+              lodge.potency_name || '',
+              canonicalPotencyCode(lodge.potency),
+              lodge.rite || '',
+              lodge.primary_meeting?.day || '',
+              formatMeetingDay(lodge.primary_meeting?.day, lodge.primary_meeting?.label) || '',
+            ]
+              .join(' ')
+              .toLowerCase();
+            if (!terms.every((t) => haystack.includes(t))) return false;
           }
           if (state && lodge.state?.toLowerCase() !== state.toLowerCase()) return false;
           if (city && !lodge.city?.toLowerCase().includes(city.toLowerCase())) return false;
-          if (potency && !lodge.potency?.toLowerCase().includes(potency.toLowerCase())) return false;
+          if (potency) {
+            const pTarget = canonicalPotencyCode(potency).toLowerCase();
+            const pLodge = canonicalPotencyCode(lodge.potency).toLowerCase();
+            if (pLodge !== pTarget && !lodge.potency?.toLowerCase().includes(potency.toLowerCase())) return false;
+          }
           if (rite && !lodge.rite?.toLowerCase().includes(rite.toLowerCase())) return false;
           if (day && lodge.primary_meeting?.day?.toLowerCase() !== day.toLowerCase()) return false;
           return true;
         });
+      };
+
+      if (res && res.items.length > 0) {
+        setLodges(res.items);
+        setTotal(res.total);
+      } else {
+        const filtered = filterLocalLodges();
         setLodges(filtered);
         setTotal(filtered.length);
       }
     } catch {
       const queryClean = search.trim().toLowerCase();
+      const terms = queryClean.split(/\s+/).filter(Boolean);
       const filtered = DEFAULT_LODGES.filter((lodge) => {
-        if (queryClean) {
-          const matchName = lodge.name.toLowerCase().includes(queryClean);
-          const matchNumber = String(lodge.code_number || '').includes(queryClean);
-          const matchCity = (lodge.city || '').toLowerCase().includes(queryClean);
-          if (!matchName && !matchNumber && !matchCity) return false;
+        if (terms.length > 0) {
+          const haystack = [
+            lodge.name,
+            String(lodge.code_number || ''),
+            lodge.city || '',
+            lodge.state || '',
+            lodge.potency || '',
+            lodge.potency_name || '',
+            canonicalPotencyCode(lodge.potency),
+            lodge.rite || '',
+            lodge.primary_meeting?.day || '',
+            formatMeetingDay(lodge.primary_meeting?.day, lodge.primary_meeting?.label) || '',
+          ]
+            .join(' ')
+            .toLowerCase();
+          if (!terms.every((t) => haystack.includes(t))) return false;
         }
         if (state && lodge.state?.toLowerCase() !== state.toLowerCase()) return false;
         if (city && !lodge.city?.toLowerCase().includes(city.toLowerCase())) return false;
-        if (potency && !lodge.potency?.toLowerCase().includes(potency.toLowerCase())) return false;
+        if (potency) {
+          const pTarget = canonicalPotencyCode(potency).toLowerCase();
+          const pLodge = canonicalPotencyCode(lodge.potency).toLowerCase();
+          if (pLodge !== pTarget && !lodge.potency?.toLowerCase().includes(potency.toLowerCase())) return false;
+        }
         if (rite && !lodge.rite?.toLowerCase().includes(rite.toLowerCase())) return false;
         if (day && lodge.primary_meeting?.day?.toLowerCase() !== day.toLowerCase()) return false;
         return true;
@@ -4808,7 +5018,7 @@ function LojasScreen({
         <input
           type="search"
           className="lojas-search-input"
-          placeholder="Buscar por nome, número, cidade ou oriente..."
+          placeholder="Buscar por cidade, potência, dia da reunião ou nome da loja..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -5591,21 +5801,41 @@ function getBusinessCoordinates(biz: MobileGuideSponsoredBusiness): { lat: numbe
   return { lat: baseLat + offsetLat, lng: baseLng + offsetLng };
 }
 
-function mapPinHtml(selected: boolean, planTier?: string | null) {
-  const isAcacia = (planTier || '').toLowerCase().includes('acacia') || (planTier || '').toLowerCase().includes('ouro');
-  const size = selected ? 44 : 34;
-  const bg = selected ? '#5d1523' : '#ffffff';
-  const fg = selected ? '#ffffff' : (isAcacia ? '#b8860b' : '#5d1523');
-  const border = isAcacia ? '2.5px solid #d4af37' : '2px solid #5d1523';
-  const ring = selected
-    ? '0 0 0 4px rgba(201, 162, 39, 0.9), 0 8px 20px rgba(0,0,0,0.45)'
-    : '0 3px 10px rgba(0,0,0,0.22)';
-  return `<div style="width:${size}px;height:${size}px;border-radius:9999px;background:${bg};color:${fg};border:${border};box-shadow:${ring};display:flex;align-items:center;justify-content:center;transition:all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);cursor:pointer;">
-    <svg width="${selected ? 22 : 18}" height="${selected ? 22 : 18}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/>
-      <circle cx="12" cy="10" r="3" fill="${selected ? '#c9a227' : 'currentColor'}"/>
-    </svg>
-  </div>`;
+function mapPinHtml(biz: MobileGuideSponsoredBusiness, selected: boolean) {
+  const isAcacia = (biz.plan_tier || '').toLowerCase().includes('acacia') || (biz.plan_tier || '').toLowerCase().includes('ouro');
+  const size = selected ? 48 : 38;
+  const pinWidth = size;
+  const pinHeight = size + 8;
+  const borderColor = isAcacia ? '#c9a227' : '#4b161b';
+  const borderWidth = isAcacia ? (selected ? 3.5 : 2.5) : (selected ? 3 : 2);
+  const bgColor = biz.logo_background_color || '#ffffff';
+  const initials = (biz.name || 'CM')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w.charAt(0).toUpperCase())
+    .join('');
+
+  const shadow = selected
+    ? '0 0 0 4px rgba(201, 162, 39, 0.8), 0 8px 22px rgba(0,0,0,0.45)'
+    : '0 3px 10px rgba(0,0,0,0.3)';
+
+  const crownHtml = isAcacia
+    ? '<div style="position:absolute;top:-11px;left:50%;transform:translateX(-50%);font-size:12px;line-height:1;z-index:10;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));">👑</div>'
+    : '';
+
+  const cleanName = (biz.name || '').replace(/"/g, '&quot;');
+  const logoOrInitials = biz.logo_url
+    ? ('<img src="' + biz.logo_url + '" alt="' + cleanName + '" style="width:100%;height:100%;object-fit:contain;border-radius:9999px;display:block;" onerror="this.onerror=null;this.parentElement.innerHTML=\'<span style=\\\'font-weight:800;font-size:' + (selected ? 13 : 11) + 'px;color:' + (isAcacia ? '#b8860b' : '#4b161b') + ';\\\'>' + initials + '</span>\';" />')
+    : ('<span style="font-weight:800;font-size:' + (selected ? 13 : 11) + 'px;color:' + (isAcacia ? '#b8860b' : '#4b161b') + ';">' + initials + '</span>');
+
+  return '<div class="map-logo-pin-marker" style="position:relative;width:' + pinWidth + 'px;height:' + pinHeight + 'px;cursor:pointer;">' +
+    crownHtml +
+    '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:9999px;background:' + bgColor + ';border:' + borderWidth + 'px solid ' + borderColor + ';box-shadow:' + shadow + ';display:flex;align-items:center;justify-content:center;overflow:hidden;padding:2px;box-sizing:border-box;">' +
+      logoOrInitials +
+    '</div>' +
+    '<div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:8px solid ' + borderColor + ';"></div>' +
+  '</div>';
 }
 
 function getMapPlanBadge(planTier?: string | null) {
@@ -5764,10 +5994,10 @@ function ExploreNoMapaSection({
       const isSelected = biz.slug === selectedBiz?.slug;
       const marker = L.marker([coords.lat, coords.lng], {
         icon: L.divIcon({
-          html: mapPinHtml(isSelected, biz.plan_tier),
+          html: mapPinHtml(biz, isSelected),
           className: 'map-custom-marker',
-          iconSize: isSelected ? [44, 44] : [34, 34],
-          iconAnchor: isSelected ? [22, 22] : [17, 17],
+          iconSize: isSelected ? [48, 56] : [38, 46],
+          iconAnchor: isSelected ? [24, 56] : [19, 46],
         }),
         title: biz.name,
         zIndexOffset: isSelected ? 1000 : 0,
@@ -6684,6 +6914,7 @@ export function App() {
   const [serverBusinesses, setServerBusinesses] = useState<MobileGuideSponsoredBusiness[]>([]);
   const [isMemberLoginModalOpen, setIsMemberLoginModalOpen] = useState(false);
   const [isShareExperienceModalOpen, setIsShareExperienceModalOpen] = useState(false);
+  const [openShareAfterLogin, setOpenShareAfterLogin] = useState(false);
   const [pendingExperienceCompanySlug, setPendingExperienceCompanySlug] = useState<string | null>(null);
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -6697,8 +6928,8 @@ export function App() {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setToastMsg(
       willBeFavorited
-        ? `❤️ ${name || 'Item'} adicionado aos favoritos!`
-        : `🤍 ${name || 'Item'} removido dos favoritos.`
+        ? ('❤️ ' + (name || 'Item') + ' adicionado aos favoritos!')
+        : ('🤍 ' + (name || 'Item') + ' removido dos favoritos.')
     );
     toastTimeoutRef.current = setTimeout(() => {
       setToastMsg(null);
@@ -6712,6 +6943,7 @@ export function App() {
   const handleStartShareExperience = (slug?: string) => {
     setPendingExperienceCompanySlug(slug || null);
     if (!memberUser) {
+      setOpenShareAfterLogin(true);
       setIsMemberLoginModalOpen(true);
     } else {
       setIsShareExperienceModalOpen(true);
@@ -6725,7 +6957,34 @@ export function App() {
       localStorage.setItem('cm_mobile_referrer_name', user.name);
     } catch {}
     setIsMemberLoginModalOpen(false);
-    setIsShareExperienceModalOpen(true);
+    if (openShareAfterLogin) {
+      setOpenShareAfterLogin(false);
+      setIsShareExperienceModalOpen(true);
+    } else {
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+      setToastMsg('✓ Acesso de membro confirmado com sucesso!');
+      toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 2500);
+    }
+  };
+
+  const handleDeleteMemberAccount = () => {
+    const emailToDelete = memberUser?.email;
+    setMemberUser(null);
+    try {
+      localStorage.removeItem('cm_mobile_member_user');
+      localStorage.removeItem('cm_mobile_referrer_name');
+      if (emailToDelete) {
+        const rawList = localStorage.getItem('cm_mobile_registered_members');
+        if (rawList) {
+          const list: Array<{ email?: string }> = JSON.parse(rawList);
+          const next = list.filter((u) => u.email !== emailToDelete);
+          localStorage.setItem('cm_mobile_registered_members', JSON.stringify(next));
+        }
+      }
+    } catch {}
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToastMsg('Sua conta e seus dados foram excluídos com sucesso.');
+    toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 3000);
   };
 
   useEffect(() => {
@@ -6743,7 +7002,7 @@ export function App() {
 
   const searchPlaceholder =
     route === 'lojas'
-      ? 'Buscar loja por nome, número ou cidade...'
+      ? 'Buscar por cidade, potência, dia da reunião ou nome da loja...'
       : route === 'beneficios'
         ? 'Buscar benefícios ou empresas parceiras...'
         : isEventosView
@@ -6998,13 +7257,17 @@ export function App() {
               window.location.hash = routeHref('empresas');
             }}
             memberUser={memberUser}
-            onOpenMemberLogin={() => setIsMemberLoginModalOpen(true)}
+            onOpenMemberLogin={() => {
+              setOpenShareAfterLogin(false);
+              setIsMemberLoginModalOpen(true);
+            }}
             onLogoutMember={() => {
               setMemberUser(null);
               try {
                 localStorage.removeItem('cm_mobile_member_user');
               } catch {}
             }}
+            onDeleteMemberAccount={handleDeleteMemberAccount}
             onStartShareExperience={() => handleStartShareExperience()}
             maisSubView={maisSubView}
             onChangeMaisSubView={(view) => setMaisSubView(view)}

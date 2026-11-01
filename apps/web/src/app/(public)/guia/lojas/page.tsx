@@ -17,7 +17,7 @@ import type { LodgeFilterState } from '@/components/public/directory/LodgeFilter
 import type { ViewMode } from '@/components/public/directory/BusinessResultsToolbar';
 import type { LodgeCardData } from '@/components/public/directory/LodgeCard';
 import { StructuredData } from '@/components/seo/StructuredData';
-import { canonicalPotencyCode, KNOWN_POTENCY_NAMES } from '@/lib/lodges/potency';
+import { canonicalPotencyCode, KNOWN_POTENCY_NAMES, resolveDbPotency } from '@/lib/lodges/potency';
 import { interpretLodgeQueryByRules, describeInterpretation } from '@/lib/lodges/smart-search';
 import '@/styles/directory-home.css';
 
@@ -173,7 +173,7 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
       p_query: q || null,
       p_state: stateParam || null,
       p_city: city || null,
-      p_potency: potency || null,
+      p_potency: resolveDbPotency(potency),
       p_rite: rite || null,
       p_meeting_day: day || null,
       p_sort: sort,
@@ -297,7 +297,7 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
                   type="text"
                   name="q"
                   defaultValue={q}
-                  placeholder="Busca inteligente: ex. feira de santana sexta · GOB quarta · loja 1842"
+                  placeholder="Buscar por cidade, potência, dia da reunião ou nome da loja..."
                   className="dh-search-box__input text-gray-900"
                 />
                 {city && <input type="hidden" name="city" value={city} />}

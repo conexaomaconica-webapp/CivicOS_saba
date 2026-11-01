@@ -4,11 +4,12 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { Heart, MapPin, User, Menu, X, PlusCircle, LogOut, UserPlus, Landmark, ShieldCheck, Compass, Scale, Calendar, Store } from 'lucide-react';
+import { Heart, MapPin, User, Menu, X, PlusCircle, LogOut, UserPlus, Landmark, ShieldCheck, Compass, Scale, Calendar, Store, Award } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useFavorites } from '@/lib/directory/favorites-context';
 import { CategoryIcon, APP_CATEGORIES } from '@/components/landing/LandingMobileTopBar';
 import { DirectoryLiveSearchBox } from './DirectoryLiveSearchBox';
+import { canonicalPotencyCode } from '@/lib/lodges/potency';
 
 type DirectoryHeaderProps = {
   appName?: string;
@@ -26,6 +27,7 @@ const DEFAULT_HEADER_POTENCIES = [
   { key: 'GOB', label: 'GOB', code: 'GOB' },
   { key: 'CMSB', label: 'CMSB', code: 'CMSB' },
   { key: 'COMAB', label: 'COMAB', code: 'COMAB' },
+  { key: 'GOSP', label: 'GOSP', code: 'GOSP' },
 ];
 
 const EVENT_HEADER_FILTERS = [
@@ -46,6 +48,7 @@ function PotencyHeaderIcon({ code }: { code: string }) {
   if (upper.includes('GOB')) return <ShieldCheck className="h-5 w-5" />;
   if (upper.includes('CMSB')) return <Compass className="h-5 w-5" />;
   if (upper.includes('COMAB')) return <Scale className="h-5 w-5" />;
+  if (upper.includes('GOSP')) return <Award className="h-5 w-5" />;
   return <Landmark className="h-5 w-5" />;
 }
 
@@ -161,7 +164,7 @@ export function DirectoryHeader({
     : 'businesses';
 
   const headerPlaceholder = isLodgesSection
-    ? 'Buscar lojas, cidade, potência ou dia...'
+    ? 'Buscar por cidade, potência, dia da reunião ou nome da loja...'
     : isBenefitsSection
     ? 'Buscar benefícios, descontos ou empresas...'
     : isEventsSection
@@ -180,14 +183,14 @@ export function DirectoryHeader({
     const base = [...DEFAULT_HEADER_POTENCIES];
     const seen = new Set(base.map((p) => p.code.toUpperCase()));
     for (const p of potencies || []) {
-      const code = (p.abbreviation || p.slug || p.name || '').trim();
-      const upper = code.toUpperCase();
-      if (!code || seen.has(upper)) continue;
+      const canonical = canonicalPotencyCode(p.abbreviation || p.slug || p.name || '').trim();
+      const upper = canonical.toUpperCase();
+      if (!canonical || seen.has(upper)) continue;
       seen.add(upper);
       base.push({
-        key: p.slug || code,
-        label: p.abbreviation || p.name,
-        code: p.slug || code,
+        key: canonical,
+        label: p.abbreviation || p.name || canonical,
+        code: canonical,
       });
     }
     return base;
@@ -195,14 +198,16 @@ export function DirectoryHeader({
 
   const handlePotencyClick = (potencyCode: string) => {
     const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
+    const canonicalCurrent = canonicalPotencyCode(currentPotency);
+    const canonicalNew = canonicalPotencyCode(potencyCode);
     const isSame =
-      (!potencyCode && !currentPotency) ||
-      (potencyCode && currentPotency.toUpperCase() === potencyCode.toUpperCase());
+      (!canonicalNew && !canonicalCurrent) ||
+      (canonicalNew && canonicalCurrent.toUpperCase() === canonicalNew.toUpperCase());
 
-    if (!potencyCode || isSame) {
+    if (!canonicalNew || isSame) {
       params.delete('potency');
     } else {
-      params.set('potency', potencyCode);
+      params.set('potency', canonicalNew);
     }
     params.delete('page');
     const qs = params.toString();
@@ -477,9 +482,10 @@ export function DirectoryHeader({
               <div className="flex gap-2.5 w-max">
                 {isLodgesSection
                   ? headerPotencies.map((pot) => {
+                      const canonicalCurrent = canonicalPotencyCode(currentPotency);
                       const isActive =
-                        (!pot.code && !currentPotency) ||
-                        Boolean(pot.code && currentPotency.toUpperCase() === pot.code.toUpperCase());
+                        (!pot.code && !canonicalCurrent) ||
+                        Boolean(pot.code && canonicalCurrent.toUpperCase() === pot.code.toUpperCase());
                       return (
                         <button
                           key={pot.key || 'all-potencies'}
