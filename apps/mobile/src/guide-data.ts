@@ -312,6 +312,19 @@ export type GuideFilters = {
   hasBenefits?: boolean;
 };
 
+export type MobileBusinessBenefit = {
+  id: string;
+  title: string;
+  description?: string;
+  discount_percentage?: number | null;
+  discount_amount?: number | null;
+  discount_code?: string | null;
+  benefit_type?: string | null;
+  badge_text?: string | null;
+  valid_until?: string | null;
+  rules?: string | null;
+};
+
 export type MobileBusinessDetail = {
   business_id: string;
   business_name: string;
@@ -358,12 +371,7 @@ export type MobileBusinessDetail = {
     description?: string;
     price?: number;
   }>;
-  benefits: Array<{
-    id: string;
-    title: string;
-    description?: string;
-    discount_percentage?: number;
-  }>;
+  benefits: MobileBusinessBenefit[];
 };
 
 export type MobileLodgeMeetingData = {
@@ -818,42 +826,23 @@ export async function loadConnectionsFeedFromDirectSupabase(
 export async function loadEventsFromDirectSupabase(
   fetchImpl: typeof fetch,
 ): Promise<MobileEventItem[]> {
-  const supabaseUrl = 'https://rwvztwsjcjljphqttiws.supabase.co';
-  const anonKey =
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3dnp0d3NqY2psanBocXR0aXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3ODk4MTIsImV4cCI6MjEwMTM2NTgxMn0.1p7e82BNjYQBKkOdbSlXZ0WLiV-Hl8T-IGicUTn9GHc';
-
   try {
+    const bffUrl = 'https://conexaomaconica.com.br/api/mobile/events';
     const res = await fetchWithTimeout(
       fetchImpl,
-      `${supabaseUrl}/rest/v1/events_and_posts?select=*&is_published=eq.true&order=event_date.asc&limit=30`,
-      {
-        headers: {
-          apikey: anonKey,
-          Authorization: `Bearer ${anonKey}`,
-        },
-      },
+      bffUrl,
+      { headers: { Accept: 'application/json' } },
       2500,
     );
-    if (!res.ok) return [];
-    const rows = await res.json();
-    if (!Array.isArray(rows)) return [];
-    return rows.map((row: Record<string, unknown>): MobileEventItem => ({
-      id: String(row.id || ''),
-      slug: String(row.slug || ''),
-      title: String(row.title || ''),
-      summary: typeof row.description === 'string' ? row.description : typeof row.summary === 'string' ? row.summary : null,
-      event_date: typeof row.event_date === 'string' ? row.event_date : null,
-      location_label: typeof row.location_name === 'string' ? row.location_name : null,
-      city: typeof row.city === 'string' ? row.city : typeof row.location_name === 'string' ? row.location_name : null,
-      state: typeof row.state === 'string' ? row.state : null,
-      organizer_name: typeof row.organizer_name === 'string' ? row.organizer_name : null,
-      organizer_type: row.organizer_type === 'lodge' ? 'lodge' : 'business',
-      cover_url: typeof row.cover_url === 'string' ? row.cover_url : null,
-      cta_url: typeof row.cta_url === 'string' ? row.cta_url : null,
-    }));
-  } catch {
-    return [];
-  }
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data?.events)) {
+        return data.events;
+      }
+    }
+  } catch {}
+
+  return [];
 }
 
 export function createMobileGuideService(

@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   alternates: { canonical: appUrl('/') },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 } },
   openGraph: {
-    title: 'Conexão Maçônica — Tradição que une, conexão que nos fortalece.',
+    title: 'Conexão Maçônica — Tradição que une! conexão que fortalece!',
     description: 'Conheça uma plataforma que valoriza negócios, aproxima irmãos, cunhadas e sobrinhos, fortalece negócios, relacionamentos e a fraternidade.',
     url: appUrl('/'),
     siteName: 'Conexão Maçônica',

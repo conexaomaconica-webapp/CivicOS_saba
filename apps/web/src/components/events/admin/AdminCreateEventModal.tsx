@@ -3,16 +3,71 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createPlatformEventAction } from '@/app/actions/platform-events';
-import { X, CalendarPlus, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import {
+  X,
+  CalendarPlus,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Megaphone,
+  Users,
+  Landmark,
+  HeartHandshake,
+  Building2,
+  Sparkles,
+  PhoneCall,
+} from 'lucide-react';
 import { EventHeaderMediaField } from './EventHeaderMediaField';
+
+export type EventCategoryType = 'lodge' | 'social_action' | 'business' | 'platform';
 
 interface Props {
   onClose: () => void;
   onSuccess?: () => void;
+  prefillCategory?: EventCategoryType;
+  prefillLodgeName?: string;
+  prefillCity?: string;
+  prefillAddress?: string;
 }
 
-export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
+const CATEGORY_DEFAULTS: Record<EventCategoryType, { label: string; badge: string; icon: React.ReactNode; desc: string }> = {
+  lodge: {
+    label: 'Loja Maçônica',
+    badge: 'Loja Maçônica',
+    icon: <Landmark size={15} />,
+    desc: 'Sessão Magna, Aniversário de Loja, Posse de Diretoria ou Banquete Ritualístico.',
+  },
+  social_action: {
+    label: 'Ação Social & Filantropia',
+    badge: 'Ação Social & Filantropia',
+    icon: <HeartHandshake size={15} />,
+    desc: 'Campanhas beneficentes, Fraternidades Femininas, Ordem DeMolay ou Filhas de Jó.',
+  },
+  business: {
+    label: 'Empresa Parceira',
+    badge: 'Empresa Parceira',
+    icon: <Building2 size={15} />,
+    desc: 'Palestras, encontros corporativos, workshops e lançamentos de empresas da rede.',
+  },
+  platform: {
+    label: 'Institucional CM',
+    badge: 'Convite Oficial',
+    icon: <Sparkles size={15} />,
+    desc: 'Eventos institucionais e comunicados gerais da plataforma Conexão Maçônica.',
+  },
+};
+
+export function AdminCreateEventModal({
+  onClose,
+  onSuccess,
+  prefillCategory = 'lodge',
+  prefillLodgeName = '',
+  prefillCity = '',
+  prefillAddress = '',
+}: Props) {
   const router = useRouter();
+
+  const [category, setCategory] = useState<EventCategoryType>(prefillCategory);
   const [formData, setFormData] = useState({
     title: '',
     subtitle: '',
@@ -20,16 +75,16 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
     eventDate: '',
     startTime: '19:30',
     endTime: '22:00',
-    venueName: '',
-    venueAddress: '',
-    city: '',
+    venueName: prefillLodgeName || '',
+    venueAddress: prefillAddress || '',
+    city: prefillCity || '',
     coverImageUrl: '',
     headerMediaType: 'logo' as 'logo' | 'banner',
     headerMediaSize: 'medium' as 'small' | 'medium' | 'large' | 'full',
     headerMediaPosition: 'center' as 'left' | 'center' | 'right',
-    badgeText: 'Convite',
+    badgeText: CATEGORY_DEFAULTS[prefillCategory].badge,
     footerInformation: '',
-    registrationEnabled: true,
+    registrationEnabled: false, // PADRÃO: Apenas divulgação (sem exigir lista de presença)
     capacity: '',
     status: 'published' as const,
   });
@@ -37,6 +92,15 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  const handleCategorySelect = (cat: EventCategoryType) => {
+    setCategory(cat);
+    // Se o badge estiver com o padrão antigo, atualiza para o novo padrão da categoria
+    setFormData((prev) => ({
+      ...prev,
+      badgeText: CATEGORY_DEFAULTS[cat].badge,
+    }));
+  };
 
   const handleChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -84,19 +148,22 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
       badgeText: formData.badgeText,
       footerInformation: formData.footerInformation.trim() || undefined,
       registrationEnabled: formData.registrationEnabled,
-      capacity: formData.capacity.trim() ? parseInt(formData.capacity, 10) : null,
+      capacity:
+        formData.registrationEnabled && formData.capacity.trim()
+          ? parseInt(formData.capacity, 10)
+          : null,
       status: formData.status,
     });
 
     setSaving(false);
 
     if (res.success) {
-      setSuccessMessage('Evento criado com sucesso!');
+      setSuccessMessage('Evento cadastrado e publicado com sucesso!');
       setTimeout(() => {
         router.refresh();
         if (onSuccess) onSuccess();
         onClose();
-      }, 800);
+      }, 700);
     } else {
       setErrorMessage(res.error || 'Erro ao criar evento.');
     }
@@ -107,10 +174,10 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
       <div className="acm-modal" onClick={(e) => e.stopPropagation()}>
         <div className="acm-header">
           <div className="acm-header-title">
-            <CalendarPlus size={20} className="acm-icon" />
+            <CalendarPlus size={22} className="acm-icon" />
             <div>
-              <h3>Criar Novo Evento</h3>
-              <p>Cadastre um novo evento institucional com suporte a RSVP</p>
+              <h3>Cadastrar Novo Evento ou Divulgação</h3>
+              <p>Divulgue encontros, sessões maçônicas, ações sociais e eventos de parceiros</p>
             </div>
           </div>
           <button type="button" onClick={onClose} className="acm-close-btn" aria-label="Fechar modal">
@@ -133,6 +200,79 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
             </div>
           )}
 
+          {/* 1. SELETOR DE MODALIDADE DO EVENTO (DIVULGAÇÃO vs RSVP) */}
+          <div className="acm-modality-box">
+            <div className="acm-modality-header">
+              <span className="acm-modality-title">Modalidade do Evento:</span>
+              <span className="acm-modality-sub">Escolha se precisa de lista de presença ou apenas divulgação</span>
+            </div>
+
+            <div className="acm-modality-grid">
+              <button
+                type="button"
+                className={`acm-modality-card ${!formData.registrationEnabled ? 'acm-modality-card--active' : ''}`}
+                onClick={() => handleChange('registrationEnabled', false)}
+              >
+                <div className="acm-modality-radio">
+                  {!formData.registrationEnabled && <div className="acm-modality-radio-dot" />}
+                </div>
+                <div className="acm-modality-content">
+                  <div className="acm-modality-label">
+                    <Megaphone size={15} className="text-[#C9A227]" />
+                    <strong>Apenas Divulgação (Sem lista de presença)</strong>
+                    <span className="acm-tag-recommended">Padrão</span>
+                  </div>
+                  <p>
+                    Apenas informar data, local, horário e orientações. Não exige check-in nem lista de inscritos.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className={`acm-modality-card ${formData.registrationEnabled ? 'acm-modality-card--active' : ''}`}
+                onClick={() => handleChange('registrationEnabled', true)}
+              >
+                <div className="acm-modality-radio">
+                  {formData.registrationEnabled && <div className="acm-modality-radio-dot" />}
+                </div>
+                <div className="acm-modality-content">
+                  <div className="acm-modality-label">
+                    <Users size={15} className="text-[#3B0B14]" />
+                    <strong>Com Confirmação de Presença (RSVP)</strong>
+                  </div>
+                  <p>
+                    Abre formulário para que maçons, cunhadas e convidados confirmem presença com controle de vagas.
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* 2. CATEGORIA / ORGANIZADOR DO EVENTO */}
+          <div className="acm-field">
+            <label className="acm-label">Tipo / Organizador do Evento *</label>
+            <div className="acm-categories-grid">
+              {(Object.keys(CATEGORY_DEFAULTS) as EventCategoryType[]).map((catKey) => {
+                const item = CATEGORY_DEFAULTS[catKey];
+                const isSelected = category === catKey;
+                return (
+                  <button
+                    key={catKey}
+                    type="button"
+                    onClick={() => handleCategorySelect(catKey)}
+                    className={`acm-category-btn ${isSelected ? 'acm-category-btn--active' : ''}`}
+                  >
+                    <span className="acm-cat-icon">{item.icon}</span>
+                    <span className="acm-cat-label">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="acm-helper-text">{CATEGORY_DEFAULTS[category].desc}</p>
+          </div>
+
+          {/* TÍTULO E SUBTÍTULO */}
           <div className="acm-field">
             <label className="acm-label" htmlFor="create-title">Título do Evento *</label>
             <input
@@ -141,23 +281,32 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
               className="acm-input"
               value={formData.title}
               onChange={(e) => handleChange('title', e.target.value)}
-              placeholder="Ex: Sessão Solene de Aniversário da Loja"
+              placeholder={
+                category === 'lodge'
+                  ? 'Ex: Sessão Magna Branca de Aniversário de 50 Anos'
+                  : category === 'social_action'
+                  ? 'Ex: Campanha do Agasalho Fraterno 2026'
+                  : category === 'business'
+                  ? 'Ex: Palestra sobre Planejamento Financeiro e Sucessão'
+                  : 'Ex: Encontro Geral de Integração da Rede Fraterna'
+              }
               required
             />
           </div>
 
           <div className="acm-field">
-            <label className="acm-label" htmlFor="create-subtitle">Subtítulo / Tema</label>
+            <label className="acm-label" htmlFor="create-subtitle">Subtítulo / Tema / Resumo Curto</label>
             <input
               id="create-subtitle"
               type="text"
               className="acm-input"
               value={formData.subtitle}
               onChange={(e) => handleChange('subtitle', e.target.value)}
-              placeholder="Ex: Homenagem aos Fundadores e Confraternização Maçônica"
+              placeholder="Ex: Homenagem aos Fundadores e Confraternização com a Comunidade"
             />
           </div>
 
+          {/* DATA E HORÁRIOS */}
           <div className="acm-grid">
             <div className="acm-field">
               <label className="acm-label" htmlFor="create-eventDate">Data do Evento *</label>
@@ -195,16 +344,19 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
             </div>
           </div>
 
+          {/* LOCAL E CIDADE */}
           <div className="acm-grid">
             <div className="acm-field">
-              <label className="acm-label" htmlFor="create-venueName">Nome do Local</label>
+              <label className="acm-label" htmlFor="create-venueName">
+                {category === 'lodge' ? 'Loja Organizadora / Nome do Templo' : 'Local / Empresa Organizadora'}
+              </label>
               <input
                 id="create-venueName"
                 type="text"
                 className="acm-input"
                 value={formData.venueName}
                 onChange={(e) => handleChange('venueName', e.target.value)}
-                placeholder="Ex: Templo Nobre da Grande Loja"
+                placeholder="Ex: A.R.L.S. Luz e Fraternidade nº 42"
               />
             </div>
 
@@ -216,7 +368,7 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
                 className="acm-input"
                 value={formData.city}
                 onChange={(e) => handleChange('city', e.target.value)}
-                placeholder="Ex: Salvador - BA"
+                placeholder="Ex: Feira de Santana - BA"
               />
             </div>
           </div>
@@ -229,22 +381,24 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
               className="acm-input"
               value={formData.venueAddress}
               onChange={(e) => handleChange('venueAddress', e.target.value)}
-              placeholder="Ex: Av. Sete de Setembro, 1500 - Corredor da Vitória"
+              placeholder="Ex: Rua Barão de Cotegipe, 120 - Centro"
             />
           </div>
 
+          {/* DESCRIÇÃO */}
           <div className="acm-field">
-            <label className="acm-label" htmlFor="create-description">Descrição Detalhada</label>
+            <label className="acm-label" htmlFor="create-description">Descrição Completa e Programação</label>
             <textarea
               id="create-description"
               className="acm-textarea"
               rows={3}
               value={formData.description}
               onChange={(e) => handleChange('description', e.target.value)}
-              placeholder="Informações adicionais, trajes exigidos, programação do evento..."
+              placeholder="Explique os objetivos do evento, programação das palestras, traje exigido (se houver), estacionamento e como participar..."
             />
           </div>
 
+          {/* MÍDIA / BANNER */}
           <EventHeaderMediaField
             mediaType={formData.headerMediaType}
             mediaSize={formData.headerMediaSize}
@@ -257,54 +411,68 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
           />
 
           <div className="acm-field">
-            <label className="acm-label" htmlFor="create-badge">Texto do badge no convite</label>
-            <input id="create-badge" type="text" maxLength={60} className="acm-input" value={formData.badgeText} onChange={(e) => handleChange('badgeText', e.target.value)} placeholder="Ex.: Convite / Lançamento" />
+            <label className="acm-label" htmlFor="create-badge">Texto do Selo / Badge no Convite</label>
+            <input
+              id="create-badge"
+              type="text"
+              maxLength={60}
+              className="acm-input"
+              value={formData.badgeText}
+              onChange={(e) => handleChange('badgeText', e.target.value)}
+              placeholder="Ex.: Loja Maçônica / Sessão Magna / Ação Social"
+            />
           </div>
 
+          {/* CONTATO / WHATSAPP / INFORMAÇÕES EXTRAS */}
           <div className="acm-field">
-            <label className="acm-label" htmlFor="create-footer-information">Informações / contato / observações no final do RSVP</label>
-            <textarea id="create-footer-information" rows={4} maxLength={1200} className="acm-textarea" value={formData.footerInformation} onChange={(e) => handleChange('footerInformation', e.target.value)} placeholder={'Ex.: Dúvidas pelo WhatsApp (75) 99999-9999\nTraje: esporte fino\nEstacionamento disponível no local'} />
-          </div>
-
-          <div className="acm-grid">
-            <div className="acm-field">
-              <label className="acm-label" htmlFor="create-capacity">Capacidade Máxima</label>
-              <input
-                id="create-capacity"
-                type="number"
-                min="1"
-                className="acm-input"
-                value={formData.capacity}
-                onChange={(e) => handleChange('capacity', e.target.value)}
-                placeholder="Deixe em branco para ilimitado"
-              />
-            </div>
-
-            <div className="acm-field">
-              <label className="acm-label" htmlFor="create-status">Status de Publicação</label>
-              <select
-                id="create-status"
-                className="acm-select"
-                value={formData.status}
-                onChange={(e) => handleChange('status', e.target.value)}
-              >
-                <option value="published">Publicado</option>
-                <option value="draft">Rascunho</option>
-                <option value="archived">Arquivado</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="acm-checkbox-group">
-            <label className="acm-checkbox-label">
-              <input
-                type="checkbox"
-                checked={formData.registrationEnabled}
-                onChange={(e) => handleChange('registrationEnabled', e.target.checked)}
-              />
-              <span>Habilitar formulário de inscrições (RSVP)</span>
+            <label className="acm-label" htmlFor="create-footer-information">
+              <span className="flex items-center gap-1.5">
+                <PhoneCall size={14} className="text-emerald-600" />
+                Informações para Contato / WhatsApp / Orientações Gerais
+              </span>
             </label>
+            <textarea
+              id="create-footer-information"
+              rows={3}
+              maxLength={1200}
+              className="acm-textarea"
+              value={formData.footerInformation}
+              onChange={(e) => handleChange('footerInformation', e.target.value)}
+              placeholder={'Ex.: Dúvidas pelo WhatsApp (75) 99999-9999 com Ir. Silva\nTraje: Passeio Completo ou Paramento\nEstacionamento gratuito no local.'}
+            />
           </div>
+
+          {/* CAMPOS ESPECÍFICOS QUANDO RSVP ESTÁ ATIVADO */}
+          {formData.registrationEnabled && (
+            <div className="acm-grid">
+              <div className="acm-field">
+                <label className="acm-label" htmlFor="create-capacity">Capacidade Máxima (Vagas de RSVP)</label>
+                <input
+                  id="create-capacity"
+                  type="number"
+                  min="1"
+                  className="acm-input"
+                  value={formData.capacity}
+                  onChange={(e) => handleChange('capacity', e.target.value)}
+                  placeholder="Deixe em branco para ilimitado"
+                />
+              </div>
+
+              <div className="acm-field">
+                <label className="acm-label" htmlFor="create-status">Status de Publicação</label>
+                <select
+                  id="create-status"
+                  className="acm-select"
+                  value={formData.status}
+                  onChange={(e) => handleChange('status', e.target.value)}
+                >
+                  <option value="published">Publicado no Guia</option>
+                  <option value="draft">Rascunho</option>
+                  <option value="archived">Arquivado</option>
+                </select>
+              </div>
+            </div>
+          )}
 
           <div className="acm-actions">
             <button type="button" onClick={onClose} className="acm-btn-cancel" disabled={saving}>
@@ -314,10 +482,12 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
               {saving ? (
                 <>
                   <Loader2 size={16} className="acm-spin" />
-                  Criando...
+                  Salvando...
                 </>
+              ) : formData.registrationEnabled ? (
+                'Criar Evento com RSVP'
               ) : (
-                'Criar Evento'
+                'Publicar Divulgação'
               )}
             </button>
           </div>
@@ -326,12 +496,12 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
 
       <style>{`
         .acm-overlay {
-          position: fixed; inset: 0; z-index: 999;
+          position: fixed; inset: 0; z-index: 9999;
           background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px);
           display: flex; align-items: center; justify-content: center; padding: 1rem;
         }
         .acm-modal {
-          background: #FFFFFF; width: 100%; max-width: 640px;
+          background: #FFFFFF; width: 100%; max-width: 680px;
           border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
           overflow: hidden; display: flex; flex-direction: column; max-height: 90vh;
         }
@@ -345,7 +515,70 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
         .acm-header-title p { margin: 0; font-size: 0.8125rem; color: #D1D5DB; }
         .acm-close-btn { background: transparent; border: none; color: #D1D5DB; cursor: pointer; padding: 0.25rem; border-radius: 6px; }
         .acm-close-btn:hover { color: #FFFFFF; background: rgba(255,255,255,0.1); }
-        .acm-form { padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; }
+        .acm-form { padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.125rem; }
+
+        /* Box de Modalidade */
+        .acm-modality-box {
+          background: #faf7f2; border: 1px solid #e8e2d9; border-radius: 12px; padding: 1rem;
+        }
+        .acm-modality-header { margin-bottom: 0.75rem; }
+        .acm-modality-title { display: block; font-size: 0.8125rem; font-weight: 700; color: #3b0b14; }
+        .acm-modality-sub { font-size: 0.75rem; color: #78716c; }
+        .acm-modality-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+        @media (max-width: 600px) {
+          .acm-modality-grid { grid-template-columns: 1fr; }
+        }
+        .acm-modality-card {
+          display: flex; align-items: flex-start; gap: 0.625rem; text-align: left;
+          background: #FFFFFF; border: 2px solid #e2e8f0; border-radius: 10px; padding: 0.75rem;
+          cursor: pointer; transition: all 0.15s ease;
+        }
+        .acm-modality-card:hover { border-color: #cbd5e1; }
+        .acm-modality-card--active {
+          border-color: #C9A227; background: #fffdfa; box-shadow: 0 0 0 1px #C9A227;
+        }
+        .acm-modality-radio {
+          width: 16px; height: 16px; border-radius: 50%; border: 2px solid #94a3b8;
+          display: flex; align-items: center; justify-content: center; margin-top: 2px; shrink-0;
+        }
+        .acm-modality-card--active .acm-modality-radio {
+          border-color: #3b0b14;
+        }
+        .acm-modality-radio-dot {
+          width: 8px; height: 8px; border-radius: 50%; background: #3b0b14;
+        }
+        .acm-modality-content { flex: 1; min-width: 0; }
+        .acm-modality-label {
+          display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem; color: #1e293b; margin-bottom: 0.25rem; flex-wrap: wrap;
+        }
+        .acm-tag-recommended {
+          font-size: 0.65rem; font-weight: 800; background: #C9A227; color: #27170b;
+          padding: 0.1rem 0.4rem; border-radius: 4px; text-transform: uppercase;
+        }
+        .acm-modality-content p {
+          margin: 0; font-size: 0.72rem; color: #64748b; line-height: 1.35;
+        }
+
+        /* Categorias */
+        .acm-categories-grid {
+          display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-top: 0.25rem;
+        }
+        @media (max-width: 640px) {
+          .acm-categories-grid { grid-template-columns: 1fr 1fr; }
+        }
+        .acm-category-btn {
+          display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.35rem;
+          padding: 0.625rem 0.5rem; border: 1px solid #d1d5db; border-radius: 8px; background: #ffffff;
+          font-size: 0.75rem; font-weight: 600; color: #4b5563; cursor: pointer; transition: all 0.15s;
+        }
+        .acm-category-btn:hover { border-color: #9ca3af; background: #f9fafb; }
+        .acm-category-btn--active {
+          border-color: #3B0B14; background: #3B0B14; color: #C9A227;
+        }
+        .acm-cat-icon { display: flex; align-items: center; }
+        .acm-cat-label { font-size: 0.72rem; text-align: center; }
+        .acm-helper-text { font-size: 0.72rem; color: #6b7280; margin-top: 0.25rem; font-style: italic; }
+
         .acm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem; }
         .acm-field { display: flex; flex-direction: column; gap: 0.375rem; }
         .acm-label { font-size: 0.8125rem; font-weight: 600; color: #374151; }
@@ -364,8 +597,6 @@ export function AdminCreateEventModal({ onClose, onSuccess }: Props) {
           appearance: none;
         }
         .acm-input:focus, .acm-textarea:focus, .acm-select:focus { outline: none; border-color: #3B0B14; box-shadow: 0 0 0 3px rgba(59,11,20,0.1); }
-        .acm-checkbox-group { margin-top: 0.25rem; }
-        .acm-checkbox-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; font-weight: 500; color: #374151; cursor: pointer; }
         .acm-alert { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; font-weight: 500; }
         .acm-alert-error { background: #FEF2F2; color: #991B1B; border: 1px solid #FCA5A5; }
         .acm-alert-success { background: #ECFDF5; color: #065F46; border: 1px solid #6EE7B7; }

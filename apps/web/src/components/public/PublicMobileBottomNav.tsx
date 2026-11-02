@@ -145,7 +145,7 @@ export function PublicMobileBottomNav() {
       {/* DRAWER / MODAL DO MENU MOBILE */}
       {menuOpen && (
         <div
-          className="fixed inset-0 z-[70] md:hidden print:hidden"
+          className="fixed inset-0 z-[1200] md:hidden print:hidden"
           role="dialog"
           aria-modal="true"
           aria-label="Menu principal de navegação"
@@ -158,7 +158,7 @@ export function PublicMobileBottomNav() {
           />
 
           {/* Bottom Sheet com cantos arredondados */}
-          <div className="fixed inset-x-0 bottom-0 z-[75] max-h-[85vh] overflow-y-auto rounded-t-3xl border-t border-[#c9a227]/40 bg-[#4b161b] p-5 pb-[calc(2.5rem+env(safe-area-inset-bottom))] text-white shadow-2xl animate-in slide-in-from-bottom duration-300">
+          <div className="fixed inset-x-0 bottom-0 z-[1201] max-h-[85vh] overflow-y-auto rounded-t-3xl border-t border-[#c9a227]/40 bg-[#4b161b] p-5 pb-[calc(2.5rem+env(safe-area-inset-bottom))] text-white shadow-2xl animate-in slide-in-from-bottom duration-300">
             {/* Indicador de arrasto no topo */}
             <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-white/20" aria-hidden="true" />
 
@@ -374,7 +374,7 @@ export function PublicMobileBottomNav() {
       {/* BARRA FIXA MOBILE INFERIOR */}
       <aside
         aria-label="Barra de navegação móvel"
-        className="fixed bottom-0 left-0 right-0 z-50 md:hidden print:hidden"
+        className="fixed bottom-0 left-0 right-0 z-[1100] md:hidden print:hidden"
       >
         <nav
           aria-label="Navegação rápida"

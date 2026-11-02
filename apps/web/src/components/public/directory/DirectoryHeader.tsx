@@ -260,11 +260,11 @@ export function DirectoryHeader({
   )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
   const navLinks = [
-    { href: '/guia', label: 'Início', exact: true },
-    { href: '/guia/empresas', label: 'Empresas' },
-    { href: '/guia/beneficios', label: 'Benefícios' },
-    { href: '/guia/eventos', label: 'Eventos' },
-    { href: '/guia/lojas', label: 'Lojas Maçônicas' },
+    { href: '/guia', label: 'Início', exact: true, icon: Compass },
+    { href: '/guia/empresas', label: 'Empresas', icon: Store },
+    { href: '/guia/lojas', label: 'Lojas Maçônicas', icon: Landmark },
+    { href: '/guia/beneficios', label: 'Benefícios', icon: Award },
+    { href: '/guia/eventos', label: 'Eventos', icon: Calendar },
   ];
 
   const isLinkActive = (href: string, exact = false) => {
@@ -274,8 +274,9 @@ export function DirectoryHeader({
   };
 
   return (
-    <header className="dh-header sticky top-0 z-50">
-      <div className="dh-container dh-header__inner hidden md:flex">
+    <>
+      <header className="dh-header sticky top-0 z-[1100]">
+        <div className="dh-container dh-header__inner hidden md:flex">
         {/* Brand / Logo */}
         <Link href="/guia" className="dh-header__brand">
           <Image
@@ -467,137 +468,26 @@ export function DirectoryHeader({
               actionUrl={headerActionUrl}
             />
 
-            {/* Linha 3: Slider Horizontal de Ícones (Potências em /guia/lojas, Tipos de Evento em /guia/eventos ou Categorias nas demais rotas) */}
-            <div
-              className="relative -mx-3 px-3 overflow-x-auto scrollbar-none py-1"
-              role="region"
-              aria-label={
-                isLodgesSection
-                  ? 'Potências Maçônicas'
-                  : isEventsSection
-                  ? 'Filtrar eventos por origem'
-                  : 'Categorias em destaque'
-              }
-            >
-              <div className="flex gap-2.5 w-max">
-                {isLodgesSection
-                  ? headerPotencies.map((pot) => {
-                      const canonicalCurrent = canonicalPotencyCode(currentPotency);
-                      const isActive =
-                        (!pot.code && !canonicalCurrent) ||
-                        Boolean(pot.code && canonicalCurrent.toUpperCase() === pot.code.toUpperCase());
-                      return (
-                        <button
-                          key={pot.key || 'all-potencies'}
-                          type="button"
-                          onClick={() => handlePotencyClick(pot.code)}
-                          className={`flex flex-col items-center gap-1 w-[64px] shrink-0 text-center transition-all ${
-                            isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
-                          }`}
-                        >
-                          <div
-                            className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
-                              isActive
-                                ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
-                                : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
-                            }`}
-                          >
-                            <PotencyHeaderIcon code={pot.code} />
-                            {pot.code && (
-                              <span
-                                className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
-                                title={`Filtrar por ${pot.label}`}
-                              />
-                            )}
-                          </div>
-                          <span
-                            className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
-                              isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
-                            }`}
-                          >
-                            {pot.label}
-                          </span>
-                        </button>
-                      );
-                    })
-                  : isEventsSection
-                  ? EVENT_HEADER_FILTERS.map((evFilter) => {
-                      const isActive =
-                        (evFilter.type === 'all' && (!currentEventType || currentEventType === 'all')) ||
-                        currentEventType === evFilter.type;
-                      return (
-                        <button
-                          key={evFilter.key}
-                          type="button"
-                          onClick={() => handleEventTypeClick(evFilter.type)}
-                          className={`flex flex-col items-center gap-1 w-[76px] shrink-0 text-center transition-all ${
-                            isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
-                          }`}
-                        >
-                          <div
-                            className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
-                              isActive
-                                ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
-                                : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
-                            }`}
-                          >
-                            <EventHeaderIcon type={evFilter.type} />
-                            {evFilter.type !== 'all' && (
-                              <span
-                                className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
-                                title={`Eventos de ${evFilter.label}`}
-                              />
-                            )}
-                          </div>
-                          <span
-                            className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
-                              isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
-                            }`}
-                          >
-                            {evFilter.label}
-                          </span>
-                        </button>
-                      );
-                    })
-                  : headerCategories.map((cat) => {
-                      const isActive = currentCat === cat.slug;
-                      const hasCount = ('business_count' in cat && (cat.business_count ?? 0) > 0) || Boolean((cat as any).isCatalog);
-                      return (
-                        <button
-                          key={cat.slug}
-                          type="button"
-                          onClick={() => handleCategoryClick(cat.slug)}
-                          className={`flex flex-col items-center gap-1 w-[60px] shrink-0 text-center transition-all ${
-                            isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
-                          }`}
-                        >
-                          <div
-                            className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
-                              isActive
-                                ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
-                                : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
-                            }`}
-                          >
-                            <CategoryIcon slug={cat.slug} name={cat.name} />
-                            {hasCount && (
-                              <span
-                                className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
-                                title="Ativo no Catálogo"
-                              />
-                            )}
-                          </div>
-                          <span
-                            className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
-                              isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
-                            }`}
-                          >
-                            {cat.name}
-                          </span>
-                        </button>
-                      );
-                    })}
-              </div>
-            </div>
+            {/* Linha de Navegação Rápida no Mobile: Empresas | Lojas Maçônicas | Benefícios | Eventos */}
+            <nav className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pt-1 pb-0.5 md:hidden" aria-label="Navegação do Guia">
+              {navLinks.map((link) => {
+                const active = isLinkActive(link.href, link.exact);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all ${
+                      active
+                        ? 'bg-[#c9a227] text-[#2b060d] shadow-sm'
+                        : 'bg-white/10 text-white/90 hover:bg-white/15'
+                    }`}
+                  >
+                    <link.icon className={`w-3.5 h-3.5 ${active ? 'text-[#2b060d]' : 'text-[#c9a227]'}`} />
+                    <span>{link.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
           </>
         )}
       </div>
@@ -678,6 +568,141 @@ export function DirectoryHeader({
         </div>
       )}
     </header>
-  );
+
+    {/* Linha 3: Slider Horizontal de Ícones (Carrossel não-fixo: rola livremente abaixo da barra de busca) */}
+    {!isBusinessProfilePage && (
+      <div
+        className="w-full px-3 overflow-x-auto scrollbar-none py-1.5 bg-[#4b161b] border-b border-[#c9a227]/30 md:hidden"
+        role="region"
+        aria-label={
+          isLodgesSection
+            ? 'Potências Maçônicas'
+            : isEventsSection
+            ? 'Filtrar eventos por origem'
+            : 'Categorias em destaque'
+        }
+      >
+        <div className="flex gap-2.5 w-max">
+          {isLodgesSection
+            ? headerPotencies.map((pot) => {
+                const canonicalCurrent = canonicalPotencyCode(currentPotency);
+                const isActive =
+                  (!pot.code && !canonicalCurrent) ||
+                  Boolean(pot.code && canonicalCurrent.toUpperCase() === pot.code.toUpperCase());
+                return (
+                  <button
+                    key={pot.key || 'all-potencies'}
+                    type="button"
+                    onClick={() => handlePotencyClick(pot.code)}
+                    className={`flex flex-col items-center gap-1 w-[64px] shrink-0 text-center transition-all ${
+                      isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
+                    }`}
+                  >
+                    <div
+                      className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
+                        isActive
+                          ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
+                          : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
+                      }`}
+                    >
+                      <PotencyHeaderIcon code={pot.code} />
+                      {pot.code && (
+                        <span
+                          className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
+                          title={`Filtrar por ${pot.label}`}
+                        />
+                      )}
+                    </div>
+                    <span
+                      className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
+                        isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
+                      }`}
+                    >
+                      {pot.label}
+                    </span>
+                  </button>
+                );
+              })
+            : isEventsSection
+            ? EVENT_HEADER_FILTERS.map((evFilter) => {
+                const isActive =
+                  (evFilter.type === 'all' && (!currentEventType || currentEventType === 'all')) ||
+                  currentEventType === evFilter.type;
+                return (
+                  <button
+                    key={evFilter.key}
+                    type="button"
+                    onClick={() => handleEventTypeClick(evFilter.type)}
+                    className={`flex flex-col items-center gap-1 w-[76px] shrink-0 text-center transition-all ${
+                      isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
+                    }`}
+                  >
+                    <div
+                      className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
+                        isActive
+                          ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
+                          : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
+                      }`}
+                    >
+                      <EventHeaderIcon type={evFilter.type} />
+                      {evFilter.type !== 'all' && (
+                        <span
+                          className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
+                          title={`Eventos de ${evFilter.label}`}
+                        />
+                      )}
+                    </div>
+                    <span
+                      className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
+                        isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
+                      }`}
+                    >
+                      {evFilter.label}
+                    </span>
+                  </button>
+                );
+              })
+            : headerCategories.map((cat) => {
+                const isActive = currentCat === cat.slug;
+                const hasCount = ('business_count' in cat && (cat.business_count ?? 0) > 0) || Boolean((cat as any).isCatalog);
+                return (
+                  <button
+                    key={cat.slug}
+                    type="button"
+                    onClick={() => handleCategoryClick(cat.slug)}
+                    className={`flex flex-col items-center gap-1 w-[60px] shrink-0 text-center transition-all ${
+                      isActive ? 'scale-105' : 'opacity-90 hover:opacity-100'
+                    }`}
+                  >
+                    <div
+                      className={`relative flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm transition-all ${
+                        isActive
+                          ? 'bg-[#c9a227] text-[#2a0a10] ring-2 ring-white shadow-md'
+                          : 'bg-[#fffdfa] text-[#4b161b] border border-[#e2d1bd] hover:border-[#c9a227]'
+                      }`}
+                    >
+                      <CategoryIcon slug={cat.slug} name={cat.name} />
+                      {hasCount && (
+                        <span
+                          className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#c9a227] border-2 border-[#4b161b]"
+                          title="Ativo no Catálogo"
+                        />
+                      )}
+                    </div>
+                    <span
+                      className={`text-[10px] font-bold leading-tight line-clamp-1 w-full ${
+                        isActive ? 'text-[#dfbd58]' : 'text-[#f3eedd]'
+                      }`}
+                    >
+                      {cat.name}
+                    </span>
+                  </button>
+                );
+              })}
+        </div>
+      </div>
+    )}
+  </>
+);
 }
 

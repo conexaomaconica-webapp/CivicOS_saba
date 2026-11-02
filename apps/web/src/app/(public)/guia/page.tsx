@@ -50,13 +50,13 @@ type Props = {
 export async function generateMetadata({ searchParams }: { searchParams?: Promise<Record<string, unknown>> }): Promise<Metadata> {
   const hasFilters = Object.keys((await searchParams) ?? {}).length > 0;
   return {
-    title: { absolute: 'Guia Comercial e Maçônico — Conexão Maçônica' },
+    title: { absolute: 'Conexão Maçônica - Plataforma Comercial e Maçônico' },
     description:
       'Encontre empresas, serviços, benefícios e Lojas Maçônicas de irmãos verificados dentro de uma rede de credibilidade.',
     alternates: { canonical: appUrl('/guia') },
     robots: hasFilters ? { index: false, follow: true } : undefined,
     openGraph: {
-      title: 'Guia Comercial e Maçônico — Conexão Maçônica',
+      title: 'Conexão Maçônica - Plataforma Comercial e Maçônico',
       description: 'Busque empresas, serviços e Lojas Maçônicas na rede Conexão Maçônica.',
       url: appUrl('/guia'),
       type: 'website',
@@ -110,7 +110,7 @@ export default async function GuiaPage({ searchParams }: Props) {
         .maybeSingle();
       directPublicSettings = data;
     }
-  } catch (_settingsErr) {}
+  } catch (_settingsErr) { }
   const configuredPageSize = Math.min(100, Math.max(1, Number(directPublicSettings?.default_page_size) || 12));
 
   // Parallel RPC execution
@@ -245,7 +245,7 @@ export default async function GuiaPage({ searchParams }: Props) {
           has_previous_page: safePage > 1,
         };
       }
-    } catch (_fallbackErr) {}
+    } catch (_fallbackErr) { }
   }
 
   if (!searchData) {
@@ -317,14 +317,14 @@ export default async function GuiaPage({ searchParams }: Props) {
         categories = parsedFeat;
       }
     }
-  } catch (_fcErr) {}
-  
+  } catch (_fcErr) { }
+
   // Normalização explícita de available_cities
   const rawCities = homeData.available_cities || homeData.availableCities;
   let availableCities: string[] = Array.isArray(rawCities)
     ? rawCities.filter(
-        (c): c is string => typeof c === 'string' && c.trim().length > 0
-      )
+      (c): c is string => typeof c === 'string' && c.trim().length > 0
+    )
     : [];
 
   // Banner sem imagem utilizável (a RPC devolve null quando a URL é rejeitada) quebraria o carrossel.
@@ -361,7 +361,7 @@ export default async function GuiaPage({ searchParams }: Props) {
           image_mobile_url: b.image_mobile_url || null,
         }));
       }
-    } catch (_banErr) {}
+    } catch (_banErr) { }
   }
 
   // Fallback para Categorias se não houver destaques nem retorno da RPC
@@ -382,7 +382,7 @@ export default async function GuiaPage({ searchParams }: Props) {
           icon_name: c.icon,
         }));
       }
-    } catch (_catErr) {}
+    } catch (_catErr) { }
   }
 
   // Fallback para Empresas Patrocinadas / Destaques se a RPC falhar ou retornar vazio
@@ -414,7 +414,7 @@ export default async function GuiaPage({ searchParams }: Props) {
           };
         });
       }
-    } catch (_spErr) {}
+    } catch (_spErr) { }
   }
 
   // Fallback exclusivo de empresas comerciais publicadas (SEM incluir organizações/Lojas Maçônicas)
@@ -440,7 +440,7 @@ export default async function GuiaPage({ searchParams }: Props) {
       }
 
       availableCities = Array.from(citySet).sort();
-    } catch (_e) {}
+    } catch (_e) { }
   }
 
   console.log('[GuiaPage Server Log] availableCities immediately before render:', availableCities);
@@ -480,7 +480,7 @@ export default async function GuiaPage({ searchParams }: Props) {
           address_line: loc.street ? addressLine : null,
         };
       });
-    } catch (_locErr) {}
+    } catch (_locErr) { }
   }
 
   // Enriquecimento em lote com o total de visualizações por atualização (event_name = 'view')

@@ -208,12 +208,47 @@ export default async function EventPage({ params }: PageProps) {
             <EventRSVPForm event={event} />
           </Suspense>
         ) : (
-          <section className="event-closed-section">
-            <div className="event-closed-card">
-              <p className="event-closed-title">Inscrições encerradas</p>
-              <p className="event-closed-sub">
-                O prazo para confirmação de presença foi encerrado.
+          <section className="event-disclosure-section">
+            <div className="event-disclosure-card">
+              <div className="event-disclosure-badge">
+                <span className="event-disclosure-deco">✦</span>
+                <span>Divulgação e Convite Fraterno</span>
+                <span className="event-disclosure-deco">✦</span>
+              </div>
+              <h2 className="event-disclosure-title">Livre Participação</h2>
+              <p className="event-disclosure-sub">
+                Este evento é de livre divulgação fraterna. Não é exigida reserva prévia ou formulário de presença online.
               </p>
+              <div className="event-disclosure-details">
+                <div className="event-disc-row">
+                  <strong>Quando:</strong>
+                  <span>{dateDisplay} às {timeDisplay}</span>
+                </div>
+                {locationLine && (
+                  <div className="event-disc-row">
+                    <strong>Onde:</strong>
+                    <span>{locationLine}</span>
+                  </div>
+                )}
+                {event.venue_address && (
+                  <div className="event-disc-row">
+                    <strong>Endereço:</strong>
+                    <span>{event.venue_address}</span>
+                  </div>
+                )}
+              </div>
+              {event.venue_address && (
+                <div className="event-disclosure-btn-wrap">
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${event.venue_name || ''} ${event.venue_address || ''} ${event.city || ''}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="event-disclosure-maps-btn"
+                  >
+                    <span>Abrir Localização no Google Maps</span>
+                  </a>
+                </div>
+              )}
             </div>
           </section>
         )}
@@ -899,6 +934,113 @@ export default async function EventPage({ params }: PageProps) {
           padding: 3rem;
           color: #888;
           font-size: 0.9375rem;
+        }
+
+        /* ── SEÇÃO DE DIVULGAÇÃO (SEM RSVP) ─────────────────────────── */
+        .event-disclosure-section {
+          padding: 2.5rem 1.25rem;
+          background: var(--cm-ivory);
+          flex: 1;
+        }
+
+        .event-disclosure-card {
+          max-width: 600px;
+          margin: 0 auto;
+          background: #FFFFFF;
+          border: 1px solid rgba(201, 162, 39, 0.4);
+          border-radius: 16px;
+          padding: 2rem 1.5rem;
+          box-shadow: 0 10px 25px -5px rgba(59, 11, 20, 0.08);
+          text-align: center;
+        }
+
+        .event-disclosure-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          background: #FAF7F2;
+          color: var(--cm-bordeaux);
+          border: 1px solid rgba(201, 162, 39, 0.5);
+          border-radius: 9999px;
+          padding: 0.35rem 1rem;
+          font-size: 0.75rem;
+          font-weight: 700;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+          margin-bottom: 1rem;
+        }
+
+        .event-disclosure-deco {
+          color: var(--cm-gold);
+        }
+
+        .event-disclosure-title {
+          font-size: 1.5rem;
+          font-weight: 800;
+          color: var(--cm-bordeaux);
+          margin-bottom: 0.5rem;
+        }
+
+        .event-disclosure-sub {
+          font-size: 0.875rem;
+          color: #64748B;
+          line-height: 1.6;
+          max-width: 460px;
+          margin: 0 auto 1.5rem;
+        }
+
+        .event-disclosure-details {
+          background: #FAF7F2;
+          border: 1px solid #E2E8F0;
+          border-radius: 12px;
+          padding: 1.25rem;
+          text-align: left;
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+          margin-bottom: 1.5rem;
+        }
+
+        .event-disc-row {
+          display: flex;
+          flex-direction: column;
+          gap: 0.2rem;
+          font-size: 0.875rem;
+        }
+
+        .event-disc-row strong {
+          color: var(--cm-bordeaux);
+          font-size: 0.75rem;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .event-disc-row span {
+          color: #1E293B;
+          font-weight: 500;
+        }
+
+        .event-disclosure-btn-wrap {
+          margin-top: 1rem;
+        }
+
+        .event-disclosure-maps-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          padding: 0.75rem 1.5rem;
+          background: var(--cm-bordeaux);
+          color: var(--cm-gold-light);
+          border-radius: 10px;
+          font-size: 0.875rem;
+          font-weight: 700;
+          text-decoration: none;
+          transition: background 0.15s;
+        }
+
+        .event-disclosure-maps-btn:hover {
+          background: #2A080E;
         }
 
         /* ── FOOTER ───────────────────────────────────────────────────── */

@@ -3,6 +3,15 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, 
 import 'leaflet/dist/leaflet.css';
 import { LaunchExperience } from './LaunchExperience';
 import {
+  type MobileBenefitItem,
+  type MobileBenefitRedemption,
+  loadRedeemedBenefits,
+  getRedeemedBenefit,
+  redeemBenefit,
+  downloadBenefitVoucher,
+  formatVoucherExpiration,
+} from './benefit-redemption';
+import {
   createMobileGuideService,
   type MobileBusinessDetail,
   type MobileConnectionFeedItem,
@@ -2419,6 +2428,163 @@ function AnuncioModal({
   );
 }
 
+function BenefitVoucherModal({
+  voucher,
+  onClose,
+  onToast,
+}: {
+  voucher: MobileBenefitRedemption | null;
+  onClose: () => void;
+  onToast?: (msg: string) => void;
+}) {
+  const [downloading, setDownloading] = useState(false);
+
+  if (!voucher) return null;
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const ok = await downloadBenefitVoucher(voucher);
+      if (ok) {
+        onToast?.('✓ Comprovante PNG baixado com sucesso!');
+      } else {
+        onToast?.('Não foi possível gerar a imagem do comprovante.');
+      }
+    } catch {
+      onToast?.('Erro ao salvar o comprovante.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    const textToShare = `🎁 Benefício Exclusivo Conexão Maçônica!\nEmpresa: ${voucher.businessName}\nBenefício: ${voucher.title}${voucher.discountPercentage ? ` (${voucher.discountPercentage}% OFF)` : ''}\nCódigo de Resgate: ${voucher.code}\nValidade: ${formatVoucherExpiration(voucher.expiresAt)}`;
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: `Benefício - ${voucher.businessName}`,
+          text: textToShare,
+        });
+      } catch {}
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(voucher.code);
+        onToast?.('✓ Código copiado para a área de transferência!');
+      } catch {
+        onToast?.(`Código: ${voucher.code}`);
+      }
+    } else {
+      onToast?.(`Código: ${voucher.code}`);
+    }
+  };
+
+  const cleanWaNumber = voucher.businessWhatsapp ? voucher.businessWhatsapp.replace(/\D/g, '') : '';
+  const waUrl = cleanWaNumber
+    ? `https://wa.me/${cleanWaNumber.length <= 11 ? '55' + cleanWaNumber : cleanWaNumber}?text=${encodeURIComponent(
+        `Olá! Resgatei o benefício "${voucher.title}" com o código ${voucher.code} pelo aplicativo da Conexão Maçônica e gostaria de utilizá-lo.`
+      )}`
+    : null;
+
+  return (
+    <div
+      className="voucher-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Comprovante de Benefício Resgatado"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="voucher-modal-card">
+        <div className="voucher-modal-header">
+          <button
+            type="button"
+            className="voucher-close-btn"
+            onClick={onClose}
+            aria-label="Fechar comprovante"
+          >
+            ✕
+          </button>
+
+          <img
+            src="/logoconexao_red.png"
+            alt="Conexão Maçônica"
+            className="voucher-logo-img"
+            onError={(e) => {
+              (e.currentTarget as HTMLElement).style.display = 'none';
+            }}
+          />
+
+          <p className="voucher-eyebrow">BENEFÍCIO RESGATADO</p>
+          <h3 className="voucher-biz-name">{voucher.businessName}</h3>
+          <p className="voucher-benefit-title">{voucher.title}</p>
+
+          {voucher.discountPercentage ? (
+            <div className="voucher-discount-highlight">
+              {voucher.discountPercentage}% Desconto
+            </div>
+          ) : null}
+
+          <div className="voucher-code-box">
+            <p className="voucher-code-label">CÓDIGO DE UTILIZAÇÃO</p>
+            <p className="voucher-code-val">{voucher.code}</p>
+          </div>
+
+          <p className="voucher-validity">
+            <span>📅</span>
+            <span>Validade: {formatVoucherExpiration(voucher.expiresAt)}</span>
+          </p>
+        </div>
+
+        <div className="voucher-modal-body">
+          <p className="voucher-instructions">
+            Salve o comprovante ou apresente o código acima na empresa no momento da compra ou atendimento.
+          </p>
+
+          <button
+            type="button"
+            className="voucher-btn-primary"
+            onClick={handleDownload}
+            disabled={downloading}
+          >
+            <span>📥</span>
+            <span>{downloading ? 'Gerando Imagem...' : 'Baixar Comprovante em PNG'}</span>
+          </button>
+
+          <button
+            type="button"
+            className="voucher-btn-secondary"
+            onClick={handleShare}
+          >
+            <span>🔗</span>
+            <span>Compartilhar ou Copiar Código</span>
+          </button>
+
+          {waUrl && (
+            <a
+              href={waUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="voucher-btn-whatsapp"
+              onClick={() => {
+                if (voucher.businessId) {
+                  trackMobileEvent({
+                    businessId: voucher.businessId,
+                    eventType: 'whatsapp',
+                  });
+                }
+              }}
+            >
+              <span>💬</span>
+              <span>Apresentar pelo WhatsApp da Empresa</span>
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BusinessDetailModal({
   slug,
   onClose,
@@ -2427,6 +2593,11 @@ function BusinessDetailModal({
   onToggleFavorite,
   onRefer,
   onShareExperience,
+  initialTab,
+  memberUser,
+  onOpenMemberLogin,
+  onOpenVoucherModal,
+  onRequestRedeemWithLogin,
 }: {
   slug: string | null;
   onClose: () => void;
@@ -2435,15 +2606,34 @@ function BusinessDetailModal({
   onToggleFavorite?: (slug: string, name?: string) => void;
   onRefer?: (name: string, slug: string) => void;
   onShareExperience?: (slug: string) => void;
+  initialTab?: 'sobre' | 'selos' | 'servicos' | 'fotos' | 'beneficio' | 'comentarios' | 'localizacao';
+  memberUser?: { id: string; name: string; email: string } | null;
+  onOpenMemberLogin?: () => void;
+  onOpenVoucherModal?: (voucher: MobileBenefitRedemption) => void;
+  onRequestRedeemWithLogin?: (
+    benefit: MobileBenefitItem,
+    businessName: string,
+    businessSlug: string,
+    businessId?: string,
+    businessWhatsapp?: string | null
+  ) => void;
 }) {
   const [detail, setDetail] = useState<MobileBusinessDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAnuncioOpen, setIsAnuncioOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'sobre' | 'selos' | 'servicos' | 'fotos' | 'beneficio' | 'comentarios' | 'localizacao'>('sobre');
+  const [activeTab, setActiveTab] = useState<'sobre' | 'selos' | 'servicos' | 'fotos' | 'beneficio' | 'comentarios' | 'localizacao'>(
+    initialTab || 'sobre'
+  );
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
 
   const guideServiceRef = useRef(createMobileGuideService());
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   useEffect(() => {
     if (!slug) {
@@ -2473,6 +2663,11 @@ function BusinessDetailModal({
               city: data.city,
               state: data.state,
             });
+          }
+          if (initialTab === 'beneficio') {
+            setTimeout(() => {
+              document.getElementById('section-beneficio')?.scrollIntoView({ behavior: 'smooth' });
+            }, 300);
           }
         }
       })
@@ -3028,7 +3223,7 @@ function BusinessDetailModal({
                       Fotos & Vídeo
                     </button>
                   )}
-                  {isAcacia && detail.benefits.length > 0 && (
+                  {detail.benefits.length > 0 && (
                     <button
                       type="button"
                       className={`profile-tab-btn ${activeTab === 'beneficio' ? 'active' : ''}`}
@@ -3037,7 +3232,7 @@ function BusinessDetailModal({
                         document.getElementById('section-beneficio')?.scrollIntoView({ behavior: 'smooth' });
                       }}
                     >
-                      Benefício
+                      Benefícios ({detail.benefits.length})
                     </button>
                   )}
                   <button
@@ -3228,17 +3423,107 @@ function BusinessDetailModal({
                   </div>
                 )}
 
-                {/* 6. BENEFÍCIO EXCLUSIVO DA FAMÍLIA MAÇÔNICA (Plano Acácia) */}
-                {isAcacia && detail.benefits.length > 0 && (
+                {/* 6. BENEFÍCIOS E OFERTAS EXCLUSIVAS */}
+                {detail.benefits.length > 0 && (
                   <div id="section-beneficio" className="detail-section-block">
-                    <div className="detail-benefit-card">
-                      <span className="detail-benefit-badge">Benefício Exclusivo da Família Maçônica</span>
-                      {detail.benefits.map((b) => (
-                        <div key={b.id || b.title}>
-                          <h4>✨ {b.title}</h4>
-                          {b.description && <p>{b.description}</p>}
-                        </div>
-                      ))}
+                    <div className="detail-benefits-container">
+                      <div className="detail-benefits-header">
+                        <span className="detail-benefit-badge">✨ Clube de Vantagens Fraterno</span>
+                        <h3 className="detail-section-title" style={{ marginTop: 6, marginBottom: 4 }}>
+                          Benefícios e Ofertas Exclusivas
+                        </h3>
+                        <p style={{ margin: 0, fontSize: '.82rem', color: '#685950' }}>
+                          Condições especiais para membros da rede e familiares. Resgate seu cupom e apresente no estabelecimento.
+                        </p>
+                      </div>
+
+                      <div className="benefits-cards-grid">
+                        {detail.benefits.map((b) => {
+                          const voucher = getRedeemedBenefit(b.id);
+                          const isRedeemed = Boolean(voucher);
+
+                          return (
+                            <div key={b.id || b.title} className="mobile-benefit-card">
+                              <div className="mobile-benefit-header">
+                                <div className="mobile-benefit-tags">
+                                  <span className="mobile-benefit-tag">
+                                    🏷️ {b.badge_text || b.benefit_type || 'Oferta Exclusiva'}
+                                  </span>
+                                </div>
+                                {b.discount_percentage ? (
+                                  <span className="mobile-benefit-discount-pill">
+                                    {b.discount_percentage}% Desconto
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              <h4 className="mobile-benefit-title">{b.title}</h4>
+                              {b.description && (
+                                <p className="mobile-benefit-desc">{b.description}</p>
+                              )}
+
+                              <div className="mobile-benefit-footer">
+                                <div className="mobile-benefit-status">
+                                  {isRedeemed ? (
+                                    <span className="benefit-code-badge">
+                                      ✓ Código: <b>{voucher?.code}</b>
+                                    </span>
+                                  ) : (
+                                    <span className="benefit-hint-text">
+                                      Código pessoal gerado no resgate
+                                    </span>
+                                  )}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  className={`benefit-redeem-btn ${isRedeemed ? 'redeemed' : ''}`}
+                                  onClick={() => {
+                                    if (isRedeemed && voucher) {
+                                      onOpenVoucherModal?.(voucher);
+                                      return;
+                                    }
+                                    if (!memberUser) {
+                                      if (onRequestRedeemWithLogin) {
+                                        onRequestRedeemWithLogin(
+                                          b,
+                                          detail.business_name,
+                                          detail.business_slug,
+                                          detail.business_id,
+                                          whatsappContact?.value || null
+                                        );
+                                      } else if (onOpenMemberLogin) {
+                                        onOpenMemberLogin();
+                                      }
+                                      return;
+                                    }
+                                    const newVoucher = redeemBenefit({
+                                      benefit: b,
+                                      businessName: detail.business_name,
+                                      businessSlug: detail.business_slug,
+                                      businessId: detail.business_id,
+                                      businessWhatsapp: whatsappContact?.value || null,
+                                      user: memberUser,
+                                    });
+                                    if (detail.business_id) {
+                                      trackMobileEvent({
+                                        businessId: detail.business_id,
+                                        eventType: 'view',
+                                        city: detail.city,
+                                        state: detail.state,
+                                      });
+                                    }
+                                    onOpenVoucherModal?.(newVoucher);
+                                  }}
+                                >
+                                  <span>{isRedeemed ? 'Ver Comprovante' : 'Resgatar Benefício'}</span>
+                                  <span>{isRedeemed ? '🎫' : '⚡'}</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -3363,6 +3648,7 @@ function BeneficiosScreen({
   onRefer,
   favoritesCount,
   onLoadedData,
+  onOpenVoucherModal,
 }: {
   search: string;
   city: string;
@@ -3377,11 +3663,17 @@ function BeneficiosScreen({
   onRefer?: (name: string, slug: string) => void;
   favoritesCount?: number;
   onLoadedData?: (data: MobileGuideHomeData) => void;
+  onOpenVoucherModal?: (voucher: MobileBenefitRedemption) => void;
 }) {
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [guideData, setGuideData] = useState<MobileGuideHomeData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [redeemedList, setRedeemedList] = useState<MobileBenefitRedemption[]>(() => loadRedeemedBenefits());
   const guideServiceRef = useRef(createMobileGuideService());
+
+  useEffect(() => {
+    setRedeemedList(loadRedeemedBenefits());
+  }, []);
 
   const fetchBenefitBusinesses = (q = search, c = city, cat = selectedCategory) => {
     setLoading(true);
@@ -3493,6 +3785,65 @@ function BeneficiosScreen({
           : `${displayedBusinesses.length} ${displayedBusinesses.length === 1 ? 'empresa parceira encontrada' : 'empresas parceiras encontradas'}${search ? ` para "${search}"` : ''}`}
       </div>
 
+      {redeemedList.length > 0 && (
+        <div
+          style={{
+            padding: '12px 16px',
+            borderRadius: 14,
+            background: 'linear-gradient(135deg, #4B161B 0%, #2A070E 100%)',
+            border: '1px solid #C9A227',
+            color: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            marginBottom: 14,
+            boxShadow: '0 4px 12px rgba(42, 7, 14, 0.25)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <span style={{ fontSize: '1.4rem' }}>🎟️</span>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: '.84rem', fontWeight: 800, color: '#F3EEDD' }}>
+                {redeemedList.length === 1
+                  ? '1 Benefício Resgatado'
+                  : `${redeemedList.length} Benefícios Resgatados`}
+              </p>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: '.72rem',
+                  color: '#e7c65d',
+                  textOverflow: 'ellipsis',
+                  overflow: 'hidden',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Último: {redeemedList[0]?.businessName} ({redeemedList[0]?.code})
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => onOpenVoucherModal?.(redeemedList[0]!)}
+            style={{
+              background: '#C9A227',
+              color: '#1a0609',
+              border: 'none',
+              borderRadius: 8,
+              padding: '6px 12px',
+              fontSize: '.76rem',
+              fontWeight: 850,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            Ver Cupom
+          </button>
+        </div>
+      )}
+
       {!loading && displayedBusinesses.length === 0 ? (
         <div className="empty-results">
           <b>Nenhum benefício encontrado para este filtro</b>
@@ -3561,6 +3912,7 @@ function EmptyScreen({
 }) {
   const [eventsList, setEventsList] = useState<MobileEventItem[]>(DEFAULT_COMMUNITY_EVENTS);
   const [loadingEvents, setLoadingEvents] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<MobileEventItem | null>(null);
   const [confirmingDeleteAccount, setConfirmingDeleteAccount] = useState(false);
   const guideServiceRef = useRef(createMobileGuideService());
 
@@ -3645,11 +3997,29 @@ function EmptyScreen({
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {filteredEvents.map((ev) => (
-              <article key={ev.id} className="event-card-mobile">
-                <span className={`event-origin-badge ${ev.organizer_type}`}>
-                  {ev.organizer_type === 'lodge' ? '🏛️ Loja Maçônica' : '🏢 Empresa Parceira'}
-                </span>
-                <h3 style={{ margin: '2px 0', font: '750 1.05rem/1.3 Georgia, serif', color: '#4b161b' }}>
+              <article
+                key={ev.id}
+                className="event-card-mobile"
+                onClick={() => setSelectedEvent(ev)}
+                style={{ cursor: 'pointer' }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedEvent(ev);
+                  }
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <span className={`event-origin-badge ${ev.organizer_type}`}>
+                    {ev.organizer_type === 'lodge' ? '🏛️ Loja Maçônica' : '🏢 Empresa Parceira'}
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: '#c9a227', fontWeight: 800 }}>
+                    Ver detalhes →
+                  </span>
+                </div>
+                <h3 style={{ margin: '4px 0 2px', font: '750 1.05rem/1.3 Georgia, serif', color: '#4b161b' }}>
                   {ev.title}
                 </h3>
                 <p style={{ margin: 0, fontSize: '0.82rem', color: '#57534e', lineHeight: 1.5 }}>
@@ -3670,6 +4040,83 @@ function EmptyScreen({
               </div>
             )}
           </div>
+
+          {selectedEvent && (
+            <div
+              className="voucher-modal-overlay"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Detalhes do Evento"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setSelectedEvent(null);
+              }}
+            >
+              <div className="voucher-modal-card">
+                <div className="voucher-modal-header">
+                  <button
+                    type="button"
+                    className="voucher-close-btn"
+                    onClick={() => setSelectedEvent(null)}
+                    aria-label="Fechar detalhes do evento"
+                  >
+                    ✕
+                  </button>
+
+                  <span
+                    className={`event-origin-badge ${selectedEvent.organizer_type}`}
+                    style={{ alignSelf: 'center', margin: '0 auto 10px', display: 'inline-flex' }}
+                  >
+                    {selectedEvent.organizer_type === 'lodge' ? '🏛️ Loja Maçônica' : '🏢 Empresa Parceira'}
+                  </span>
+
+                  <h3 className="voucher-biz-name" style={{ fontSize: '1.2rem', marginTop: 4 }}>
+                    {selectedEvent.title}
+                  </h3>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8, fontSize: '0.82rem', color: '#f3eedd' }}>
+                    <span>🗓️ Data: <b>{selectedEvent.event_date || 'A definir'}</b></span>
+                    {selectedEvent.location_label && <span>📍 Local: <b>{selectedEvent.location_label}</b></span>}
+                    <span>🏙️ Cidade: <b>{selectedEvent.city} - {selectedEvent.state}</b></span>
+                    <span>👤 Organizador: <b>{selectedEvent.organizer_name}</b></span>
+                  </div>
+                </div>
+
+                <div className="voucher-modal-body">
+                  {selectedEvent.summary ? (
+                    <div style={{ fontSize: '0.86rem', color: '#44403c', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+                      {selectedEvent.summary}
+                    </div>
+                  ) : (
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#78716c', fontStyle: 'italic' }}>
+                      Evento público de divulgação da rede fraterna.
+                    </p>
+                  )}
+
+                  {selectedEvent.cta_url && (
+                    <a
+                      href={selectedEvent.cta_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="voucher-btn-primary"
+                      style={{ textDecoration: 'none', textAlign: 'center', marginTop: 6 }}
+                    >
+                      <span>🔗</span>
+                      <span>Mais Informações / Link Externo</span>
+                    </a>
+                  )}
+
+                  <button
+                    type="button"
+                    className="voucher-btn-secondary"
+                    onClick={() => setSelectedEvent(null)}
+                    style={{ marginTop: 4 }}
+                  >
+                    <span>Fechar</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -3911,7 +4358,7 @@ function EmptyScreen({
               onClick={onGoToFavorites}
               style={{ width: '100%', minHeight: 42, fontSize: '0.85rem' }}
             >
-              Ver Favoritas no Catálogo
+              Ver Minhas Empresas Favoritas
             </Button>
           </div>
 
@@ -3930,6 +4377,247 @@ function EmptyScreen({
   }
 
   return null;
+}
+
+function MobileFavoritesModal({
+  isOpen,
+  onClose,
+  favorites,
+  onSelectBusiness,
+  onToggleFavorite,
+  onRefer,
+  onZoomLogo,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  favorites: string[];
+  onSelectBusiness: (slug: string) => void;
+  onToggleFavorite: (slug: string, name?: string) => void;
+  onRefer?: (name: string, slug: string) => void;
+  onZoomLogo?: (logoUrl: string, name: string, backgroundColor?: string | null) => void;
+}) {
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<MobileGuideSponsoredBusiness[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchFilter, setSearchFilter] = useState('');
+  const guideServiceRef = useRef(createMobileGuideService());
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (favorites.length === 0) {
+      setFavoriteBusinesses([]);
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setLoading(true);
+
+    async function loadFavoritesData() {
+      try {
+        const homeData = await guideServiceRef.current.loadHome({});
+        const pool = [...(homeData.businesses || []), ...(homeData.sponsored || [])];
+        const map = new Map<string, MobileGuideSponsoredBusiness>();
+        pool.forEach((b) => {
+          if (b.slug) map.set(b.slug.toLowerCase(), b);
+        });
+
+        // Caso haja alguma empresa favoritada fora do pool inicial, busca o detalhe individual
+        const missingSlugs = favorites.filter((s) => !map.has(s.toLowerCase()));
+        if (missingSlugs.length > 0) {
+          const detailResults = await Promise.allSettled(
+            missingSlugs.map((slug) => guideServiceRef.current.loadBusinessDetail(slug))
+          );
+          detailResults.forEach((res) => {
+            if (res.status === 'fulfilled' && res.value) {
+              const d = res.value;
+              map.set(d.business_slug.toLowerCase(), {
+                id: d.business_id,
+                name: d.business_name,
+                slug: d.business_slug,
+                city: d.city,
+                state: d.state,
+                logo_url: d.logo_url,
+                cover_url: d.cover_url ?? null,
+                description: d.description,
+                category_name: d.primary_category_name,
+                category_slug: null,
+                plan_tier: d.effective_plan_code,
+                is_featured: false,
+                is_pedra_fundamental: d.is_pedra_fundamental,
+                address: d.address,
+              });
+            }
+          });
+        }
+
+        if (isMounted) {
+          const list = favorites
+            .map((slug) => map.get(slug.toLowerCase()))
+            .filter((b): b is MobileGuideSponsoredBusiness => Boolean(b));
+          setFavoriteBusinesses(list);
+          setLoading(false);
+        }
+      } catch (_err) {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadFavoritesData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, favorites]);
+
+  if (!isOpen) return null;
+
+  const filtered = favoriteBusinesses.filter((b) => {
+    if (!searchFilter.trim()) return true;
+    const q = searchFilter.toLowerCase();
+    return (
+      (b.name || '').toLowerCase().includes(q) ||
+      (b.category_name || '').toLowerCase().includes(q) ||
+      (b.city || '').toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label="Janela de Empresas Favoritas">
+      <div
+        className="location-modal-card"
+        style={{ maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="location-modal-header" style={{ borderBottom: '1px solid #ebd9c8', paddingBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: '1.25rem' }}>❤️</span>
+            <div>
+              <h3 style={{ margin: 0, font: '750 1.15rem/1.2 Georgia, serif', color: '#4b161b' }}>
+                Empresas Favoritas
+              </h3>
+              <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#7a6e67' }}>
+                {favorites.length} {favorites.length === 1 ? 'empresa salva' : 'empresas salvas'} para consulta rápida
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="modal-close-btn"
+            onClick={onClose}
+            aria-label="Fechar janela de favoritas"
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: '50%',
+              background: '#f5f0eb',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1rem',
+              color: '#4b161b',
+              fontWeight: 800,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {favorites.length > 2 && (
+          <div style={{ padding: '10px 16px 4px' }}>
+            <div className="location-search-wrap">
+              <input
+                type="text"
+                placeholder="Buscar entre suas favoritas..."
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                className="location-filter-input"
+                style={{ fontSize: '0.82rem', height: 38 }}
+              />
+              {searchFilter && (
+                <button
+                  type="button"
+                  onClick={() => setSearchFilter('')}
+                  style={{
+                    position: 'absolute',
+                    right: 10,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    border: 0,
+                    background: 'none',
+                    cursor: 'pointer',
+                    color: '#888',
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '12px 16px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+          }}
+        >
+          {loading ? (
+            <div style={{ padding: '36px 16px', textAlign: 'center', color: '#7a6e67', fontSize: '0.85rem' }}>
+              Carregando suas empresas favoritas...
+            </div>
+          ) : favorites.length === 0 ? (
+            <div
+              style={{
+                padding: '40px 16px',
+                textAlign: 'center',
+                color: '#7a6e67',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
+              <span style={{ fontSize: '2.5rem' }}>🤍</span>
+              <strong style={{ font: '700 1.05rem/1.3 Georgia, serif', color: '#4b161b' }}>
+                Nenhuma empresa favoritada ainda
+              </strong>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#7a6e67', maxWidth: 300, lineHeight: 1.5 }}>
+                Ao navegar pelo guia ou perfil das empresas parceiras, toque no ícone de coração para salvá-las aqui.
+              </p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div style={{ padding: '30px 16px', textAlign: 'center', color: '#7a6e67', fontSize: '0.82rem' }}>
+              Nenhuma empresa favorita corresponde a &quot;{searchFilter}&quot;.
+            </div>
+          ) : (
+            filtered.map((biz) => (
+              <BusinessCard
+                key={biz.id || biz.slug}
+                business={biz}
+                onSelect={(slug) => {
+                  onClose();
+                  onSelectBusiness(slug);
+                }}
+                onZoomLogo={onZoomLogo}
+                isFavorited={true}
+                onToggleFavorite={onToggleFavorite}
+                onRefer={onRefer}
+              />
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function LocationModal({
@@ -6968,6 +7656,7 @@ export function App() {
   const [maisSubView, setMaisSubView] = useState<'menu' | 'eventos'>('menu');
   const [eventTypeFilter, setEventTypeFilter] = useState<'all' | 'empresas' | 'lojas'>('all');
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [isFavoritesModalOpen, setIsFavoritesModalOpen] = useState(false);
   const [availableCities, setAvailableCities] = useState<string[]>(['Feira de Santana']);
   const [serverCategories, setServerCategories] = useState<Array<{ id?: string; name: string; slug: string; business_count?: number }>>([]);
   const [selectedBusinessSlug, setSelectedBusinessSlug] = useState<string | null>(null);
@@ -6987,6 +7676,15 @@ export function App() {
   const [isShareExperienceModalOpen, setIsShareExperienceModalOpen] = useState(false);
   const [openShareAfterLogin, setOpenShareAfterLogin] = useState(false);
   const [pendingExperienceCompanySlug, setPendingExperienceCompanySlug] = useState<string | null>(null);
+  const [activeVoucherModal, setActiveVoucherModal] = useState<MobileBenefitRedemption | null>(null);
+  const [detailInitialTab, setDetailInitialTab] = useState<'sobre' | 'beneficio'>('sobre');
+  const [pendingBenefitToRedeem, setPendingBenefitToRedeem] = useState<{
+    benefit: MobileBenefitItem;
+    businessName: string;
+    businessSlug: string;
+    businessId?: string;
+    businessWhatsapp?: string | null;
+  } | null>(null);
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -7032,6 +7730,24 @@ export function App() {
       }
     } catch {}
     setIsMemberLoginModalOpen(false);
+
+    if (pendingBenefitToRedeem) {
+      const voucher = redeemBenefit({
+        benefit: pendingBenefitToRedeem.benefit,
+        businessName: pendingBenefitToRedeem.businessName,
+        businessSlug: pendingBenefitToRedeem.businessSlug,
+        businessId: pendingBenefitToRedeem.businessId,
+        businessWhatsapp: pendingBenefitToRedeem.businessWhatsapp,
+        user,
+      });
+      setPendingBenefitToRedeem(null);
+      setActiveVoucherModal(voucher);
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+      setToastMsg('🎉 Benefício resgatado com sucesso!');
+      toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 3000);
+      return;
+    }
+
     if (openShareAfterLogin) {
       setOpenShareAfterLogin(false);
       setIsShareExperienceModalOpen(true);
@@ -7131,17 +7847,45 @@ export function App() {
       <header className="topbar">
         <div className="topbar-brand-row">
           <img className="brand-logo" src="./logo_conexao.svg" alt="Conexão Maçônica" />
-          <button
-            type="button"
-            className="location-pill-btn"
-            onClick={() => setIsLocationModalOpen(true)}
-            aria-label={`Localização: ${city || 'Brasil'}`}
-            title="Alterar localização"
-          >
-            <FeatureIcon name="map" />
-            <span className="location-pill-text">{city || 'Brasil'}</span>
-            <span className="location-pill-chevron" aria-hidden="true">▾</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              type="button"
+              className="location-pill-btn"
+              onClick={() => setIsLocationModalOpen(true)}
+              aria-label={`Localização: ${city || 'Brasil'}`}
+              title="Alterar localização"
+            >
+              <FeatureIcon name="map" />
+              <span className="location-pill-text">{city || 'Brasil'}</span>
+              <span className="location-pill-chevron" aria-hidden="true">▾</span>
+            </button>
+            <button
+              type="button"
+              className="topbar-favorites-btn"
+              onClick={() => setIsFavoritesModalOpen(true)}
+              aria-label={`Ver Favoritas (${favorites.length})`}
+              title="Minhas Empresas Favoritas"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '0 10px',
+                height: 32,
+                borderRadius: 999,
+                background: favorites.length > 0 ? '#fffdfa' : 'rgba(255,255,255,0.12)',
+                border: favorites.length > 0 ? '1px solid #c9a227' : '1px solid rgba(255,255,255,0.25)',
+                color: favorites.length > 0 ? '#e11d48' : '#f3eedd',
+                fontSize: '0.78rem',
+                fontWeight: 750,
+                cursor: 'pointer',
+              }}
+            >
+              <svg viewBox="0 0 24 24" fill={favorites.length > 0 ? '#e11d48' : 'none'} stroke={favorites.length > 0 ? '#e11d48' : '#f3eedd'} strokeWidth="2.2" width="14" height="14">
+                <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+              </svg>
+              <span>{favorites.length}</span>
+            </button>
+          </div>
         </div>
 
         {!isDetailOpen && !isMaisMenuOnly && (
@@ -7165,92 +7909,125 @@ export function App() {
         )}
 
         {!isDetailOpen && !isMaisMenuOnly && (
-          <div className="categories-slider-bar" role="region" aria-label="Filtros rápidos no topo">
-            <div className="categories-slider-track">
-              {route === 'lojas' ? (
-                <>
-                  <button
-                    type="button"
-                    className={`category-item-btn ${!selectedPotency ? 'active' : ''}`}
-                    onClick={() => setSelectedPotency('')}
-                    title="Todas as Potências"
-                  >
-                    <span className="category-item-icon">
-                      <FeatureIcon name="lodges" />
-                    </span>
-                    <span className="category-item-label">Todas</span>
-                  </button>
-                  {DEFAULT_POTENCIES.map((pot) => (
-                    <button
-                      key={pot.slug}
-                      type="button"
-                      className={`category-item-btn ${selectedPotency === pot.slug ? 'active' : ''}`}
-                      onClick={() => setSelectedPotency(selectedPotency === pot.slug ? '' : pot.slug)}
-                      title={pot.name}
-                    >
-                      <span className="category-item-icon">
-                        <FeatureIcon name="lodges" />
-                      </span>
-                      <span className="category-item-label">{pot.abbreviation}</span>
-                    </button>
-                  ))}
-                </>
-              ) : isEventosView ? (
-                <>
-                  <button
-                    type="button"
-                    className={`category-item-btn ${eventTypeFilter === 'all' ? 'active' : ''}`}
-                    onClick={() => setEventTypeFilter('all')}
-                    title="Todos os Eventos"
-                  >
-                    <span className="category-item-icon">
-                      <FeatureIcon name="events" />
-                    </span>
-                    <span className="category-item-label">Todos</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`category-item-btn ${eventTypeFilter === 'empresas' ? 'active' : ''}`}
-                    onClick={() => setEventTypeFilter('empresas')}
-                    title="Eventos de Empresas"
-                  >
-                    <span className="category-item-icon">
-                      <FeatureIcon name="companies" />
-                    </span>
-                    <span className="category-item-label">Empresas</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`category-item-btn ${eventTypeFilter === 'lojas' ? 'active' : ''}`}
-                    onClick={() => setEventTypeFilter('lojas')}
-                    title="Eventos de Lojas Maçônicas"
-                  >
-                    <span className="category-item-icon">
-                      <FeatureIcon name="lodges" />
-                    </span>
-                    <span className="category-item-label">Lojas Maçônicas</span>
-                  </button>
-                </>
-              ) : (
-                displayCategories.map((cat) => (
-                  <button
-                    key={cat.slug}
-                    type="button"
-                    className={`category-item-btn ${selectedCategory === cat.slug ? 'active' : ''}`}
-                    onClick={() => handleCategoryClick(cat.slug)}
-                    title={cat.name}
-                  >
-                    <span className="category-item-icon">
-                      <CategoryIcon slug={cat.slug} name={cat.name} />
-                    </span>
-                    <span className="category-item-label">{cat.name}</span>
-                  </button>
-                ))
-              )}
-            </div>
+          <div className="topbar-sections-nav" role="tablist" aria-label="Seções do Guia">
+            <button
+              type="button"
+              className={`topbar-section-pill ${route === 'inicio' ? 'active' : ''}`}
+              onClick={() => { window.location.hash = routeHref('inicio'); }}
+            >
+              <span>Início</span>
+            </button>
+            <button
+              type="button"
+              className={`topbar-section-pill ${route === 'empresas' ? 'active' : ''}`}
+              onClick={() => { window.location.hash = routeHref('empresas'); }}
+            >
+              <span>Empresas</span>
+            </button>
+            <button
+              type="button"
+              className={`topbar-section-pill ${route === 'lojas' ? 'active' : ''}`}
+              onClick={() => { window.location.hash = routeHref('lojas'); }}
+            >
+              <span>Lojas Maçônicas</span>
+            </button>
+            <button
+              type="button"
+              className={`topbar-section-pill ${route === 'beneficios' ? 'active' : ''}`}
+              onClick={() => { window.location.hash = routeHref('beneficios'); }}
+            >
+              <span>Benefícios</span>
+            </button>
           </div>
         )}
       </header>
+
+      {!isDetailOpen && !isMaisMenuOnly && (
+        <div className="categories-slider-bar" role="region" aria-label="Filtros rápidos no topo">
+          <div className="categories-slider-track">
+            {route === 'lojas' ? (
+              <>
+                <button
+                  type="button"
+                  className={`category-item-btn ${!selectedPotency ? 'active' : ''}`}
+                  onClick={() => setSelectedPotency('')}
+                  title="Todas as Potências"
+                >
+                  <span className="category-item-icon">
+                    <FeatureIcon name="lodges" />
+                  </span>
+                  <span className="category-item-label">Todas</span>
+                </button>
+                {DEFAULT_POTENCIES.map((pot) => (
+                  <button
+                    key={pot.slug}
+                    type="button"
+                    className={`category-item-btn ${selectedPotency === pot.slug ? 'active' : ''}`}
+                    onClick={() => setSelectedPotency(selectedPotency === pot.slug ? '' : pot.slug)}
+                    title={pot.name}
+                  >
+                    <span className="category-item-icon">
+                      <FeatureIcon name="lodges" />
+                    </span>
+                    <span className="category-item-label">{pot.abbreviation}</span>
+                  </button>
+                ))}
+              </>
+            ) : isEventosView ? (
+              <>
+                <button
+                  type="button"
+                  className={`category-item-btn ${eventTypeFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setEventTypeFilter('all')}
+                  title="Todos os Eventos"
+                >
+                  <span className="category-item-icon">
+                    <FeatureIcon name="events" />
+                  </span>
+                  <span className="category-item-label">Todos</span>
+                </button>
+                <button
+                  type="button"
+                  className={`category-item-btn ${eventTypeFilter === 'empresas' ? 'active' : ''}`}
+                  onClick={() => setEventTypeFilter('empresas')}
+                  title="Eventos de Empresas"
+                >
+                  <span className="category-item-icon">
+                    <FeatureIcon name="companies" />
+                  </span>
+                  <span className="category-item-label">Empresas</span>
+                </button>
+                <button
+                  type="button"
+                  className={`category-item-btn ${eventTypeFilter === 'lojas' ? 'active' : ''}`}
+                  onClick={() => setEventTypeFilter('lojas')}
+                  title="Eventos de Lojas Maçônicas"
+                >
+                  <span className="category-item-icon">
+                    <FeatureIcon name="lodges" />
+                  </span>
+                  <span className="category-item-label">Lojas Maçônicas</span>
+                </button>
+              </>
+            ) : (
+              displayCategories.map((cat) => (
+                <button
+                  key={cat.slug}
+                  type="button"
+                  className={`category-item-btn ${selectedCategory === cat.slug ? 'active' : ''}`}
+                  onClick={() => handleCategoryClick(cat.slug)}
+                  title={cat.name}
+                >
+                  <span className="category-item-icon">
+                    <CategoryIcon slug={cat.slug} name={cat.name} />
+                  </span>
+                  <span className="category-item-label">{cat.name}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       <main className="main-content">
         {route === 'inicio' ? (
@@ -7318,12 +8095,16 @@ export function App() {
             onSelectCategory={(catSlug) => setSelectedCategory(catSlug)}
             onSelectCity={(newCity) => setCity(newCity)}
             onOpenLocationModal={() => setIsLocationModalOpen(true)}
-            onSelectBusiness={(slug) => setSelectedBusinessSlug(slug)}
+            onSelectBusiness={(slug) => {
+              setDetailInitialTab('beneficio');
+              setSelectedBusinessSlug(slug);
+            }}
             onZoomLogo={(url, name, backgroundColor) => setZoomLogo({ url, name, backgroundColor })}
             isFavorite={isFavorite}
             onToggleFavorite={handleToggleFavorite}
             onRefer={handleOpenRefer}
             favoritesCount={favorites.length}
+            onOpenVoucherModal={(v) => setActiveVoucherModal(v)}
             onLoadedData={(data) => {
               if (data.available_cities?.length) {
                 setAvailableCities(data.available_cities);
@@ -7348,7 +8129,7 @@ export function App() {
             route={route}
             favoritesCount={favorites.length}
             onGoToFavorites={() => {
-              window.location.hash = routeHref('empresas');
+              setIsFavoritesModalOpen(true);
             }}
             memberUser={memberUser}
             onOpenMemberLogin={() => {
@@ -7395,12 +8176,32 @@ export function App() {
 
       <BusinessDetailModal
         slug={selectedBusinessSlug}
-        onClose={() => setSelectedBusinessSlug(null)}
+        onClose={() => {
+          setSelectedBusinessSlug(null);
+          setDetailInitialTab('sobre');
+        }}
         onZoomLogo={(url, name, backgroundColor) => setZoomLogo({ url, name, backgroundColor })}
         isFavorited={selectedBusinessSlug ? isFavorite(selectedBusinessSlug) : false}
         onToggleFavorite={handleToggleFavorite}
         onRefer={handleOpenRefer}
         onShareExperience={handleStartShareExperience}
+        initialTab={detailInitialTab}
+        memberUser={memberUser}
+        onOpenMemberLogin={() => {
+          setOpenShareAfterLogin(false);
+          setIsMemberLoginModalOpen(true);
+        }}
+        onOpenVoucherModal={(v) => setActiveVoucherModal(v)}
+        onRequestRedeemWithLogin={(benefit, bizName, bizSlug, bizId, bizWa) => {
+          setPendingBenefitToRedeem({
+            benefit,
+            businessName: bizName,
+            businessSlug: bizSlug,
+            businessId: bizId,
+            businessWhatsapp: bizWa,
+          });
+          setIsMemberLoginModalOpen(true);
+        }}
       />
 
       <LodgeDetailModal
@@ -7415,6 +8216,19 @@ export function App() {
         logoUrl={zoomLogo?.url ?? null}
         businessName={zoomLogo?.name ?? ''} backgroundColor={zoomLogo?.backgroundColor}
         onClose={() => setZoomLogo(null)}
+      />
+
+      <MobileFavoritesModal
+        isOpen={isFavoritesModalOpen}
+        onClose={() => setIsFavoritesModalOpen(false)}
+        favorites={favorites}
+        onSelectBusiness={(slug) => {
+          setIsFavoritesModalOpen(false);
+          setSelectedBusinessSlug(slug);
+        }}
+        onToggleFavorite={handleToggleFavorite}
+        onRefer={handleOpenRefer}
+        onZoomLogo={(url, name, backgroundColor) => setZoomLogo({ url, name, backgroundColor })}
       />
 
       {referModal && (
@@ -7443,6 +8257,16 @@ export function App() {
         initialCompanySlug={pendingExperienceCompanySlug}
         businesses={serverBusinesses.length ? serverBusinesses : DEFAULT_BUSINESSES}
         memberUser={memberUser}
+      />
+
+      <BenefitVoucherModal
+        voucher={activeVoucherModal}
+        onClose={() => setActiveVoucherModal(null)}
+        onToast={(msg) => {
+          if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+          setToastMsg(msg);
+          toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 3000);
+        }}
       />
 
       {toastMsg && (

@@ -367,7 +367,7 @@ export function BusinessLeafletMap({
   }, [selectedSlug]);
 
   return (
-    <div className="relative w-full h-full min-h-[340px] overflow-hidden">
+    <div className="relative w-full h-full min-h-[340px] overflow-hidden isolate z-0">
       <style>{`
         .cm-leaflet-div-icon {
           background: transparent !important;

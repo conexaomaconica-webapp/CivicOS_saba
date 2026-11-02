@@ -345,15 +345,20 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
             </div>
 
             {/* Controle de Inscrição */}
-            <div className="aem-field aem-field--checkbox">
-              <label className="aem-checkbox-label">
+            <div className="aem-field aem-field--full" style={{ background: '#FAF7F2', padding: '0.875rem', borderRadius: '8px', border: '1px solid #E8E2D9' }}>
+              <label className="aem-checkbox-label" style={{ fontWeight: 600, color: '#3B0B14' }}>
                 <input
                   type="checkbox"
                   checked={formData.registrationEnabled}
                   onChange={(e) => handleChange('registrationEnabled', e.target.checked)}
                 />
-                <span>Inscrições abertas e ativas para confirmação</span>
+                <span>Habilitar lista de presença e inscrições (RSVP)</span>
               </label>
+              <p style={{ margin: '0.25rem 0 0 1.5rem', fontSize: '0.75rem', color: '#6B7280' }}>
+                {formData.registrationEnabled
+                  ? 'Ativado: Maçons, cunhadas e convidados podem confirmar presença com controle de vagas.'
+                  : 'Desativado: Evento em formato "Apenas Divulgação" (sem lista de presença ou formulário de check-in).'}
+              </p>
             </div>
           </div>
 

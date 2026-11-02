@@ -28,7 +28,7 @@ export function markLaunchAsShown(): void {
   try {
     sessionStorage.setItem(STORAGE_KEY_SESSION, '1');
     localStorage.setItem(STORAGE_KEY_PERMANENT, String(Date.now()));
-  } catch {}
+  } catch { }
 }
 
 type LaunchExperienceProps = {
@@ -98,9 +98,8 @@ export function LaunchExperience({ forceShow = false }: LaunchExperienceProps) {
       role="dialog"
       aria-modal="true"
       aria-label="Abertura da Conexão Maçônica"
-      className={`fixed inset-0 z-[99999] flex items-center justify-center transition-colors duration-200 ${
-        fading ? 'opacity-0 pointer-events-none' : 'opacity-100'
-      }`}
+      className={`fixed inset-0 z-[99999] flex items-center justify-center transition-colors duration-200 ${fading ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}
       style={{
         backgroundColor: bgColor,
         padding:
@@ -127,7 +126,7 @@ export function LaunchExperience({ forceShow = false }: LaunchExperienceProps) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/splash.svg"
-            alt="Conexão Maçônica — Tradição que une, conexão que nos fortalece"
+            alt="Conexão Maçônica — Tradição que une! conexão que fortalece!"
             className="max-h-[75vh] max-w-[85vw] object-contain"
           />
         </button>

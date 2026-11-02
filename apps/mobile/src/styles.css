@@ -11,9 +11,28 @@ body { min-width: 320px; background: #f7f3ec; }
 button, a, input { -webkit-tap-highlight-color: transparent; }
 button, input { font: inherit; }
 
-.launch-screen { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; overflow: hidden; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); background: #491519; }
+.launch-screen { position: fixed; z-index: 99999; inset: 0; display: grid; place-items: center; overflow: hidden; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); background: #491519; }
 .launch-screen video { width: 100%; height: 100%; object-fit: contain; background: #491519; }
 .launch-screen.launch-playing, .launch-screen.launch-playing video { background: #321511; }
+.launch-skip-btn {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top));
+  right: 16px;
+  z-index: 100000;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 0.76rem;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+.launch-skip-btn:active {
+  background: rgba(0, 0, 0, 0.7);
+}
 .launch-fallback button { width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .launch-fallback img { width: 100%; height: 100%; object-fit: contain; }
 
@@ -48,7 +67,7 @@ button, input { font: inherit; }
   to { opacity: 1; transform: scale(1); }
 }
 .offline-banner { background: #c9a227; color: #241b00; padding: calc(8px + env(safe-area-inset-top)) 18px 8px; text-align: center; font-size: .82rem; font-weight: 700; }
-.topbar { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 8px; padding: calc(8px + env(safe-area-inset-top)) 20px 8px; background: #4b161b; border-bottom: 1px solid #c9a227; }
+.topbar { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 8px; padding: calc(8px + env(safe-area-inset-top)) 20px 8px; background: #4b161b; border-bottom: 1px solid #c9a227; position: sticky; top: 0; z-index: 1100; }
 .offline-banner + .topbar { padding-top: 8px; }
 .topbar-brand-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; }
 .brand-logo { height: 38px; width: auto; max-width: min(180px, 52vw); object-fit: contain; object-position: left center; }
@@ -62,6 +81,42 @@ button, input { font: inherit; }
 .topbar-tools .search-form input { height: 34px; }
 .topbar-tools .search-form button { min-height: 36px; padding: 0 12px; border-radius: 10px; }
 
+.topbar-sections-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 1px 0 2px;
+}
+.topbar-sections-nav::-webkit-scrollbar { display: none; }
+.topbar-section-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f3eedd;
+  font-size: 0.74rem;
+  font-weight: 750;
+  border: 1px solid rgba(201, 162, 39, 0.35);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 140ms ease;
+}
+.topbar-section-pill:active {
+  transform: scale(0.96);
+}
+.topbar-section-pill.active {
+  background: #c9a227;
+  color: #2b060d;
+  border-color: #f7e296;
+  box-shadow: 0 2px 8px rgba(201, 162, 39, 0.35);
+}
+
 /* Barra de Categorias em Destaque (5 ícones visíveis com scroll horizontal) */
 .categories-slider-bar {
   --visible-w: min(100vw, 760px);
@@ -69,14 +124,16 @@ button, input { font: inherit; }
   --gap: 8px;
   --cat-w: calc((var(--visible-w) - var(--bar-pad-x) - (4 * var(--gap))) / 5);
   width: 100%;
-  margin: 2px -20px -2px;
-  padding: 4px 12px 6px;
+  margin: 0;
+  padding: 8px 12px 10px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
   box-sizing: border-box;
+  background: #4b161b;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.4);
 }
 .categories-slider-bar::-webkit-scrollbar { display: none; }
 .categories-slider-track { display: flex; gap: var(--gap); width: max-content; }
@@ -206,7 +263,7 @@ button, input { font: inherit; }
 .filter-shell input, .filter-shell button { width: 100%; min-height: 46px; margin-top: 5px; padding: 0 13px; border: 1px solid #d9c9b9; border-radius: 12px; background: #fffdfa; color: #514641; }
 .filter-shell button { margin: 0; text-align: left; opacity: .72; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-.bottom-nav { position: fixed; z-index: 10; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: repeat(5, 1fr); padding: 7px 8px calc(7px + env(safe-area-inset-bottom)); border-top: 1px solid #7d2b2f; background: rgb(75 22 27 / .98); backdrop-filter: blur(14px); }
+.bottom-nav { position: fixed; z-index: 1100; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: repeat(5, 1fr); padding: 7px 8px calc(7px + env(safe-area-inset-bottom)); border-top: 1px solid #7d2b2f; background: rgb(75 22 27 / .98); backdrop-filter: blur(14px); }
 .bottom-nav a { display: flex; min-height: 54px; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 2px solid transparent; border-radius: 12px; color: #f0dcd2; font-size: .66rem; font-weight: 700; text-decoration: none; transition: color 180ms ease, transform 180ms ease, background-color 180ms ease; }
 .bottom-nav a[aria-current="page"] { background: rgb(201 162 39 / .09); color: #e2bc4d; transform: translateY(-2px) scale(1.06); }
 .bottom-nav a:not([aria-current="page"]):active { background: rgb(255 255 255 / .1); color: #f1c77e; }
@@ -273,7 +330,7 @@ button, input { font: inherit; }
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: 2000;
   background: rgb(0 0 0 / .65);
   backdrop-filter: blur(5px);
   display: flex;
@@ -1736,7 +1793,7 @@ button, input { font: inherit; }
 .gallery-lightbox-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1400;
+  z-index: 3000;
   background: rgb(0 0 0 / .94);
   backdrop-filter: blur(8px);
   display: flex;
@@ -1794,7 +1851,7 @@ button, input { font: inherit; }
 .logo-zoom-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1400;
+  z-index: 3000;
   background: rgb(0 0 0 / .85);
   backdrop-filter: blur(6px);
   display: flex;
@@ -4190,7 +4247,7 @@ button, input { font: inherit; }
   inset: 0;
   background: rgba(15, 23, 42, 0.65);
   backdrop-filter: blur(4px);
-  z-index: 1000;
+  z-index: 2000;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -4520,12 +4577,20 @@ button, input { font: inherit; }
   border: 1.5px solid #ddcfbd;
   box-shadow: 0 8px 24px rgba(75, 22, 27, 0.08);
   background: #f5f0eb;
+  isolation: isolate;
+  z-index: 1;
 }
 
 .map-leaflet-box {
   width: 100%;
   height: 380px;
+  position: relative;
   z-index: 1;
+  isolation: isolate;
+}
+
+.leaflet-container {
+  isolation: isolate;
 }
 
 .map-floating-controls {
@@ -5143,3 +5208,369 @@ button, input { font: inherit; }
   border: 1px solid #d6b8ac;
   color: #4b161b;
 }
+
+/* ==========================================================================
+   SISTEMA DE BENEFÍCIOS E RESGATE DE VOUCHERS (MOBILE)
+   ========================================================================== */
+
+.detail-benefits-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-benefits-header {
+  margin-bottom: 4px;
+}
+
+.benefits-cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mobile-benefit-card {
+  padding: 16px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #4B161B 0%, #2A070E 100%);
+  border: 1px solid rgba(201, 162, 39, 0.45);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(42, 7, 14, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.mobile-benefit-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mobile-benefit-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mobile-benefit-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(201, 162, 39, 0.18);
+  border: 1px solid rgba(201, 162, 39, 0.35);
+  color: #C9A227;
+  font-size: 0.68rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.mobile-benefit-discount-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 10px;
+  border-radius: 10px;
+  background: #C9A227;
+  color: #1a0609;
+  font-size: 0.82rem;
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.mobile-benefit-title {
+  font-family: Georgia, serif;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: #F3EEDD;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.mobile-benefit-desc {
+  font-size: 0.82rem;
+  color: #e7e5e4;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.mobile-benefit-footer {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobile-benefit-status {
+  display: flex;
+  align-items: center;
+}
+
+.benefit-code-badge {
+  font-size: 0.74rem;
+  color: #E7C65D;
+  font-family: monospace;
+  background: rgba(231, 198, 93, 0.12);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px dashed rgba(201, 162, 39, 0.4);
+}
+
+.benefit-hint-text {
+  font-size: 0.72rem;
+  color: #a8a29e;
+  font-style: italic;
+}
+
+.benefit-redeem-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #C9A227, #e0be43);
+  color: #1a0609;
+  font-weight: 850;
+  font-size: 0.84rem;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.benefit-redeem-btn:active {
+  transform: scale(0.98);
+}
+
+.benefit-redeem-btn.redeemed {
+  background: #ffffff;
+  color: #4B161B;
+  border: 1.5px solid #C9A227;
+}
+
+/* Modal de Comprovante / Voucher */
+.voucher-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeInModal 0.2s ease-out;
+}
+
+@keyframes fadeInModal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.voucher-modal-card {
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+}
+
+.voucher-modal-header {
+  position: relative;
+  background: linear-gradient(135deg, #4B161B 0%, #22070C 100%);
+  padding: 24px 20px 20px;
+  text-align: center;
+  color: #ffffff;
+  border-bottom: 4px solid #C9A227;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+}
+
+.voucher-modal-header .voucher-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f3eedd;
+  border: none;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.voucher-modal-header .voucher-close-btn:active {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.voucher-logo-img {
+  max-height: 54px;
+  width: auto;
+  margin: 0 auto 10px;
+  display: block;
+  object-fit: contain;
+}
+
+.voucher-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.2em;
+  color: #E7C65D;
+  text-transform: uppercase;
+  margin: 0 0 6px;
+}
+
+.voucher-biz-name {
+  font-family: Georgia, serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 6px;
+  line-height: 1.3;
+}
+
+.voucher-benefit-title {
+  font-size: 0.88rem;
+  color: #f3eedd;
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+
+.voucher-discount-highlight {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #E7C65D;
+  margin: 4px 0 10px;
+}
+
+.voucher-code-box {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 12px 0 8px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.voucher-code-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #4B161B;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0 0 4px;
+}
+
+.voucher-code-val {
+  font-size: 1.55rem;
+  font-weight: 900;
+  font-family: monospace;
+  color: #4B161B;
+  letter-spacing: 0.08em;
+  word-break: break-all;
+  margin: 0;
+}
+
+.voucher-validity {
+  font-size: 0.74rem;
+  color: #E7C65D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-weight: 600;
+}
+
+.voucher-modal-body {
+  padding: 18px 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #ffffff;
+  border-bottom-left-radius: 20px;
+  border-bottom-right-radius: 20px;
+}
+
+.voucher-instructions {
+  font-size: 0.8rem;
+  color: #57534e;
+  line-height: 1.45;
+  margin: 0 0 4px;
+  text-align: center;
+}
+
+.voucher-btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #4B161B, #2A070E);
+  color: #ffffff;
+  border: 1.5px solid #C9A227;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 0.88rem;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+  transition: transform 0.15s ease;
+}
+
+.voucher-btn-primary:active {
+  transform: scale(0.98);
+}
+
+.voucher-btn-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 16px;
+  background: #fdfbf7;
+  color: #4B161B;
+  border: 1.5px solid #d4af37;
+  border-radius: 12px;
+  font-weight: 750;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.voucher-btn-whatsapp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 16px;
+  background: #25D366;
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 0.84rem;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(37, 211, 102, 0.3);
+}
+

@@ -7,7 +7,7 @@
 // "Informações: IIr.·. Douglas Ramos / Eduardo Saba / Henrique Oliveira | Telefone: (75) 98152-4838"
 export const CANONICAL_WHATSAPP_NUMBER = '5575981524838';
 
-export const OFFICIAL_SLOGAN = 'Tradição que une, conexão que nos fortalece.';
+export const OFFICIAL_SLOGAN = 'Tradição que une! conexão que fortalece!';
 
 export const EVENT_WHATSAPP_MESSAGE =
   'Olá! Gostaria de receber mais informações e confirmar minha presença no lançamento da Conexão Maçônica no dia 24/11.';

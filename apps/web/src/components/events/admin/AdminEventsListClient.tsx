@@ -165,43 +165,53 @@ export function AdminEventsListClient({ initialEvents }: Props) {
                   )}
                   <div className="ev-card-badges">
                     <StatusBadge status={event.status} />
-                    {!event.registration_enabled && (
-                      <span className="ev-badge badge-red">Inscrições encerradas</span>
+                    {!event.registration_enabled ? (
+                      <span className="ev-badge" style={{ background: '#FEF9C3', color: '#854D0E', border: '1px solid #FDE047' }}>
+                        📢 Apenas Divulgação
+                      </span>
+                    ) : (
+                      <span className="ev-badge badge-green">📋 Com RSVP</span>
                     )}
-                    {event.capacity !== null && (
+                    {event.registration_enabled && event.capacity !== null && (
                       <span className="ev-badge badge-gray">Capacidade: {event.capacity}</span>
                     )}
                   </div>
                 </div>
 
                 <div className="ev-card-right">
-                  <div className="ev-stats">
-                    <div className="ev-stat">
-                      <Users size={14} className="ev-stat-icon" />
-                      <span className="ev-stat-value">{event.total_registrations}</span>
-                      <span className="ev-stat-label">Inscrições</span>
+                  {event.registration_enabled ? (
+                    <div className="ev-stats">
+                      <div className="ev-stat">
+                        <Users size={14} className="ev-stat-icon" />
+                        <span className="ev-stat-value">{event.total_registrations}</span>
+                        <span className="ev-stat-label">Inscrições</span>
+                      </div>
+                      <div className="ev-stat">
+                        <CheckCircle2 size={14} className="ev-stat-icon ev-stat-icon--green" />
+                        <span className="ev-stat-value">{event.total_confirmed}</span>
+                        <span className="ev-stat-label">Confirmados</span>
+                      </div>
+                      <div className="ev-stat">
+                        <XCircle size={14} className="ev-stat-icon ev-stat-icon--red" />
+                        <span className="ev-stat-value">{event.total_declined ?? 0}</span>
+                        <span className="ev-stat-label">Não confirmados</span>
+                      </div>
+                      <div className="ev-stat">
+                        <CheckCircle2 size={14} className="ev-stat-icon ev-stat-icon--gold" />
+                        <span className="ev-stat-value">{event.total_checkins}</span>
+                        <span className="ev-stat-label">Check-ins</span>
+                      </div>
+                      <div className="ev-stat">
+                        <TicketCheck size={14} className="ev-stat-icon ev-stat-icon--blue" />
+                        <span className="ev-stat-value">{getAvailableCapacity(event) ?? '∞'}</span>
+                        <span className="ev-stat-label">Vagas disponíveis</span>
+                      </div>
                     </div>
-                    <div className="ev-stat">
-                      <CheckCircle2 size={14} className="ev-stat-icon ev-stat-icon--green" />
-                      <span className="ev-stat-value">{event.total_confirmed}</span>
-                      <span className="ev-stat-label">Confirmados</span>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.75rem 1rem', background: '#F8FAFC', borderRadius: '8px', border: '1px dashed #CBD5E1', color: '#64748B', fontSize: '0.75rem', gap: '0.5rem' }}>
+                      <span>📢 Publicado para divulgação geral (sem controle de lista de presença)</span>
                     </div>
-                    <div className="ev-stat">
-                      <XCircle size={14} className="ev-stat-icon ev-stat-icon--red" />
-                      <span className="ev-stat-value">{event.total_declined ?? 0}</span>
-                      <span className="ev-stat-label">Não confirmados</span>
-                    </div>
-                    <div className="ev-stat">
-                      <CheckCircle2 size={14} className="ev-stat-icon ev-stat-icon--gold" />
-                      <span className="ev-stat-value">{event.total_checkins}</span>
-                      <span className="ev-stat-label">Check-ins</span>
-                    </div>
-                    <div className="ev-stat">
-                      <TicketCheck size={14} className="ev-stat-icon ev-stat-icon--blue" />
-                      <span className="ev-stat-value">{getAvailableCapacity(event) ?? '∞'}</span>
-                      <span className="ev-stat-label">Vagas disponíveis</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
@@ -212,10 +222,10 @@ export function AdminEventsListClient({ initialEvents }: Props) {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="ev-action-btn ev-action-rsvp"
-                  title="Abrir página pública de confirmação"
+                  title="Abrir página pública do evento"
                 >
                   <ExternalLink size={15} />
-                  <span>Abrir página RSVP</span>
+                  <span>{event.registration_enabled ? 'Abrir RSVP' : 'Ver Divulgação'}</span>
                 </Link>
                 <Link href={`/admin/eventos/${event.id}`} className="ev-action-btn ev-action-view">
                   <span>Ver detalhes</span>

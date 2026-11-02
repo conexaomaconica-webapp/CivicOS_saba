@@ -3,7 +3,7 @@ import { appUrl } from '@/lib/seo/app-url';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, Calendar, Phone, Mail, Globe, Navigation, ChevronRight, Image as ImageIcon, AtSign } from 'lucide-react';
+import { MapPin, Calendar, Phone, Mail, Globe, Navigation, ChevronRight, Image as ImageIcon, AtSign, ArrowRight } from 'lucide-react';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
@@ -13,6 +13,7 @@ import { formatMeetingDay, formatMeetingTime } from '@/lib/lodges/format';
 import { canonicalPotencyCode } from '@/lib/lodges/potency';
 import { LodgeLogoZoom } from '@/components/public/directory/LodgeLogoZoom';
 import { LodgeGallery } from '@/components/public/directory/LodgeGallery';
+import { formatDateBR } from '@/lib/format/datetime-br';
 import '@/styles/directory-home.css';
 
 
@@ -130,6 +131,18 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
   if (!lodge) {
     notFound();
   }
+
+  // Busca eventos e sessões desta Loja cadastrados na plataforma
+  let lodgeEvents: any[] = [];
+  try {
+    const { data: evts } = await (supabase as any)
+      .from('platform_events')
+      .select('id, title, subtitle, event_date, start_time, slug, badge_text, registration_enabled, venue_name, city')
+      .eq('status', 'published')
+      .or(`venue_name.ilike.%${lodge.name}%,title.ilike.%${lodge.name}%,subtitle.ilike.%${lodge.name}%`)
+      .order('event_date', { ascending: true });
+    lodgeEvents = evts || [];
+  } catch (_e) {}
 
   // Localização exata (coordenadas/endereço) só quando o endereço é público ou a pessoa é membro logado.
   // Caso contrário o mapa mostra apenas a cidade e não há botão de rota.
@@ -289,6 +302,57 @@ export default async function MasonicLodgeDetailPage({ params }: Props) {
               </div>
             </div>
           </div>
+
+          {/* Eventos e Sessões da Loja (se houver cadastrados) */}
+          {lodgeEvents.length > 0 && (
+            <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between border-b pb-3">
+                <h2 className="font-serif font-bold text-xl text-gray-900 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-[#3b0b14]" />
+                  <span>Próximos Eventos &amp; Sessões da Loja</span>
+                </h2>
+                <Link
+                  href="/guia/eventos?type=lojas"
+                  className="text-xs font-bold text-[#3b0b14] hover:text-[#c59b27] flex items-center gap-1 transition-colors"
+                >
+                  <span>Ver agenda completa</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {lodgeEvents.map((evt) => (
+                  <div
+                    key={evt.id}
+                    className="p-4 bg-stone-50 border border-stone-200 hover:border-[#c59b27]/60 rounded-xl transition-all flex flex-col justify-between space-y-3"
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#3b0b14] text-[#c59b27]">
+                          {evt.badge_text || 'Loja Maçônica'}
+                        </span>
+                        <span className="text-xs text-stone-600 font-semibold">
+                          {formatDateBR(evt.event_date)}
+                          {evt.start_time && ` às ${evt.start_time.slice(0, 5)}`}
+                        </span>
+                      </div>
+
+                      <h3 className="font-serif font-bold text-base text-stone-900">{evt.title}</h3>
+                      {evt.subtitle && <p className="text-xs text-stone-600 line-clamp-2">{evt.subtitle}</p>}
+                    </div>
+
+                    <Link
+                      href={`/eventos/${evt.slug}`}
+                      className="w-full py-2 bg-[#3b0b14] hover:bg-[#c59b27] text-white hover:text-[#1f1914] text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 mt-2 shadow-xs"
+                    >
+                      <span>Ver Detalhes do Evento</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Localização e Mapa */}
           <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-2xs space-y-4">

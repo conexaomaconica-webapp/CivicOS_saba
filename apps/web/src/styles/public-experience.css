@@ -20,12 +20,16 @@
 
 .cm-public-main { min-width: 0; }
 
+.leaflet-container {
+  isolation: isolate;
+}
+
 .cm-public-header {
   height: 81px;
   border-bottom: 1px solid var(--cm-line);
   background: rgb(255 254 250 / 96%);
   position: relative;
-  z-index: 20;
+  z-index: 1100;
 }
 
 body:has(#captacao-lead) .cm-public-header {

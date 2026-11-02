@@ -23,7 +23,7 @@ export default function AdminGuiaLayout({ children }: { children: React.ReactNod
             <LayoutGrid className="w-6 h-6 text-amber-700" /> Gestão da Home do Guia
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Administre os banners, destaques comerciais, seções e parâmetros visuais da Home do Guia Comercial e Maçônico.
+            Administre os banners, destaques comerciais, seções e parâmetros visuais da Home da Plataforma Comercial e Maçônica.
           </p>
         </div>
       </div>
@@ -36,11 +36,10 @@ export default function AdminGuiaLayout({ children }: { children: React.ReactNod
             <Link
               key={href}
               href={href}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
-                isActive
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-md transition-colors ${isActive
                   ? 'bg-amber-900 text-white shadow-sm'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-              }`}
+                }`}
             >
               <Icon className="w-4 h-4" />
               {label}

@@ -885,5 +885,62 @@ export async function deletePlatformEventAction(
   }
 }
 
+// ---------------------------------------------------------------------------
+// ADMIN / LOJAS: Buscar eventos associados a uma Loja Maçônica
+// ---------------------------------------------------------------------------
+export async function getEventsForLodgeAction(
+  lodgeName: string
+): Promise<ActionResponse<PlatformEvent[]>> {
+  try {
+    if (!lodgeName || !lodgeName.trim()) {
+      return { success: true, data: [] };
+    }
+
+    const supabase = await getSupabaseServerOrAdminClient();
+    const cleanName = lodgeName.trim();
+
+    const { data, error } = await supabase
+      .from('platform_events')
+      .select('*')
+      .or(`venue_name.ilike.%${cleanName}%,title.ilike.%${cleanName}%,subtitle.ilike.%${cleanName}%,description.ilike.%${cleanName}%`)
+      .order('event_date', { ascending: false });
+
+    if (error) {
+      console.error('[Admin/Events] Erro ao buscar eventos da loja:', error);
+      return { success: false, error: error.message };
+    }
+
+    return {
+      success: true,
+      data: ((data ?? []) as any[]).map((e) => ({
+        id: e.id,
+        slug: e.slug,
+        title: e.title,
+        subtitle: e.subtitle ?? null,
+        description: e.description ?? null,
+        event_date: e.event_date,
+        start_time: e.start_time,
+        end_time: e.end_time ?? null,
+        timezone: e.timezone || 'America/Bahia',
+        venue_name: e.venue_name ?? null,
+        venue_address: e.venue_address ?? null,
+        city: e.city ?? null,
+        cover_image_url: e.cover_image_url ?? null,
+        header_media_type: e.header_media_type ?? 'logo',
+        header_media_size: e.header_media_size ?? 'medium',
+        header_media_position: e.header_media_position ?? 'center',
+        badge_text: e.badge_text ?? 'Convite',
+        footer_information: e.footer_information ?? null,
+        registration_enabled: e.registration_enabled ?? true,
+        capacity: e.capacity ?? null,
+        status: e.status,
+      })),
+    };
+  } catch (err) {
+    console.error('[Admin/Events] Exceção ao buscar eventos da loja:', err);
+    return { success: false, error: 'Erro inesperado ao buscar eventos.' };
+  }
+}
+
 // Re-export for convenience
 export { sanitizeUTMParams };

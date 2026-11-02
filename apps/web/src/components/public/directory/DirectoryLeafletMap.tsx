@@ -359,7 +359,7 @@ export function DirectoryLeafletMap({
   }, [selectedId]);
 
   return (
-    <div className="relative w-full h-full min-h-[460px] overflow-hidden">
+    <div className="relative w-full h-full min-h-[460px] overflow-hidden isolate z-0">
       <style>{`
         .cm-leaflet-div-icon {
           background: transparent !important;

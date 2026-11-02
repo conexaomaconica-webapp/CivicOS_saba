@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { getAdminLodge360DetailsAction } from '@/lib/admin/admin-lodges-service';
 import LodgeGovernanceControls from './lodge-governance-client';
+import LodgeEventsSectionClient from './LodgeEventsSectionClient';
 import { canonicalPotencyCode } from '@/lib/lodges/potency';
 
 type AdminLodge360PageProps = {
@@ -222,7 +223,7 @@ export default async function AdminLodge360Page({ params }: AdminLodge360PagePro
         {/* Reuniões e Contatos */}
         <section className="bg-white border border-stone-300 rounded-2xl p-5 space-y-4 shadow-xs">
           <h3 className="font-serif font-bold text-base text-[#1f1914] flex items-center gap-2 border-b border-stone-200 pb-2">
-            <Calendar className="w-4 h-4 text-[#4B161B]" /> Reuniões & Canais de Contato
+            <Calendar className="w-4 h-4 text-[#4B161B]" /> Reuniões &amp; Canais de Contato
           </h3>
 
           {/* Reuniões */}
@@ -266,12 +267,20 @@ export default async function AdminLodge360Page({ params }: AdminLodge360PagePro
         </section>
       </div>
 
+      {/* SEÇÃO DEDICADA: EVENTOS E AÇÕES SOCIAIS DA LOJA */}
+      <LodgeEventsSectionClient
+        lodgeId={lodge.id}
+        lodgeName={lodge.name}
+        lodgeCity={lodge.city}
+        lodgeAddress={lodge.address}
+      />
+
       {/* SEÇÃO 4 & 5: LOCALIZAÇÃO GPS & AUDITORIA */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Localização GPS e Endereço */}
         <section className="bg-white border border-stone-300 rounded-2xl p-5 space-y-4 shadow-xs">
           <h3 className="font-serif font-bold text-base text-[#1f1914] flex items-center gap-2 border-b border-stone-200 pb-2">
-            <MapPin className="w-4 h-4 text-[#4B161B]" /> Endereço & Geocodificação GPS
+            <MapPin className="w-4 h-4 text-[#4B161B]" /> Endereço &amp; Geocodificação GPS
           </h3>
 
           <div className="space-y-2 text-xs text-stone-700">
@@ -302,7 +311,7 @@ export default async function AdminLodge360Page({ params }: AdminLodge360PagePro
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs rounded-xl transition-colors mt-2"
               >
                 <Globe className="w-3.5 h-3.5" />
-                <span>Testar "Como Chegar" no Google Maps</span>
+                <span>Testar &quot;Como Chegar&quot; no Google Maps</span>
               </a>
             )}
           </div>
@@ -311,7 +320,7 @@ export default async function AdminLodge360Page({ params }: AdminLodge360PagePro
         {/* Governança & Auditoria */}
         <section className="bg-white border border-stone-300 rounded-2xl p-5 space-y-4 shadow-xs">
           <h3 className="font-serif font-bold text-base text-[#1f1914] flex items-center gap-2 border-b border-stone-200 pb-2">
-            <History className="w-4 h-4 text-[#4B161B]" /> Governança & Timeline de Auditoria
+            <History className="w-4 h-4 text-[#4B161B]" /> Governança &amp; Timeline de Auditoria
           </h3>
 
           <LodgeGovernanceControls lodgeId={lodge.id} initialStatus={lodge.is_active} />
