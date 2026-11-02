@@ -27,6 +27,8 @@ import { claimColdLaunch } from './launch-session';
 import { trackMobileEvent, resetMobileCycleId } from './mobile-analytics';
 import { routeFromHash, routeHref, routeLabels, routes, type Route } from './navigation';
 import { setupPushNotifications, sendTokenToSupabase } from './push-service';
+import { executeAccountDeletion, purgeLocalAccountState } from './account-lifecycle';
+import { setupDeepLinkListeners } from './deep-links';
 
 const launchOnThisBoot = claimColdLaunch(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
@@ -7758,25 +7760,59 @@ export function App() {
     }
   };
 
-  const handleDeleteMemberAccount = () => {
+  const handleDeleteMemberAccount = async () => {
     const emailToDelete = memberUser?.email;
-    setMemberUser(null);
-    try {
-      localStorage.removeItem('cm_mobile_member_user');
-      localStorage.removeItem('cm_mobile_referrer_name');
-      if (emailToDelete) {
-        const rawList = localStorage.getItem('cm_mobile_registered_members');
-        if (rawList) {
-          const list: Array<{ email?: string }> = JSON.parse(rawList);
-          const next = list.filter((u) => u.email !== emailToDelete);
-          localStorage.setItem('cm_mobile_registered_members', JSON.stringify(next));
-        }
-      }
-    } catch {}
-    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    setToastMsg('Sua conta e seus dados foram excluídos com sucesso.');
-    toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 3000);
+    const userId = memberUser?.id;
+
+    const res = await executeAccountDeletion(null, {
+      userId,
+      userEmail: emailToDelete,
+      deviceToken: localStorage.getItem('cm_fcm_device_token'),
+      isAuthenticatedSupabase: false,
+    });
+
+    if (res.success) {
+      purgeLocalAccountState({ userEmail: emailToDelete });
+      setMemberUser(null);
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+      setToastMsg(`✓ ${res.message}`);
+      toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 3000);
+    } else {
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+      setToastMsg(`⚠️ ${res.message}`);
+      toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 4500);
+    }
   };
+
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+    void setupDeepLinkListeners({
+      onOAuthCode: () => {
+        if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+        setToastMsg('✓ Autenticação validada com sucesso via callback.');
+        toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 3000);
+      },
+      onPasswordRecovery: () => {
+        if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+        setToastMsg('Link de recuperação de senha reconhecido.');
+        toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 3500);
+      },
+      onNavigate: (route) => {
+        window.location.hash = route.startsWith('#') ? route : `#${route}`;
+      },
+      onError: (err, desc) => {
+        if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+        setToastMsg(`⚠️ Falha na validação do link: ${desc || err}`);
+        toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 4000);
+      },
+    }).then((unsub) => {
+      cleanup = unsub;
+    });
+
+    return () => {
+      cleanup?.();
+    };
+  }, []);
 
   useEffect(() => {
     setupPushNotifications({
