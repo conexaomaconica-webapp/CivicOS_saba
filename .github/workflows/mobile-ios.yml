@@ -63,6 +63,8 @@ jobs:
             -scheme App \
             -configuration Release \
             -destination 'generic/platform=iOS' \
+            MARKETING_VERSION="1.0.0" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -75,3 +77,25 @@ jobs:
           name: ios-xcodebuild-log
           path: apps/mobile/ios/App/xcodebuild.log
           if-no-files-found: warn
+
+      # -----------------------------------------------------------------------
+      # Gate iOS 02B (Estrutura futura de assinatura e exportação do IPA)
+      # Inativa até o provisionamento das secrets da Apple Developer Account.
+      # Preserva integralmente o Gate 01 sem executar chamadas externas ou builds assinados.
+      # -----------------------------------------------------------------------
+      # - name: Build and Sign IPA for TestFlight
+      #   if: false # Ativar somente no Gate iOS 02B com secrets configuradas
+      #   run: |
+      #     cd apps/mobile/ios/App
+      #     xcodebuild -workspace App.xcworkspace \
+      #       -scheme App \
+      #       -configuration Release \
+      #       -destination 'generic/platform=iOS' \
+      #       -archivePath build/App.xcarchive \
+      #       MARKETING_VERSION="1.0.0" \
+      #       CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+      #       archive
+      #     xcodebuild -exportArchive \
+      #       -archivePath build/App.xcarchive \
+      #       -exportPath build/App-IPA \
+      #       -exportOptionsPlist ExportOptions.plist
