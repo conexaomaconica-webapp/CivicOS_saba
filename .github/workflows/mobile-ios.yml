@@ -79,7 +79,7 @@ jobs:
           if-no-files-found: warn
 
       # -----------------------------------------------------------------------
-      # Gate iOS 02B (Estrutura futura de assinatura e exportação do IPA)
+      # Gate iOS 02B.1 (Estrutura futura de assinatura e exportação do IPA)
       # Inativa até o provisionamento das secrets da Apple Developer Account.
       # Preserva integralmente o Gate 01 sem executar chamadas externas ou builds assinados.
       # -----------------------------------------------------------------------
