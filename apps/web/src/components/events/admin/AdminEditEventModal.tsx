@@ -7,9 +7,83 @@ import {
   getPlatformEventByIdAction,
   type PlatformEvent,
 } from '@/app/actions/platform-events';
-import { X, Edit3, Save, CheckCircle2, AlertCircle, Loader2, Tag } from 'lucide-react';
+import {
+  X,
+  Edit3,
+  Save,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Tag,
+  Landmark,
+  HeartHandshake,
+  GraduationCap,
+  Building2,
+  PartyPopper,
+  Sparkles,
+} from 'lucide-react';
 import { EventHeaderMediaField } from './EventHeaderMediaField';
-import { extractPriceInfo } from '@/lib/events/events-service';
+import { extractPriceInfo, classifyEventCategory } from '@/lib/events/events-service';
+
+export type EventCategoryType = 'lodge' | 'social_action' | 'palestras' | 'business' | 'festividades' | 'platform';
+
+const CATEGORY_DEFAULTS: Record<EventCategoryType, { label: string; badge: string; icon: React.ReactNode; desc: string }> = {
+  lodge: {
+    label: 'Loja Maçônica',
+    badge: 'Sessão Maçônica',
+    icon: <Landmark size={15} />,
+    desc: 'Sessão Magna, Aniversário de Loja, Posse de Diretoria ou Banquete Ritualístico.',
+  },
+  social_action: {
+    label: 'Ação Social & Filantropia',
+    badge: 'Ação Beneficente',
+    icon: <HeartHandshake size={15} />,
+    desc: 'Campanhas beneficentes, Fraternidades Femininas, Ordem DeMolay ou Filhas de Jó.',
+  },
+  palestras: {
+    label: 'Palestra / Workshop',
+    badge: 'Palestra & Workshop',
+    icon: <GraduationCap size={15} />,
+    desc: 'Palestras, cursos, workshops, seminários e treinamentos de capacitação.',
+  },
+  business: {
+    label: 'Empresa Parceira',
+    badge: 'Empresa Parceira',
+    icon: <Building2 size={15} />,
+    desc: 'Encontros corporativos, rodadas de negócios B2B, networking e lançamentos de empresas.',
+  },
+  festividades: {
+    label: 'Festividade / Show',
+    badge: 'Festividade / Show',
+    icon: <PartyPopper size={15} />,
+    desc: 'Almoços fraternos, banquetes, festividades, shows e encontros culturais.',
+  },
+  platform: {
+    label: 'Institucional CM',
+    badge: 'Convite Oficial',
+    icon: <Sparkles size={15} />,
+    desc: 'Eventos institucionais e comunicados gerais da plataforma Conexão Maçônica.',
+  },
+};
+
+function detectEventCategory(title?: string | null, badge?: string | null, venue?: string | null): EventCategoryType {
+  const cat = classifyEventCategory(title, badge, venue);
+  switch (cat.id) {
+    case 'festividades':
+      return 'festividades';
+    case 'palestras':
+      return 'palestras';
+    case 'sociais':
+      return 'social_action';
+    case 'empresas':
+      return 'business';
+    case 'institucional':
+      return 'platform';
+    case 'lojas':
+    default:
+      return 'lodge';
+  }
+}
 
 interface Props {
   event: PlatformEvent;
@@ -19,6 +93,9 @@ interface Props {
 
 export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
   const router = useRouter();
+  const [category, setCategory] = useState<EventCategoryType>(() =>
+    detectEventCategory(event.title, event.badge_text, event.venue_name)
+  );
   const [formData, setFormData] = useState({
     title: event.title || '',
     subtitle: event.subtitle || '',
@@ -55,6 +132,7 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
       const res = await getPlatformEventByIdAction(event.id);
       if (isMounted && res.success && res.data) {
         const full = res.data;
+        setCategory(detectEventCategory(full.title, full.badge_text, full.venue_name));
         setFormData({
           title: full.title || '',
           subtitle: full.subtitle || '',
@@ -88,6 +166,20 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
   const handleChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     setErrorMessage('');
+  };
+
+  const handleSelectCategory = (catKey: EventCategoryType) => {
+    setCategory(catKey);
+    const targetBadge = CATEGORY_DEFAULTS[catKey].badge;
+    const previousBadge = formData.badgeText.trim();
+    const isPreviousDefault =
+      !previousBadge ||
+      previousBadge === 'Convite' ||
+      Object.values(CATEGORY_DEFAULTS).some((c) => c.badge.toLowerCase() === previousBadge.toLowerCase());
+
+    if (isPreviousDefault) {
+      handleChange('badgeText', targetBadge);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -143,7 +235,7 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
       headerMediaType: formData.headerMediaType,
       headerMediaSize: formData.headerMediaSize,
       headerMediaPosition: formData.headerMediaPosition,
-      badgeText: formData.badgeText,
+      badgeText: formData.badgeText.trim() || CATEGORY_DEFAULTS[category].badge,
       footerInformation: finalFooter || null,
       registrationEnabled: formData.registrationEnabled,
       capacity: formData.capacity.trim() ? parseInt(formData.capacity, 10) : null,
@@ -203,6 +295,29 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
           )}
 
           <div className="aem-grid">
+            {/* Tipo / Categoria do Evento */}
+            <div className="aem-field aem-field--full">
+              <label>Tipo / Categoria do Evento *</label>
+              <div className="aem-categories-grid">
+                {(Object.keys(CATEGORY_DEFAULTS) as EventCategoryType[]).map((catKey) => {
+                  const item = CATEGORY_DEFAULTS[catKey];
+                  const isSelected = category === catKey;
+                  return (
+                    <button
+                      type="button"
+                      key={catKey}
+                      onClick={() => handleSelectCategory(catKey)}
+                      className={`aem-category-btn ${isSelected ? 'aem-category-btn--active' : ''}`}
+                    >
+                      <span className="aem-category-icon">{item.icon}</span>
+                      <span className="aem-category-label">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="aem-category-desc">{CATEGORY_DEFAULTS[category].desc}</p>
+            </div>
+
             {/* Título */}
             <div className="aem-field aem-field--full">
               <label htmlFor="aem-title">Título do Evento *</label>
@@ -448,6 +563,64 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
         .aem-field { display: flex; flex-direction: column; gap: 0.375rem; }
         .aem-field--full { grid-column: 1 / -1; }
         .aem-field--checkbox { grid-column: 1 / -1; margin-top: 0.5rem; }
+        .aem-categories-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0.5rem;
+          margin-top: 0.25rem;
+        }
+        @media (max-width: 640px) {
+          .aem-categories-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+        .aem-category-btn {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.625rem 0.75rem;
+          background: #FAF8F5;
+          border: 1.5px solid #DDD7CD;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 0.8125rem;
+          font-weight: 600;
+          color: #4A4A4A;
+          transition: all 0.15s ease;
+          text-align: left;
+        }
+        .aem-category-btn:hover {
+          background: #F4EFEA;
+          border-color: #C9A227;
+          color: #1C0D10;
+        }
+        .aem-category-btn--active {
+          background: #3B0B14 !important;
+          border-color: #3B0B14 !important;
+          color: #C9A227 !important;
+          box-shadow: 0 2px 6px rgba(59, 11, 20, 0.25);
+        }
+        .aem-category-btn--active .aem-category-icon {
+          color: #C9A227;
+        }
+        .aem-category-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #8C7355;
+          flex-shrink: 0;
+        }
+        .aem-category-label {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .aem-category-desc {
+          margin: 0.375rem 0 0 0;
+          font-size: 0.75rem;
+          color: #6B7280;
+          font-style: italic;
+        }
         .aem-field label { font-size: 0.8125rem; font-weight: 700; color: #333; }
         .aem-field input[type="text"],
         .aem-field input[type="date"],

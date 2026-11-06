@@ -37,6 +37,22 @@ describe('events-service helpers', () => {
     expect(cat.icon).toBe('🎉');
   });
 
+  it('garante que badge de Festividade / Show prevalece sobre local de Loja Maçônica', () => {
+    // Caso relatado pelo usuário: evento de show ou feijoada em espaço da loja
+    const catComBadge = classifyEventCategory('Feijoada da 16', 'Festividade / Show', 'Loja Maçônica 16 de Junho');
+    expect(catComBadge.id).toBe('festividades');
+    expect(catComBadge.icon).toBe('🎉');
+
+    const catMicaraco = classifyEventCategory('3º MicarAço 2026', 'Festividade / Show', 'Templo Maçônico');
+    expect(catMicaraco.id).toBe('festividades');
+  });
+
+  it('garante que badge de Sessão Maçônica classifica corretamente em Lojas', () => {
+    const cat = classifyEventCategory('Aniversário comemorativo', 'Sessão Maçônica', 'Auditório Central');
+    expect(cat.id).toBe('lojas');
+    expect(cat.icon).toBe('🏛️');
+  });
+
   it('formata datas de card de evento no formato exato da imagem de referência', () => {
     // 2026-11-06 (Sexta-feira) às 21:00
     const formatted = formatEventCardDate('2026-11-06', '21:00');
@@ -51,6 +67,6 @@ describe('events-service helpers', () => {
     expect(extractPriceInfo('Entrada R$ 50,00')).toBe('R$ 50,00');
     expect(extractPriceInfo('Ingresso solidário: R$ 35,00')).toBe('R$ 35,00');
     expect(extractPriceInfo('Evento Gratuito e Aberto')).toBe('Entrada Franca');
-    expect(extractPriceInfo(null, null, null, 'lodge')).toBe('Livre Participação Fraterna');
+    expect(extractPriceInfo(null, null, null, 'lodge')).toBe('Livre Participação');
   });
 });

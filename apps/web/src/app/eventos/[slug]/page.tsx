@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
+import '@/styles/directory-home.css';
 import {
   Calendar,
   MapPin,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 import { getUnifiedEventBySlugOrIdAction } from '@/app/actions/platform-events';
 import { EventRSVPForm } from '@/components/events/EventRSVPForm';
+import { EventBannerMedia } from '@/components/events/EventBannerMedia';
 import { StructuredEventData } from '@/components/events/StructuredEventData';
 import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { appUrl } from '@/lib/seo/app-url';
@@ -405,32 +407,14 @@ export default async function EventPage({ params }: PageProps) {
                   />
                 </div>
 
-                {/* COLUNA DIREITA: Imagem / Flyer do Evento (~42%) */}
-                <div className="lg:col-span-5 relative w-full h-56 sm:h-72 lg:h-full min-h-[240px] rounded-2xl overflow-hidden border border-[#E8E5DF] shadow-sm group bg-stone-900">
-                  {event.cover_image_url ? (
-                    <Image
-                      src={event.cover_image_url}
-                      alt={`Flyer e imagem oficial do evento ${event.title}`}
-                      fill
-                      sizes="(max-width: 1024px) 100vw, 42vw"
-                      priority
-                      unoptimized
-                      className="object-cover group-hover:scale-102 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-br from-[#4b161b] via-[#3b0b14] to-stone-950 text-white">
-                      <div className="w-16 h-16 rounded-full bg-[#c59b27]/20 border border-[#c59b27]/50 flex items-center justify-center mb-3">
-                        <Calendar className="w-8 h-8 text-[#c59b27]" />
-                      </div>
-                      <span className="font-serif font-bold text-xl text-amber-100 max-w-xs">
-                        {event.title}
-                      </span>
-                      <span className="text-xs text-amber-200/80 mt-2 font-medium">
-                        {brand.appName ?? 'Conexão Maçônica'}
-                      </span>
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+                {/* COLUNA DIREITA: Banner do Evento com Ajuste Automático e Lightbox (~45%) */}
+                <div className="lg:col-span-5 flex flex-col justify-center">
+                  <EventBannerMedia
+                    imageUrl={event.cover_image_url}
+                    title={event.title}
+                    appName={brand.appName ?? 'Conexão Maçônica'}
+                    priority
+                  />
                 </div>
 
               </div>
@@ -487,7 +471,7 @@ export default async function EventPage({ params }: PageProps) {
                         Modalidade de Confirmação
                       </span>
                       <p className="text-lg font-extrabold text-[#1f1914]">
-                        {event.registration_enabled ? 'Inscrição RSVP Obrigatória' : 'Aberto à Comunidade'}
+                        {event.registration_enabled ? 'Inscrição RSVP Obrigatória' : 'Livre'}
                       </p>
                       <p className="text-xs text-stone-600">
                         {event.capacity ? `Vagas limitadas a ${event.capacity} participantes.` : 'Sem restrição rígida de lotação.'}
@@ -557,24 +541,54 @@ export default async function EventPage({ params }: PageProps) {
                   </a>
                 </div>
 
-                {/* Card do Organizador / Loja / Empresa */}
+                {/* Card do Organizador / Realização do Evento */}
                 <div className="bg-white rounded-2xl p-6 border border-[#E8E5DF] shadow-xs space-y-4">
                   <h3 className="font-serif font-bold text-lg text-stone-900 flex items-center gap-2">
                     <Building2 className="w-4 h-4 text-[#c59b27]" />
-                    <span>Organização</span>
+                    <span>Realização &amp; Organização</span>
                   </h3>
 
                   <div className="space-y-2">
-                    <p className="font-bold text-sm text-[#4b161b]">
-                      {event.organizer_name || 'Conexão Maçônica'}
-                    </p>
-                    <p className="text-xs text-stone-500 leading-relaxed">
-                      {event.organizer_type === 'lodge'
-                        ? 'Loja Maçônica regularizada cadastrada na rede Conexão Maçônica.'
-                        : event.organizer_type === 'social_action'
-                          ? 'Iniciativa beneficente fraterna em prol da assistência e solidariedade social.'
-                          : 'Empresa parceira com perfil homologado na vitrine comercial do Guia.'}
-                    </p>
+                    {(() => {
+                      const isSameAsVenue = Boolean(
+                        event.organizer_name &&
+                        event.venue_name &&
+                        event.organizer_name.trim().toLowerCase() === event.venue_name.trim().toLowerCase()
+                      );
+
+                      const displayOrganizer =
+                        !isSameAsVenue && event.organizer_name
+                          ? event.organizer_name
+                          : event.organizer_type === 'platform' || event.category_id === 'institucional'
+                          ? 'Conexão Maçônica'
+                          : event.category_id === 'festividades'
+                          ? (event.title?.toLowerCase().includes('16') ? 'Loja Maçônica 16 de Junho' : 'Comissão Organizadora & Conexão Maçônica')
+                          : event.organizer_type === 'social_action'
+                          ? 'Ação Social Fraterna'
+                          : 'Loja Maçônica Promotora';
+
+                      const explanationText =
+                        event.organizer_type === 'platform' || event.category_id === 'institucional'
+                          ? 'Evento oficial promovido e coordenado pela plataforma Conexão Maçônica.'
+                          : event.organizer_type === 'social_action'
+                          ? 'Iniciativa beneficente fraterna em prol da solidariedade e assistência social.'
+                          : event.organizer_type === 'business'
+                          ? 'Empresa parceira com perfil homologado na vitrine comercial do Guia.'
+                          : event.category_id === 'festividades'
+                          ? 'Comissão organizadora e integração da comunidade maçônica e amigos.'
+                          : 'Loja Maçônica regularizada e integrada à rede fraterna Conexão Maçônica.';
+
+                      return (
+                        <>
+                          <p className="font-bold text-sm text-[#4b161b]">
+                            {displayOrganizer}
+                          </p>
+                          <p className="text-xs text-stone-500 leading-relaxed">
+                            {explanationText}
+                          </p>
+                        </>
+                      );
+                    })()}
 
                     {event.organizer_slug && (
                       <div className="pt-2">

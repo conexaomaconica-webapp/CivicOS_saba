@@ -134,16 +134,38 @@ export async function GET() {
     const normalizedPlatform = rawPlatform
       .filter((p) => p.event_date && p.event_date >= todayStr)
       .map((p) => {
-        const isLodge = !(p.badge_text || '').toLowerCase().includes('empresa');
-        const orgType = (p.badge_text || '').toLowerCase().includes('social')
-          ? 'social_action'
-          : isLodge
-          ? 'lodge'
-          : 'business';
+        const cat = classifyEventCategory(p.title, p.badge_text, p.venue_name);
+        const badgeLower = (p.badge_text || '').toLowerCase();
+        const orgType: 'lodge' | 'social_action' | 'business' | 'platform' =
+          cat.id === 'sociais' || badgeLower.includes('social')
+            ? 'social_action'
+            : cat.id === 'empresas' || badgeLower.includes('empresa')
+            ? 'business'
+            : cat.id === 'festividades' || cat.id === 'palestras' || badgeLower.includes('institucional')
+            ? 'platform'
+            : 'lodge';
 
-        const cat = classifyEventCategory(p.title, p.badge_text, p.venue_name, orgType);
         const price = extractPriceInfo(p.badge_text, p.subtitle, p.description, orgType);
         const formattedDate = formatEventCardDate(p.event_date, p.start_time);
+
+        const isLodgeVenue = Boolean(
+          p.venue_name &&
+          (p.venue_name.toLowerCase().includes('loja') ||
+           p.venue_name.toLowerCase().includes('templo') ||
+           p.venue_name.toLowerCase().includes('augusta'))
+        );
+
+        const resolvedOrganizerName =
+          p.organizer_name ||
+          (orgType === 'platform' || cat.id === 'institucional'
+            ? 'Conexão Maçônica'
+            : cat.id === 'festividades'
+            ? (p.title?.toLowerCase().includes('16') ? 'Loja Maçônica 16 de Junho' : 'Comissão Organizadora')
+            : orgType === 'social_action'
+            ? 'Ação Social Fraterna'
+            : isLodgeVenue
+            ? p.venue_name
+            : (p.title?.toLowerCase().includes('loja') ? 'Loja Maçônica Responsável' : 'Conexão Maçônica'));
 
         return {
           id: p.id,
@@ -160,7 +182,7 @@ export async function GET() {
           address: p.venue_address || null,
           city: p.city || 'Feira de Santana',
           state: 'BA',
-          organizer_name: p.venue_name || 'Loja Maçônica',
+          organizer_name: resolvedOrganizerName,
           organizer_type: orgType,
           organizer_slug: null,
           organizer_whatsapp: null,

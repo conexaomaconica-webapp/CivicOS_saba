@@ -2,7 +2,21 @@
 
 import React, { useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ChevronDown } from 'lucide-react';
+import {
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  User,
+  Phone,
+  Mail,
+  Building2,
+  MapPin,
+  ChevronDown,
+  Sparkles,
+  Users,
+  Check,
+} from 'lucide-react';
 import { upsertEventRegistrationAction } from '@/app/actions/platform-events';
 import { EventSuccessScreen } from './EventSuccessScreen';
 import { trackGa } from '@/lib/analytics/ga';
@@ -38,11 +52,11 @@ const INITIAL_FORM: FormData = {
   attendanceStatus: 'confirmed',
 };
 
-const ATTENDEE_TYPES: { value: AttendeeType; label: string }[] = [
-  { value: 'macom', label: 'Maçom' },
-  { value: 'cunhada', label: 'Cunhada' },
-  { value: 'familiar', label: 'Familiar' },
-  { value: 'convidado', label: 'Convidado' },
+const ATTENDEE_TYPES: { value: AttendeeType; label: string; icon: string }[] = [
+  { value: 'macom', label: 'Maçom', icon: '🏛️' },
+  { value: 'cunhada', label: 'Cunhada', icon: '🌸' },
+  { value: 'familiar', label: 'Familiar', icon: '👨‍👩‍👦' },
+  { value: 'convidado', label: 'Convidado Especial', icon: '🤝' },
 ];
 
 export function EventRSVPForm({ event }: EventRSVPFormProps) {
@@ -56,9 +70,9 @@ export function EventRSVPForm({ event }: EventRSVPFormProps) {
 
   // Captura UTMs da URL
   const utmParams = sanitizeUTMParams({
-    ref:          searchParams.get('ref') ?? undefined,
-    utm_source:   searchParams.get('utm_source') ?? undefined,
-    utm_medium:   searchParams.get('utm_medium') ?? undefined,
+    ref: searchParams.get('ref') ?? undefined,
+    utm_source: searchParams.get('utm_source') ?? undefined,
+    utm_medium: searchParams.get('utm_medium') ?? undefined,
     utm_campaign: searchParams.get('utm_campaign') ?? undefined,
   });
 
@@ -81,6 +95,10 @@ export function EventRSVPForm({ event }: EventRSVPFormProps) {
       errors.whatsapp = whatsappValidation.message;
     }
 
+    if (formData.attendeeType === 'macom' && !formData.masonicOrganization.trim()) {
+      errors.masonicOrganization = 'Informe sua Loja e Potência Maçônica.';
+    }
+
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = 'E-mail inválido.';
     }
@@ -98,30 +116,29 @@ export function EventRSVPForm({ event }: EventRSVPFormProps) {
     setFormState('submitting');
 
     const result = await upsertEventRegistrationAction({
-      eventId:             event.id,
-      fullName:            formData.fullName,
-      whatsapp:            normalizeWhatsApp(formData.whatsapp),
-      email:               formData.email || undefined,
-      attendeeType:        formData.attendeeType,
+      eventId: event.id,
+      fullName: formData.fullName,
+      whatsapp: normalizeWhatsApp(formData.whatsapp),
+      email: formData.email || undefined,
+      attendeeType: formData.attendeeType,
       masonicOrganization: formData.masonicOrganization || undefined,
-      companyName:         formData.companyName || undefined,
-      city:                formData.city || undefined,
-      attendanceStatus:    formData.attendanceStatus,
-      source:              utmParams.source,
-      utmSource:           utmParams.utmSource,
-      utmMedium:           utmParams.utmMedium,
-      utmCampaign:         utmParams.utmCampaign,
+      companyName: formData.companyName || undefined,
+      city: formData.city || undefined,
+      attendanceStatus: formData.attendanceStatus,
+      source: utmParams.source,
+      utmSource: utmParams.utmSource,
+      utmMedium: utmParams.utmMedium,
+      utmCampaign: utmParams.utmCampaign,
     });
 
     if (result.success && result.data) {
       setSuccessResult(result.data);
       setFormState('success');
-      // Só presença confirmada conta como lead; quem recusa não entra na medição de leads.
       if (formData.attendanceStatus === 'confirmed') {
         trackGa('generate_lead', { lead_type: 'event_rsvp', event_id: event.id, source_page: 'event' });
       }
     } else {
-      setErrorMessage(result.error ?? 'Ocorreu um erro. Tente novamente.');
+      setErrorMessage(result.error ?? 'Ocorreu um erro ao processar sua confirmação. Tente novamente.');
       setFormState('error');
     }
   };
@@ -133,183 +150,204 @@ export function EventRSVPForm({ event }: EventRSVPFormProps) {
   const isSubmitting = formState === 'submitting';
 
   return (
-    <section id="confirmar-presenca" className="rsvp-form-section">
-      <div className="rsvp-form-container">
-        <div className="rsvp-form-header">
-          <h2 className="rsvp-form-title">Confirme sua presença</h2>
-          <p className="rsvp-form-subtitle">
-            Preencha os dados abaixo para garantir sua vaga.
-          </p>
-        </div>
+    <div className="w-full">
+      <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-6">
+        {/* BLOCO 1: Informações Obrigatórias de Contato */}
+        <div className="bg-[#FAF7F2] p-4 sm:p-5 rounded-2xl border border-[#E8E2D9] space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-[#E8E2D9]/70 text-xs font-bold uppercase tracking-wider text-[#4b161b]">
+            <User className="w-4 h-4 text-[#c59b27]" />
+            <span>1. Dados Pessoais de Identificação</span>
+          </div>
 
-        <form ref={formRef} onSubmit={handleSubmit} noValidate className="rsvp-form">
-          {/* ── Dados Obrigatórios ─────────────────────────────────────── */}
-          <fieldset className="rsvp-fieldset">
-            <legend className="rsvp-legend">Dados Pessoais</legend>
-
-            {/* Nome completo */}
-            <div className="rsvp-field">
-              <label htmlFor="rsvp-fullname" className="rsvp-label">
-                Nome completo <span className="rsvp-required" aria-hidden="true">*</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Nome Completo */}
+            <div className="sm:col-span-2 space-y-1.5">
+              <label htmlFor="rsvp-fullname" className="block text-xs font-bold text-stone-800">
+                Nome Completo <span className="text-amber-600">*</span>
               </label>
-              <input
-                id="rsvp-fullname"
-                type="text"
-                autoComplete="name"
-                placeholder="Seu nome completo"
-                value={formData.fullName}
-                onChange={(e) => updateField('fullName', e.target.value)}
-                className={`rsvp-input ${fieldErrors.fullName ? 'rsvp-input--error' : ''}`}
-                required
-                disabled={isSubmitting}
-                aria-describedby={fieldErrors.fullName ? 'rsvp-fullname-error' : undefined}
-              />
+              <div className="relative">
+                <input
+                  id="rsvp-fullname"
+                  type="text"
+                  autoComplete="name"
+                  placeholder="Digite seu nome completo"
+                  value={formData.fullName}
+                  onChange={(e) => updateField('fullName', e.target.value)}
+                  disabled={isSubmitting}
+                  className={`w-full py-2.5 px-3.5 rounded-xl bg-white border text-stone-900 text-sm focus:outline-none transition-all placeholder:text-stone-400 ${
+                    fieldErrors.fullName
+                      ? 'border-red-400 ring-2 ring-red-100'
+                      : 'border-stone-300 focus:border-[#4b161b] focus:ring-2 focus:ring-[#4b161b]/10'
+                  }`}
+                  required
+                />
+              </div>
               {fieldErrors.fullName && (
-                <p id="rsvp-fullname-error" className="rsvp-field-error" role="alert">
-                  {fieldErrors.fullName}
+                <p className="text-xs text-red-600 font-medium flex items-center gap-1 mt-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{fieldErrors.fullName}</span>
                 </p>
               )}
             </div>
 
             {/* WhatsApp */}
-            <div className="rsvp-field">
-              <label htmlFor="rsvp-whatsapp" className="rsvp-label">
-                WhatsApp <span className="rsvp-required" aria-hidden="true">*</span>
+            <div className="space-y-1.5">
+              <label htmlFor="rsvp-whatsapp" className="block text-xs font-bold text-stone-800">
+                WhatsApp <span className="text-amber-600">*</span>
               </label>
-              <input
-                id="rsvp-whatsapp"
-                type="tel"
-                autoComplete="tel"
-                placeholder="(75) 99999-9999"
-                value={formData.whatsapp}
-                onChange={(e) => updateField('whatsapp', e.target.value)}
-                className={`rsvp-input ${fieldErrors.whatsapp ? 'rsvp-input--error' : ''}`}
-                required
-                disabled={isSubmitting}
-                aria-describedby={fieldErrors.whatsapp ? 'rsvp-whatsapp-error' : undefined}
-              />
+              <div className="relative">
+                <input
+                  id="rsvp-whatsapp"
+                  type="tel"
+                  autoComplete="tel"
+                  placeholder="(75) 99999-9999"
+                  value={formData.whatsapp}
+                  onChange={(e) => updateField('whatsapp', e.target.value)}
+                  disabled={isSubmitting}
+                  className={`w-full py-2.5 px-3.5 rounded-xl bg-white border text-stone-900 text-sm focus:outline-none transition-all placeholder:text-stone-400 ${
+                    fieldErrors.whatsapp
+                      ? 'border-red-400 ring-2 ring-red-100'
+                      : 'border-stone-300 focus:border-[#4b161b] focus:ring-2 focus:ring-[#4b161b]/10'
+                  }`}
+                  required
+                />
+              </div>
               {fieldErrors.whatsapp && (
-                <p id="rsvp-whatsapp-error" className="rsvp-field-error" role="alert">
-                  {fieldErrors.whatsapp}
+                <p className="text-xs text-red-600 font-medium flex items-center gap-1 mt-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{fieldErrors.whatsapp}</span>
                 </p>
               )}
             </div>
 
-            {/* Tipo de participante */}
-            <div className="rsvp-field">
-              <label className="rsvp-label">
-                Tipo de participante <span className="rsvp-required" aria-hidden="true">*</span>
+            {/* E-mail (Opcional) */}
+            <div className="space-y-1.5">
+              <label htmlFor="rsvp-email" className="block text-xs font-bold text-stone-800">
+                E-mail <span className="text-stone-400 font-normal">(opcional)</span>
               </label>
-              <div className="rsvp-radio-group" role="radiogroup" aria-label="Tipo de participante">
-                {ATTENDEE_TYPES.map(({ value, label }) => (
-                  <label key={value} className="rsvp-radio-label">
-                    <input
-                      type="radio"
-                      name="attendeeType"
-                      value={value}
-                      checked={formData.attendeeType === value}
-                      onChange={() => updateField('attendeeType', value)}
-                      className="rsvp-radio"
-                      disabled={isSubmitting}
-                    />
-                    <span className="rsvp-radio-text">{label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Presença */}
-            <div className="rsvp-field">
-              <label htmlFor="rsvp-attendance" className="rsvp-label">
-                Confirmação de participação <span className="rsvp-required" aria-hidden="true">*</span>
-              </label>
-              <select
-                id="rsvp-attendance"
-                value={formData.attendanceStatus}
-                onChange={(e) => updateField('attendanceStatus', e.target.value as AttendanceStatus)}
-                className="rsvp-select"
-                required
-                disabled={isSubmitting}
-              >
-                <option value="confirmed">✓ Sim, estarei presente</option>
-                <option value="declined">✗ Infelizmente não poderei comparecer</option>
-              </select>
-            </div>
-          </fieldset>
-
-          {/* ── Dados Opcionais ────────────────────────────────────────── */}
-          <fieldset className="rsvp-fieldset">
-            <legend className="rsvp-legend">Informações Adicionais <span className="rsvp-optional">(opcional)</span></legend>
-
-            {/* E-mail */}
-            <div className="rsvp-field">
-              <label htmlFor="rsvp-email" className="rsvp-label">E-mail</label>
               <input
                 id="rsvp-email"
                 type="email"
                 autoComplete="email"
-                placeholder="seu@email.com"
+                placeholder="seuemail@exemplo.com"
                 value={formData.email}
                 onChange={(e) => updateField('email', e.target.value)}
-                className={`rsvp-input ${fieldErrors.email ? 'rsvp-input--error' : ''}`}
                 disabled={isSubmitting}
-                aria-describedby={fieldErrors.email ? 'rsvp-email-error' : undefined}
+                className={`w-full py-2.5 px-3.5 rounded-xl bg-white border text-stone-900 text-sm focus:outline-none transition-all placeholder:text-stone-400 ${
+                  fieldErrors.email
+                    ? 'border-red-400 ring-2 ring-red-100'
+                    : 'border-stone-300 focus:border-[#4b161b] focus:ring-2 focus:ring-[#4b161b]/10'
+                }`}
               />
               {fieldErrors.email && (
-                <p id="rsvp-email-error" className="rsvp-field-error" role="alert">
-                  {fieldErrors.email}
+                <p className="text-xs text-red-600 font-medium flex items-center gap-1 mt-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{fieldErrors.email}</span>
                 </p>
               )}
             </div>
+          </div>
 
-            {/* Loja / Potência — Exibido EXCLUSIVAMENTE quando selecionado "Maçom" */}
-            {formData.attendeeType === 'macom' && (
-              <div className="rsvp-field rsvp-field--masonic">
-                <label htmlFor="rsvp-lodge" className="rsvp-label">
-                  Loja / Potência Maçônica <span className="rsvp-required" aria-hidden="true">*</span>
-                </label>
-                <input
-                  id="rsvp-lodge"
-                  type="text"
-                  placeholder="Ex.: Loja Virtude e Sabedoria — GOB"
-                  value={formData.masonicOrganization}
-                  onChange={(e) => updateField('masonicOrganization', e.target.value)}
-                  className="rsvp-input"
-                  disabled={isSubmitting}
-                />
-              </div>
-            )}
+          {/* Vínculo / Tipo de Participante */}
+          <div className="space-y-2 pt-1">
+            <label className="block text-xs font-bold text-stone-800">
+              Vínculo / Categoria do Participante <span className="text-amber-600">*</span>
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {ATTENDEE_TYPES.map(({ value, label, icon }) => {
+                const isSelected = formData.attendeeType === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => updateField('attendeeType', value)}
+                    disabled={isSubmitting}
+                    className={`flex items-center justify-center gap-2 p-2.5 rounded-xl text-xs font-bold transition-all border ${
+                      isSelected
+                        ? 'bg-[#3b0b14] text-[#c59b27] border-[#3b0b14] shadow-sm'
+                        : 'bg-white text-stone-700 border-stone-200 hover:border-stone-300 hover:bg-stone-50'
+                    }`}
+                  >
+                    <span>{icon}</span>
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-            {/* Empresa / Profissão */}
-            <div className="rsvp-field">
-              <label htmlFor="rsvp-company" className="rsvp-label">Empresa / Profissão</label>
+          {/* Seletor Dinâmico: Loja / Potência (Obrigatório se Maçom) */}
+          {formData.attendeeType === 'macom' && (
+            <div className="space-y-1.5 pt-1 animate-in fade-in duration-200">
+              <label htmlFor="rsvp-lodge" className="block text-xs font-bold text-stone-800">
+                Loja &amp; Potência Maçônica <span className="text-amber-600">*</span>
+              </label>
               <input
-                id="rsvp-company"
+                id="rsvp-lodge"
                 type="text"
-                placeholder="Ex.: Escritório Advocacia Silva | Médico"
-                value={formData.companyName}
-                onChange={(e) => updateField('companyName', e.target.value)}
-                className="rsvp-input"
+                placeholder="Ex.: Loja 16 de Junho — GOB / GLEB"
+                value={formData.masonicOrganization}
+                onChange={(e) => updateField('masonicOrganization', e.target.value)}
                 disabled={isSubmitting}
+                className={`w-full py-2.5 px-3.5 rounded-xl bg-white border text-stone-900 text-sm focus:outline-none transition-all placeholder:text-stone-400 ${
+                  fieldErrors.masonicOrganization
+                    ? 'border-red-400 ring-2 ring-red-100'
+                    : 'border-stone-300 focus:border-[#4b161b] focus:ring-2 focus:ring-[#4b161b]/10'
+                }`}
+                required
               />
+              {fieldErrors.masonicOrganization && (
+                <p className="text-xs text-red-600 font-medium flex items-center gap-1 mt-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{fieldErrors.masonicOrganization}</span>
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* BLOCO 2: Informações de Presença e Cidade */}
+        <div className="bg-[#FAF7F2] p-4 sm:p-5 rounded-2xl border border-[#E8E2D9] space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-[#E8E2D9]/70 text-xs font-bold uppercase tracking-wider text-[#4b161b]">
+            <Building2 className="w-4 h-4 text-[#c59b27]" />
+            <span>2. Confirmação &amp; Dados Complementares</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Status da Presença */}
+            <div className="space-y-1.5">
+              <label htmlFor="rsvp-status" className="block text-xs font-bold text-stone-800">
+                Você comparecerá ao evento? <span className="text-amber-600">*</span>
+              </label>
+              <select
+                id="rsvp-status"
+                value={formData.attendanceStatus}
+                onChange={(e) => updateField('attendanceStatus', e.target.value as AttendanceStatus)}
+                disabled={isSubmitting}
+                className="w-full py-2.5 px-3.5 rounded-xl bg-white border border-stone-300 text-stone-900 text-sm font-semibold focus:outline-none focus:border-[#4b161b] focus:ring-2 focus:ring-[#4b161b]/10 transition-all cursor-pointer"
+              >
+                <option value="confirmed">✓ Sim, estarei presente com certeza</option>
+                <option value="declined">✗ Infelizmente não poderei comparecer</option>
+              </select>
             </div>
 
-            {/* Cidade com Seleção Rápida e Auto-sugestão */}
-            <div className="rsvp-field">
-              <label htmlFor="rsvp-city" className="rsvp-label">Cidade / Município</label>
-              <div className="rsvp-select-wrap">
+            {/* Cidade / Município */}
+            <div className="space-y-1.5">
+              <label htmlFor="rsvp-city" className="block text-xs font-bold text-stone-800">
+                Sua Cidade <span className="text-stone-400 font-normal">(opcional)</span>
+              </label>
+              <div className="relative">
                 <input
                   id="rsvp-city"
                   type="text"
                   list="rsvp-city-list"
-                  placeholder="Selecione ou digite sua cidade (ex.: Feira de Santana - BA)"
+                  placeholder="Ex.: Feira de Santana - BA"
                   value={formData.city}
                   onChange={(e) => updateField('city', e.target.value)}
-                  className="rsvp-input"
-                  style={{ paddingRight: '2.5rem' }}
                   disabled={isSubmitting}
+                  className="w-full py-2.5 px-3.5 pr-8 rounded-xl bg-white border border-stone-300 text-stone-900 text-sm focus:outline-none focus:border-[#4b161b] focus:ring-2 focus:ring-[#4b161b]/10 transition-all placeholder:text-stone-400"
                 />
-                <ChevronDown size={18} className="rsvp-select-icon" aria-hidden="true" />
+                <ChevronDown className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
               <datalist id="rsvp-city-list">
                 <option value="Feira de Santana - BA" />
@@ -324,55 +362,68 @@ export function EventRSVPForm({ event }: EventRSVPFormProps) {
                 <option value="Alagoinhas - BA" />
                 <option value="Barreiras - BA" />
                 <option value="Porto Seguro - BA" />
-                <option value="Simões Filho - BA" />
-                <option value="Paulo Afonso - BA" />
                 <option value="Santo Antônio de Jesus - BA" />
                 <option value="Serrinha - BA" />
                 <option value="Conceição do Coité - BA" />
                 <option value="Cruz das Almas - BA" />
-                <option value="Valença - BA" />
-                <option value="Brumado - BA" />
-                <option value="Guanambi - BA" />
-                <option value="Itapetinga - BA" />
-                <option value="Jacobina - BA" />
-                <option value="Senhor do Bonfim - BA" />
               </datalist>
             </div>
-          </fieldset>
 
-          {/* Erro global */}
-          {formState === 'error' && errorMessage && (
-            <div className="rsvp-global-error" role="alert">
-              <span className="rsvp-global-error-icon" aria-hidden="true">⚠</span>
-              {errorMessage}
+            {/* Empresa / Profissão (Opcional) */}
+            <div className="sm:col-span-2 space-y-1.5">
+              <label htmlFor="rsvp-company" className="block text-xs font-bold text-stone-800">
+                Empresa ou Atuação Profissional <span className="text-stone-400 font-normal">(para networking fraterno)</span>
+              </label>
+              <input
+                id="rsvp-company"
+                type="text"
+                placeholder="Ex.: Escritório de Advocacia Silva / Médico / Empresário"
+                value={formData.companyName}
+                onChange={(e) => updateField('companyName', e.target.value)}
+                disabled={isSubmitting}
+                className="w-full py-2.5 px-3.5 rounded-xl bg-white border border-stone-300 text-stone-900 text-sm focus:outline-none focus:border-[#4b161b] focus:ring-2 focus:ring-[#4b161b]/10 transition-all placeholder:text-stone-400"
+              />
             </div>
-          )}
+          </div>
+        </div>
 
-          {/* Botão de submit */}
+        {/* Mensagem de Erro Geral */}
+        {formState === 'error' && errorMessage && (
+          <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs sm:text-sm font-semibold flex items-center gap-2.5 animate-in fade-in">
+            <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
+        {/* BOTÃO PRINCIPAL DE SUBMISSÃO (CONFIRMAR MINHA PRESENÇA) */}
+        <div className="pt-2">
           <button
             id="rsvp-submit-btn"
             type="submit"
-            className="rsvp-submit-btn"
             disabled={isSubmitting}
-            aria-busy={isSubmitting}
+            className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-[#3b0b14] via-[#4b161b] to-[#2a060d] hover:from-[#4b161b] hover:to-[#3b0b14] text-[#c59b27] font-extrabold text-sm sm:text-base tracking-wide shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2.5 border border-[#c59b27]/40 active:scale-[0.99] cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <>
-                <span className="rsvp-spinner" aria-hidden="true" />
-                <span>Confirmando...</span>
+                <Loader2 className="w-5 h-5 animate-spin text-[#c59b27]" />
+                <span className="text-white">Processando sua confirmação...</span>
               </>
             ) : (
-              'CONFIRMAR MINHA PRESENÇA'
+              <>
+                <CheckCircle2 className="w-5 h-5 text-[#c59b27]" />
+                <span>CONFIRMAR MINHA PRESENÇA</span>
+              </>
             )}
           </button>
+        </div>
 
-          {/* Aviso LGPD */}
-          <p className="rsvp-lgpd-notice">
-            Ao confirmar sua presença, seus dados serão utilizados exclusivamente para
-            organização e comunicação relacionada ao evento.
+        {/* Termo e Segurança Fraterna (LGPD) */}
+        <div className="text-center pt-1">
+          <p className="text-[11px] text-stone-500 leading-relaxed max-w-lg mx-auto">
+            🔒 Seus dados são confidenciais e protegidos pela Conexão Maçônica. O comprovante oficial de inscrição e orientações de acesso serão enviados via WhatsApp.
           </p>
-        </form>
-      </div>
-    </section>
+        </div>
+      </form>
+    </div>
   );
 }

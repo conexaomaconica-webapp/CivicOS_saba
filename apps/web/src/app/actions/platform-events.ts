@@ -368,15 +368,36 @@ export async function getUnifiedEventBySlugOrIdAction(
     if (pData && !pError) {
       const cat = classifyEventCategory(pData.title, pData.badge_text, pData.venue_name);
       const isPast = pData.event_date ? pData.event_date < todayStr : false;
-      const orgType = (pData.badge_text || '').toLowerCase().includes('social')
-        ? 'social_action'
-        : (pData.badge_text || '').toLowerCase().includes('empresa')
-        ? 'business'
-        : (pData.badge_text || '').toLowerCase().includes('institucional')
-        ? 'platform'
-        : 'lodge';
+      const badgeLower = (pData.badge_text || '').toLowerCase();
+      const orgType: 'lodge' | 'social_action' | 'business' | 'platform' =
+        cat.id === 'sociais' || badgeLower.includes('social')
+          ? 'social_action'
+          : cat.id === 'empresas' || badgeLower.includes('empresa')
+          ? 'business'
+          : cat.id === 'festividades' || cat.id === 'palestras' || badgeLower.includes('institucional')
+          ? 'platform'
+          : 'lodge';
 
       const price = extractPriceInfo(pData.badge_text, pData.subtitle, pData.description, orgType);
+
+      const isLodgeVenue = Boolean(
+        pData.venue_name &&
+        (pData.venue_name.toLowerCase().includes('loja') ||
+         pData.venue_name.toLowerCase().includes('templo') ||
+         pData.venue_name.toLowerCase().includes('augusta'))
+      );
+
+      const resolvedOrganizerName =
+        pData.organizer_name ||
+        (orgType === 'platform' || cat.id === 'institucional'
+          ? 'Conexão Maçônica'
+          : cat.id === 'festividades'
+          ? (pData.title?.toLowerCase().includes('16') ? 'Loja Maçônica 16 de Junho' : 'Comissão Organizadora')
+          : orgType === 'social_action'
+          ? 'Ação Social Fraterna'
+          : isLodgeVenue
+          ? pData.venue_name
+          : (pData.title?.toLowerCase().includes('loja') ? 'Loja Maçônica Responsável' : 'Conexão Maçônica'));
 
       return {
         success: true,
@@ -403,7 +424,7 @@ export async function getUnifiedEventBySlugOrIdAction(
           category_label: cat.label,
           category_icon: cat.icon,
           organizer_type: orgType,
-          organizer_name: pData.venue_name || 'Loja Maçônica',
+          organizer_name: resolvedOrganizerName,
           organizer_slug: null,
           organizer_whatsapp: null,
           organizer_logo: null,

@@ -55,6 +55,18 @@ export function EventActionsClient({
     setIsFavorited(!isFavorited);
   };
 
+  const handleScrollToRsvp = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const target = document.getElementById('rsvp-form');
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setTimeout(() => {
+        const input = document.getElementById('rsvp-fullname');
+        if (input) input.focus();
+      }, 500);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Botões de Ação Rápida no Topo / Barra de Ação */}
@@ -63,9 +75,10 @@ export function EventActionsClient({
         {registrationEnabled ? (
           <a
             href="#rsvp-form"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#3b0b14] hover:bg-[#c59b27] text-white hover:text-[#1f1914] font-bold text-xs shadow-md transition-all cursor-pointer"
+            onClick={handleScrollToRsvp}
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-[#3b0b14] to-[#5a111f] hover:from-[#4b161b] hover:to-[#3b0b14] text-[#c59b27] hover:text-white font-extrabold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all cursor-pointer border border-[#c59b27]/30"
           >
-            <span>Confirmar Presença (RSVP)</span>
+            <span>✍️ Confirmar Presença (Preencher Formulário)</span>
           </a>
         ) : externalTicketUrl ? (
           <a

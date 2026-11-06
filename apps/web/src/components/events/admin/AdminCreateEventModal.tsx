@@ -60,7 +60,7 @@ const CATEGORY_DEFAULTS: Record<EventCategoryType, { label: string; badge: strin
   },
   festividades: {
     label: 'Festividade / Show',
-    badge: 'Confraternização',
+    badge: 'Festividade / Show',
     icon: <PartyPopper size={15} />,
     desc: 'Almoços fraternos, banquetes, festividades, shows e encontros culturais.',
   },
@@ -175,7 +175,7 @@ export function AdminCreateEventModal({
       headerMediaType: formData.headerMediaType,
       headerMediaSize: formData.headerMediaSize,
       headerMediaPosition: formData.headerMediaPosition,
-      badgeText: formData.badgeText,
+      badgeText: formData.badgeText.trim() || CATEGORY_DEFAULTS[category].badge,
       footerInformation: finalFooter || undefined,
       registrationEnabled: formData.registrationEnabled,
       capacity:

@@ -78,9 +78,9 @@ export function sanitizeUTMParams(searchParams: Record<string, string | undefine
   };
 
   return {
-    source:      sanitize(searchParams['ref']),
-    utmSource:   sanitize(searchParams['utm_source']),
-    utmMedium:   sanitize(searchParams['utm_medium']),
+    source: sanitize(searchParams['ref']),
+    utmSource: sanitize(searchParams['utm_source']),
+    utmMedium: sanitize(searchParams['utm_medium']),
     utmCampaign: sanitize(searchParams['utm_campaign']),
   };
 }
@@ -234,15 +234,15 @@ const CSV_HEADERS = [
 ];
 
 const ATTENDEE_TYPE_LABELS: Record<string, string> = {
-  macom:     'Maçom',
-  cunhada:   'Cunhada',
-  familiar:  'Familiar',
+  macom: 'Maçom',
+  cunhada: 'Cunhada',
+  familiar: 'Familiar',
   convidado: 'Convidado',
 };
 
 const ATTENDANCE_LABELS: Record<string, string> = {
   confirmed: 'Confirmado',
-  declined:  'Não comparecerá',
+  declined: 'Não comparecerá',
 };
 
 function escapeCSVField(value: string | null | undefined): string {
@@ -365,7 +365,8 @@ export const EVENT_CATEGORIES: Record<EventCategoryKey, EventCategoryInfo> = {
 };
 
 /**
- * Classifica a categoria do evento a partir do título, badge, descrição e organizador.
+ * Classifica a categoria do evento a partir do badge selecionado pelo admin,
+ * do título, do local e do tipo do organizador.
  */
 export function classifyEventCategory(
   title?: string | null,
@@ -373,6 +374,67 @@ export function classifyEventCategory(
   venueName?: string | null,
   organizerType?: string | null
 ): EventCategoryInfo {
+  const badgeLower = (badgeText || '').toLowerCase().trim();
+
+  // 1. Prioridade Absoluta: Categoria/Badge explícito escolhido no Admin
+  if (
+    badgeLower.includes('festividade') ||
+    badgeLower.includes('show') ||
+    badgeLower.includes('confraternização') ||
+    badgeLower.includes('confraternizacao') ||
+    badgeLower.includes('confraterniz') ||
+    badgeLower.includes('cultural')
+  ) {
+    return EVENT_CATEGORIES.festividades;
+  }
+
+  if (
+    badgeLower.includes('palestra') ||
+    badgeLower.includes('workshop') ||
+    badgeLower.includes('curso') ||
+    badgeLower.includes('seminário') ||
+    badgeLower.includes('seminario') ||
+    badgeLower.includes('treinamento')
+  ) {
+    return EVENT_CATEGORIES.palestras;
+  }
+
+  if (
+    badgeLower.includes('social') ||
+    badgeLower.includes('filantrop') ||
+    badgeLower.includes('beneficente') ||
+    badgeLower.includes('beneficência') ||
+    badgeLower.includes('beneficencia') ||
+    badgeLower.includes('ação social') ||
+    badgeLower.includes('acao social')
+  ) {
+    return EVENT_CATEGORIES.sociais;
+  }
+
+  if (
+    badgeLower.includes('empresa') ||
+    badgeLower.includes('parceira') ||
+    badgeLower.includes('corporativo') ||
+    badgeLower.includes('b2b') ||
+    badgeLower.includes('networking')
+  ) {
+    return EVENT_CATEGORIES.empresas;
+  }
+
+  if (
+    badgeLower.includes('sessão') ||
+    badgeLower.includes('sessao') ||
+    badgeLower.includes('loja maçônica') ||
+    badgeLower.includes('loja maconica') ||
+    badgeLower.includes('magna') ||
+    badgeLower.includes('rito') ||
+    badgeLower.includes('ritualística') ||
+    badgeLower.includes('ritualistica')
+  ) {
+    return EVENT_CATEGORIES.lojas;
+  }
+
+  // 2. Classificação heurística contextual por termos combinados no título, local e termos
   const combined = `${badgeText || ''} ${title || ''} ${venueName || ''}`.toLowerCase();
 
   if (
@@ -386,7 +448,9 @@ export function classifyEventCategory(
     combined.includes('beneficente') ||
     combined.includes('doação') ||
     combined.includes('doacao') ||
-    combined.includes('bazar')
+    combined.includes('bazar') ||
+    combined.includes('solidári') ||
+    combined.includes('solidari')
   ) {
     return EVENT_CATEGORIES.sociais;
   }
@@ -401,16 +465,31 @@ export function classifyEventCategory(
     combined.includes('simposio') ||
     combined.includes('simpósio') ||
     combined.includes('conferência') ||
-    combined.includes('conferencia')
+    combined.includes('conferencia') ||
+    combined.includes('capacita')
   ) {
     return EVENT_CATEGORIES.palestras;
   }
 
   if (
     combined.includes('show') ||
+    combined.includes('shows') ||
     combined.includes('teatro') ||
     combined.includes('festa') ||
+    combined.includes('festas') ||
+    combined.includes('festividade') ||
+    combined.includes('festividades') ||
     combined.includes('confraterniz') ||
+    combined.includes('feijoada') ||
+    combined.includes('micaraco') ||
+    combined.includes('micareta') ||
+    combined.includes('carnaval') ||
+    combined.includes('reveillon') ||
+    combined.includes('réveillon') ||
+    combined.includes('samba') ||
+    combined.includes('pagode') ||
+    combined.includes('baile') ||
+    combined.includes('concerto') ||
     combined.includes('almoço') ||
     combined.includes('almoco') ||
     combined.includes('churrasco') ||
@@ -431,7 +510,8 @@ export function classifyEventCategory(
     combined.includes('negócio') ||
     combined.includes('negocio') ||
     combined.includes('networking') ||
-    combined.includes('inaugura')
+    combined.includes('inaugura') ||
+    combined.includes('corporativ')
   ) {
     return EVENT_CATEGORIES.empresas;
   }
@@ -518,7 +598,7 @@ export function extractPriceInfo(
   }
 
   if (organizerType === 'lodge') {
-    return 'Livre Participação Fraterna';
+    return 'Livre Participação';
   }
 
   if (organizerType === 'social_action') {
