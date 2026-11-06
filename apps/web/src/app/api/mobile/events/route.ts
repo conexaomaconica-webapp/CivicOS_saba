@@ -192,7 +192,7 @@ export async function GET() {
           category_label: cat.label,
           category_short_label: cat.shortLabel,
           category_icon: cat.icon,
-          badge_text: p.badge_text || (isLodge ? 'Loja Maçônica' : 'Evento Especial'),
+          badge_text: p.badge_text || (orgType === 'lodge' ? 'Loja Maçônica' : 'Evento Especial'),
           price_info: price,
           registration_enabled: Boolean(p.registration_enabled),
           footer_information: p.footer_information || null,

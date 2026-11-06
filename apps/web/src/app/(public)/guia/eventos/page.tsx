@@ -2,7 +2,6 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { appUrl } from '@/lib/seo/app-url';
 import Link from 'next/link';
-import Image from 'next/image';
 import {
   ChevronRight,
   Calendar,

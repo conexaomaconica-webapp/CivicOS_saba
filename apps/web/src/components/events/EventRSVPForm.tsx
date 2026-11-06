@@ -3,19 +3,12 @@
 import React, { useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
-  ShieldCheck,
   CheckCircle2,
   AlertCircle,
   Loader2,
   User,
-  Phone,
-  Mail,
   Building2,
-  MapPin,
   ChevronDown,
-  Sparkles,
-  Users,
-  Check,
 } from 'lucide-react';
 import { upsertEventRegistrationAction } from '@/app/actions/platform-events';
 import { EventSuccessScreen } from './EventSuccessScreen';

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Maximize2, X, Calendar, ZoomIn } from 'lucide-react';
+import { X, Calendar, ZoomIn } from 'lucide-react';
 
 interface EventBannerMediaProps {
   imageUrl?: string | null;

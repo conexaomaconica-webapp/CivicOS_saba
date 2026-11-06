@@ -2,7 +2,6 @@
 
 import React, { useRef } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { ChevronLeft, ChevronRight, Calendar, MapPin, Tag } from 'lucide-react';
 
 export interface CarouselEventCardItem {
