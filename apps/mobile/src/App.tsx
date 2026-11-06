@@ -7635,9 +7635,10 @@ function Home({
 
       return (
         <section className="guide-section" aria-labelledby="sponsored-title">
-          <div className="section-heading">
-            <p className="eyebrow">Empresas Fundadoras</p>
-            <h2 id="sponsored-title">Empresas — Pedra Fundamental</h2>
+          <div className="section-heading" style={{ marginBottom: '6px' }}>
+            <p className="eyebrow" id="sponsored-title" style={{ fontSize: '0.8125rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#4b161b', margin: 0 }}>
+              Empresas — Pedra Fundamental
+            </p>
           </div>
           <div className="pedra-marquee-container" aria-label="Marcas Pedra Fundamental">
             <div className={`pedra-marquee-track ${displayBizs.length < 4 ? 'no-animation' : ''}`}>
@@ -7649,20 +7650,15 @@ function Home({
                   onClick={() => onSelectBusiness(biz.slug)}
                   title={`${biz.name} — Pedra Fundamental`}
                 >
-                  <div className="pedra-brand-circle">
+                  <div
+                    className="pedra-brand-circle"
+                    style={biz.logo_background_color ? { backgroundColor: biz.logo_background_color } : undefined}
+                  >
                     {biz.logo_url ? (
                       <img src={biz.logo_url} alt={biz.name} className="pedra-brand-logo-img" />
                     ) : (
                       <span className="pedra-brand-initial">{biz.name.charAt(0).toUpperCase()}</span>
                     )}
-                    <img
-                      src={PEDRA_FUNDAMENTAL_ROUND_SEAL}
-                      alt="Pedra Fundamental"
-                      className="pedra-brand-mini-seal"
-                      onError={(e) => {
-                        e.currentTarget.src = PEDRA_FUNDAMENTAL_SEAL;
-                      }}
-                    />
                   </div>
                   <span className="pedra-brand-label">{biz.name}</span>
                 </button>
