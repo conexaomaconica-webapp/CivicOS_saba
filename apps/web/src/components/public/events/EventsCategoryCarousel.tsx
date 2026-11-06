@@ -108,6 +108,7 @@ export function EventsCategoryCarousel({
                       src={evt.cover_image_url}
                       alt={`Imagem do evento ${evt.title}`}
                       fill
+                      unoptimized
                       sizes="(max-width: 768px) 280px, 310px"
                       className="object-cover group-hover:scale-104 transition-transform duration-300"
                     />

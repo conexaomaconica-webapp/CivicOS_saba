@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export type DirectoryBannerItem = {
@@ -17,22 +16,6 @@ export type DirectoryBannerItem = {
 
 type DirectoryCarouselProps = {
   banners?: DirectoryBannerItem[];
-};
-
-// O otimizador do Next só serve hospedagens liberadas em next.config (Supabase Storage); URLs externas ficam como estão.
-const SUPABASE_HOST = (() => {
-  try {
-    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '').hostname;
-  } catch {
-    return '';
-  }
-})();
-const canOptimize = (url: string) => {
-  try {
-    return Boolean(SUPABASE_HOST) && new URL(url).hostname === SUPABASE_HOST;
-  } catch {
-    return false;
-  }
 };
 
 export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
@@ -61,67 +44,7 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
 
   const alt = current.title || 'Banner institucional';
   const fit = `object-cover ${imageOnly ? 'object-center' : ''}`;
-  const desktopOptimizable = canOptimize(current.image_desktop_url);
-  const mobileOptimizable = Boolean(current.image_mobile_url) && canOptimize(current.image_mobile_url as string);
-
   const bannerSrc = current.image_mobile_url || current.image_desktop_url;
-
-  const image = imageOnly ? (
-    <div className="relative block w-full h-full aspect-[801/207] overflow-hidden rounded-xl md:rounded-2xl">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={bannerSrc}
-        alt={alt}
-        loading={activeIndex === 0 ? 'eager' : 'lazy'}
-        fetchPriority={activeIndex === 0 ? 'high' : 'auto'}
-        decoding="async"
-        className="w-full h-full object-cover rounded-xl md:rounded-2xl block"
-        onError={(e) => {
-          // Se falhar a imagem mobile, tenta desktop se diferente
-          if (current.image_mobile_url && e.currentTarget.src !== current.image_desktop_url) {
-            e.currentTarget.src = current.image_desktop_url;
-          }
-        }}
-      />
-    </div>
-  ) : desktopOptimizable && (!current.image_mobile_url || mobileOptimizable) ? (
-    // Imagens do Supabase passam pelo otimizador quando acompanhadas de texto editorial
-    <div className="relative block h-full w-full">
-      <Image
-        src={current.image_desktop_url}
-        alt={alt}
-        fill
-        sizes="(max-width: 640px) 100vw, (max-width: 1280px) 100vw, 1280px"
-        quality={75}
-        priority={activeIndex === 0}
-        className={`${fit} ${current.image_mobile_url ? 'max-sm:hidden' : ''}`}
-      />
-      {current.image_mobile_url && (
-        <Image
-          src={current.image_mobile_url}
-          alt={alt}
-          fill
-          sizes="100vw"
-          quality={75}
-          priority={activeIndex === 0}
-          className={`${fit} sm:hidden`}
-        />
-      )}
-    </div>
-  ) : (
-    <picture className="block h-full">
-      {current.image_mobile_url && <source media="(max-width: 640px)" srcSet={current.image_mobile_url} />}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={current.image_desktop_url}
-        alt={alt}
-        loading={activeIndex === 0 ? 'eager' : 'lazy'}
-        fetchPriority={activeIndex === 0 ? 'high' : 'auto'}
-        decoding="async"
-        className={`h-full w-full ${fit}`}
-      />
-    </picture>
-  );
 
   return (
     <section
@@ -133,61 +56,150 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
     >
-      <div
-        className={`dh-carousel-card transition-opacity duration-300 ${
-          imageOnly
-            ? 'is-image-only !bg-transparent !border-0 !shadow-none relative w-full aspect-[801/207] !block overflow-hidden rounded-xl md:rounded-2xl'
-            : ''
-        }`}
-      >
-        {imageOnly ? (
-          current.cta_url ? (
-            <Link href={current.cta_url} className="relative block w-full h-full aspect-[801/207]">
-              {image}
+      {imageOnly ? (
+        <div className="relative w-full aspect-[801/207] overflow-hidden rounded-xl md:rounded-2xl shadow-xs transition-opacity duration-300 bg-transparent">
+          {current.cta_url ? (
+            <Link href={current.cta_url} className="block w-full h-full">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={bannerSrc}
+                alt={alt}
+                loading={activeIndex === 0 ? 'eager' : 'lazy'}
+                fetchPriority={activeIndex === 0 ? 'high' : 'auto'}
+                decoding="async"
+                className="w-full h-full object-cover block rounded-xl md:rounded-2xl"
+                onError={(e) => {
+                  if (current.image_mobile_url && e.currentTarget.src !== current.image_desktop_url) {
+                    e.currentTarget.src = current.image_desktop_url;
+                  }
+                }}
+              />
             </Link>
           ) : (
-            <div className="relative block w-full h-full aspect-[801/207]">{image}</div>
-          )
-        ) : (
-          <>
-            <div className="dh-carousel-card__content">
-              {current.subtitle && <div className="dh-carousel-card__tag">{current.subtitle}</div>}
-              <h2 className="dh-carousel-card__title">{current.title}</h2>
-              {current.cta_text && (
-                <Link href={current.cta_url || '/guia'} className="dh-carousel-card__cta">
-                  <span>{current.cta_text}</span>
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
-              )}
-            </div>
-            <div className="dh-carousel-card__media">{image}</div>
-          </>
-        )}
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={bannerSrc}
+              alt={alt}
+              loading={activeIndex === 0 ? 'eager' : 'lazy'}
+              fetchPriority={activeIndex === 0 ? 'high' : 'auto'}
+              decoding="async"
+              className="w-full h-full object-cover block rounded-xl md:rounded-2xl"
+              onError={(e) => {
+                if (current.image_mobile_url && e.currentTarget.src !== current.image_desktop_url) {
+                  e.currentTarget.src = current.image_desktop_url;
+                }
+              }}
+            />
+          )}
 
-        {banners.length > 1 && (
-          <>
-            <button type="button" onClick={goToPrevious} aria-label="Banner anterior" className="absolute left-3 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/45 p-2 text-white backdrop-blur-sm transition hover:bg-black/70">
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <button type="button" onClick={goToNext} aria-label="Próximo banner" className="absolute right-3 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/45 p-2 text-white backdrop-blur-sm transition hover:bg-black/70">
-              <ChevronRight className="h-5 w-5" />
-            </button>
-            <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 gap-2" role="tablist" aria-label="Selecionar banner">
-              {banners.map((banner, index) => (
-                <button
-                  key={banner.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={index === activeIndex}
-                  aria-label={`Exibir banner ${index + 1}`}
-                  onClick={() => setActiveIndex(index)}
-                  className={`h-2.5 rounded-full border border-white/80 transition-all ${index === activeIndex ? 'w-7 bg-white' : 'w-2.5 bg-white/45 hover:bg-white/75'}`}
-                />
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+          {banners.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={goToPrevious}
+                aria-label="Banner anterior"
+                className="absolute left-2.5 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/45 p-1.5 md:p-2 text-white backdrop-blur-sm transition hover:bg-black/70 cursor-pointer"
+              >
+                <ChevronLeft className="h-4 w-4 md:h-5 md:w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={goToNext}
+                aria-label="Próximo banner"
+                className="absolute right-2.5 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/45 p-1.5 md:p-2 text-white backdrop-blur-sm transition hover:bg-black/70 cursor-pointer"
+              >
+                <ChevronRight className="h-4 w-4 md:h-5 md:w-5" />
+              </button>
+              <div
+                className="absolute bottom-2.5 left-1/2 z-20 flex -translate-x-1/2 gap-1.5"
+                role="tablist"
+                aria-label="Selecionar banner"
+              >
+                {banners.map((banner, index) => (
+                  <button
+                    key={banner.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={index === activeIndex}
+                    aria-label={`Exibir banner ${index + 1}`}
+                    onClick={() => setActiveIndex(index)}
+                    className={`h-1.5 md:h-2 rounded-full border border-white/80 transition-all ${
+                      index === activeIndex ? 'w-5 md:w-7 bg-white' : 'w-1.5 md:w-2 bg-white/45 hover:bg-white/75'
+                    }`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="dh-carousel-card transition-opacity duration-300">
+          <div className="dh-carousel-card__content">
+            {current.subtitle && <div className="dh-carousel-card__tag">{current.subtitle}</div>}
+            <h2 className="dh-carousel-card__title">{current.title}</h2>
+            {current.cta_text && (
+              <Link href={current.cta_url || '/guia'} className="dh-carousel-card__cta">
+                <span>{current.cta_text}</span>
+                <ChevronRight className="h-4 w-4" />
+              </Link>
+            )}
+          </div>
+          <div className="dh-carousel-card__media">
+            <picture className="block h-full">
+              {current.image_mobile_url && <source media="(max-width: 640px)" srcSet={current.image_mobile_url} />}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={current.image_desktop_url}
+                alt={alt}
+                loading={activeIndex === 0 ? 'eager' : 'lazy'}
+                fetchPriority={activeIndex === 0 ? 'high' : 'auto'}
+                decoding="async"
+                className={`h-full w-full ${fit}`}
+              />
+            </picture>
+          </div>
+
+          {banners.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={goToPrevious}
+                aria-label="Banner anterior"
+                className="absolute left-3 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/45 p-2 text-white backdrop-blur-sm transition hover:bg-black/70 cursor-pointer"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={goToNext}
+                aria-label="Próximo banner"
+                className="absolute right-3 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/45 p-2 text-white backdrop-blur-sm transition hover:bg-black/70 cursor-pointer"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+              <div
+                className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 gap-2"
+                role="tablist"
+                aria-label="Selecionar banner"
+              >
+                {banners.map((banner, index) => (
+                  <button
+                    key={banner.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={index === activeIndex}
+                    aria-label={`Exibir banner ${index + 1}`}
+                    onClick={() => setActiveIndex(index)}
+                    className={`h-2.5 rounded-full border border-white/80 transition-all ${
+                      index === activeIndex ? 'w-7 bg-white' : 'w-2.5 bg-white/45 hover:bg-white/75'
+                    }`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </section>
   );
 }

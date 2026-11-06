@@ -549,6 +549,7 @@ export default async function PublicEventsDirectoryPage({ searchParams }: Props)
                               src={evt.cover_image_url}
                               alt={`Imagem do evento ${evt.title}`}
                               fill
+                              unoptimized
                               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 33vw, 25vw"
                               className="object-cover group-hover:scale-104 transition-transform duration-300"
                             />

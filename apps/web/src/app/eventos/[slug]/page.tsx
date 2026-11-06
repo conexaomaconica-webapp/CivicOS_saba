@@ -34,53 +34,60 @@ interface PageProps {
 // Metadata dinâmica via generateMetadata
 // ---------------------------------------------------------------------------
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { slug } = await params;
-  const result = await getUnifiedEventBySlugOrIdAction(slug);
+  try {
+    const { slug } = await params;
+    const result = await getUnifiedEventBySlugOrIdAction(slug);
 
-  if (!result.success || !result.data) {
+    if (!result.success || !result.data) {
+      return {
+        title: { absolute: 'Evento não encontrado | Conexão Maçônica' },
+        robots: { index: false, follow: false },
+      };
+    }
+
+    const event = result.data;
+    const pageUrl = appUrl(`/eventos/${slug}`);
+
+    const [year, month, day] = (event.event_date || '').split('-').map(Number);
+    const dateDisplay = year && month && day
+      ? new Date(Date.UTC(year, month - 1, day, 12, 0, 0)).toLocaleDateString('pt-BR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        timeZone: 'America/Bahia',
+      })
+      : 'Data a confirmar';
+
     return {
-      title: { absolute: 'Evento não encontrado | Conexão Maçônica' },
+      title: { absolute: `${event.title} · Conexão Maçônica` },
+      description:
+        event.subtitle ??
+        event.description ??
+        `${event.title} — ${dateDisplay} • ${event.venue_name ?? event.city ?? 'Conexão Maçônica'}. Confira informações, horários e valores.`,
+      openGraph: {
+        title: event.title,
+        description: event.subtitle ?? `${dateDisplay} • ${event.venue_name ?? ''}`,
+        url: pageUrl,
+        type: 'website',
+        locale: 'pt_BR',
+        ...(event.cover_image_url
+          ? { images: [{ url: event.cover_image_url, width: 1200, height: 630 }] }
+          : {}),
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: event.title,
+        description: event.subtitle ?? '',
+      },
+      robots: { index: true, follow: true },
+      alternates: { canonical: pageUrl },
+    };
+  } catch {
+    return {
+      title: { absolute: 'Agenda de Eventos | Conexão Maçônica' },
       robots: { index: false, follow: false },
     };
   }
-
-  const event = result.data;
-  const pageUrl = appUrl(`/eventos/${slug}`);
-
-  const [year, month, day] = (event.event_date || '').split('-').map(Number);
-  const dateDisplay = year && month && day
-    ? new Date(Date.UTC(year, month - 1, day, 12, 0, 0)).toLocaleDateString('pt-BR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      timeZone: 'America/Bahia',
-    })
-    : 'Data a confirmar';
-
-  return {
-    title: { absolute: `${event.title} · Conexão Maçônica` },
-    description:
-      event.subtitle ??
-      event.description ??
-      `${event.title} — ${dateDisplay} • ${event.venue_name ?? event.city ?? 'Conexão Maçônica'}. Confira informações, horários e valores.`,
-    openGraph: {
-      title: event.title,
-      description: event.subtitle ?? `${dateDisplay} • ${event.venue_name ?? ''}`,
-      url: pageUrl,
-      type: 'website',
-      locale: 'pt_BR',
-      ...(event.cover_image_url
-        ? { images: [{ url: event.cover_image_url, width: 1200, height: 630 }] }
-        : {}),
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: event.title,
-      description: event.subtitle ?? '',
-    },
-    robots: { index: true, follow: true },
-    alternates: { canonical: pageUrl },
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -115,16 +122,76 @@ function formatEventTimeFull(timeStr: string | null): string {
 export default async function EventPage({ params }: PageProps) {
   const { slug } = await params;
 
-  const [eventResult, brand] = await Promise.all([
-    getUnifiedEventBySlugOrIdAction(slug),
-    resolveTenantBrandContext(),
-  ]);
+  let event: any = null;
+  let brand: any = { appName: 'Conexão Maçônica' };
 
-  if (!eventResult.success || !eventResult.data) {
+  try {
+    const [eventResult, brandRes] = await Promise.all([
+      getUnifiedEventBySlugOrIdAction(slug).catch(() => ({ success: false, data: undefined })),
+      resolveTenantBrandContext().catch(() => ({ appName: 'Conexão Maçônica' })),
+    ]);
+
+    if (brandRes) brand = brandRes;
+    if (eventResult && eventResult.success && eventResult.data) {
+      event = eventResult.data;
+    }
+  } catch (_fetchErr) {
+    // Silencioso; prossegue para fallback direto
+  }
+
+  // Fallback garantido se a Server Action não retornou dados
+  if (!event) {
+    try {
+      const { createServerSideClient } = await import('@/lib/supabase/server');
+      const supabase = await createServerSideClient();
+      const { data: rpcRows } = await (supabase as any)
+        .rpc('get_platform_event_by_slug', { p_slug: slug.toLowerCase() });
+
+      if (rpcRows && Array.isArray(rpcRows) && rpcRows[0]) {
+        const p = rpcRows[0];
+        const todayStr = new Date().toISOString().split('T')[0] ?? '';
+        const isPast = p.event_date ? p.event_date < todayStr : false;
+        event = {
+          id: p.id,
+          slug: p.slug || p.id,
+          title: p.title,
+          subtitle: p.subtitle ?? null,
+          description: p.description ?? null,
+          event_date: p.event_date,
+          start_time: p.start_time ? p.start_time.slice(0, 5) : null,
+          end_time: p.end_time ? p.end_time.slice(0, 5) : null,
+          timezone: p.timezone || 'America/Bahia',
+          venue_name: p.venue_name ?? null,
+          venue_address: p.venue_address ?? null,
+          city: p.city ?? 'Feira de Santana',
+          state: 'BA',
+          cover_image_url: p.cover_image_url ?? null,
+          badge_text: p.badge_text || 'Sessão Maçônica',
+          category_id: 'lojas',
+          category_label: 'Sessões & Encontros de Lojas Maçônicas',
+          category_icon: '🏛️',
+          organizer_type: 'lodge',
+          organizer_name: p.venue_name || 'Loja Maçônica',
+          organizer_slug: null,
+          organizer_whatsapp: null,
+          price_info: 'Entrada Franca',
+          registration_enabled: Boolean(p.registration_enabled),
+          external_ticket_url: null,
+          footer_information: null,
+          capacity: p.capacity ?? null,
+          status: 'published',
+          is_past: isPast,
+        };
+      }
+    } catch (_fallbackErr) {
+      // Falha do fallback
+    }
+  }
+
+  if (!event) {
     notFound();
   }
 
-  const event = eventResult.data;
   const pageUrl = appUrl(`/eventos/${slug}`);
 
   const dateDisplay = formatEventDateFull(event.event_date);
@@ -309,6 +376,7 @@ export default async function EventPage({ params }: PageProps) {
                     fill
                     sizes="(max-width: 1024px) 100vw, 42vw"
                     priority
+                    unoptimized
                     className="object-cover group-hover:scale-102 transition-transform duration-300"
                   />
                 ) : (
