@@ -178,7 +178,7 @@ export default async function PublicEventsDirectoryPage({ searchParams }: Props)
           slug: 'conexao-empresarial-2026',
           title: 'Conexão Empresarial da Família Maçônica',
           subtitle: 'Relacionamentos que aproximam! Negócios que fortalecem!',
-          description: 'Encontro exclusivo de integração, palestras empresariais e fortalecimento da rede fraterna de negócios.',
+          description: 'Encontro exclusivo de integração e fortalecimento da rede fraterna de negócios com as palestras "Ninguém prospera sozinho" com Dr. Lucas Almeida (Empresário, Médico e Advogado) e "Síndrome dos Pais Culpados" com Dr. Alfredo Morais (Psicólogo).',
           event_date: '2026-11-24',
           start_time: '19:00:00',
           end_time: '22:00:00',

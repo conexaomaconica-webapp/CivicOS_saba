@@ -34,7 +34,20 @@ export const EVENT_TIME_LABEL = '19h';
 export const EVENT_DAY_OF_WEEK = 'Terça-feira';
 export const EVENT_VENUE_NAME = 'Centro de Convenções de Feira de Santana';
 export const EVENT_VENUE_ADDRESS = 'R. Tupinambás - São João, Feira de Santana - BA';
-export const EVENT_LECTURE_TITLE = 'Liderança Emocional Inteligente e Síndrome dos Pais Culpados';
-export const EVENT_LECTURE_SPEAKER = 'Dr. Alfredo Morais - Psicólogo';
+export const EVENT_LECTURES = [
+  {
+    theme: 'Ninguém prospera sozinho',
+    speaker: 'Dr. Lucas Almeida',
+    role: 'Empresário, Médico e Advogado',
+  },
+  {
+    theme: 'Síndrome dos Pais Culpados',
+    speaker: 'Dr. Alfredo Morais',
+    role: 'Psicólogo',
+  },
+] as const;
+
+export const EVENT_LECTURE_TITLE = 'Ninguém prospera sozinho & Síndrome dos Pais Culpados';
+export const EVENT_LECTURE_SPEAKER = 'Dr. Lucas Almeida (Empresário, Médico e Advogado) & Dr. Alfredo Morais (Psicólogo)';
 export const EVENT_ORGANIZERS = 'IIr.·. Douglas Ramos / Eduardo Saba / Henrique Oliveira';
 export const EVENT_PHONE_FORMATTED = '(75) 98152-4838';

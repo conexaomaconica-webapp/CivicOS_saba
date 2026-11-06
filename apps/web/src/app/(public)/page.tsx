@@ -131,7 +131,7 @@ const launchEventSchema = {
   '@type': 'Event',
   name: 'Lançamento oficial da Conexão Maçônica',
   description:
-    'Noite de relacionamentos, oportunidades e fortalecimento de negócios para irmãos, cunhadas e sobrinhos empresários, com palestras sobre Liderança Emocional Inteligente e Síndrome dos Pais Culpados.',
+    'Noite de relacionamentos, oportunidades e fortalecimento de negócios para irmãos, cunhadas e sobrinhos empresários, com palestras "Ninguém prospera sozinho" com Dr. Lucas Almeida (Empresário, Médico e Advogado) e "Síndrome dos Pais Culpados" com Dr. Alfredo Morais (Psicólogo).',
   startDate: '2026-11-24T19:00:00-03:00',
   eventStatus: 'https://schema.org/EventScheduled',
   eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
@@ -140,7 +140,10 @@ const launchEventSchema = {
     name: 'Centro de Convenções de Feira de Santana',
     address: { '@type': 'PostalAddress', addressLocality: 'Feira de Santana', addressRegion: 'BA', addressCountry: 'BR' },
   },
-  performer: { '@type': 'Person', name: 'Dr. Alfredo Morais', jobTitle: 'Psicólogo' },
+  performer: [
+    { '@type': 'Person', name: 'Dr. Lucas Almeida', jobTitle: 'Empresário, Médico e Advogado' },
+    { '@type': 'Person', name: 'Dr. Alfredo Morais', jobTitle: 'Psicólogo' },
+  ],
   organizer: { '@id': appUrl('/#organization') },
   url: appUrl('/#lancamento'),
 };

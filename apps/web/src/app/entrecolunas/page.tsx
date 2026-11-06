@@ -95,7 +95,7 @@ export default function EntreColunasPage() {
         '@id': 'https://www.conexaomaconica.com.br/entrecolunas#event',
         name: 'Lançamento Oficial da Conexão Maçônica',
         description:
-          'Uma noite especial para aproximar irmãos, cunhadas, sobrinhos e empresários, estimulando parcerias e novas conexões. Palestras "Liderança Emocional Inteligente e Síndrome dos Pais Culpados" com Dr. Alfredo Morais, recepção com saxofone e coquetel com voz e violão.',
+          'Uma noite especial para aproximar irmãos, cunhadas, sobrinhos e empresários, estimulando parcerias e novas conexões. Palestras "Ninguém prospera sozinho" com Dr. Lucas Almeida (Empresário, Médico e Advogado) e "Síndrome dos Pais Culpados" com Dr. Alfredo Morais (Psicólogo), recepção com saxofone e coquetel com voz e violão.',
         startDate: EVENT_DATE_ISO,
         endDate: '2026-11-24T22:00:00-03:00',
         eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
@@ -111,6 +111,10 @@ export default function EntreColunasPage() {
             addressCountry: 'BR',
           },
         },
+        performer: [
+          { '@type': 'Person', name: 'Dr. Lucas Almeida', jobTitle: 'Empresário, Médico e Advogado' },
+          { '@type': 'Person', name: 'Dr. Alfredo Morais', jobTitle: 'Psicólogo' },
+        ],
         organizer: {
           '@type': 'Organization',
           name: 'Conexão Maçônica',

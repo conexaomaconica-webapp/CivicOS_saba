@@ -124,10 +124,17 @@ export function LandingLaunchSection() {
             A Conexão Maçônica convida você para uma noite especial de relacionamentos, oportunidades e fortalecimento de negócios.
             Um encontro pensado para aproximar irmãos, cunhadas, familiares e empresários, estimulando parcerias e novas conexões.
           </p>
-          <div className="mt-6 rounded-2xl bg-white/5 p-5 ring-1 ring-[#C9A227]/30">
-            <p className="text-sm font-bold text-[#C9A227]">Palestras</p>
-            <p className="mt-1 text-sm text-white/85">Liderança Emocional Inteligente e Síndrome dos Pais Culpados</p>
-            <p className="mt-1 text-sm text-white/60">com Dr. Alfredo Morais — Psicólogo</p>
+          <div className="mt-6 rounded-2xl bg-white/5 p-5 ring-1 ring-[#C9A227]/30 space-y-3">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#C9A227]">Palestras da Noite</p>
+            <div className="space-y-0.5">
+              <p className="text-sm font-semibold text-white/95">&ldquo;Ninguém prospera sozinho&rdquo;</p>
+              <p className="text-xs text-white/70">com <strong className="text-[#C9A227] font-semibold">Dr. Lucas Almeida</strong> — Empresário, Médico e Advogado</p>
+            </div>
+            <div className="h-[1px] w-full bg-[#C9A227]/20" />
+            <div className="space-y-0.5">
+              <p className="text-sm font-semibold text-white/95">&ldquo;Síndrome dos Pais Culpados&rdquo;</p>
+              <p className="text-xs text-white/70">com <strong className="text-[#C9A227] font-semibold">Dr. Alfredo Morais</strong> — Psicólogo</p>
+            </div>
           </div>
         </div>
         <div className="rounded-3xl bg-white p-7 text-[#2a0a10] shadow-2xl">

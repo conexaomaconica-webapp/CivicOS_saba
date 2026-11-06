@@ -24,8 +24,7 @@ import {
   EVENT_DAY_OF_WEEK,
   EVENT_VENUE_NAME,
   EVENT_VENUE_ADDRESS,
-  EVENT_LECTURE_TITLE,
-  EVENT_LECTURE_SPEAKER,
+  EVENT_LECTURES,
   EVENT_ORGANIZERS,
   EVENT_PHONE_FORMATTED,
   CANONICAL_WHATSAPP_NUMBER,
@@ -188,16 +187,24 @@ export function LaunchEventSection() {
               <div className="w-12 h-12 rounded-xl bg-[#C9A227]/20 border border-[#C9A227]/50 flex items-center justify-center text-[#C9A227] shrink-0">
                 <Mic className="w-6 h-6" />
               </div>
-              <div className="min-w-0">
-                <span className="text-[11px] font-bold tracking-[0.18em] uppercase text-[#C9A227] block mb-1">
-                  Palestras:
+              <div className="min-w-0 space-y-3 flex-1">
+                <span className="text-[11px] font-bold tracking-[0.18em] uppercase text-[#C9A227] block">
+                  Palestras da Noite:
                 </span>
-                <p className="text-base sm:text-lg font-semibold text-[#FFFDF9] leading-snug">
-                  {EVENT_LECTURE_TITLE}
-                </p>
-                <p className="text-xs sm:text-sm text-[#F3EEDD]/90 font-medium mt-1">
-                  {EVENT_LECTURE_SPEAKER}
-                </p>
+                {EVENT_LECTURES.map((lec, index) => (
+                  <React.Fragment key={lec.theme}>
+                    {index > 0 && <div className="h-[1px] w-full bg-[#C9A227]/20" />}
+                    <div className="space-y-0.5">
+                      <p className="text-base sm:text-lg font-semibold text-[#FFFDF9] leading-snug">
+                        &ldquo;{lec.theme}&rdquo;
+                      </p>
+                      <p className="text-xs sm:text-sm text-[#F3EEDD]/90 font-medium">
+                        <strong className="text-[#C9A227] font-semibold">{lec.speaker}</strong>
+                        <span className="text-[#F3EEDD]/75 font-normal"> — {lec.role}</span>
+                      </p>
+                    </div>
+                  </React.Fragment>
+                ))}
               </div>
             </div>
 
