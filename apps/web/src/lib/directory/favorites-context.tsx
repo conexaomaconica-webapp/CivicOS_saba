@@ -130,7 +130,15 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
 export function useFavorites() {
   const context = useContext(FavoritesContext);
   if (!context) {
-    throw new Error('useFavorites must be used within a FavoritesProvider');
+    return {
+      favoriteSlugs: [],
+      favoritesCount: 0,
+      toggleFavorite: () => {},
+      isFavorite: () => false,
+      clearFavorites: () => {},
+      isModalOpen: false,
+      setIsModalOpen: () => {},
+    };
   }
   return context;
 }

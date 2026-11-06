@@ -611,17 +611,14 @@ function HomeBannerCarousel({
             }}
           />
         )}
-        {!isImageOnly && (
-          <>
-            <div className="home-banner-overlay" />
-            <div className="home-banner-text-box">
-              <span className="home-banner-tag">{currentBanner.subtitle || 'Destaque'}</span>
-              <h2 className="home-banner-heading">{currentBanner.title || 'Conexões que geram oportunidades'}</h2>
-              <span className="home-banner-cta-btn">
-                {currentBanner.cta_text || 'Conhecer empresas →'}
-              </span>
-            </div>
-          </>
+        {!isImageOnly && !bannerImg && (
+          <div className="home-banner-text-box">
+            <span className="home-banner-tag">{currentBanner.subtitle || 'Destaque'}</span>
+            <h2 className="home-banner-heading">{currentBanner.title || 'Conexões que geram oportunidades'}</h2>
+            <span className="home-banner-cta-btn">
+              {currentBanner.cta_text || 'Conhecer empresas →'}
+            </span>
+          </div>
         )}
       </article>
 

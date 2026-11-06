@@ -8,3 +8,4 @@ export default async function GuiaEventRedirect({
   const { slug } = await params;
   redirect(`/eventos/${slug}`);
 }
+

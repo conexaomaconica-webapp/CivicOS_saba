@@ -38,13 +38,13 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
   const current = banners[activeIndex];
   if (!current) return null;
 
-  const imageOnly = !current.title?.trim() && !current.subtitle?.trim() && !current.cta_text?.trim();
+  const bannerSrc = current.image_mobile_url || current.image_desktop_url;
+  const imageOnly = Boolean(bannerSrc);
   const goToPrevious = () => setActiveIndex((currentIndex) => (currentIndex - 1 + banners.length) % banners.length);
   const goToNext = () => setActiveIndex((currentIndex) => (currentIndex + 1) % banners.length);
 
   const alt = current.title || 'Banner institucional';
   const fit = `object-cover ${imageOnly ? 'object-center' : ''}`;
-  const bannerSrc = current.image_mobile_url || current.image_desktop_url;
 
   return (
     <section
@@ -57,7 +57,7 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
       onBlurCapture={() => setPaused(false)}
     >
       {imageOnly ? (
-        <div className="relative w-full aspect-[801/207] overflow-hidden rounded-xl md:rounded-2xl shadow-xs transition-opacity duration-300 bg-transparent">
+        <div className="relative w-full aspect-[801/260] sm:aspect-[801/207] min-h-[105px] overflow-hidden rounded-xl md:rounded-2xl shadow-xs transition-opacity duration-300 bg-transparent">
           {current.cta_url ? (
             <Link href={current.cta_url} className="block w-full h-full">
               {/* eslint-disable-next-line @next/next/no-img-element */}

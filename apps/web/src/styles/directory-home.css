@@ -253,15 +253,15 @@
 
 /* Carousel Banner Section */
 .dh-carousel-card {
-  background: linear-gradient(135deg, #2b080f, var(--dh-wine-light));
+  background: transparent;
   border-radius: 16px;
   overflow: hidden;
   color: #ffffff;
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: center;
-  min-height: 280px;
-  margin: 32px 0;
+  min-height: 200px;
+  margin: 16px 0;
   position: relative;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
@@ -567,9 +567,9 @@
     display: block !important;
     position: relative !important;
     width: 100% !important;
-    aspect-ratio: 801 / 207 !important;
+    aspect-ratio: 801 / 240 !important;
+    min-height: 105px !important;
     height: auto !important;
-    min-height: auto !important;
     margin: 8px 0 16px !important;
     overflow: hidden !important;
     border-radius: 12px !important;
