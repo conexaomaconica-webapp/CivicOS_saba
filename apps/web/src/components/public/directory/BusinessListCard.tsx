@@ -138,24 +138,47 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discover
       )}
       {/* Esquerda: Logo e Imagem */}
       <div className="flex items-center gap-5 sm:gap-6 shrink-0 w-full md:w-auto">
-        <div
-          className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 border-stone-200/90 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-xs p-2 transition-all duration-300 ease-out group-hover:scale-105 hover:!scale-115 hover:shadow-xl hover:border-amber-400 cursor-pointer ${
-            data.logo_url ? 'bg-white' : 'bg-amber-950 text-amber-400 font-bold'
-          }`}
-        >
-          {data.logo_url ? (
-            <img
-              src={data.logo_url}
-              alt={data.name}
-              loading={priority ? 'eager' : 'lazy'}
-              fetchPriority={priority ? 'high' : 'auto'}
-              decoding="async"
-              className="max-w-full max-h-full object-contain object-center bg-white transition-transform duration-300 ease-out group-hover:scale-105 hover:scale-110"
-            />
-          ) : (
-            <span className="text-xl sm:text-2xl font-bold">{data.name.slice(0, 2).toUpperCase()}</span>
-          )}
-        </div>
+        {(() => {
+          const customBg = data.logo_background_color?.trim();
+          const hasCustomBg = Boolean(
+            customBg &&
+            customBg.toLowerCase() !== '#ffffff' &&
+            customBg.toLowerCase() !== '#fff' &&
+            customBg.toLowerCase() !== 'white' &&
+            customBg.toLowerCase() !== 'rgb(255, 255, 255)'
+          );
+          const containerBg = hasCustomBg ? customBg : '#ffffff';
+          const containerBorder = hasCustomBg ? customBg : 'rgba(231, 229, 228, 0.9)';
+
+          return (
+            <div
+              className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 flex items-center justify-center overflow-hidden shrink-0 shadow-xs p-2 transition-all duration-300 ease-out group-hover:scale-105 hover:!scale-115 hover:shadow-xl hover:border-amber-400 cursor-pointer ${
+                data.logo_url ? '' : 'bg-amber-950 text-amber-400 font-bold'
+              }`}
+              style={
+                data.logo_url
+                  ? {
+                      backgroundColor: containerBg,
+                      borderColor: containerBorder,
+                    }
+                  : undefined
+              }
+            >
+              {data.logo_url ? (
+                <img
+                  src={data.logo_url}
+                  alt={data.name}
+                  loading={priority ? 'eager' : 'lazy'}
+                  fetchPriority={priority ? 'high' : 'auto'}
+                  decoding="async"
+                  className="max-w-full max-h-full object-contain object-center transition-transform duration-300 ease-out group-hover:scale-105 hover:scale-110"
+                />
+              ) : (
+                <span className="text-xl sm:text-2xl font-bold">{data.name.slice(0, 2).toUpperCase()}</span>
+              )}
+            </div>
+          );
+        })()}
 
         <div>
           <div className="flex items-center gap-2 flex-wrap">

@@ -3,12 +3,31 @@ import type { NextConfig } from 'next';
 const isMobileExport = process.env.NEXT_OUTPUT === 'export';
 
 const supabaseImageRemotePatterns: NonNullable<NextConfig['images']>['remotePatterns'] = (() => {
+  const patterns: NonNullable<NextConfig['images']>['remotePatterns'] = [
+    {
+      protocol: 'https',
+      hostname: 'rwvztwsjcjljphqttiws.supabase.co',
+      pathname: '/storage/v1/object/public/**',
+    },
+    {
+      protocol: 'https',
+      hostname: '*.supabase.co',
+      pathname: '/storage/v1/object/public/**',
+    },
+  ];
   try {
     const supabaseUrl = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '');
-    return [{ protocol: supabaseUrl.protocol.replace(':', '') as 'http' | 'https', hostname: supabaseUrl.hostname, pathname: '/storage/v1/object/public/**' }];
+    if (supabaseUrl.hostname && !patterns.some((p) => p.hostname === supabaseUrl.hostname)) {
+      patterns.push({
+        protocol: supabaseUrl.protocol.replace(':', '') as 'http' | 'https',
+        hostname: supabaseUrl.hostname,
+        pathname: '/storage/v1/object/public/**',
+      });
+    }
   } catch {
-    return [];
+    // URL inválida ou não configurada
   }
+  return patterns;
 })();
 
 const securityHeaders = [

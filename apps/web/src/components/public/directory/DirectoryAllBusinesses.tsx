@@ -22,6 +22,7 @@ export type PublicSearchResultItem = {
   name: string;
   short_description?: string | null;
   logo_url?: string | null;
+  logo_background_color?: string | null;
   cover_url?: string | null;
   category_slug?: string | null;
   category_name?: string | null;
@@ -316,13 +317,42 @@ export function DirectoryAllBusinesses({
           {items.map((biz) => (
             <div key={biz.id} className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:shadow-sm transition-shadow">
               <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 overflow-hidden p-1 ${biz.logo_url ? 'bg-white border-stone-200' : 'bg-amber-950 text-amber-400 font-bold border-amber-900'}`}>
-                  {biz.logo_url ? (
-                    <img src={biz.logo_url} alt={biz.name} loading="lazy" decoding="async" className="max-w-full max-h-full object-contain object-center bg-white" />
-                  ) : (
-                    biz.name.slice(0, 2).toUpperCase()
-                  )}
-                </div>
+                {(() => {
+                  const customBg = (biz as any).logo_background_color?.trim();
+                  const hasCustomBg = Boolean(
+                    customBg &&
+                    customBg.toLowerCase() !== '#ffffff' &&
+                    customBg.toLowerCase() !== '#fff' &&
+                    customBg.toLowerCase() !== 'white'
+                  );
+                  return (
+                    <div
+                      className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 overflow-hidden p-1 ${
+                        biz.logo_url ? '' : 'bg-amber-950 text-amber-400 font-bold border-amber-900'
+                      }`}
+                      style={
+                        biz.logo_url
+                          ? {
+                              backgroundColor: hasCustomBg ? customBg : '#ffffff',
+                              borderColor: hasCustomBg ? customBg : 'rgb(231 229 228)',
+                            }
+                          : undefined
+                      }
+                    >
+                      {biz.logo_url ? (
+                        <img
+                          src={biz.logo_url}
+                          alt={biz.name}
+                          loading="lazy"
+                          decoding="async"
+                          className="max-w-full max-h-full object-contain object-center"
+                        />
+                      ) : (
+                        biz.name.slice(0, 2).toUpperCase()
+                      )}
+                    </div>
+                  );
+                })()}
                 <div>
                   <h3 className="font-bold text-gray-900 text-base">{biz.name}</h3>
                   <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">

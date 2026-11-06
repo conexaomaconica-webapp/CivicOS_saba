@@ -439,15 +439,31 @@ export type MobileEventItem = {
   id: string;
   slug: string;
   title: string;
+  subtitle?: string | null;
   summary: string | null;
+  description?: string | null;
   event_date: string | null;
+  raw_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
   location_label: string | null;
+  address?: string | null;
   city: string | null;
   state: string | null;
   organizer_name: string | null;
-  organizer_type: 'business' | 'lodge';
+  organizer_type: 'business' | 'lodge' | 'social_action';
+  organizer_slug?: string | null;
+  organizer_whatsapp?: string | null;
   cover_url: string | null;
   cta_url: string | null;
+  category_id?: string;
+  category_label?: string;
+  category_short_label?: string;
+  category_icon?: string;
+  badge_text?: string;
+  price_info?: string;
+  registration_enabled?: boolean;
+  footer_information?: string | null;
 };
 
 async function fetchWithTimeout(

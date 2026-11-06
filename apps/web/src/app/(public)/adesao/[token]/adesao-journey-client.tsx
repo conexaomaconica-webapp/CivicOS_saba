@@ -156,7 +156,7 @@ O presente instrumento tem por objeto a concessão de licença de uso do Guia de
 3. DAS CONDIÇÕES COMERCIAIS
 - Plano Selecionado: ${offer.planName}
 - Condição Escolhida: ${selectedPaymentMode === 'upfront' ? `À vista por ${offer.formattedUpfront}` : `${offer.installmentsCount}x de ${offer.formattedInstallmentValue} (Total: ${offer.formattedInstallmentsTotal})`}
-- Vigência: 12 (doze) meses a contar da data de publicação oficial.
+- Vigência: ${offer.planName.toLowerCase().includes('pedra') || (offer.planName.toLowerCase().includes('acácia') && offer.planName.toLowerCase().includes('pedra')) || (offer.planName.toLowerCase().includes('acacia') && offer.planName.toLowerCase().includes('pedra')) ? '24 (vinte e quatro) meses (dois anos)' : '12 (doze) meses'} a contar da data de publicação oficial.
 
 4. DA ELEGIBILIDADE E PRIVACIDADE MAÇÔNICA
 A CONTRATANTE declara expressamente o seu vínculo com a Família Maçônica (Loja: ${business.masonicLodge || 'Informada em cadastro'}) e concorda com as diretrizes institucionais do ecossistema.

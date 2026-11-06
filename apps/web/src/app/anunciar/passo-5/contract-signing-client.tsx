@@ -48,6 +48,14 @@ export default function ContractSigningClient({
       year: 'numeric',
     });
 
+    const isBiennialOrPedra =
+      (planName || '').toLowerCase().includes('pedra fundamental') ||
+      ((planName || '').toLowerCase().includes('acácia') && (planName || '').toLowerCase().includes('pedra')) ||
+      ((planName || '').toLowerCase().includes('acacia') && (planName || '').toLowerCase().includes('pedra')) ||
+      (planName || '').toLowerCase().includes('bienal') ||
+      (planName || '').toLowerCase().includes('2 anos');
+    const vigenciaExtenso = isBiennialOrPedra ? '24 (vinte e quatro) meses (dois anos)' : '12 (doze) meses';
+
     return `
 ================================================================================
  CONTRATO DE ADESÃO E LICENÇA DE USO DA PLATAFORMA CONEXÃO MAÇÔNICA (${contractVersion})
@@ -70,7 +78,7 @@ SITE: https://conexaomaconica.com.br
 2.3. A CONTRATADA compromete-se a manter os serviços ativos com alto nível de disponibilidade, conformidade com a LGPD e selos de credibilidade fraterna.
 
 3. DA VIGÊNCIA E REGRAS DE CANCELAMENTO
-3.1. O presente contrato vigora pelo período de 12 (doze) meses a contar da data de confirmação do pagamento transacional via gateway seguro.
+3.1. O presente contrato vigora pelo período de ${vigenciaExtenso} a contar da data de confirmação do pagamento transacional via gateway seguro.
 3.2. A renovação ocorre mediante conciliação prévia e o cancelamento pode ser efetuado a qualquer momento no Painel do Anunciante.
 
 4. DA VALIDADE JURÍDICA E SNAPSHOT IMUTÁVEL

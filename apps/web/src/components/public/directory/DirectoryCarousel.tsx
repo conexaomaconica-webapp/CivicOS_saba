@@ -67,7 +67,7 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
   const image =
     desktopOptimizable && (!current.image_mobile_url || mobileOptimizable) ? (
       // Imagens do Supabase passam pelo otimizador: tamanho certo para a tela, em WebP/AVIF, com carregamento sob demanda.
-      <div className={imageOnly ? 'absolute inset-0' : 'relative block h-full w-full'}>
+      <div className={imageOnly ? 'relative block w-full h-full' : 'relative block h-full w-full'}>
         <Image
           src={current.image_desktop_url}
           alt={alt}
@@ -90,7 +90,7 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
         )}
       </div>
     ) : (
-      <picture className={imageOnly ? 'absolute inset-0' : 'block h-full'}>
+      <picture className={imageOnly ? 'relative block w-full h-full' : 'block h-full'}>
         {current.image_mobile_url && <source media="(max-width: 640px)" srcSet={current.image_mobile_url} />}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -114,9 +114,21 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
     >
-      <div className={`dh-carousel-card transition-opacity duration-300 ${imageOnly ? '!block min-h-[280px]' : ''}`}>
+      <div
+        className={`dh-carousel-card transition-opacity duration-300 ${
+          imageOnly
+            ? 'is-image-only relative w-full aspect-16/9 sm:aspect-21/9 lg:aspect-[2.7/1] min-h-[190px] sm:min-h-[240px] md:min-h-[280px] max-h-[380px] !block overflow-hidden rounded-2xl'
+            : ''
+        }`}
+      >
         {imageOnly ? (
-          current.cta_url ? <Link href={current.cta_url} className="absolute inset-0">{image}</Link> : image
+          current.cta_url ? (
+            <Link href={current.cta_url} className="relative block w-full h-full">
+              {image}
+            </Link>
+          ) : (
+            <div className="relative block w-full h-full">{image}</div>
+          )
         ) : (
           <>
             <div className="dh-carousel-card__content">

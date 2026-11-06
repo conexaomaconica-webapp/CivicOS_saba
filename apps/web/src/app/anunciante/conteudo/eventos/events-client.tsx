@@ -29,6 +29,8 @@ export default function AdvertiserEventsClient({ data }: { data: AdvertiserConte
   const [eventDate, setEventDate] = useState('');
   const [location, setLocation] = useState('');
   const [ctaLink, setCtaLink] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [priceInfo, setPriceInfo] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
@@ -39,13 +41,19 @@ export default function AdvertiserEventsClient({ data }: { data: AdvertiserConte
     setFeedback(null);
 
     try {
+      let resolvedDesc = description.trim();
+      if (priceInfo.trim() && !resolvedDesc.includes('Valor')) {
+        resolvedDesc = `${resolvedDesc}\n\nIngressos / Valor: ${priceInfo.trim()}`;
+      }
+
       const res = await saveAdvertiserEventAction({
         business_id: business.id,
         title,
-        description,
+        description: resolvedDesc,
         event_date: eventDate || new Date().toISOString(),
         location,
         cta_link: ctaLink,
+        image_url: imageUrl.trim() || undefined,
       });
 
       if (!res.success) {
@@ -60,10 +68,11 @@ export default function AdvertiserEventsClient({ data }: { data: AdvertiserConte
       const newEvt: AdvertiserEventItem = {
         id: `evt-${Date.now()}`,
         title,
-        description,
+        description: resolvedDesc,
         event_date: eventDate || new Date().toLocaleDateString('pt-BR'),
         location,
         cta_link: ctaLink,
+        image_url: imageUrl.trim() || undefined,
         is_active: true,
         status: 'published',
         status_label: 'Publicado',
@@ -81,6 +90,8 @@ export default function AdvertiserEventsClient({ data }: { data: AdvertiserConte
       setEventDate('');
       setLocation('');
       setCtaLink('');
+      setImageUrl('');
+      setPriceInfo('');
     } catch (err: unknown) {
       setSaving(false);
       setFeedback({
@@ -255,6 +266,30 @@ export default function AdvertiserEventsClient({ data }: { data: AdvertiserConte
                     className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
                     placeholder="Ex: Auditório Comandos — SP"
                     required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-stone-800">Valores / Ingressos</label>
+                  <input
+                    type="text"
+                    value={priceInfo}
+                    onChange={(e) => setPriceInfo(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
+                    placeholder="Ex: Entrada Franca ou R$ 50,00"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-stone-800">Flyer / Imagem do Evento (URL)</label>
+                  <input
+                    type="url"
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
+                    placeholder="https://.../flyer.png (16:9)"
                   />
                 </div>
               </div>

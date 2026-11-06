@@ -15,6 +15,7 @@ export type BusinessCardData = {
   name: string;
   short_description?: string | null;
   logo_url?: string | null;
+  logo_background_color?: string | null;
   cover_url?: string | null;
   category_name?: string | null;
   city?: string | null;
@@ -330,26 +331,45 @@ export function BusinessCard({
           {/* Transição da capa para o conteúdo: [ LOGO DA EMPRESA ] ... [ PEDRA FUNDAMENTAL ] */}
           <div className={`relative mb-3 flex items-end justify-between ${isFeatured ? '-mt-13 sm:-mt-14' : '-mt-11 sm:-mt-12'}`}>
             {/* Logo da Empresa */}
-            <div
-              className={`rounded-2xl border-2 sm:border-3 border-white bg-white shadow-md overflow-hidden shrink-0 flex items-center justify-center p-1.5 transition-all duration-300 ease-out group-hover:scale-105 hover:!scale-115 hover:shadow-xl hover:z-20 cursor-pointer ${
-                isFeatured ? 'w-22 h-22 sm:w-24 sm:h-24' : 'w-20 h-20 sm:w-22 sm:h-22'
-              }`}
-            >
-              {data.logo_url ? (
-                <img
-                  src={data.logo_url}
-                  alt={data.name}
-                  loading={priority ? 'eager' : 'lazy'}
-                  fetchPriority={priority ? 'high' : 'auto'}
-                  decoding="async"
-                  className="max-w-full max-h-full object-contain object-center p-0.5 transition-transform duration-300 ease-out group-hover:scale-105 hover:scale-110"
-                />
-              ) : (
-                <div className="w-full h-full bg-[#3b0b14] text-amber-400 font-bold flex items-center justify-center text-lg sm:text-xl">
-                  {data.name.slice(0, 2).toUpperCase()}
+            {(() => {
+              const customBg = data.logo_background_color?.trim();
+              const hasCustomBg = Boolean(
+                customBg &&
+                customBg.toLowerCase() !== '#ffffff' &&
+                customBg.toLowerCase() !== '#fff' &&
+                customBg.toLowerCase() !== 'white' &&
+                customBg.toLowerCase() !== 'rgb(255, 255, 255)'
+              );
+              const containerBg = hasCustomBg ? customBg : '#ffffff';
+              const containerBorder = hasCustomBg ? customBg : '#ffffff';
+
+              return (
+                <div
+                  className={`rounded-2xl border-2 sm:border-3 shadow-md overflow-hidden shrink-0 flex items-center justify-center p-1.5 transition-all duration-300 ease-out group-hover:scale-105 hover:!scale-115 hover:shadow-xl hover:z-20 cursor-pointer ${
+                    isFeatured ? 'w-22 h-22 sm:w-24 sm:h-24' : 'w-20 h-20 sm:w-22 sm:h-22'
+                  }`}
+                  style={{
+                    backgroundColor: containerBg,
+                    borderColor: containerBorder,
+                  }}
+                >
+                  {data.logo_url ? (
+                    <img
+                      src={data.logo_url}
+                      alt={data.name}
+                      loading={priority ? 'eager' : 'lazy'}
+                      fetchPriority={priority ? 'high' : 'auto'}
+                      decoding="async"
+                      className="max-w-full max-h-full object-contain object-center p-0.5 transition-transform duration-300 ease-out group-hover:scale-105 hover:scale-110"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-[#3b0b14] text-amber-400 font-bold flex items-center justify-center text-lg sm:text-xl">
+                      {data.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* Exibição Conforme Opção Escolhida no Admin da Pedra Fundamental */}
             {isPedraFundamental && (

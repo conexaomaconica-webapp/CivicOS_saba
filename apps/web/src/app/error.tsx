@@ -84,7 +84,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
 
       {/* Footer */}
       <footer className="bg-[#2b060d] text-amber-100/70 py-6 px-4 text-center text-xs border-t border-[#c59b27]/20">
-        <p>© Conexão Maçônica — Rede Fraterna de Negócios e Credibilidade</p>
+        <p>© Conexão Maçônica — Rede de Negócios e Credibilidade</p>
       </footer>
     </div>
   );

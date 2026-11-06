@@ -44,7 +44,9 @@ Você é um engenheiro full-stack sênior atuando no ecossistema **Conexão Maç
 ---
 
 ## 5. Validação & Qualidade
-* Executar a checagem de tipos TypeScript (`pnpm --filter web typecheck`) e suítes de teste Vitest (`pnpm --filter web exec vitest run`) para garantir 0 erros antes de finalizar qualquer entrega.
+* Executar a checagem de tipos TypeScript e suítes de teste Vitest em ambas as aplicações para garantir 0 erros antes de finalizar qualquer entrega:
+  - **Web & Web Mobile:** `pnpm --filter web typecheck` e `pnpm --filter web exec vitest run`.
+  - **App iOS & App Android:** `pnpm --filter mobile typecheck` e `pnpm --filter mobile test`.
 
 ---
 
@@ -60,4 +62,22 @@ Você é um engenheiro full-stack sênior atuando no ecossistema **Conexão Maç
 * **Slug Público:** `businesses.slug` único por empresa (resolução canônica em `/guia/{businesses.slug}`).
 * **Analytics:** Usar a fonte canônica `analytics_events` definida pelo projeto.
 * **Reconhecimentos:** Selos **Pedra Fundamental**, **Fundadora** e **Coluna de Honra** NUNCA devem ser tratados como entitlement ou benefício de plano comercial.
+
+---
+
+## 8. REGRA DE SINCRONIZAÇÃO OBRIGATÓRIA ENTRE AS 4 PLATAFORMAS (Web Desktop + Web Mobile + App iOS + App Android)
+* **Princípio da Paridade Multiplataforma Total:**
+  Toda correção de bug, ajuste de regra de negócio, alteração de contratos, cálculos financeiros, fluxos cadastrais, termos, textos institucionais ou componentes de interface realizada no sistema **DEVE ser obrigatoriamente replicada e mantida em paridade nas 4 plataformas suportadas**:
+  1. **Web Desktop** (`apps/web`): Navegação desktop widescreen, tabelas, modais amplos e fluxos administrativos.
+  2. **Web Mobile** (`apps/web`): Responsividade em navegadores móveis (`touch`, drawer de navegação, bottom sheet, cards empilhados e breakpoints `sm:` / `md:`).
+  3. **App iOS** (`apps/mobile`): Interface móvel Capacitor para iPhone/iPad, respeitando safe-areas, status bar, styles e overrides em `apps/mobile/ios-overrides/`.
+  4. **App Android** (`apps/mobile`): Interface móvel Capacitor para Android, respeitando hardware back button, splash screen, styles e overrides em `apps/mobile/android-overrides/`.
+
+* **Regras de Propagação Imediata:**
+  - **Lógica e Contratos:** Sempre que uma regra comercial, política de vigência (ex: Plano Acácia c/ Pedra Fundamental bienal de 2 anos), cálculo financeiro ou payload for alterado na Web, sincronize imediatamente o serviço, adapter, mock ou UI correspondente no Mobile (`apps/mobile/src/App.tsx`, `guide-data.ts`, etc.) e vice-versa.
+  - **Interface & Experiência (UI/UX):** Todo ajuste visual ou componente na Web deve ser validado para telas mobile (Web Mobile) e espelhado na estilização do aplicativo móvel (`apps/mobile/src/styles.css`).
+  - **Sincronização de Overrides Nativos:** Ao alterar assets, ícones, splash screen, deep links, push tokens ou esquemas de URL, sincronizar e manter paridade idêntica entre `apps/mobile/android-overrides` e `apps/mobile/ios-overrides` (`pnpm --filter mobile sync`).
+  - **Zero Regressão Quádrupla:** Nunca concluir uma entrega sem verificar a higidez dos testes e compilação das 4 frentes:
+    - `pnpm --filter web typecheck` && `pnpm --filter web exec vitest run`
+    - `pnpm --filter mobile typecheck` && `pnpm --filter mobile test`
 

@@ -100,10 +100,14 @@ export function renderContractTemplate(
           return String(variables.prazo_vigencia);
         }
         const hasPedra = Boolean(
-          variables.selo_pedra_fundamental &&
-          variables.selo_pedra_fundamental.includes('Pedra Fundamental')
+          (variables.selo_pedra_fundamental &&
+            variables.selo_pedra_fundamental.includes('Pedra Fundamental')) ||
+          (variables.plano_nome &&
+            (variables.plano_nome.toLowerCase().includes('pedra fundamental') ||
+              (variables.plano_nome.toLowerCase().includes('acácia') && variables.plano_nome.toLowerCase().includes('pedra')) ||
+              (variables.plano_nome.toLowerCase().includes('acacia') && variables.plano_nome.toLowerCase().includes('pedra'))))
         );
-        return formatPrazoVigenciaExtenso(variables.vigencia, hasPedra);
+        return formatPrazoVigenciaExtenso(variables.vigencia, hasPedra, variables.plano_nome);
       }
 
       const key = legacyAliases[rawKey] || (rawKey as keyof AdvertiserContractVariables);
@@ -231,9 +235,18 @@ export function formatVigencia(monthsOrCycle: number | string): string {
  */
 export function formatPrazoVigenciaExtenso(
   monthsOrCycle?: number | string | null,
-  isPedraFundamental?: boolean
+  isPedraFundamental?: boolean,
+  planName?: string | null
 ): string {
-  if (isPedraFundamental) {
+  const planStr = String(planName ?? '').toLowerCase();
+  const hasPedra = Boolean(
+    isPedraFundamental ||
+    planStr.includes('pedra fundamental') ||
+    (planStr.includes('acacia') && planStr.includes('pedra')) ||
+    (planStr.includes('acácia') && planStr.includes('pedra'))
+  );
+
+  if (hasPedra) {
     return 'dois anos correntes';
   }
   const str = String(monthsOrCycle ?? '').trim().toLowerCase();

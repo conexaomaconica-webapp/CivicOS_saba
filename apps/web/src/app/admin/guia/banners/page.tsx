@@ -192,42 +192,42 @@ export default function AdminGuiaBannersPage() {
           <div className="p-8 text-center text-gray-500 text-sm">Nenhum banner cadastrado. Clique no botão acima para adicionar o primeiro.</div>
         ) : (
           <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="bg-gray-50 text-gray-700 border-b font-semibold">
-              <tr>
-                <th className="p-3">Ordem</th>
-                <th className="p-3">Título</th>
-                <th className="p-3">Cidade</th>
-                <th className="p-3">Status</th>
-                <th className="p-3 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y text-gray-800">
-              {banners.map((b) => (
-                <tr key={b.id} className="hover:bg-gray-50">
-                  <td className="p-3 font-semibold text-amber-900">{b.display_order}</td>
-                  <td className="p-3 font-medium">
-                    <div>{b.title || 'Banner somente imagem'}</div>
-                    <div className="text-xs text-gray-400">{b.subtitle}</div>
-                  </td>
-                  <td className="p-3">{b.city || 'Todas as Cidades'}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${b.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                      {b.is_active ? 'Ativo' : 'Inativo'}
-                    </span>
-                  </td>
-                  <td className="p-3 text-right space-x-2">
-                    <button onClick={() => handleOpenModal(b)} className="p-1.5 hover:bg-gray-100 rounded text-gray-700">
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleDelete(b.id)} className="p-1.5 hover:bg-red-50 text-red-600 rounded">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead className="bg-gray-50 text-gray-700 border-b font-semibold">
+                <tr>
+                  <th className="p-3">Ordem</th>
+                  <th className="p-3">Título</th>
+                  <th className="p-3">Cidade</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3 text-right">Ações</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y text-gray-800">
+                {banners.map((b) => (
+                  <tr key={b.id} className="hover:bg-gray-50">
+                    <td className="p-3 font-semibold text-amber-900">{b.display_order}</td>
+                    <td className="p-3 font-medium">
+                      <div>{b.title || 'Banner somente imagem'}</div>
+                      <div className="text-xs text-gray-400">{b.subtitle}</div>
+                    </td>
+                    <td className="p-3">{b.city || 'Todas as Cidades'}</td>
+                    <td className="p-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${b.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                        {b.is_active ? 'Ativo' : 'Inativo'}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right space-x-2">
+                      <button onClick={() => handleOpenModal(b)} className="p-1.5 hover:bg-gray-100 rounded text-gray-700">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDelete(b.id)} className="p-1.5 hover:bg-red-50 text-red-600 rounded">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -257,26 +257,26 @@ export default function AdminGuiaBannersPage() {
               </fieldset>
 
               {contentMode === 'image_text' && <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Título Principal *</label>
-                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full px-3 py-1.5 border rounded-md text-sm" />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Subtítulo / Tag</label>
-                <input type="text" value={subtitle} onChange={(e) => setSubtitle(e.target.value)} className="w-full px-3 py-1.5 border rounded-md text-sm" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Texto do Botão CTA</label>
-                  <input type="text" value={ctaText} onChange={(e) => setCtaText(e.target.value)} className="w-full px-3 py-1.5 border rounded-md text-sm" />
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Título Principal *</label>
+                  <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full px-3 py-1.5 border rounded-md text-sm" />
                 </div>
+
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Link do CTA (URL)</label>
-                  <input type="text" value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} className="w-full px-3 py-1.5 border rounded-md text-sm" />
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Subtítulo / Tag</label>
+                  <input type="text" value={subtitle} onChange={(e) => setSubtitle(e.target.value)} className="w-full px-3 py-1.5 border rounded-md text-sm" />
                 </div>
-              </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Texto do Botão CTA</label>
+                    <input type="text" value={ctaText} onChange={(e) => setCtaText(e.target.value)} className="w-full px-3 py-1.5 border rounded-md text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Link do CTA (URL)</label>
+                    <input type="text" value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} className="w-full px-3 py-1.5 border rounded-md text-sm" />
+                  </div>
+                </div>
 
               </div>}
 
@@ -285,7 +285,7 @@ export default function AdminGuiaBannersPage() {
                 value={imageDesktopUrl}
                 onChange={setImageDesktopUrl}
                 required
-                hint="Imagem larga (ex.: 1920×720). É reduzida automaticamente (WebP, até ~450 KB)."
+                hint="Imagem larga (ex.: 851×207). É reduzida automaticamente (WebP, até ~450 KB)."
               />
 
               <BannerImageField

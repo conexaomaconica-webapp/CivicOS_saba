@@ -44,6 +44,12 @@ export default function ContractStepClient({
 
   const planRules = CANONICAL_PLAN_PAYMENT_RULES[planCode.toLowerCase()] || CANONICAL_PLAN_PAYMENT_RULES['prata'] || { planCode: 'prata', amountCents: 178800 };
   const amountFormatted = (planRules.amountCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const isBiennialOrPedra =
+    planCode.toLowerCase().includes('pedra') ||
+    (planCode.toLowerCase().includes('acacia') && planCode.toLowerCase().includes('pedra')) ||
+    planRules.planCode.toLowerCase().includes('pedra');
+  const contractDurationText = isBiennialOrPedra ? '24 (vinte e quatro) meses (dois anos)' : '12 (doze) meses';
+  const priceFrequencySuffix = isBiennialOrPedra ? '/2 anos' : '/ano';
 
   // Texto impresso do contrato oficial de prestação de serviços de publicidade
   const contractText = `CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE PUBLICIDADE, DIVULGAÇÃO E PRESENÇA COMERCIAL DIGITAL — GUIA CONEXÃO MAÇÔNICA
@@ -66,7 +72,7 @@ CLÁUSULA 1 — DO OBJETO
 1.3. A contratação não representa aquisição de propriedade sobre qualquer parte da plataforma, código-fonte, sistema ou tecnologia utilizada pela CONEXÃO MAÇÔNICA.
 
 CLÁUSULA 2 — DO PLANO CONTRATADO
-2.1. O ANUNCIANTE contrata o Plano ${planRules.planCode.toUpperCase()}, pelo valor de ${amountFormatted}/ano, para o período de 12 (doze) meses.
+2.1. O ANUNCIANTE contrata o Plano ${planRules.planCode.toUpperCase()}, pelo valor de ${amountFormatted}${priceFrequencySuffix}, para o período de ${contractDurationText}.
 2.2. Os recursos, limites e benefícios correspondentes ao plano contratado serão aqueles indicados na proposta comercial e na descrição vigente do plano apresentada ao ANUNCIANTE no momento da contratação.
 2.3. Eventuais recursos adicionais poderão possuir condições e valores próprios.
 2.4. O histórico da contratação, incluindo plano, valor, condições comerciais e versão contratual aceita, será registrado eletronicamente pela PLATAFORMA.

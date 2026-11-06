@@ -132,7 +132,7 @@ export function FigmaOuroView({ company = defaultOuroCompanyFixture }: { company
         title: company.name,
         text: company.about,
         url: typeof window !== 'undefined' ? window.location.href : '',
-      }).catch(() => {});
+      }).catch(() => { });
     } else {
       showToast('Link copiado para a área de transferência!');
     }
@@ -449,7 +449,7 @@ export function FigmaOuroView({ company = defaultOuroCompanyFixture }: { company
 
           {/* Quote Card Gold */}
           <div className={styles.quoteCardGold}>
-            ⭐ <strong>Empresa Acácia / Fundadora:</strong> Destaque máximo na rede fraterna com selo de excelência e compromisso de atendimento de alta prioridade.
+            ⭐ <strong>Empresa Acácia / Fundadora:</strong> Destaque máximo na rede com selo de excelência e compromisso de atendimento de alta prioridade.
           </div>
         </div>
       </div>

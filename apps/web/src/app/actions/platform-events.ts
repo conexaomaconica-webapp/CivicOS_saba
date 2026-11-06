@@ -4,7 +4,12 @@ import { createServerSideClient, resolveTenantIdServer } from '@/lib/supabase/se
 import { revalidatePath } from 'next/cache';
 import { checkRateLimit } from '@/lib/security/rate-limiter';
 import type { AttendeeType, AttendanceStatus } from '@/types/database-extensions';
-import { buildCSVContent, sanitizeUTMParams } from '@/lib/events/events-service';
+import {
+  buildCSVContent,
+  sanitizeUTMParams,
+  classifyEventCategory,
+  extractPriceInfo,
+} from '@/lib/events/events-service';
 
 // ---------------------------------------------------------------------------
 // Shared response type (consistent with platform pattern)
@@ -16,13 +21,23 @@ export interface ActionResponse<T = unknown> {
 }
 
 async function getSupabaseServerOrAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (url && serviceKey) {
+    const { createClient } = await import('@supabase/supabase-js');
+    return createClient(url, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+
   try {
     return await createServerSideClient();
   } catch (_e) {
     const { createClient } = await import('@supabase/supabase-js');
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://rwvztwsjcjljphqttiws.supabase.co';
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-    return createClient(url, key);
+    const fallbackUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://rwvztwsjcjljphqttiws.supabase.co';
+    const fallbackKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    return createClient(fallbackUrl, fallbackKey);
   }
 }
 
@@ -232,6 +247,222 @@ export async function getPlatformEventByIdAction(
     return { success: false, error: 'Erro inesperado ao carregar o evento.' };
   }
 }
+
+// ---------------------------------------------------------------------------
+// PUBLIC: Evento Unificado (Plataforma ou Empresa) com Formato Plano Esquadro
+// ---------------------------------------------------------------------------
+export interface UnifiedEventDetail {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  event_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  timezone: string;
+  venue_name: string | null;
+  venue_address: string | null;
+  city: string | null;
+  state: string | null;
+  cover_image_url: string | null;
+  badge_text: string;
+  category_id: string;
+  category_label: string;
+  category_icon: string;
+  organizer_type: 'lodge' | 'social_action' | 'business' | 'platform';
+  organizer_name: string | null;
+  organizer_slug: string | null;
+  organizer_whatsapp: string | null;
+  organizer_logo: string | null;
+  price_info: string;
+  registration_enabled: boolean;
+  external_ticket_url: string | null;
+  footer_information: string | null;
+  capacity: number | null;
+  status: string;
+  is_past: boolean;
+  header_media_type?: 'logo' | 'banner';
+  header_media_size?: 'small' | 'medium' | 'large' | 'full';
+  header_media_position?: 'left' | 'center' | 'right';
+}
+
+export async function getUnifiedEventBySlugOrIdAction(
+  slugOrId: string
+): Promise<ActionResponse<UnifiedEventDetail>> {
+  try {
+    const term = (slugOrId || '').trim();
+    if (!term) {
+      return { success: false, error: 'Identificador do evento não informado.' };
+    }
+
+    const supabase = await getSupabaseServerOrAdminClient();
+    const todayStr = new Date().toISOString().split('T')[0] ?? '';
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(term);
+
+    // 1. Tenta buscar em platform_events por slug ou id
+    let pData: any = null;
+    let pError: any = null;
+
+    try {
+      let platformQuery = (supabase as any)
+        .from('platform_events')
+        .select('*');
+
+      if (isUuid) {
+        platformQuery = platformQuery.or(`slug.eq.${term.toLowerCase()},id.eq.${term}`);
+      } else {
+        platformQuery = platformQuery.eq('slug', term.toLowerCase());
+      }
+
+      const res = await platformQuery.maybeSingle();
+      pData = res.data;
+      pError = res.error;
+    } catch (err) {
+      pError = err;
+    }
+
+    // Fallback de alta resiliência: se a busca direta falhou (ex.: restrição RLS de perfis)
+    // ou não retornou dados, invoca a RPC SECURITY DEFINER pública get_platform_event_by_slug
+    if (!pData) {
+      try {
+        const { data: rpcRows, error: rpcErr } = await (supabase as any)
+          .rpc('get_platform_event_by_slug', { p_slug: term.toLowerCase() });
+        if (!rpcErr && Array.isArray(rpcRows) && rpcRows.length > 0) {
+          pData = rpcRows[0];
+          pError = null;
+        }
+      } catch (_rpcErr) {
+        // Silencioso; prossegue para busca em business_events
+      }
+    }
+
+    if (pData && !pError) {
+      const cat = classifyEventCategory(pData.title, pData.badge_text, pData.venue_name);
+      const isPast = pData.event_date ? pData.event_date < todayStr : false;
+      const orgType = (pData.badge_text || '').toLowerCase().includes('social')
+        ? 'social_action'
+        : (pData.badge_text || '').toLowerCase().includes('empresa')
+        ? 'business'
+        : (pData.badge_text || '').toLowerCase().includes('institucional')
+        ? 'platform'
+        : 'lodge';
+
+      const price = extractPriceInfo(pData.badge_text, pData.subtitle, pData.description, orgType);
+
+      return {
+        success: true,
+        data: {
+          id: pData.id,
+          slug: pData.slug || pData.id,
+          title: pData.title,
+          subtitle: pData.subtitle ?? null,
+          description: pData.description ?? null,
+          event_date: pData.event_date,
+          start_time: pData.start_time ? pData.start_time.slice(0, 5) : null,
+          end_time: pData.end_time ? pData.end_time.slice(0, 5) : null,
+          timezone: pData.timezone || 'America/Bahia',
+          venue_name: pData.venue_name ?? null,
+          venue_address: pData.venue_address ?? null,
+          city: pData.city ?? 'Feira de Santana',
+          state: 'BA',
+          cover_image_url: pData.cover_image_url ?? null,
+          header_media_type: pData.header_media_type ?? 'banner',
+          header_media_size: pData.header_media_size ?? 'medium',
+          header_media_position: pData.header_media_position ?? 'center',
+          badge_text: pData.badge_text || (orgType === 'lodge' ? 'Sessão Maçônica' : 'Evento Especial'),
+          category_id: cat.id,
+          category_label: cat.label,
+          category_icon: cat.icon,
+          organizer_type: orgType,
+          organizer_name: pData.venue_name || 'Loja Maçônica',
+          organizer_slug: null,
+          organizer_whatsapp: null,
+          organizer_logo: null,
+          price_info: price,
+          registration_enabled: Boolean(pData.registration_enabled),
+          external_ticket_url: null,
+          footer_information: pData.footer_information ?? null,
+          capacity: pData.capacity ?? null,
+          status: pData.status || 'published',
+          is_past: isPast,
+        },
+      };
+    }
+
+    // 2. Se não encontrou em platform_events, busca em business_events
+    let businessQuery = (supabase as any)
+      .from('business_events')
+      .select('*, businesses:business_id(id, name, slug, city, state, logo_url, whatsapp, phone)')
+      .eq('is_active', true)
+      .eq('publication_status', 'published');
+
+    if (isUuid) {
+      businessQuery = businessQuery.eq('id', term);
+    } else {
+      // busca por match em id se for id, ou se tiver coluna slug
+      businessQuery = businessQuery.eq('id', term);
+    }
+
+    const { data: bData, error: bError } = await businessQuery.maybeSingle();
+
+    if (bData && !bError) {
+      const biz = bData.businesses;
+      const startsAtDate = bData.starts_at ? bData.starts_at.split('T')[0] : '';
+      const startsAtTime = bData.starts_at && bData.starts_at.includes('T') ? bData.starts_at.split('T')[1].slice(0, 5) : null;
+      const endsAtTime = bData.ends_at && bData.ends_at.includes('T') ? bData.ends_at.split('T')[1].slice(0, 5) : null;
+      const isPast = startsAtDate ? startsAtDate < todayStr : false;
+
+      const cat = classifyEventCategory(bData.title, 'Empresa Parceira', bData.location_name, 'business');
+      const price = extractPriceInfo(null, null, bData.description, 'business');
+
+      return {
+        success: true,
+        data: {
+          id: bData.id,
+          slug: bData.id,
+          title: bData.title,
+          subtitle: null,
+          description: bData.description ?? null,
+          event_date: startsAtDate,
+          start_time: startsAtTime,
+          end_time: endsAtTime,
+          timezone: bData.timezone || 'America/Bahia',
+          venue_name: bData.location_name ?? biz?.name ?? null,
+          venue_address: bData.address ?? null,
+          city: biz?.city ?? 'Feira de Santana',
+          state: biz?.state ?? 'BA',
+          cover_image_url: bData.cover_image_url ?? null,
+          header_media_type: 'banner',
+          header_media_size: 'medium',
+          header_media_position: 'center',
+          badge_text: 'Empresa Parceira',
+          category_id: cat.id,
+          category_label: cat.label,
+          category_icon: cat.icon,
+          organizer_type: 'business',
+          organizer_name: biz?.name ?? 'Empresa Parceira',
+          organizer_slug: biz?.slug ?? null,
+          organizer_whatsapp: biz?.whatsapp || biz?.phone || null,
+          organizer_logo: biz?.logo_url ?? null,
+          price_info: price,
+          registration_enabled: false,
+          external_ticket_url: bData.external_ticket_url ?? null,
+          footer_information: null,
+          capacity: null,
+          status: bData.publication_status || 'published',
+          is_past: isPast,
+        },
+      };
+    }
+
+    return { success: false, error: 'Evento não encontrado ou não está publicado.' };
+  } catch (err) {
+    console.error('[Events] Exceção em getUnifiedEventBySlugOrIdAction:', err);
+    return { success: false, error: 'Erro inesperado ao carregar o evento.' };
+  }
+}
+
 
 
 // ---------------------------------------------------------------------------

@@ -169,7 +169,7 @@ export default function MasonicBondForm({ businessId, businessName }: MasonicBon
           <ShieldCheck className="w-4 h-4" /> Privacidade & Validação de Rede
         </div>
         <p>
-          A comprovação do vínculo é usada para validação da participação na rede fraterna. Seu nome somente será exibido publicamente se você autorizar no seu painel.
+          A comprovação do vínculo é usada para validação da participação na plataforma. Seu nome somente será exibido publicamente se você autorizar no seu painel.
         </p>
       </div>
 

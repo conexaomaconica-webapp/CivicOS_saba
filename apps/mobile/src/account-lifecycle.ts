@@ -117,3 +117,4 @@ export function purgeLocalAccountState(req: AccountDeletionRequest, storage: Sto
     console.warn('Erro ao expurgar dados locais pós-exclusão:', err);
   }
 }
+

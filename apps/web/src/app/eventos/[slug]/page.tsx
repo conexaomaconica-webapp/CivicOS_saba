@@ -1,12 +1,29 @@
 import React, { Suspense } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { getPlatformEventBySlugAction } from '@/app/actions/platform-events';
+import {
+  Calendar,
+  MapPin,
+  Building2,
+  Tag,
+  ChevronRight,
+  ArrowLeft,
+  ExternalLink,
+  MessageCircle,
+  ShieldCheck,
+  Info,
+  CheckCircle2,
+} from 'lucide-react';
+import { getUnifiedEventBySlugOrIdAction } from '@/app/actions/platform-events';
 import { EventRSVPForm } from '@/components/events/EventRSVPForm';
 import { StructuredEventData } from '@/components/events/StructuredEventData';
 import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { appUrl } from '@/lib/seo/app-url';
+import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
+import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
+import { EventActionsClient } from '@/components/public/events/EventActionsClient';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -18,7 +35,7 @@ interface PageProps {
 // ---------------------------------------------------------------------------
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const result = await getPlatformEventBySlugAction(slug);
+  const result = await getUnifiedEventBySlugOrIdAction(slug);
 
   if (!result.success || !result.data) {
     return {
@@ -30,20 +47,22 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const event = result.data;
   const pageUrl = appUrl(`/eventos/${slug}`);
 
-  const [year, month, day] = event.event_date.split('-').map(Number);
-  const dateDisplay = new Date(Date.UTC(year!, month! - 1, day!, 12, 0, 0)).toLocaleDateString('pt-BR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'America/Bahia',
-  });
+  const [year, month, day] = (event.event_date || '').split('-').map(Number);
+  const dateDisplay = year && month && day
+    ? new Date(Date.UTC(year, month - 1, day, 12, 0, 0)).toLocaleDateString('pt-BR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'America/Bahia',
+    })
+    : 'Data a confirmar';
 
   return {
-    title: { absolute: `${event.title} · Confirme sua presença` },
+    title: { absolute: `${event.title} · Conexão Maçônica` },
     description:
       event.subtitle ??
       event.description ??
-      `${event.title} — ${dateDisplay} • ${event.venue_name ?? 'Feira de Santana – BA'}. Confirme sua presença.`,
+      `${event.title} — ${dateDisplay} • ${event.venue_name ?? event.city ?? 'Conexão Maçônica'}. Confira informações, horários e valores.`,
     openGraph: {
       title: event.title,
       description: event.subtitle ?? `${dateDisplay} • ${event.venue_name ?? ''}`,
@@ -67,30 +86,37 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 // ---------------------------------------------------------------------------
 // Helpers de formatação
 // ---------------------------------------------------------------------------
-function formatEventDate(dateStr: string): string {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const date = new Date(Date.UTC(year!, month! - 1, day!, 12, 0, 0));
-  return date.toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'America/Bahia',
-  });
+function formatEventDateFull(dateStr: string): string {
+  if (!dateStr) return 'Data a confirmar';
+  try {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    if (!year || !month || !day) return dateStr;
+    const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    return date.toLocaleDateString('pt-BR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'America/Bahia',
+    });
+  } catch {
+    return dateStr;
+  }
 }
 
-function formatEventTime(timeStr: string): string {
+function formatEventTimeFull(timeStr: string | null): string {
+  if (!timeStr) return '';
   return timeStr.slice(0, 5).replace(':', 'h');
 }
 
 // ---------------------------------------------------------------------------
-// Página principal
+// Página Principal do Evento (Design Inspirado no Plano Esquadro)
 // ---------------------------------------------------------------------------
 export default async function EventPage({ params }: PageProps) {
   const { slug } = await params;
 
   const [eventResult, brand] = await Promise.all([
-    getPlatformEventBySlugAction(slug),
+    getUnifiedEventBySlugOrIdAction(slug),
     resolveTenantBrandContext(),
   ]);
 
@@ -101,1024 +127,396 @@ export default async function EventPage({ params }: PageProps) {
   const event = eventResult.data;
   const pageUrl = appUrl(`/eventos/${slug}`);
 
-  const dateDisplay  = formatEventDate(event.event_date);
-  const timeDisplay  = formatEventTime(event.start_time);
-  const locationLine = [event.venue_name, event.city].filter(Boolean).join(' — ');
-  const mediaSize = event.header_media_size ?? 'medium';
-  const mediaPosition = event.header_media_position ?? 'center';
+  const dateDisplay = formatEventDateFull(event.event_date);
+  const timeDisplay = formatEventTimeFull(event.start_time);
+  const endTimeDisplay = formatEventTimeFull(event.end_time);
+  const locationLine = [event.venue_name, event.city, event.state].filter(Boolean).join(' — ');
+
+  const mapsQuery = encodeURIComponent(
+    [event.venue_name, event.venue_address, event.city, event.state].filter(Boolean).join(', ')
+  );
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+
+  const whatsappPhone = event.organizer_whatsapp ? event.organizer_whatsapp.replace(/\D/g, '') : null;
+  const whatsappUrl = whatsappPhone
+    ? `https://wa.me/55${whatsappPhone}?text=${encodeURIComponent(
+      `Olá! Gostaria de mais informações sobre o evento "${event.title}" visto na Conexão Maçônica.`
+    )}`
+    : null;
 
   return (
-    <>
-      {/* JSON-LD para SEO */}
-      <StructuredEventData event={event} pageUrl={pageUrl} />
+    <div className="min-h-screen bg-[#F8F7F5] text-stone-900 font-sans antialiased flex flex-col justify-between">
+      {/* Structured Data para SEO */}
+      {event.registration_enabled ? (
+        <StructuredEventData event={event as any} pageUrl={pageUrl} />
+      ) : null}
 
-      <div className="event-page">
-        {/* ── HERO ────────────────────────────────────────────────────────── */}
-        <header className="event-hero">
-          <div className={`event-hero-inner event-hero-inner--${event.header_media_type === 'banner' ? mediaSize : 'medium'}`}>
-            {event.header_media_type === 'banner' && event.cover_image_url && (
-              <div className={`event-custom-banner event-media--${mediaSize} event-media-position--${mediaPosition}`}>
-                <Image src={event.cover_image_url} alt={`Banner do evento ${event.title}`} width={1600} height={520} className="event-custom-banner-image" priority />
-              </div>
-            )}
+      <DirectoryHeader selectedCity={event.city || ''} />
 
-            {/* Logomarca específica do evento ou identidade oficial do tenant */}
-            {(event.header_media_type !== 'banner' && event.cover_image_url) || brand.logoUrl ? (
-              <div className={`event-logo-wrap event-media--${mediaSize} event-media-position--${mediaPosition}`}>
-                <Image
-                  src={event.header_media_type !== 'banner' && event.cover_image_url ? event.cover_image_url : brand.logoUrl!}
-                  alt={event.header_media_type !== 'banner' && event.cover_image_url ? `Logomarca do evento ${event.title}` : (brand.appName ?? 'Conexão Maçônica')}
-                  width={160}
-                  height={80}
-                  className="event-logo"
-                  priority
+      <main className="pb-16 flex-1">
+        {/* Barra Superior de Breadcrumbs */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 border-b border-[#E8E5DF] bg-white">
+          <nav className="flex items-center gap-2 text-xs text-stone-500 font-medium" aria-label="Navegação">
+            <Link href="/guia" className="hover:text-[#4b161b] transition-colors">
+              Início
+            </Link>
+            <ChevronRight className="w-3 h-3 text-stone-400" />
+            <Link href="/guia/eventos" className="hover:text-[#4b161b] transition-colors">
+              Agenda de Eventos
+            </Link>
+            <ChevronRight className="w-3 h-3 text-stone-400" />
+            <span className="text-[#4b161b] font-bold line-clamp-1 max-w-[280px] sm:max-w-md">
+              {event.title}
+            </span>
+          </nav>
+        </div>
+
+        {/* HERO BANNER ESTILO PLANO ESQUADRO (Composição Horizontal Split em 2 Colunas no Desktop) */}
+        <header className="relative w-full bg-white text-stone-900 border-b border-[#E8E5DF] shadow-xs">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+
+              {/* COLUNA ESQUERDA: Identidade e Informações Resumidas do Evento (~58%) */}
+              <div className="lg:col-span-7 flex flex-col justify-between space-y-5">
+                <div className="space-y-3">
+
+                  {/* Badges de Categoria & Status */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-[#3b0b14] text-[#c59b27] border border-[#c59b27]/30 shadow-xs">
+                      <span>{event.category_icon}</span>
+                      <span>{event.category_label || event.badge_text}</span>
+                    </span>
+
+                    {event.is_past ? (
+                      <span className="inline-flex items-center text-xs font-semibold px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-600 border border-stone-200">
+                        Evento Realizado
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Confirmado</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Nome / Título do Evento em Tipografia Serif Nobre */}
+                  <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight tracking-tight text-[#4B161B]">
+                    {event.title}
+                  </h1>
+
+                  {/* Subtítulo / Frase do Evento */}
+                  {event.subtitle && (
+                    <p className="text-sm font-medium text-[#4b161b]/80 leading-relaxed">
+                      {event.subtitle}
+                    </p>
+                  )}
+
+                  {/* Dados de Data, Horário e Local */}
+                  <div className="pt-2 space-y-2 text-xs sm:text-sm text-stone-600 font-medium">
+                    <div className="flex items-center gap-2.5 text-stone-800 font-semibold">
+                      <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+                        <Calendar className="w-4 h-4 text-[#c59b27]" />
+                      </div>
+                      <div>
+                        <span>{dateDisplay}</span>
+                        {timeDisplay && (
+                          <span className="text-[#4b161b] font-bold"> às {timeDisplay}</span>
+                        )}
+                        {endTimeDisplay && (
+                          <span className="text-stone-500 font-normal"> (término previsto {endTimeDisplay})</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {locationLine && (
+                      <div className="flex items-center gap-2.5 text-stone-700">
+                        <div className="w-8 h-8 rounded-lg bg-stone-100 border border-stone-200 flex items-center justify-center shrink-0">
+                          <MapPin className="w-4 h-4 text-[#c59b27]" />
+                        </div>
+                        <div className="line-clamp-2">
+                          <span>{locationLine}</span>
+                          {event.venue_address && (
+                            <span className="block text-xs text-stone-500 font-normal">
+                              {event.venue_address}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {event.organizer_name && (
+                      <div className="flex items-center gap-2.5 text-stone-700">
+                        <div className="w-8 h-8 rounded-lg bg-stone-100 border border-stone-200 flex items-center justify-center shrink-0">
+                          <Building2 className="w-4 h-4 text-[#c59b27]" />
+                        </div>
+                        <div>
+                          <span>Realização: </span>
+                          <strong className="text-stone-900 font-bold">{event.organizer_name}</strong>
+                          {event.organizer_slug && (
+                            <Link
+                              href={`/guia/${event.organizer_slug}`}
+                              className="ml-2 text-xs font-semibold text-[#c59b27] hover:underline"
+                            >
+                              Ver perfil da empresa →
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* DESTAQUE DE VALORES / INGRESSOS (Estilo Plano Esquadro) */}
+                  <div className="pt-2">
+                    <div className="inline-flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-3.5 bg-gradient-to-r from-amber-50/80 via-white to-amber-50/40 border border-[#c59b27]/40 rounded-xl shadow-2xs">
+                      <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-[#4b161b]">
+                        <Tag className="w-4 h-4 text-[#c59b27]" />
+                        <span>Valores &amp; Ingressos:</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm sm:text-base font-extrabold text-[#1f1914] bg-white px-3 py-1 rounded-lg border border-[#e8e2d9] shadow-xs">
+                          {event.price_info || 'Entrada Franca'}
+                        </span>
+                        <span className="text-xs text-stone-500 font-medium">
+                          {event.registration_enabled
+                            ? '• Inscrição antecipada recomendada'
+                            : '• Livre participação fraterna'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Barra de Ações Rápidas (RSVP, WhatsApp, Maps, Compartilhar) */}
+                <EventActionsClient
+                  title={event.title}
+                  slug={event.slug}
+                  dateDisplay={dateDisplay}
+                  locationLine={locationLine}
+                  whatsappUrl={whatsappUrl}
+                  mapsUrl={mapsUrl}
+                  registrationEnabled={event.registration_enabled}
+                  externalTicketUrl={event.external_ticket_url}
                 />
               </div>
-            ) : (
-              <div className="event-logo-text" aria-label="Conexão Maçônica">
-                Conexão Maçônica
+
+              {/* COLUNA DIREITA: Imagem / Flyer do Evento (~42%) */}
+              <div className="lg:col-span-5 relative w-full h-56 sm:h-72 lg:h-full min-h-[240px] rounded-2xl overflow-hidden border border-[#E8E5DF] shadow-sm group bg-stone-900">
+                {event.cover_image_url ? (
+                  <Image
+                    src={event.cover_image_url}
+                    alt={`Flyer e imagem oficial do evento ${event.title}`}
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 42vw"
+                    priority
+                    className="object-cover group-hover:scale-102 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-br from-[#4b161b] via-[#3b0b14] to-stone-950 text-white">
+                    <div className="w-16 h-16 rounded-full bg-[#c59b27]/20 border border-[#c59b27]/50 flex items-center justify-center mb-3">
+                      <Calendar className="w-8 h-8 text-[#c59b27]" />
+                    </div>
+                    <span className="font-serif font-bold text-xl text-amber-100 max-w-xs">
+                      {event.title}
+                    </span>
+                    <span className="text-xs text-amber-200/80 mt-2 font-medium">
+                      {brand.appName ?? 'Conexão Maçônica'}
+                    </span>
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
               </div>
-            )}
 
-            {/* Badge convite */}
-            <div className="event-badge" aria-label="Convite oficial">
-              <span className="event-badge-deco" aria-hidden="true">✦</span>
-              {event.badge_text || 'Convite'}
-              <span className="event-badge-deco" aria-hidden="true">✦</span>
-            </div>
-
-            {/* Título principal */}
-            <h1 className="event-title">{event.title}</h1>
-
-            {/* Subtítulo / frase */}
-            {event.subtitle && (
-              <p className="event-subtitle">{event.subtitle}</p>
-            )}
-
-            {/* Separador ornamental */}
-            <div className="event-divider" aria-hidden="true">
-              <span className="event-divider-line" />
-              <span className="event-divider-symbol">◆</span>
-              <span className="event-divider-line" />
-            </div>
-
-            {/* Data, hora, local */}
-            <div className="event-meta">
-              <div className="event-meta-item">
-                <svg className="event-meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                  <line x1="16" y1="2" x2="16" y2="6" />
-                  <line x1="8" y1="2" x2="8" y2="6" />
-                  <line x1="3" y1="10" x2="21" y2="10" />
-                </svg>
-                <span>{dateDisplay}</span>
-              </div>
-              <div className="event-meta-item">
-                <svg className="event-meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
-                <span>{timeDisplay}</span>
-              </div>
-              {locationLine && (
-                <div className="event-meta-item">
-                  <svg className="event-meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                    <circle cx="12" cy="10" r="3" />
-                  </svg>
-                  <span>{locationLine}</span>
-                </div>
-              )}
             </div>
           </div>
         </header>
 
-        {/* ── DESCRIÇÃO ──────────────────────────────────────────────────── */}
-        {event.description && (
-          <section className="event-description-section">
-            <div className="event-description-inner">
-              <p className="event-description">{event.description}</p>
-            </div>
-          </section>
-        )}
+        {/* CONTEÚDO PRINCIPAL (Grid de Detalhes, Valores, Localização e Inscrição) */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-        {/* ── FORMULÁRIO RSVP ───────────────────────────────────────────── */}
-        {event.registration_enabled ? (
-          <Suspense fallback={<div className="event-form-loading">Carregando formulário...</div>}>
-            <EventRSVPForm event={event} />
-          </Suspense>
-        ) : (
-          <section className="event-disclosure-section">
-            <div className="event-disclosure-card">
-              <div className="event-disclosure-badge">
-                <span className="event-disclosure-deco">✦</span>
-                <span>Divulgação e Convite Fraterno</span>
-                <span className="event-disclosure-deco">✦</span>
-              </div>
-              <h2 className="event-disclosure-title">Livre Participação</h2>
-              <p className="event-disclosure-sub">
-                Este evento é de livre divulgação fraterna. Não é exigida reserva prévia ou formulário de presença online.
-              </p>
-              <div className="event-disclosure-details">
-                <div className="event-disc-row">
-                  <strong>Quando:</strong>
-                  <span>{dateDisplay} às {timeDisplay}</span>
+            {/* COLUNA PRINCIPAL (Esquerda: Descrição, Programação e RSVP) */}
+            <div className="lg:col-span-8 space-y-8">
+
+              {/* Seção 1: Sobre o Evento */}
+              <section className="bg-white rounded-2xl p-6 sm:p-8 border border-[#E8E5DF] shadow-xs space-y-4">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#4b161b] border-b border-stone-100 pb-3">
+                  <Info className="w-4 h-4 text-[#c59b27]" />
+                  <span>Sobre o Evento</span>
                 </div>
-                {locationLine && (
-                  <div className="event-disc-row">
-                    <strong>Onde:</strong>
-                    <span>{locationLine}</span>
+
+                {event.description ? (
+                  <div className="text-stone-700 text-sm sm:text-base leading-relaxed whitespace-pre-line space-y-3 font-normal">
+                    {event.description}
+                  </div>
+                ) : (
+                  <p className="text-sm text-stone-500 italic">
+                    Evento comemorativo e integrativo promovido na Conexão Maçônica.
+                  </p>
+                )}
+              </section>
+
+              {/* Seção 2: Informações de Valores e Acesso */}
+              <section className="bg-white rounded-2xl p-6 sm:p-8 border border-[#E8E5DF] shadow-xs space-y-4">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#4b161b] border-b border-stone-100 pb-3">
+                  <Tag className="w-4 h-4 text-[#c59b27]" />
+                  <span>Informações de Acesso &amp; Valores</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                  <div className="p-4 rounded-xl bg-[#FAF7F2] border border-[#E8E5DF] space-y-1">
+                    <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
+                      Investimento / Entrada
+                    </span>
+                    <p className="text-lg font-extrabold text-[#4b161b]">
+                      {event.price_info || 'Entrada Franca'}
+                    </p>
+                    <p className="text-xs text-stone-600">
+                      Condição aplicável a membros da comunidade e convidados.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-[#FAF7F2] border border-[#E8E5DF] space-y-1">
+                    <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
+                      Modalidade de Confirmação
+                    </span>
+                    <p className="text-lg font-extrabold text-[#1f1914]">
+                      {event.registration_enabled ? 'Inscrição RSVP Obrigatória' : 'Aberto à Comunidade'}
+                    </p>
+                    <p className="text-xs text-stone-600">
+                      {event.capacity ? `Vagas limitadas a ${event.capacity} participantes.` : 'Sem restrição rígida de lotação.'}
+                    </p>
+                  </div>
+                </div>
+
+                {event.footer_information && (
+                  <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 text-xs sm:text-sm text-amber-950 leading-relaxed mt-2">
+                    <strong className="block font-bold text-amber-900 mb-1">Observações da Organização:</strong>
+                    <span>{event.footer_information}</span>
                   </div>
                 )}
-                {event.venue_address && (
-                  <div className="event-disc-row">
-                    <strong>Endereço:</strong>
-                    <span>{event.venue_address}</span>
+              </section>
+
+              {/* Seção 3: Formulário de Confirmação de Presença (RSVP) */}
+              {event.registration_enabled && (
+                <section id="rsvp-form" className="bg-white rounded-2xl p-6 sm:p-8 border border-[#E8E5DF] shadow-xs space-y-4 scroll-mt-20">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#4b161b] border-b border-stone-100 pb-3">
+                    <ShieldCheck className="w-4 h-4 text-[#c59b27]" />
+                    <span>Confirmação de Presença Fraterna</span>
                   </div>
-                )}
-              </div>
-              {event.venue_address && (
-                <div className="event-disclosure-btn-wrap">
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${event.venue_name || ''} ${event.venue_address || ''} ${event.city || ''}`)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="event-disclosure-maps-btn"
-                  >
-                    <span>Abrir Localização no Google Maps</span>
-                  </a>
-                </div>
+
+                  <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
+                    Preencha o formulário abaixo para registrar sua presença antecipada e receber a confirmação oficial no seu WhatsApp.
+                  </p>
+
+                  <Suspense fallback={<div className="p-8 text-center text-sm text-stone-500">Carregando formulário seguro...</div>}>
+                    <EventRSVPForm event={event as any} />
+                  </Suspense>
+                </section>
               )}
+
             </div>
-          </section>
-        )}
 
-        {event.footer_information && (
-          <section className="event-information-section" aria-labelledby="event-information-title">
-            <div className="event-information-card">
-              <h2 id="event-information-title">Informações e contato</h2>
-              <p>{event.footer_information}</p>
+            {/* COLUNA LATERAL (Direita: Localização no Mapa e Card do Organizador) */}
+            <div className="lg:col-span-4 space-y-6">
+
+              {/* Card de Localização & Rota */}
+              <div className="bg-white rounded-2xl p-6 border border-[#E8E5DF] shadow-xs space-y-4">
+                <h3 className="font-serif font-bold text-lg text-stone-900 flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-[#c59b27]" />
+                  <span>Localização</span>
+                </h3>
+
+                <div className="space-y-1.5 text-xs text-stone-600">
+                  {event.venue_name && (
+                    <p className="font-bold text-stone-900 text-sm">
+                      {event.venue_name}
+                    </p>
+                  )}
+                  {event.venue_address && <p>{event.venue_address}</p>}
+                  <p className="font-medium text-stone-700">
+                    {[event.city, event.state].filter(Boolean).join(' - ')}
+                  </p>
+                </div>
+
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 px-4 rounded-xl bg-stone-100 hover:bg-stone-200 text-[#4b161b] font-bold text-xs flex items-center justify-center gap-2 transition-all border border-stone-200"
+                >
+                  <MapPin className="w-4 h-4 text-[#c59b27]" />
+                  <span>Traçar Rota no Google Maps</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-stone-400" />
+                </a>
+              </div>
+
+              {/* Card do Organizador / Loja / Empresa */}
+              <div className="bg-white rounded-2xl p-6 border border-[#E8E5DF] shadow-xs space-y-4">
+                <h3 className="font-serif font-bold text-lg text-stone-900 flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-[#c59b27]" />
+                  <span>Organização</span>
+                </h3>
+
+                <div className="space-y-2">
+                  <p className="font-bold text-sm text-[#4b161b]">
+                    {event.organizer_name || 'Conexão Maçônica'}
+                  </p>
+                  <p className="text-xs text-stone-500 leading-relaxed">
+                    {event.organizer_type === 'lodge'
+                      ? 'Loja Maçônica regularizada cadastrada na rede Conexão Maçônica.'
+                      : event.organizer_type === 'social_action'
+                        ? 'Iniciativa beneficente fraterna em prol da assistência e solidariedade social.'
+                        : 'Empresa parceira com perfil homologado na vitrine comercial do Guia.'}
+                  </p>
+
+                  {event.organizer_slug && (
+                    <div className="pt-2">
+                      <Link
+                        href={`/guia/${event.organizer_slug}`}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-[#c59b27] hover:underline"
+                      >
+                        <span>Conhecer Empresa no Guia</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  )}
+
+                  {whatsappUrl && (
+                    <div className="pt-2">
+                      <a
+                        href={whatsappUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-semibold text-xs flex items-center justify-center gap-2 transition-all"
+                      >
+                        <MessageCircle className="w-4 h-4 text-emerald-600" />
+                        <span>Contato WhatsApp do Organizador</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Card Voltar à Agenda */}
+              <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-200/60 text-center space-y-2">
+                <span className="text-xs text-stone-600">Quer conferir outros eventos da comunidade?</span>
+                <Link
+                  href="/guia/eventos"
+                  className="inline-flex items-center justify-center gap-1.5 w-full py-2 px-4 rounded-xl bg-[#3b0b14] text-white text-xs font-bold hover:bg-[#c59b27] hover:text-[#1f1914] transition-all shadow-xs"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Voltar para Todos os Eventos</span>
+                </Link>
+              </div>
+
             </div>
-          </section>
-        )}
 
-        {/* ── FOOTER MÍNIMO ─────────────────────────────────────────────── */}
-        <footer className="event-footer">
-          <p className="event-footer-brand">{brand.appName ?? 'Conexão Maçônica'}</p>
-          <p className="event-footer-copy">
-            &copy; {new Date().getFullYear()} · Todos os direitos reservados
-          </p>
-        </footer>
-      </div>
+          </div>
+        </div>
+      </main>
 
-      {/* ── CSS DO EVENTO ─────────────────────────────────────────────────── */}
-      {/*
-        Tokens de marca:
-        --cm-bordeaux:  #4B161B  (bordô institucional)
-        --cm-gold:      #C9A227  (dourado)
-        --cm-ivory:     #F3EEDD  (marfim/fundo)
-        --cm-dark:      #1A0507  (bordô escuro)
-        --cm-text:      #2C0D10  (texto sobre marfim)
-      */}
-      <style>{`
-        :root {
-          --cm-bordeaux: #4B161B;
-          --cm-gold:     #C9A227;
-          --cm-ivory:    #F3EEDD;
-          --cm-dark:     #1A0507;
-          --cm-text:     #2C0D10;
-          --cm-gold-light: #E8C96A;
-          --cm-bordeaux-soft: rgba(75, 22, 27, 0.08);
-          --font-inter:  'Inter', sans-serif;
-        }
-
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        .events-layout {
-          font-family: var(--font-inter);
-          background: var(--cm-ivory);
-          color: var(--cm-text);
-          min-height: 100dvh;
-        }
-
-        .event-page {
-          display: flex;
-          flex-direction: column;
-          min-height: 100dvh;
-        }
-
-        /* ── HERO ─────────────────────────────────────────────────────── */
-        .event-hero {
-          background: linear-gradient(160deg, var(--cm-dark) 0%, var(--cm-bordeaux) 50%, #6B1E25 100%);
-          padding: 2.5rem 1.25rem 3rem;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .event-hero::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(ellipse at 70% 0%, rgba(201, 162, 39, 0.12) 0%, transparent 60%);
-          pointer-events: none;
-        }
-
-        .event-hero-inner {
-          max-width: 640px;
-          margin: 0 auto;
-          text-align: center;
-          position: relative;
-          z-index: 1;
-        }
-
-        .event-hero-inner--large { max-width: 900px; }
-        .event-hero-inner--full { max-width: 1180px; }
-
-        .event-logo-wrap {
-          margin-bottom: 1.5rem;
-          display: flex;
-          justify-content: center;
-        }
-
-        .event-media-position--left { justify-content: flex-start; margin-left: 0; margin-right: auto; }
-        .event-media-position--center { justify-content: center; margin-left: auto; margin-right: auto; }
-        .event-media-position--right { justify-content: flex-end; margin-left: auto; margin-right: 0; }
-
-        .event-logo {
-          max-height: 72px;
-          width: auto;
-          object-fit: contain;
-          filter: brightness(1.1);
-        }
-
-        .event-logo-wrap.event-media--small .event-logo { width: 140px; max-height: 56px; max-width: 100%; }
-        .event-logo-wrap.event-media--medium .event-logo { width: 240px; max-height: 96px; max-width: 100%; }
-        .event-logo-wrap.event-media--large .event-logo { width: 380px; max-height: 150px; max-width: 100%; }
-        .event-logo-wrap.event-media--full .event-logo { width: 620px; max-height: 220px; max-width: 100%; }
-
-        .event-custom-banner {
-          width: min(100%, 1080px);
-          margin: 0 auto 2rem;
-          border-radius: 18px;
-          box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
-        }
-
-        .event-custom-banner-image {
-          display: block;
-          width: 100%;
-          height: auto;
-          max-height: 680px;
-          object-fit: contain;
-          border-radius: 18px;
-        }
-
-        .event-custom-banner.event-media--small { max-width: 480px; }
-        .event-custom-banner.event-media--medium { max-width: 640px; }
-        .event-custom-banner.event-media--large { max-width: 900px; }
-        .event-custom-banner.event-media--full { max-width: 1180px; }
-        .event-media-position--left .event-custom-banner-image { object-position: left center; }
-        .event-media-position--center .event-custom-banner-image { object-position: center; }
-        .event-media-position--right .event-custom-banner-image { object-position: right center; }
-
-        .event-logo-text {
-          color: var(--cm-gold);
-          font-size: 1.125rem;
-          font-weight: 700;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          margin-bottom: 1.5rem;
-        }
-
-        .event-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.5rem;
-          background: rgba(201, 162, 39, 0.15);
-          border: 1px solid rgba(201, 162, 39, 0.4);
-          color: var(--cm-gold-light);
-          font-size: 0.6875rem;
-          font-weight: 700;
-          letter-spacing: 0.2em;
-          text-transform: uppercase;
-          padding: 0.375rem 1rem;
-          border-radius: 100px;
-          margin-bottom: 1.25rem;
-        }
-
-        .event-badge-deco {
-          font-size: 0.5rem;
-          opacity: 0.7;
-        }
-
-        .event-title {
-          color: #FFFFFF;
-          font-size: clamp(1.5rem, 5vw, 2.125rem);
-          font-weight: 700;
-          line-height: 1.25;
-          letter-spacing: -0.01em;
-          margin-bottom: 0.75rem;
-        }
-
-        .event-subtitle {
-          color: var(--cm-gold-light);
-          font-size: clamp(0.9375rem, 3vw, 1.0625rem);
-          font-style: italic;
-          line-height: 1.5;
-          margin-bottom: 1.5rem;
-          opacity: 0.9;
-        }
-
-        .event-divider {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          margin: 1.25rem 0;
-        }
-
-        .event-divider-line {
-          flex: 1;
-          height: 1px;
-          background: linear-gradient(90deg, transparent, rgba(201, 162, 39, 0.4), transparent);
-        }
-
-        .event-divider-symbol {
-          color: var(--cm-gold);
-          font-size: 0.5rem;
-          opacity: 0.7;
-        }
-
-        .event-meta {
-          display: flex;
-          flex-direction: column;
-          gap: 0.625rem;
-          align-items: center;
-        }
-
-        .event-meta-item {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          color: rgba(243, 238, 221, 0.9);
-          font-size: 0.9375rem;
-          font-weight: 500;
-        }
-
-        .event-meta-icon {
-          width: 16px;
-          height: 16px;
-          color: var(--cm-gold);
-          flex-shrink: 0;
-        }
-
-        /* ── DESCRIÇÃO ────────────────────────────────────────────────── */
-        .event-description-section {
-          padding: 2rem 1.25rem;
-          background: #FFFFFF;
-          border-bottom: 1px solid rgba(75, 22, 27, 0.1);
-        }
-
-        .event-description-inner {
-          max-width: 640px;
-          margin: 0 auto;
-        }
-
-        .event-description {
-          font-size: 0.9375rem;
-          line-height: 1.7;
-          color: #444;
-          text-align: center;
-        }
-
-        /* ── FORMULÁRIO RSVP ──────────────────────────────────────────── */
-        .rsvp-form-section {
-          padding: 2rem 1.25rem;
-          background: var(--cm-ivory);
-          flex: 1;
-        }
-
-        .rsvp-form-container {
-          max-width: 560px;
-          margin: 0 auto;
-        }
-
-        .rsvp-form-header {
-          text-align: center;
-          margin-bottom: 1.75rem;
-        }
-
-        .rsvp-form-title {
-          font-size: 1.375rem;
-          font-weight: 700;
-          color: var(--cm-bordeaux);
-          margin-bottom: 0.375rem;
-        }
-
-        .rsvp-form-subtitle {
-          font-size: 0.875rem;
-          color: #666;
-        }
-
-        .rsvp-form {
-          display: flex;
-          flex-direction: column;
-          gap: 1.5rem;
-        }
-
-        .rsvp-fieldset {
-          border: none;
-          padding: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        .rsvp-legend {
-          font-size: 0.75rem;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.1em;
-          color: var(--cm-bordeaux);
-          opacity: 0.7;
-          margin-bottom: 0.5rem;
-          display: block;
-        }
-
-        .rsvp-optional {
-          font-weight: 400;
-          font-style: italic;
-          text-transform: none;
-          letter-spacing: 0;
-          opacity: 0.7;
-        }
-
-        .rsvp-field {
-          display: flex;
-          flex-direction: column;
-          gap: 0.375rem;
-        }
-
-        .rsvp-label {
-          font-size: 0.875rem;
-          font-weight: 600;
-          color: var(--cm-text);
-        }
-
-        .rsvp-required {
-          color: var(--cm-bordeaux);
-          margin-left: 2px;
-        }
-
-        .rsvp-input,
-        .rsvp-select {
-          width: 100%;
-          padding: 0.75rem 1rem;
-          border: 1.5px solid #D5C9A6;
-          border-radius: 10px;
-          font-size: 1rem;
-          font-family: var(--font-inter);
-          background-color: #FFFFFF;
-          color: var(--cm-text);
-          transition: border-color 0.15s, box-shadow 0.15s;
-          -webkit-appearance: none;
-          appearance: none;
-        }
-
-        .rsvp-select {
-          cursor: pointer;
-          padding-right: 2.75rem;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%234B161B' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-          background-repeat: no-repeat;
-          background-position: right 1rem center;
-          background-size: 18px 18px;
-        }
-
-        .rsvp-select-wrap {
-          position: relative;
-          width: 100%;
-        }
-
-        .rsvp-select-wrap .rsvp-select-icon {
-          position: absolute;
-          right: 1rem;
-          top: 50%;
-          transform: translateY(-50%);
-          pointer-events: none;
-          color: var(--cm-bordeaux);
-        }
-
-        .rsvp-input::placeholder {
-          color: #AAA;
-        }
-
-        .rsvp-input:focus,
-        .rsvp-select:focus {
-          outline: none;
-          border-color: var(--cm-bordeaux);
-          box-shadow: 0 0 0 3px rgba(75, 22, 27, 0.12);
-        }
-
-        .rsvp-input--error {
-          border-color: #C0392B;
-        }
-
-        .rsvp-input--error:focus {
-          box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.15);
-        }
-
-        .rsvp-field-error {
-          font-size: 0.8125rem;
-          color: #C0392B;
-          font-weight: 500;
-        }
-
-        .rsvp-radio-group {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 0.5rem;
-        }
-
-        .rsvp-radio-label {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.625rem 0.875rem;
-          border: 1.5px solid #D5C9A6;
-          border-radius: 8px;
-          cursor: pointer;
-          transition: border-color 0.15s, background 0.15s;
-          background: #FFFFFF;
-        }
-
-        .rsvp-radio-label:has(.rsvp-radio:checked) {
-          border-color: var(--cm-bordeaux);
-          background: var(--cm-bordeaux-soft);
-        }
-
-        .rsvp-radio {
-          accent-color: var(--cm-bordeaux);
-          width: 16px;
-          height: 16px;
-          flex-shrink: 0;
-        }
-
-        .rsvp-radio-text {
-          font-size: 0.9375rem;
-          font-weight: 500;
-          color: var(--cm-text);
-        }
-
-        .rsvp-global-error {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.875rem 1rem;
-          background: #FDF2F2;
-          border: 1px solid #F5C6CB;
-          border-radius: 10px;
-          font-size: 0.9rem;
-          color: #7B1E1E;
-          font-weight: 500;
-        }
-
-        .rsvp-global-error-icon {
-          font-size: 1rem;
-        }
-
-        .rsvp-submit-btn {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.625rem;
-          width: 100%;
-          padding: 1rem;
-          background: linear-gradient(135deg, var(--cm-bordeaux) 0%, #6B1E25 100%);
-          color: var(--cm-gold-light);
-          border: none;
-          border-radius: 12px;
-          font-size: 1rem;
-          font-weight: 800;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          cursor: pointer;
-          transition: opacity 0.15s, transform 0.1s;
-          box-shadow: 0 4px 16px rgba(75, 22, 27, 0.35);
-          font-family: var(--font-inter);
-          min-height: 54px;
-        }
-
-        .rsvp-submit-btn:hover:not(:disabled) {
-          opacity: 0.9;
-          transform: translateY(-1px);
-        }
-
-        .rsvp-submit-btn:active:not(:disabled) {
-          transform: translateY(0);
-        }
-
-        .rsvp-submit-btn:disabled {
-          opacity: 0.7;
-          cursor: not-allowed;
-        }
-
-        .rsvp-spinner {
-          width: 18px;
-          height: 18px;
-          border: 2.5px solid rgba(201, 162, 39, 0.3);
-          border-top-color: var(--cm-gold);
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-          flex-shrink: 0;
-        }
-
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-
-        .rsvp-lgpd-notice {
-          font-size: 0.75rem;
-          color: #888;
-          text-align: center;
-          line-height: 1.5;
-          padding: 0 0.5rem;
-        }
-
-        /* ── ENCERRADO ────────────────────────────────────────────────── */
-        .event-closed-section {
-          padding: 3rem 1.25rem;
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .event-closed-card {
-          text-align: center;
-          max-width: 380px;
-        }
-
-        .event-closed-title {
-          font-size: 1.25rem;
-          font-weight: 700;
-          color: var(--cm-bordeaux);
-          margin-bottom: 0.5rem;
-        }
-
-        .event-closed-sub {
-          font-size: 0.9375rem;
-          color: #666;
-        }
-
-        /* ── TELA DE SUCESSO ─────────────────────────────────────────── */
-        .success-screen {
-          max-width: 560px;
-          margin: 0 auto;
-          padding: 2.5rem 1.25rem;
-          text-align: center;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 1.25rem;
-        }
-
-        .success-icon-wrap {
-          width: 72px;
-          height: 72px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-
-        .success-icon-wrap--confirmed {
-          background: linear-gradient(135deg, #1A6B3C, #27AE60);
-          box-shadow: 0 8px 24px rgba(39, 174, 96, 0.3);
-        }
-
-        .success-icon-wrap--declined {
-          background: linear-gradient(135deg, #6B3A1A, #C0713A);
-          box-shadow: 0 8px 24px rgba(192, 113, 58, 0.3);
-        }
-
-        .success-icon {
-          width: 36px;
-          height: 36px;
-          color: white;
-        }
-
-        @keyframes pop-in {
-          from { transform: scale(0.5); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-
-        .success-title {
-          font-size: 1.5rem;
-          font-weight: 800;
-          color: var(--cm-bordeaux);
-        }
-
-        .success-personal-message {
-          font-size: 1.0625rem;
-          color: #444;
-          line-height: 1.5;
-        }
-
-        .success-event-card {
-          background: var(--cm-bordeaux);
-          border-radius: 12px;
-          padding: 1.25rem 1.5rem;
-          width: 100%;
-        }
-
-        .success-event-title {
-          color: var(--cm-gold-light);
-          font-size: 1rem;
-          font-weight: 700;
-          margin-bottom: 0.375rem;
-        }
-
-        .success-event-datetime {
-          color: rgba(243, 238, 221, 0.85);
-          font-size: 0.9375rem;
-          font-weight: 500;
-          margin-bottom: 0.25rem;
-        }
-
-        .success-event-venue {
-          color: rgba(243, 238, 221, 0.7);
-          font-size: 0.875rem;
-        }
-
-        .success-code-card {
-          background: rgba(201, 162, 39, 0.08);
-          border: 1.5px solid rgba(201, 162, 39, 0.35);
-          border-radius: 12px;
-          padding: 1.25rem 1.5rem;
-          width: 100%;
-        }
-
-        .success-code-label {
-          font-size: 0.75rem;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.1em;
-          color: #888;
-          margin-bottom: 0.375rem;
-        }
-
-        .success-code {
-          font-size: 1.625rem;
-          font-weight: 800;
-          color: var(--cm-bordeaux);
-          letter-spacing: 0.08em;
-          font-variant-numeric: tabular-nums;
-          margin-bottom: 0.375rem;
-        }
-
-        .success-code-hint {
-          font-size: 0.8125rem;
-          color: #888;
-        }
-
-        .success-actions {
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-          width: 100%;
-        }
-
-        .success-btn {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.5rem;
-          width: 100%;
-          padding: 0.875rem 1rem;
-          border-radius: 10px;
-          font-size: 0.9rem;
-          font-weight: 700;
-          letter-spacing: 0.05em;
-          text-transform: uppercase;
-          cursor: pointer;
-          transition: opacity 0.15s, transform 0.1s;
-          font-family: var(--font-inter);
-          border: none;
-        }
-
-        .success-btn:hover {
-          opacity: 0.9;
-          transform: translateY(-1px);
-        }
-
-        .success-btn--secondary {
-          background: linear-gradient(135deg, var(--cm-bordeaux), #6B1E25);
-          color: var(--cm-gold-light);
-          box-shadow: 0 4px 12px rgba(75, 22, 27, 0.3);
-        }
-
-        .success-btn--outline {
-          background: transparent;
-          color: var(--cm-bordeaux);
-          border: 2px solid var(--cm-bordeaux);
-        }
-
-        .success-btn-icon {
-          width: 18px;
-          height: 18px;
-          flex-shrink: 0;
-        }
-
-        /* ── FORM LOADING ─────────────────────────────────────────────── */
-        .event-form-loading {
-          text-align: center;
-          padding: 3rem;
-          color: #888;
-          font-size: 0.9375rem;
-        }
-
-        /* ── SEÇÃO DE DIVULGAÇÃO (SEM RSVP) ─────────────────────────── */
-        .event-disclosure-section {
-          padding: 2.5rem 1.25rem;
-          background: var(--cm-ivory);
-          flex: 1;
-        }
-
-        .event-disclosure-card {
-          max-width: 600px;
-          margin: 0 auto;
-          background: #FFFFFF;
-          border: 1px solid rgba(201, 162, 39, 0.4);
-          border-radius: 16px;
-          padding: 2rem 1.5rem;
-          box-shadow: 0 10px 25px -5px rgba(59, 11, 20, 0.08);
-          text-align: center;
-        }
-
-        .event-disclosure-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.5rem;
-          background: #FAF7F2;
-          color: var(--cm-bordeaux);
-          border: 1px solid rgba(201, 162, 39, 0.5);
-          border-radius: 9999px;
-          padding: 0.35rem 1rem;
-          font-size: 0.75rem;
-          font-weight: 700;
-          letter-spacing: 0.05em;
-          text-transform: uppercase;
-          margin-bottom: 1rem;
-        }
-
-        .event-disclosure-deco {
-          color: var(--cm-gold);
-        }
-
-        .event-disclosure-title {
-          font-size: 1.5rem;
-          font-weight: 800;
-          color: var(--cm-bordeaux);
-          margin-bottom: 0.5rem;
-        }
-
-        .event-disclosure-sub {
-          font-size: 0.875rem;
-          color: #64748B;
-          line-height: 1.6;
-          max-width: 460px;
-          margin: 0 auto 1.5rem;
-        }
-
-        .event-disclosure-details {
-          background: #FAF7F2;
-          border: 1px solid #E2E8F0;
-          border-radius: 12px;
-          padding: 1.25rem;
-          text-align: left;
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-          margin-bottom: 1.5rem;
-        }
-
-        .event-disc-row {
-          display: flex;
-          flex-direction: column;
-          gap: 0.2rem;
-          font-size: 0.875rem;
-        }
-
-        .event-disc-row strong {
-          color: var(--cm-bordeaux);
-          font-size: 0.75rem;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-
-        .event-disc-row span {
-          color: #1E293B;
-          font-weight: 500;
-        }
-
-        .event-disclosure-btn-wrap {
-          margin-top: 1rem;
-        }
-
-        .event-disclosure-maps-btn {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.5rem;
-          padding: 0.75rem 1.5rem;
-          background: var(--cm-bordeaux);
-          color: var(--cm-gold-light);
-          border-radius: 10px;
-          font-size: 0.875rem;
-          font-weight: 700;
-          text-decoration: none;
-          transition: background 0.15s;
-        }
-
-        .event-disclosure-maps-btn:hover {
-          background: #2A080E;
-        }
-
-        /* ── FOOTER ───────────────────────────────────────────────────── */
-        .event-information-section {
-          background: var(--cm-ivory);
-          padding: 0 1.25rem 2rem;
-        }
-
-        .event-information-card {
-          max-width: 640px;
-          margin: 0 auto;
-          padding: 1.25rem 1.5rem;
-          border: 1px solid rgba(201, 162, 39, 0.45);
-          border-radius: 14px;
-          background: #fffdf7;
-          color: var(--cm-text);
-          box-shadow: 0 8px 24px rgba(44, 13, 16, 0.06);
-        }
-
-        .event-information-card h2 {
-          margin-bottom: 0.5rem;
-          color: var(--cm-bordeaux);
-          font-size: 1rem;
-          font-weight: 800;
-        }
-
-        .event-information-card p {
-          white-space: pre-line;
-          font-size: 0.875rem;
-          line-height: 1.7;
-        }
-
-        .event-footer {
-          background: var(--cm-dark);
-          padding: 1.5rem 1.25rem;
-          text-align: center;
-          margin-top: auto;
-        }
-
-        .event-footer-brand {
-          color: var(--cm-gold);
-          font-size: 0.875rem;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          margin-bottom: 0.25rem;
-        }
-
-        .event-footer-copy {
-          color: rgba(243, 238, 221, 0.4);
-          font-size: 0.75rem;
-        }
-
-        /* ── RESPONSIVO ───────────────────────────────────────────────── */
-        @media (min-width: 480px) {
-          .event-hero {
-            padding: 3rem 2rem 3.5rem;
-          }
-
-          .rsvp-form-section {
-            padding: 2.5rem 2rem;
-          }
-
-          .rsvp-radio-group {
-            grid-template-columns: repeat(4, 1fr);
-          }
-
-          .success-actions {
-            flex-direction: row;
-          }
-        }
-
-        @media (min-width: 768px) {
-          .event-hero {
-            padding: 4rem 2rem 4.5rem;
-          }
-        }
-      `}</style>
-    </>
+      <DirectoryFooter />
+    </div>
   );
 }

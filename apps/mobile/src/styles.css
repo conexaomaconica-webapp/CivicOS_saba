@@ -5210,6 +5210,296 @@ button, input { font: inherit; }
 }
 
 /* ==========================================================================
+   CARROSSEL E CARDS DE EVENTOS ESTILO FLYER (MOBILE - MODELO DE REFERÊNCIA)
+   ========================================================================== */
+
+.events-category-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.events-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 4px;
+}
+
+.events-category-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.events-category-title {
+  margin: 0;
+  font: 750 1rem/1.25 Georgia, serif;
+  color: #1f1914;
+}
+
+.events-category-count {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  background: #f5ebe6;
+  border: 1px solid #d6b8ac;
+  border-radius: 999px;
+  color: #4b161b;
+}
+
+.events-see-all-link {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0284c7;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.events-horizontal-carousel {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  padding-top: 2px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.events-horizontal-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.event-flyer-card {
+  flex-shrink: 0;
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  scroll-snap-align: start;
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.event-flyer-media-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #3b0b14, #1f0507);
+  box-shadow: 0 3px 10px rgba(75, 22, 27, 0.1);
+  border: 1px solid #ebd9c8;
+}
+
+.event-flyer-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.event-flyer-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  text-align: center;
+  background: linear-gradient(135deg, #4b161b, #220609);
+  color: #f3eedd;
+}
+
+.event-flyer-badge-top {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.92);
+  color: #4b161b;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.event-flyer-price-tag {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 2;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  background: rgba(31, 25, 20, 0.88);
+  color: #fef3c7;
+  border: 1px solid rgba(245, 215, 110, 0.3);
+  backdrop-filter: blur(4px);
+}
+
+.event-flyer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 2px 2px 0;
+}
+
+.event-flyer-title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #1f1914;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.event-flyer-location {
+  margin: 0;
+  font-size: 0.73rem;
+  color: #78716c;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.event-flyer-date {
+  margin: 0;
+  font-size: 0.74rem;
+  color: #4b161b;
+  font-weight: 750;
+}
+
+/* ==========================================================================
+   TELA DEDICADA DE DETALHES DO EVENTO (MOBILE - ESTILO PLANO ESQUADRO)
+   ========================================================================== */
+
+.mobile-event-detail-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #f8f7f5;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-event-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #e8e5df;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mobile-event-back-btn {
+  background: transparent;
+  border: 0;
+  color: #4b161b;
+  font-size: 0.84rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.mobile-event-share-btn {
+  background: #ffffff;
+  border: 1px solid #d6b8ac;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.74rem;
+  font-weight: 750;
+  color: #4b161b;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.mobile-event-hero-card {
+  background: #ffffff;
+  border-bottom: 1px solid #e8e5df;
+  padding: 16px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mobile-event-cover-wrap {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #2a080d;
+  box-shadow: 0 4px 14px rgba(75, 22, 27, 0.12);
+  border: 1px solid #e8e5df;
+}
+
+.mobile-event-cover-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mobile-event-price-highlight {
+  background: linear-gradient(135deg, #fffcf5, #fef7e6);
+  border: 1.5px solid #c9a227;
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobile-event-content-section {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e8e5df;
+  padding: 16px;
+  margin: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobile-event-bottom-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid #e8e5df;
+  padding: 12px 16px;
+  display: flex;
+  gap: 10px;
+}
+
+/* ==========================================================================
    SISTEMA DE BENEFÍCIOS E RESGATE DE VOUCHERS (MOBILE)
    ========================================================================== */
 

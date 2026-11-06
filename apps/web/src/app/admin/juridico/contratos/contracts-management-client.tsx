@@ -289,6 +289,10 @@ E, por manifestação eletrônica de vontade, o ANUNCIANTE declara que teve aces
       .replace(/{{plano_nome}}/g, 'Plano Acácia Anual')
       .replace(/{{plano_valor}}/g, 'R$ 2.388,00/ano')
       .replace(/{{vigencia}}/g, '12 (doze) meses')
+      .replace(/{{prazo_vigencia}}/g, 'um ano corrente')
+      .replace(/{{prazo_vigencia_extenso}}/g, 'um ano corrente')
+      .replace(/{{vigencia_extenso}}/g, 'um ano corrente')
+      .replace(/{{data_inicio_vigencia}}/g, 'a contar da data de assinatura')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');

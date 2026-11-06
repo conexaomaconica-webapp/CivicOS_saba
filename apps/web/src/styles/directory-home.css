@@ -540,6 +540,21 @@
     min-height: 0;
     margin-block: 16px;
   }
+  .dh-carousel-card.is-image-only {
+    display: block !important;
+    position: relative !important;
+    width: 100% !important;
+    min-height: 190px !important;
+    aspect-ratio: 16 / 9;
+    max-height: 380px;
+    overflow: hidden !important;
+    border-radius: 16px;
+  }
+  .dh-carousel-card.is-image-only img {
+    object-fit: cover !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
   .dh-mobile-visible-section {
     display: block !important;
     visibility: visible !important;
@@ -558,8 +573,10 @@
     min-height: 210px;
   }
   .dh-carousel-card > picture,
-  .dh-carousel-card > a > picture {
-    min-height: 210px;
+  .dh-carousel-card > a > picture,
+  .dh-carousel-card > div,
+  .dh-carousel-card > a > div {
+    min-height: 190px;
   }
   .dh-categories-grid {
     display: grid;

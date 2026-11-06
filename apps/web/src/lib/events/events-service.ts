@@ -304,3 +304,227 @@ export function buildCSVContent(
   // BOM UTF-8 para compatibilidade com Excel
   return '\uFEFF' + rows.join('\r\n');
 }
+
+// ---------------------------------------------------------------------------
+// Helpers para Vitrine de Eventos Agrupados por Categoria & Cards Estilo Flyer
+// ---------------------------------------------------------------------------
+
+export interface EventCategoryInfo {
+  id: string;
+  label: string;
+  shortLabel: string;
+  icon: string;
+  order: number;
+}
+
+export type EventCategoryKey = 'lojas' | 'sociais' | 'palestras' | 'empresas' | 'festividades' | 'geral';
+
+export const EVENT_CATEGORIES: Record<EventCategoryKey, EventCategoryInfo> = {
+  lojas: {
+    id: 'lojas',
+    label: 'Sessões & Encontros de Lojas Maçônicas',
+    shortLabel: 'Lojas Maçônicas',
+    icon: '🏛️',
+    order: 1,
+  },
+  sociais: {
+    id: 'sociais',
+    label: 'Campanhas & Ações Sociais Fraternas',
+    shortLabel: 'Ações Sociais',
+    icon: '🤝',
+    order: 2,
+  },
+  palestras: {
+    id: 'palestras',
+    label: 'Palestras, Cursos & Workshops',
+    shortLabel: 'Palestras & Cursos',
+    icon: '🎓',
+    order: 3,
+  },
+  empresas: {
+    id: 'empresas',
+    label: 'Eventos Corporativos & Networking Empresarial',
+    shortLabel: 'Empresas & Negócios',
+    icon: '🏢',
+    order: 4,
+  },
+  festividades: {
+    id: 'festividades',
+    label: 'Shows, Festividades & Confraternizações',
+    shortLabel: 'Festividades & Confraternização',
+    icon: '🎉',
+    order: 5,
+  },
+  geral: {
+    id: 'geral',
+    label: 'Outros Encontros & Comunicados Fraternos',
+    shortLabel: 'Outros Eventos',
+    icon: '📅',
+    order: 6,
+  },
+};
+
+/**
+ * Classifica a categoria do evento a partir do título, badge, descrição e organizador.
+ */
+export function classifyEventCategory(
+  title?: string | null,
+  badgeText?: string | null,
+  venueName?: string | null,
+  organizerType?: string | null
+): EventCategoryInfo {
+  const combined = `${badgeText || ''} ${title || ''} ${venueName || ''}`.toLowerCase();
+
+  if (
+    combined.includes('social') ||
+    combined.includes('filantrop') ||
+    combined.includes('fraternidade feminina') ||
+    combined.includes('demolay') ||
+    combined.includes('filhas de jo') ||
+    combined.includes('filhas de jó') ||
+    combined.includes('agasalho') ||
+    combined.includes('beneficente') ||
+    combined.includes('doação') ||
+    combined.includes('doacao') ||
+    combined.includes('bazar')
+  ) {
+    return EVENT_CATEGORIES.sociais;
+  }
+
+  if (
+    combined.includes('palestra') ||
+    combined.includes('workshop') ||
+    combined.includes('curso') ||
+    combined.includes('seminario') ||
+    combined.includes('seminário') ||
+    combined.includes('treinamento') ||
+    combined.includes('simposio') ||
+    combined.includes('simpósio') ||
+    combined.includes('conferência') ||
+    combined.includes('conferencia')
+  ) {
+    return EVENT_CATEGORIES.palestras;
+  }
+
+  if (
+    combined.includes('show') ||
+    combined.includes('teatro') ||
+    combined.includes('festa') ||
+    combined.includes('confraterniz') ||
+    combined.includes('almoço') ||
+    combined.includes('almoco') ||
+    combined.includes('churrasco') ||
+    combined.includes('jantar') ||
+    combined.includes('banquete') ||
+    combined.includes('festival') ||
+    combined.includes('música') ||
+    combined.includes('musica')
+  ) {
+    return EVENT_CATEGORIES.festividades;
+  }
+
+  if (
+    organizerType === 'business' ||
+    combined.includes('empresa') ||
+    combined.includes('parceir') ||
+    combined.includes('b2b') ||
+    combined.includes('negócio') ||
+    combined.includes('negocio') ||
+    combined.includes('networking') ||
+    combined.includes('inaugura')
+  ) {
+    return EVENT_CATEGORIES.empresas;
+  }
+
+  if (
+    organizerType === 'lodge' ||
+    combined.includes('loja') ||
+    combined.includes('sessão') ||
+    combined.includes('sessao') ||
+    combined.includes('magna') ||
+    combined.includes('iniciação') ||
+    combined.includes('iniciacao') ||
+    combined.includes('elevação') ||
+    combined.includes('elevacao') ||
+    combined.includes('exaltação') ||
+    combined.includes('exaltacao') ||
+    combined.includes('templo') ||
+    combined.includes('maçôn') ||
+    combined.includes('macon')
+  ) {
+    return EVENT_CATEGORIES.lojas;
+  }
+
+  return EVENT_CATEGORIES.geral;
+}
+
+/**
+ * Formata a data no formato conciso de card de evento da imagem:
+ * Ex.: "Sexta, 06 de Nov às 21:00" ou "Sábado, 07 de Nov às 14:00"
+ */
+export function formatEventCardDate(dateStr?: string | null, timeStr?: string | null): string {
+  if (!dateStr) return 'Data a confirmar';
+  try {
+    const raw = dateStr.split('T')[0];
+    const [yearStr, monthStr, dayStr] = (raw || '').split('-');
+    const year = parseInt(yearStr || '0', 10);
+    const month = parseInt(monthStr || '1', 10) - 1;
+    const day = parseInt(dayStr || '1', 10);
+    const d = new Date(year, month, day, 12, 0, 0);
+
+    const weekDays = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+    const weekDay = weekDays[d.getDay()] || 'Data';
+    const monthName = months[month] || '';
+    const dayFormatted = String(day).padStart(2, '0');
+
+    let timeFormatted = '';
+    if (timeStr) {
+      const cleanTime = timeStr.slice(0, 5);
+      timeFormatted = ` às ${cleanTime}`;
+    }
+    return `${weekDay}, ${dayFormatted} de ${monthName}${timeFormatted}`;
+  } catch {
+    return dateStr || 'Data a confirmar';
+  }
+}
+
+/**
+ * Extrai ou resolve o rótulo de preço / valores do evento.
+ */
+export function extractPriceInfo(
+  textOrBadge?: string | null,
+  subtitle?: string | null,
+  description?: string | null,
+  organizerType?: string | null
+): string {
+  const combined = `${textOrBadge || ''} ${subtitle || ''} ${description || ''}`;
+
+  const matchBRL = combined.match(/R\$\s*[\d.,]+/i);
+  if (matchBRL) {
+    return matchBRL[0].replace(/\s+/g, ' ').trim();
+  }
+
+  const lower = combined.toLowerCase();
+  if (
+    lower.includes('gratuito') ||
+    lower.includes('gratis') ||
+    lower.includes('grátis') ||
+    lower.includes('livre participação') ||
+    lower.includes('entrada franca')
+  ) {
+    return 'Entrada Franca';
+  }
+
+  if (organizerType === 'lodge') {
+    return 'Livre Participação Fraterna';
+  }
+
+  if (organizerType === 'social_action') {
+    return 'Ação Beneficente';
+  }
+
+  return 'Entrada Livre';
+}
+

@@ -252,7 +252,15 @@ export async function getAdminContractDraftPreviewAction(
       vigencia: formatVigencia(ctRow.billing_cycle),
       prazo_vigencia: formatPrazoVigenciaExtenso(
         ctRow.billing_cycle,
-        Boolean(pedraFundamentalRecognition || ctRow.is_pedra_fundamental)
+        Boolean(
+          pedraFundamentalRecognition ||
+          ctRow.is_pedra_fundamental ||
+          ctRow.plan_code === 'acacia_pedra_fundamental' ||
+          ctRow.plan_name?.toLowerCase().includes('pedra fundamental') ||
+          (ctRow.plan_name?.toLowerCase().includes('acácia') && ctRow.is_pedra_fundamental) ||
+          (ctRow.plan_name?.toLowerCase().includes('acacia') && ctRow.is_pedra_fundamental)
+        ),
+        ctRow.plan_name
       ),
       data_inicio_vigencia: formatDataInicioVigencia(ctRow.contract_start_date ?? null),
       valor_total: formatCurrencyBRL(ctRow.amount_cents),
@@ -568,7 +576,15 @@ export async function generateAdminContractSnapshotAction(
       vigencia: formatVigencia(ctRow.billing_cycle),
       prazo_vigencia: formatPrazoVigenciaExtenso(
         ctRow.billing_cycle,
-        Boolean(pedraFundamentalRecognition || ctRow.is_pedra_fundamental)
+        Boolean(
+          pedraFundamentalRecognition ||
+          ctRow.is_pedra_fundamental ||
+          ctRow.plan_code === 'acacia_pedra_fundamental' ||
+          ctRow.plan_name?.toLowerCase().includes('pedra fundamental') ||
+          (ctRow.plan_name?.toLowerCase().includes('acácia') && ctRow.is_pedra_fundamental) ||
+          (ctRow.plan_name?.toLowerCase().includes('acacia') && ctRow.is_pedra_fundamental)
+        ),
+        ctRow.plan_name
       ),
       data_inicio_vigencia: formatDataInicioVigencia(ctRow.contract_start_date ?? null),
       valor_total: formatCurrencyBRL(ctRow.amount_cents),

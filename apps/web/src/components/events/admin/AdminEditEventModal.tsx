@@ -7,8 +7,9 @@ import {
   getPlatformEventByIdAction,
   type PlatformEvent,
 } from '@/app/actions/platform-events';
-import { X, Edit3, Save, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { X, Edit3, Save, CheckCircle2, AlertCircle, Loader2, Tag } from 'lucide-react';
 import { EventHeaderMediaField } from './EventHeaderMediaField';
+import { extractPriceInfo } from '@/lib/events/events-service';
 
 interface Props {
   event: PlatformEvent;
@@ -21,6 +22,7 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
   const [formData, setFormData] = useState({
     title: event.title || '',
     subtitle: event.subtitle || '',
+    priceInfo: extractPriceInfo(event.badge_text, event.subtitle, event.description, null),
     description: event.description || '',
     eventDate: event.event_date || '',
     startTime: event.start_time?.slice(0, 5) || '',
@@ -56,6 +58,7 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
         setFormData({
           title: full.title || '',
           subtitle: full.subtitle || '',
+          priceInfo: extractPriceInfo(full.badge_text, full.subtitle, full.description, null),
           description: full.description || '',
           eventDate: full.event_date || '',
           startTime: full.start_time?.slice(0, 5) || '',
@@ -111,10 +114,24 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
       return;
     }
 
+    let finalSubtitle = formData.subtitle.trim();
+    if (formData.priceInfo.trim() && !finalSubtitle.includes(formData.priceInfo.trim())) {
+      finalSubtitle = finalSubtitle
+        ? `${finalSubtitle} • Ingressos: ${formData.priceInfo.trim()}`
+        : `Ingressos: ${formData.priceInfo.trim()}`;
+    }
+
+    let finalFooter = formData.footerInformation.trim();
+    if (formData.priceInfo.trim() && !finalFooter.includes('Valor')) {
+      finalFooter = finalFooter
+        ? `${finalFooter}\nValor / Ingressos: ${formData.priceInfo.trim()}`
+        : `Valor / Ingressos: ${formData.priceInfo.trim()}`;
+    }
+
     const res = await updatePlatformEventAction({
       eventId: event.id,
       title: formData.title.trim(),
-      subtitle: formData.subtitle.trim() || null as any,
+      subtitle: finalSubtitle || null as any,
       description: formData.description.trim() || null as any,
       eventDate: formData.eventDate,
       startTime: formData.startTime,
@@ -127,7 +144,7 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
       headerMediaSize: formData.headerMediaSize,
       headerMediaPosition: formData.headerMediaPosition,
       badgeText: formData.badgeText,
-      footerInformation: formData.footerInformation.trim() || null,
+      footerInformation: finalFooter || null,
       registrationEnabled: formData.registrationEnabled,
       capacity: formData.capacity.trim() ? parseInt(formData.capacity, 10) : null,
       status: formData.status,
@@ -209,6 +226,24 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
                 onChange={(e) => handleChange('subtitle', e.target.value)}
                 placeholder="Ex.: Uma celebração de sabedoria, união e celebração fraterna"
               />
+            </div>
+
+            {/* Valores / Ingressos */}
+            <div className="aem-field aem-field--full">
+              <label htmlFor="aem-priceInfo" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Tag size={14} color="#C9A227" />
+                <span>Valores &amp; Ingressos (Exibição em Destaque nos Cards e na Página)</span>
+              </label>
+              <input
+                id="aem-priceInfo"
+                type="text"
+                value={formData.priceInfo}
+                onChange={(e) => handleChange('priceInfo', e.target.value)}
+                placeholder="Ex.: Entrada Franca / R$ 50,00 por pessoa / A partir de R$ 35,00"
+              />
+              <span className="aem-helper-text" style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', display: 'block' }}>
+                Exibido com destaque nos carrosséis da vitrine e no cabeçalho estilo Plano Esquadro.
+              </span>
             </div>
 
             {/* Data e Horários */}

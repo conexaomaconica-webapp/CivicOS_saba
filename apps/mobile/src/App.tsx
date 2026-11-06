@@ -583,6 +583,11 @@ function HomeBannerCarousel({
     }
   };
 
+  const isImageOnly =
+    !currentBanner.title?.trim() &&
+    !currentBanner.subtitle?.trim() &&
+    !currentBanner.cta_text?.trim();
+
   return (
     <div
       className="home-banner-carousel"
@@ -606,14 +611,18 @@ function HomeBannerCarousel({
             }}
           />
         )}
-        <div className="home-banner-overlay" />
-        <div className="home-banner-text-box">
-          <span className="home-banner-tag">{currentBanner.subtitle || 'Destaque'}</span>
-          <h2 className="home-banner-heading">{currentBanner.title || 'Conexões que geram oportunidades'}</h2>
-          <span className="home-banner-cta-btn">
-            {currentBanner.cta_text || 'Conhecer empresas →'}
-          </span>
-        </div>
+        {!isImageOnly && (
+          <>
+            <div className="home-banner-overlay" />
+            <div className="home-banner-text-box">
+              <span className="home-banner-tag">{currentBanner.subtitle || 'Destaque'}</span>
+              <h2 className="home-banner-heading">{currentBanner.title || 'Conexões que geram oportunidades'}</h2>
+              <span className="home-banner-cta-btn">
+                {currentBanner.cta_text || 'Conhecer empresas →'}
+              </span>
+            </div>
+          </>
+        )}
       </article>
 
       {banners.length > 1 && (
@@ -653,7 +662,7 @@ function useMobileFavorites() {
       const next = prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug];
       try {
         localStorage.setItem('cm_mobile_favorites', JSON.stringify(next));
-      } catch {}
+      } catch { }
       return next;
     });
   };
@@ -690,7 +699,7 @@ function ReferBusinessModal({
     setReferrerName(newName);
     try {
       localStorage.setItem('cm_mobile_referrer_name', newName);
-    } catch {}
+    } catch { }
   };
 
   const cleanName = referrerName.trim() || 'Membro Conexão Maçônica';
@@ -721,7 +730,7 @@ function ReferBusinessModal({
           text: `Recomendo a empresa ${businessName} na Conexão Maçônica. Indicado por ${cleanName}.`,
           url: referralUrl,
         });
-      } catch {}
+      } catch { }
     } else {
       await handleCopy();
     }
@@ -1012,7 +1021,7 @@ function MuralDeConexoesSection({
         }
         setLikes(initialLikes);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const toggleLike = (id: string) => {
@@ -1233,7 +1242,7 @@ function MemberLoginModal({
         const filtered = list.filter((u) => u.email !== cleanEmail);
         filtered.push(user);
         localStorage.setItem('cm_mobile_registered_members', JSON.stringify(filtered));
-      } catch {}
+      } catch { }
       onLoginSuccess(user);
     }, 350);
   };
@@ -1696,10 +1705,10 @@ function ShareExperienceModal({
                     experienceType === 'visita'
                       ? 'Ex.: Conheci a loja física, participei de reunião'
                       : experienceType === 'servico'
-                      ? 'Ex.: Manutenção veicular, assessoria contábil'
-                      : experienceType === 'parceria'
-                      ? 'Ex.: Fornecimento mútuo, apoio a evento'
-                      : 'Ex.: Óculos de grau, almoço em família'
+                        ? 'Ex.: Manutenção veicular, assessoria contábil'
+                        : experienceType === 'parceria'
+                          ? 'Ex.: Fornecimento mútuo, apoio a evento'
+                          : 'Ex.: Óculos de grau, almoço em família'
                   }
                 />
 
@@ -2081,8 +2090,8 @@ function AnuncioModal({
   const cleanWaNumber = whatsappContact?.value ? whatsappContact.value.replace(/\D/g, '') : '';
   const waUrl = cleanWaNumber
     ? `https://wa.me/${cleanWaNumber.length <= 11 ? '55' + cleanWaNumber : cleanWaNumber}?text=${encodeURIComponent(
-        `Olá! Vi seu anúncio no app da Conexão Maçônica e gostaria de mais informações.`
-      )}`
+      `Olá! Vi seu anúncio no app da Conexão Maçônica e gostaria de mais informações.`
+    )}`
     : null;
 
   const locationQuery = [detail.business_name, detail.address, detail.city, detail.state]
@@ -2467,7 +2476,7 @@ function BenefitVoucherModal({
           title: `Benefício - ${voucher.businessName}`,
           text: textToShare,
         });
-      } catch {}
+      } catch { }
     } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
       try {
         await navigator.clipboard.writeText(voucher.code);
@@ -2483,8 +2492,8 @@ function BenefitVoucherModal({
   const cleanWaNumber = voucher.businessWhatsapp ? voucher.businessWhatsapp.replace(/\D/g, '') : '';
   const waUrl = cleanWaNumber
     ? `https://wa.me/${cleanWaNumber.length <= 11 ? '55' + cleanWaNumber : cleanWaNumber}?text=${encodeURIComponent(
-        `Olá! Resgatei o benefício "${voucher.title}" com o código ${voucher.code} pelo aplicativo da Conexão Maçônica e gostaria de utilizá-lo.`
-      )}`
+      `Olá! Resgatei o benefício "${voucher.title}" com o código ${voucher.code} pelo aplicativo da Conexão Maçônica e gostaria de utilizá-lo.`
+    )}`
     : null;
 
   return (
@@ -2719,8 +2728,8 @@ function BusinessDetailModal({
   const cleanWaNumber = whatsappContact?.value ? whatsappContact.value.replace(/\D/g, '') : '';
   const waUrl = cleanWaNumber
     ? `https://wa.me/${cleanWaNumber.length <= 11 ? '55' + cleanWaNumber : cleanWaNumber}?text=${encodeURIComponent(
-        `Olá! Vi sua empresa no app da Conexão Maçônica e gostaria de mais informações.`
-      )}`
+      `Olá! Vi sua empresa no app da Conexão Maçônica e gostaria de mais informações.`
+    )}`
     : null;
 
   // Mídias
@@ -3939,10 +3948,54 @@ function EmptyScreen({
           const matchTitle = (ev.title || '').toLowerCase().includes(qClean);
           const matchSummary = (ev.summary || '').toLowerCase().includes(qClean);
           const matchCity = (ev.city || '').toLowerCase().includes(qClean);
-          if (!matchTitle && !matchSummary && !matchCity) return false;
+          const matchLocation = (ev.location_label || '').toLowerCase().includes(qClean);
+          if (!matchTitle && !matchSummary && !matchCity && !matchLocation) return false;
         }
         return true;
       });
+
+      // Agrupamento por Categorias para Exibição em Carrosséis (Modelo de Referência)
+      const isViewingAll = eventTypeFilter === 'all' && !qClean;
+
+      const categoryDefinitions = [
+        { id: 'lojas', title: 'Sessões & Encontros Maçônicos', icon: '🏛️' },
+        { id: 'sociais', title: 'Ações Sociais & Filantropia', icon: '🤝' },
+        { id: 'palestras', title: 'Palestras, Cursos & Workshops', icon: '🎓' },
+        { id: 'empresas', title: 'Empresas Parceiras & Negócios', icon: '🏢' },
+        { id: 'festividades', title: 'Festividades & Confraternizações', icon: '🎉' },
+        { id: 'geral', title: 'Outros Eventos & Comunicados', icon: '📅' },
+      ];
+
+      const categorizedGroups = categoryDefinitions
+        .map((cat) => {
+          const items = eventsList.filter((ev) => {
+            if (cat.id === 'lojas') return ev.category_id === 'lojas' || ev.organizer_type === 'lodge';
+            if (cat.id === 'sociais') return ev.category_id === 'sociais' || ev.organizer_type === 'social_action';
+            if (cat.id === 'palestras') return ev.category_id === 'palestras';
+            if (cat.id === 'empresas') return ev.category_id === 'empresas' || ev.organizer_type === 'business';
+            if (cat.id === 'festividades') return ev.category_id === 'festividades';
+            return ev.category_id === 'geral' || !ev.category_id;
+          });
+          return { ...cat, items };
+        })
+        .filter((group) => group.items.length > 0);
+
+      const handleShareEvent = async (ev: MobileEventItem) => {
+        const url = `https://conexaomaconica.com.br/eventos/${ev.slug || ev.id}`;
+        const text = `Confira o evento "${ev.title}" na Conexão Maçônica!\nData: ${ev.event_date || 'Em breve'} em ${ev.city || ''}.\n${url}`;
+        if (typeof navigator !== 'undefined' && navigator.share) {
+          try {
+            await navigator.share({ title: ev.title, text, url });
+            return;
+          } catch { }
+        }
+        try {
+          await navigator.clipboard.writeText(url);
+          alert('Link do evento copiado com sucesso!');
+        } catch {
+          window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+        }
+      };
 
       return (
         <div className="directory-screen">
@@ -3968,155 +4021,365 @@ function EmptyScreen({
           </div>
 
           <div className="directory-header">
-            <p className="eyebrow">Agenda Integrada da Rede Fraterna</p>
-            <h1>Eventos & Comunicados</h1>
-            <p>Encontros de negócios de empresas parceiras e sessões/comunicados de Lojas Maçônicas.</p>
+            <p className="eyebrow">Agenda Integrada</p>
+            <h1>Eventos &amp; Sessões</h1>
+            <p>Encontre o que fazer: sessões de Lojas Maçônicas, ações beneficentes, palestras e encontros de empresas parceiras.</p>
           </div>
 
-          <div className="category-pills" role="tablist" aria-label="Filtrar eventos por origem" style={{ marginBottom: 14 }}>
+          {/* Filtros Rápidos por Categoria */}
+          <div className="category-pills" role="tablist" aria-label="Filtrar eventos por origem" style={{ marginBottom: 16 }}>
             <button
               type="button"
               className={`category-pill ${eventTypeFilter === 'all' ? 'active' : ''}`}
               onClick={() => onChangeEventTypeFilter?.('all')}
             >
-              📅 Todos os Eventos
-            </button>
-            <button
-              type="button"
-              className={`category-pill ${eventTypeFilter === 'empresas' ? 'active' : ''}`}
-              onClick={() => onChangeEventTypeFilter?.('empresas')}
-            >
-              🏢 Eventos de Empresas
+              📅 Todas as Categorias ({eventsList.length})
             </button>
             <button
               type="button"
               className={`category-pill ${eventTypeFilter === 'lojas' ? 'active' : ''}`}
               onClick={() => onChangeEventTypeFilter?.('lojas')}
             >
-              🏛️ Eventos de Lojas Maçônicas
+              🏛️ Lojas Maçônicas ({eventsList.filter((e) => e.organizer_type === 'lodge').length})
+            </button>
+            <button
+              type="button"
+              className={`category-pill ${eventTypeFilter === 'empresas' ? 'active' : ''}`}
+              onClick={() => onChangeEventTypeFilter?.('empresas')}
+            >
+              🏢 Empresas Parceiras ({eventsList.filter((e) => e.organizer_type === 'business').length})
             </button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {filteredEvents.map((ev) => (
-              <article
-                key={ev.id}
-                className="event-card-mobile"
-                onClick={() => setSelectedEvent(ev)}
-                style={{ cursor: 'pointer' }}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setSelectedEvent(ev);
-                  }
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                  <span className={`event-origin-badge ${ev.organizer_type}`}>
-                    {ev.organizer_type === 'lodge' ? '🏛️ Loja Maçônica' : '🏢 Empresa Parceira'}
-                  </span>
-                  <span style={{ fontSize: '0.72rem', color: '#c9a227', fontWeight: 800 }}>
-                    Ver detalhes →
-                  </span>
-                </div>
-                <h3 style={{ margin: '4px 0 2px', font: '750 1.05rem/1.3 Georgia, serif', color: '#4b161b' }}>
-                  {ev.title}
-                </h3>
-                <p style={{ margin: 0, fontSize: '0.82rem', color: '#57534e', lineHeight: 1.5 }}>
-                  {ev.summary}
-                </p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 6, fontSize: '0.76rem', color: '#78716c', fontWeight: 650 }}>
-                  <span>🗓️ {ev.event_date}</span>
-                  <span>📍 {ev.city} - {ev.state}</span>
-                  <span>👤 {ev.organizer_name}</span>
-                </div>
-              </article>
-            ))}
+          {/* MODO 1: Vitrine Principal em Carrosséis Horizontais Agrupados por Categoria (Conforme a Imagem) */}
+          {isViewingAll && categorizedGroups.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {categorizedGroups.map((group) => (
+                <section key={group.id} className="events-category-section">
+                  <div className="events-category-header">
+                    <div className="events-category-title-wrap">
+                      <span style={{ fontSize: '1.1rem' }}>{group.icon}</span>
+                      <h2 className="events-category-title">{group.title}</h2>
+                      <span className="events-category-count">{group.items.length}</span>
+                    </div>
 
-            {!loadingEvents && filteredEvents.length === 0 && (
-              <div className="empty-results">
-                <b>Nenhum evento ou comunicado publicado no momento</b>
-                <p>Novos eventos de empresas parceiras e Lojas Maçônicas aparecerão nesta agenda assim que publicados.</p>
-              </div>
-            )}
-          </div>
+                    <button
+                      type="button"
+                      className="events-see-all-link"
+                      style={{ background: 'none', border: 'none', padding: 0 }}
+                      onClick={() => {
+                        if (group.id === 'lojas') onChangeEventTypeFilter?.('lojas');
+                        else if (group.id === 'empresas') onChangeEventTypeFilter?.('empresas');
+                      }}
+                    >
+                      <span>Ver tudo</span>
+                      <span>›</span>
+                    </button>
+                  </div>
 
+                  {/* Carrossel Horizontal com Scroll Snap e Cards Flyer */}
+                  <div className="events-horizontal-carousel">
+                    {group.items.map((ev) => (
+                      <button
+                        key={ev.id}
+                        type="button"
+                        className="event-flyer-card"
+                        onClick={() => setSelectedEvent(ev)}
+                      >
+                        {/* Imagem / Flyer com Proporção Ampla e Cantos Arredondados */}
+                        <div className="event-flyer-media-wrap">
+                          {ev.cover_url ? (
+                            <img
+                              src={ev.cover_url}
+                              alt={ev.title}
+                              className="event-flyer-img"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="event-flyer-placeholder">
+                              <span style={{ fontSize: '1.4rem', marginBottom: 4 }}>📅</span>
+                              <strong style={{ fontSize: '0.78rem', lineHeight: 1.2 }}>{ev.title}</strong>
+                            </div>
+                          )}
+
+                          {/* Badge de Modalidade / Origem */}
+                          <span className="event-flyer-badge-top">
+                            {ev.badge_text || (ev.organizer_type === 'lodge' ? 'Loja Maçônica' : 'Empresa')}
+                          </span>
+
+                          {/* Tag de Valor / Entrada */}
+                          {ev.price_info && (
+                            <span className="event-flyer-price-tag">
+                              🏷️ {ev.price_info}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Dados textuais abaixo da foto */}
+                        <div className="event-flyer-info">
+                          <h3 className="event-flyer-title">{ev.title}</h3>
+                          <p className="event-flyer-location">
+                            📍 {ev.location_label || [ev.city, ev.state].filter(Boolean).join(' - ') || 'Feira de Santana, BA'}
+                          </p>
+                          <p className="event-flyer-date">
+                            🗓️ {ev.event_date || 'Data a confirmar'}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+
+          {/* MODO 2: Lista Filtrada ou Busca */}
+          {(!isViewingAll || categorizedGroups.length === 0) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {filteredEvents.map((ev) => (
+                <button
+                  key={ev.id}
+                  type="button"
+                  className="event-card-mobile"
+                  onClick={() => setSelectedEvent(ev)}
+                  style={{ cursor: 'pointer', textAlign: 'left', border: '1.5px solid #ebd9c8', background: '#ffffff', padding: 12, borderRadius: 18 }}
+                >
+                  <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', borderRadius: 14, overflow: 'hidden', background: '#3b0b14', marginBottom: 8 }}>
+                    {ev.cover_url ? (
+                      <img src={ev.cover_url} alt={ev.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f3eedd', flexDirection: 'column', padding: 12, textAlign: 'center' }}>
+                        <span style={{ fontSize: '1.4rem' }}>📅</span>
+                        <strong style={{ fontSize: '0.82rem' }}>{ev.title}</strong>
+                      </div>
+                    )}
+                    {ev.price_info && (
+                      <span style={{ position: 'absolute', bottom: 8, left: 8, padding: '2px 8px', borderRadius: 6, fontSize: '0.65rem', fontWeight: 800, background: 'rgba(31,25,20,0.85)', color: '#fef3c7' }}>
+                        🏷️ {ev.price_info}
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <span className={`event-origin-badge ${ev.organizer_type}`}>
+                      {ev.organizer_type === 'lodge' ? '🏛️ Loja Maçônica' : '🏢 Empresa Parceira'}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: '#c9a227', fontWeight: 800 }}>
+                      Ver detalhes →
+                    </span>
+                  </div>
+
+                  <h3 style={{ margin: '6px 0 2px', font: '750 1rem/1.3 Georgia, serif', color: '#4b161b' }}>
+                    {ev.title}
+                  </h3>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4, fontSize: '0.76rem', color: '#78716c', fontWeight: 650 }}>
+                    <span>🗓️ {ev.event_date || 'Data a confirmar'}</span>
+                    <span>📍 {ev.location_label || [ev.city, ev.state].filter(Boolean).join(' - ')}</span>
+                  </div>
+                </button>
+              ))}
+
+              {!loadingEvents && filteredEvents.length === 0 && (
+                <div className="empty-results">
+                  <b>Nenhum evento localizado</b>
+                  <p>Não há eventos futuros para o filtro selecionado. Tente alterar sua busca ou conferir outras categorias.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TELA DEDICADA DE DETALHES DO EVENTO (ESTILO PLANO ESQUADRO) */}
           {selectedEvent && (
             <div
-              className="voucher-modal-overlay"
+              className="mobile-event-detail-screen"
               role="dialog"
               aria-modal="true"
-              aria-label="Detalhes do Evento"
-              onClick={(e) => {
-                if (e.target === e.currentTarget) setSelectedEvent(null);
-              }}
+              aria-label="Página do Evento"
             >
-              <div className="voucher-modal-card">
-                <div className="voucher-modal-header">
-                  <button
-                    type="button"
-                    className="voucher-close-btn"
-                    onClick={() => setSelectedEvent(null)}
-                    aria-label="Fechar detalhes do evento"
-                  >
-                    ✕
-                  </button>
+              {/* Barra Superior com Voltar e Compartilhar */}
+              <div className="mobile-event-topbar">
+                <button
+                  type="button"
+                  className="mobile-event-back-btn"
+                  onClick={() => setSelectedEvent(null)}
+                >
+                  <span>←</span>
+                  <span>Voltar</span>
+                </button>
 
+                <button
+                  type="button"
+                  className="mobile-event-share-btn"
+                  onClick={() => handleShareEvent(selectedEvent)}
+                >
+                  <span>🔗</span>
+                  <span>Compartilhar</span>
+                </button>
+              </div>
+
+              {/* Bloco Hero do Evento (Estilo Plano Esquadro) */}
+              <header className="mobile-event-hero-card">
+                <div className="mobile-event-cover-wrap">
+                  {selectedEvent.cover_url ? (
+                    <img
+                      src={selectedEvent.cover_url}
+                      alt={selectedEvent.title}
+                    />
+                  ) : (
+                    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#f3eedd', padding: 20, textAlign: 'center' }}>
+                      <span style={{ fontSize: '2rem', marginBottom: 6 }}>📅</span>
+                      <strong style={{ fontSize: '1rem', font: '700 1.1rem/1.3 Georgia, serif' }}>{selectedEvent.title}</strong>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <span
                     className={`event-origin-badge ${selectedEvent.organizer_type}`}
-                    style={{ alignSelf: 'center', margin: '0 auto 10px', display: 'inline-flex' }}
+                    style={{ alignSelf: 'flex-start' }}
                   >
                     {selectedEvent.organizer_type === 'lodge' ? '🏛️ Loja Maçônica' : '🏢 Empresa Parceira'}
                   </span>
 
-                  <h3 className="voucher-biz-name" style={{ fontSize: '1.2rem', marginTop: 4 }}>
+                  <h1 style={{ margin: 0, font: '750 1.35rem/1.25 Georgia, serif', color: '#4b161b' }}>
                     {selectedEvent.title}
-                  </h3>
+                  </h1>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8, fontSize: '0.82rem', color: '#f3eedd' }}>
-                    <span>🗓️ Data: <b>{selectedEvent.event_date || 'A definir'}</b></span>
-                    {selectedEvent.location_label && <span>📍 Local: <b>{selectedEvent.location_label}</b></span>}
-                    <span>🏙️ Cidade: <b>{selectedEvent.city} - {selectedEvent.state}</b></span>
-                    <span>👤 Organizador: <b>{selectedEvent.organizer_name}</b></span>
-                  </div>
-                </div>
-
-                <div className="voucher-modal-body">
-                  {selectedEvent.summary ? (
-                    <div style={{ fontSize: '0.86rem', color: '#44403c', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
-                      {selectedEvent.summary}
-                    </div>
-                  ) : (
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#78716c', fontStyle: 'italic' }}>
-                      Evento público de divulgação da rede fraterna.
+                  {selectedEvent.subtitle && (
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#661a22', fontWeight: 600 }}>
+                      {selectedEvent.subtitle}
                     </p>
                   )}
 
-                  {selectedEvent.cta_url && (
-                    <a
-                      href={selectedEvent.cta_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="voucher-btn-primary"
-                      style={{ textDecoration: 'none', textAlign: 'center', marginTop: 6 }}
-                    >
-                      <span>🔗</span>
-                      <span>Mais Informações / Link Externo</span>
-                    </a>
-                  )}
+                  {/* Informações Básicas com Ícones */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4, fontSize: '0.8rem', color: '#44403c', fontWeight: 650 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>🗓️</span>
+                      <span><b>Data:</b> {selectedEvent.event_date || 'A definir'}</span>
+                    </div>
 
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                      <span>📍</span>
+                      <div>
+                        <span><b>Local:</b> {selectedEvent.location_label || 'Local do Evento'}</span>
+                        {selectedEvent.address && (
+                          <div style={{ fontSize: '0.74rem', color: '#78716c', fontWeight: 500 }}>
+                            {selectedEvent.address}
+                          </div>
+                        )}
+                        <div style={{ fontSize: '0.74rem', color: '#78716c', fontWeight: 500 }}>
+                          {[selectedEvent.city, selectedEvent.state].filter(Boolean).join(' - ')}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>👤</span>
+                      <span><b>Realização:</b> {selectedEvent.organizer_name || 'Conexão Maçônica'}</span>
+                    </div>
+                  </div>
+
+                  {/* Destaque de Valores / Ingressos (Estilo Plano Esquadro) */}
+                  <div className="mobile-event-price-highlight" style={{ marginTop: 8 }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#78350f', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      🎟️ Ingressos &amp; Valores
+                    </span>
+                    <strong style={{ fontSize: '1.15rem', color: '#4b161b' }}>
+                      {selectedEvent.price_info || 'Entrada Franca'}
+                    </strong>
+                    <span style={{ fontSize: '0.72rem', color: '#78716c', fontWeight: 500 }}>
+                      {selectedEvent.registration_enabled
+                        ? 'Confirmação antecipada recomendada pela organização.'
+                        : 'Livre participação de membros e convidados.'}
+                    </span>
+                  </div>
+                </div>
+              </header>
+
+              {/* Seção Sobre o Evento */}
+              <section className="mobile-event-content-section">
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#4b161b', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #f0ece1', paddingBottom: 6 }}>
+                  ℹ️ Sobre o Evento
+                </span>
+
+                {selectedEvent.description || selectedEvent.summary ? (
+                  <div style={{ fontSize: '0.86rem', color: '#332f2b', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+                    {selectedEvent.description || selectedEvent.summary}
+                  </div>
+                ) : (
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#78716c', fontStyle: 'italic' }}>
+                    Evento oficial divulgado na rede integrada Conexão Maçônica.
+                  </p>
+                )}
+
+                {selectedEvent.footer_information && (
+                  <div style={{ marginTop: 8, padding: 10, background: '#fef7e6', borderRadius: 10, border: '1px solid #f5d76e', fontSize: '0.76rem', color: '#78350f' }}>
+                    <b>Informações Adicionais:</b>
+                    <p style={{ margin: '4px 0 0' }}>{selectedEvent.footer_information}</p>
+                  </div>
+                )}
+              </section>
+
+              {/* Seção Organização */}
+              <section className="mobile-event-content-section" style={{ marginBottom: 90 }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#4b161b', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #f0ece1', paddingBottom: 6 }}>
+                  🏛️ Organização &amp; Contato
+                </span>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.82rem' }}>
+                  <strong style={{ color: '#4b161b', fontSize: '0.92rem' }}>
+                    {selectedEvent.organizer_name || 'Conexão Maçônica'}
+                  </strong>
+                  <span style={{ fontSize: '0.76rem', color: '#78716c' }}>
+                    {selectedEvent.organizer_type === 'lodge'
+                      ? 'Loja Maçônica atuante na comunidade e cadastrada na plataforma.'
+                      : 'Empresa participante da vitrine de negócios Conexão Maçônica.'}
+                  </span>
+                </div>
+              </section>
+
+              {/* Barra Inferior Fixa com Botões de Ação */}
+              <footer className="mobile-event-bottom-bar">
+                {selectedEvent.cta_url ? (
+                  <a
+                    href={selectedEvent.cta_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ flex: 1, padding: '12px 16px', background: '#4b161b', color: '#c9a227', borderRadius: 12, fontWeight: 800, fontSize: '0.82rem', textAlign: 'center', textDecoration: 'none', border: '1px solid #c9a227', boxShadow: '0 2px 8px rgba(75,22,27,0.2)' }}
+                  >
+                    <span>🎟️ Mais Informações / Ingressos</span>
+                  </a>
+                ) : (
                   <button
                     type="button"
-                    className="voucher-btn-secondary"
-                    onClick={() => setSelectedEvent(null)}
-                    style={{ marginTop: 4 }}
+                    onClick={() => handleShareEvent(selectedEvent)}
+                    style={{ flex: 1, padding: '12px 16px', background: '#4b161b', color: '#ffffff', borderRadius: 12, fontWeight: 800, fontSize: '0.82rem', textAlign: 'center', border: 'none', cursor: 'pointer', boxShadow: '0 2px 8px rgba(75,22,27,0.2)' }}
                   >
-                    <span>Fechar</span>
+                    <span>🔗 Compartilhar Evento</span>
                   </button>
-                </div>
-              </div>
+                )}
+
+                {selectedEvent.organizer_whatsapp ? (
+                  <a
+                    href={`https://wa.me/55${selectedEvent.organizer_whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá! Vi o evento "${selectedEvent.title}" no App Conexão Maçônica e gostaria de mais informações.`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ padding: '12px 14px', background: '#15803d', color: '#ffffff', borderRadius: 12, fontWeight: 800, fontSize: '0.82rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <span>💬 WhatsApp</span>
+                  </a>
+                ) : null}
+
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([selectedEvent.location_label, selectedEvent.address, selectedEvent.city, selectedEvent.state].filter(Boolean).join(', '))}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ padding: '12px 14px', background: '#f5ebe6', color: '#4b161b', borderRadius: 12, fontWeight: 800, fontSize: '0.82rem', textDecoration: 'none', border: '1px solid #d6b8ac', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <span>📍 Rota</span>
+                </a>
+              </footer>
             </div>
           )}
         </div>
@@ -6593,10 +6856,10 @@ function mapPinHtml(biz: MobileGuideSponsoredBusiness, selected: boolean) {
   return '<div class="map-logo-pin-marker" style="position:relative;width:' + pinWidth + 'px;height:' + pinHeight + 'px;cursor:pointer;">' +
     crownHtml +
     '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:9999px;background:' + bgColor + ';border:' + borderWidth + 'px solid ' + borderColor + ';box-shadow:' + shadow + ';display:flex;align-items:center;justify-content:center;overflow:hidden;padding:2px;box-sizing:border-box;">' +
-      logoOrInitials +
+    logoOrInitials +
     '</div>' +
     '<div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:8px solid ' + borderColor + ';"></div>' +
-  '</div>';
+    '</div>';
 }
 
 function getMapPlanBadge(planTier?: string | null) {
@@ -7489,8 +7752,8 @@ function Home({
 
       {(guideData?.settings.sections_config.length
         ? guideData.settings.sections_config.filter(
-            (section) => section.enabled && section.id in sectionNodes && section.id !== 'connections_cta',
-          )
+          (section) => section.enabled && section.id in sectionNodes && section.id !== 'connections_cta',
+        )
         : visibleHomeSections().filter((section) => section.id !== 'connections_cta')
       ).map((section) => {
         const node = dynamicNodes[section.id as HomeSectionId] ?? sectionNodes[section.id as HomeSectionId];
@@ -7730,7 +7993,7 @@ export function App() {
       if (cachedToken) {
         sendTokenToSupabase({ token: cachedToken, memberEmail: user.email, memberId: user.id });
       }
-    } catch {}
+    } catch { }
     setIsMemberLoginModalOpen(false);
 
     if (pendingBenefitToRedeem) {
@@ -8176,7 +8439,7 @@ export function App() {
               setMemberUser(null);
               try {
                 localStorage.removeItem('cm_mobile_member_user');
-              } catch {}
+              } catch { }
             }}
             onDeleteMemberAccount={handleDeleteMemberAccount}
             onStartShareExperience={() => handleStartShareExperience()}

@@ -38,11 +38,12 @@ BEGIN
   SELECT email INTO v_email FROM auth.users WHERE id = v_user_id;
 
   -- Exclui o token SOMENTE se pertencer à identidade autenticada
+  -- Regra estrita: se member_id estiver preenchido com outro ID, impede revogação por e-mail divergente
   DELETE FROM public.mobile_device_tokens
   WHERE token = trim(p_token)
     AND (
       member_id = v_user_id::text
-      OR (v_email IS NOT NULL AND lower(member_email) = lower(v_email))
+      OR (member_id IS NULL AND v_email IS NOT NULL AND lower(member_email) = lower(v_email))
     );
 
   GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
@@ -84,7 +85,7 @@ BEGIN
 
   DELETE FROM public.mobile_device_tokens
   WHERE member_id = v_user_id::text
-     OR (v_email IS NOT NULL AND lower(member_email) = lower(v_email));
+     OR (member_id IS NULL AND v_email IS NOT NULL AND lower(member_email) = lower(v_email));
 
   GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
 
@@ -152,7 +153,7 @@ BEGIN
   -- 4. Revogar e expurgar todos os tokens de notificações push em todos os dispositivos
   DELETE FROM public.mobile_device_tokens
   WHERE member_id = v_user_id::text
-     OR (v_user_email IS NOT NULL AND lower(member_email) = lower(v_user_email));
+     OR (member_id IS NULL AND v_user_email IS NOT NULL AND lower(member_email) = lower(v_user_email));
 
   -- 5. Vínculos remanescentes (drafts etc.) → revoked com history auditável
   UPDATE public.business_masonic_links
@@ -219,3 +220,4 @@ GRANT EXECUTE ON FUNCTION public.revoke_all_my_mobile_device_tokens() TO service
 REVOKE ALL ON FUNCTION public.request_account_deletion() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.request_account_deletion() FROM anon;
 GRANT EXECUTE ON FUNCTION public.request_account_deletion() TO authenticated;
+

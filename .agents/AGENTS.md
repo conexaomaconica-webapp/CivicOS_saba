@@ -29,3 +29,21 @@ Sempre que você criar, refatorar ou ajustar páginas públicas, componentes de 
    - H2s cobrindo subtemas e diferenciais reais.
    - Seção de FAQ quando trouxer benefício real ao usuário (alimentando o schema `FAQPage`).
    - CTA claro (Demo/Cadastro para SaaS, Orçamento/WhatsApp para serviços).
+
+---
+
+## Paridade e Sincronização Obrigatória nas 4 Plataformas (Web + Web Mobile + App iOS + App Android)
+
+Toda e qualquer correção, ajuste funcional, alteração de regras de negócio, dados contratuais, fluxos de autenticação, telas ou layouts deve ser obrigatoriamente replicada e verificada de forma consistente nas **4 plataformas**:
+
+1. **Web Desktop** (`apps/web`): Telas e fluxos em resolução desktop / widescreen.
+2. **Web Mobile** (`apps/web`): Responsividade em navegadores móveis (`touch`, drawers, viewport adaptativo).
+3. **App iOS** (`apps/mobile`): Aplicação Capacitor empacotada para iOS (`apps/mobile/ios-overrides/`, safe-areas, status bar).
+4. **App Android** (`apps/mobile`): Aplicação Capacitor empacotada para Android (`apps/mobile/android-overrides/`, hardware back, splash).
+
+### Checklist de Execução Obrigatório
+* Ao corrigir uma regra de negócio ou lógica na Web, inspecionar e atualizar imediatamente o módulo equivalente no Mobile (`apps/mobile`), garantindo paridade em iOS e Android.
+* Ao realizar ajustes de interface, validar no viewport desktop e mobile (Web Mobile) e aplicar os estilos correspondentes no app móvel (`apps/mobile/src/styles.css`).
+* Garantir 0 erros nos dois ecossistemas antes de finalizar qualquer entrega:
+  - `pnpm --filter web typecheck` && `pnpm --filter web exec vitest run`
+  - `pnpm --filter mobile typecheck` && `pnpm --filter mobile test`

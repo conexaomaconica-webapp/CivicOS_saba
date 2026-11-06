@@ -16,10 +16,13 @@ import {
   Building2,
   Sparkles,
   PhoneCall,
+  GraduationCap,
+  PartyPopper,
+  Tag,
 } from 'lucide-react';
 import { EventHeaderMediaField } from './EventHeaderMediaField';
 
-export type EventCategoryType = 'lodge' | 'social_action' | 'business' | 'platform';
+export type EventCategoryType = 'lodge' | 'social_action' | 'palestras' | 'business' | 'festividades' | 'platform';
 
 interface Props {
   onClose: () => void;
@@ -33,21 +36,33 @@ interface Props {
 const CATEGORY_DEFAULTS: Record<EventCategoryType, { label: string; badge: string; icon: React.ReactNode; desc: string }> = {
   lodge: {
     label: 'Loja Maçônica',
-    badge: 'Loja Maçônica',
+    badge: 'Sessão Maçônica',
     icon: <Landmark size={15} />,
     desc: 'Sessão Magna, Aniversário de Loja, Posse de Diretoria ou Banquete Ritualístico.',
   },
   social_action: {
     label: 'Ação Social & Filantropia',
-    badge: 'Ação Social & Filantropia',
+    badge: 'Ação Beneficente',
     icon: <HeartHandshake size={15} />,
     desc: 'Campanhas beneficentes, Fraternidades Femininas, Ordem DeMolay ou Filhas de Jó.',
+  },
+  palestras: {
+    label: 'Palestra / Workshop',
+    badge: 'Palestra & Workshop',
+    icon: <GraduationCap size={15} />,
+    desc: 'Palestras, cursos, workshops, seminários e treinamentos de capacitação.',
   },
   business: {
     label: 'Empresa Parceira',
     badge: 'Empresa Parceira',
     icon: <Building2 size={15} />,
-    desc: 'Palestras, encontros corporativos, workshops e lançamentos de empresas da rede.',
+    desc: 'Encontros corporativos, rodadas de negócios B2B, networking e lançamentos de empresas.',
+  },
+  festividades: {
+    label: 'Festividade / Show',
+    badge: 'Confraternização',
+    icon: <PartyPopper size={15} />,
+    desc: 'Almoços fraternos, banquetes, festividades, shows e encontros culturais.',
   },
   platform: {
     label: 'Institucional CM',
@@ -83,6 +98,7 @@ export function AdminCreateEventModal({
     headerMediaSize: 'medium' as 'small' | 'medium' | 'large' | 'full',
     headerMediaPosition: 'center' as 'left' | 'center' | 'right',
     badgeText: CATEGORY_DEFAULTS[prefillCategory].badge,
+    priceInfo: 'Entrada Franca',
     footerInformation: '',
     registrationEnabled: false, // PADRÃO: Apenas divulgação (sem exigir lista de presença)
     capacity: '',
@@ -131,9 +147,23 @@ export function AdminCreateEventModal({
       return;
     }
 
+    let finalSubtitle = formData.subtitle.trim();
+    if (formData.priceInfo.trim() && !finalSubtitle.includes(formData.priceInfo.trim())) {
+      finalSubtitle = finalSubtitle
+        ? `${finalSubtitle} • Ingressos: ${formData.priceInfo.trim()}`
+        : `Ingressos: ${formData.priceInfo.trim()}`;
+    }
+
+    let finalFooter = formData.footerInformation.trim();
+    if (formData.priceInfo.trim() && !finalFooter.includes('Valor')) {
+      finalFooter = finalFooter
+        ? `${finalFooter}\nValor / Ingressos: ${formData.priceInfo.trim()}`
+        : `Valor / Ingressos: ${formData.priceInfo.trim()}`;
+    }
+
     const res = await createPlatformEventAction({
       title: formData.title.trim(),
-      subtitle: formData.subtitle.trim() || undefined,
+      subtitle: finalSubtitle || undefined,
       description: formData.description.trim() || undefined,
       eventDate: formData.eventDate,
       startTime: formData.startTime,
@@ -146,7 +176,7 @@ export function AdminCreateEventModal({
       headerMediaSize: formData.headerMediaSize,
       headerMediaPosition: formData.headerMediaPosition,
       badgeText: formData.badgeText,
-      footerInformation: formData.footerInformation.trim() || undefined,
+      footerInformation: finalFooter || undefined,
       registrationEnabled: formData.registrationEnabled,
       capacity:
         formData.registrationEnabled && formData.capacity.trim()
@@ -304,6 +334,27 @@ export function AdminCreateEventModal({
               onChange={(e) => handleChange('subtitle', e.target.value)}
               placeholder="Ex: Homenagem aos Fundadores e Confraternização com a Comunidade"
             />
+          </div>
+
+          {/* VALORES E INGRESSOS */}
+          <div className="acm-field">
+            <label className="acm-label" htmlFor="create-priceInfo">
+              <span className="flex items-center gap-1.5">
+                <Tag size={14} className="text-[#C9A227]" />
+                Valores &amp; Ingressos (Exibição em Destaque nos Cards e na Página)
+              </span>
+            </label>
+            <input
+              id="create-priceInfo"
+              type="text"
+              className="acm-input"
+              value={formData.priceInfo}
+              onChange={(e) => handleChange('priceInfo', e.target.value)}
+              placeholder="Ex.: Entrada Franca / R$ 50,00 por pessoa / A partir de R$ 35,00"
+            />
+            <p className="acm-helper-text">
+              Exibido em destaque nos carrosséis da vitrine e no cabeçalho do evento (estilo Plano Esquadro).
+            </p>
           </div>
 
           {/* DATA E HORÁRIOS */}

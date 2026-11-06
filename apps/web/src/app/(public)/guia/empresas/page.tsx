@@ -312,11 +312,18 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
           ? createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } })
           : supabase;
 
-        const { data: viewEvents } = await (dbReader as any)
-          .from('analytics_events')
-          .select('business_id')
-          .in('business_id', bizIds)
-          .eq('event_name', 'view');
+        const [{ data: viewEvents }, { data: attrRows }] = await Promise.all([
+          (dbReader as any)
+            .from('analytics_events')
+            .select('business_id')
+            .in('business_id', bizIds)
+            .eq('event_name', 'view'),
+          (dbReader as any)
+            .from('business_attributes')
+            .select('business_id, attribute_key, attribute_value')
+            .in('business_id', bizIds)
+            .in('attribute_key', ['logo_background_color', 'logo_bg_color']),
+        ]);
 
         const countsMap: Record<string, number> = {};
         if (viewEvents && viewEvents.length > 0) {
@@ -324,8 +331,19 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
             countsMap[ev.business_id] = (countsMap[ev.business_id] || 0) + 1;
           }
         }
+
+        const logoBgMap: Record<string, string> = {};
+        if (attrRows && attrRows.length > 0) {
+          for (const row of attrRows) {
+            if (row.attribute_value) {
+              logoBgMap[row.business_id] = row.attribute_value.trim();
+            }
+          }
+        }
+
         businessItems.forEach((item) => {
           item.views_count = countsMap[item.id] ?? 0;
+          item.logo_background_color = logoBgMap[item.id] || null;
         });
       }
     } catch (_viewsErr) {

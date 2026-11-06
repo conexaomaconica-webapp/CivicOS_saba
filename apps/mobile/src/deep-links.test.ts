@@ -54,3 +54,4 @@ describe('Deep Link Parser & Sanitization (Gate 02B.1)', () => {
     expect(parseDeepLinkUrl('not-a-valid-url')).toEqual({ type: 'invalid', raw: '[parse-exception]' });
   });
 });
+
