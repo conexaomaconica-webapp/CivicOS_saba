@@ -2020,21 +2020,22 @@ button, input { font: inherit; }
 /* 1. Carrossel de Banners Compacto na Home */
 .home-banner-carousel {
   position: relative;
-  margin: 8px 0 4px;
+  margin: 8px 0 6px;
   width: 100%;
 }
 .home-banner-card {
   position: relative;
   width: 100%;
-  height: 140px;
-  border-radius: 20px;
+  aspect-ratio: 801 / 207;
+  height: auto;
+  border-radius: 14px;
   overflow: hidden;
-  background: radial-gradient(circle at 85% 15%, rgb(201 162 39 / .3), transparent 50%), linear-gradient(145deg, #4b161b, #28050b);
-  border: 1px solid rgb(201 162 39 / .45);
-  box-shadow: 0 8px 24px rgb(43 6 13 / .2);
+  background: transparent;
+  border: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
   display: flex;
   align-items: flex-end;
-  padding: 16px 18px;
+  padding: 0;
   cursor: pointer;
   transition: transform 140ms ease;
 }
@@ -2047,17 +2048,19 @@ button, input { font: inherit; }
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.45;
+  opacity: 1;
 }
 .home-banner-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, transparent 0%, rgba(43, 6, 13, 0.75) 55%, rgba(35, 4, 8, 0.95) 100%);
-  pointer-events: none;
+  display: none;
 }
 .home-banner-text-box {
   position: relative;
   z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+}
   display: flex;
   flex-direction: column;
   gap: 3px;

@@ -94,6 +94,13 @@ export default async function GuiaPage({ searchParams }: Props) {
   const headersList = await headers();
   const host = headersList.get('host') ?? 'localhost:3000';
   const supabase = await createServerSideClient();
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const dbReader = supabaseUrl && serviceRoleKey
+    ? createClient(supabaseUrl, serviceRoleKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      })
+    : supabase;
   const brand = await resolveTenantBrandContext();
 
   // Resolve primeiro as preferências do tenant público para que Hero, busca e
@@ -336,7 +343,7 @@ export default async function GuiaPage({ searchParams }: Props) {
   // Fallback para Banners se a RPC falhar, retornar vazio ou só trouxer banners sem imagem válida
   if (banners.length === 0) {
     try {
-      const { data: dbBanners } = await (supabase as any)
+      const { data: dbBanners } = await (dbReader as any)
         .from('directory_banners')
         .select('id, title, subtitle, cta_text, cta_url, image_desktop_url, image_mobile_url, start_at, end_at')
         .eq('is_active', true)

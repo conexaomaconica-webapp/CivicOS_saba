@@ -64,49 +64,68 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
   const desktopOptimizable = canOptimize(current.image_desktop_url);
   const mobileOptimizable = Boolean(current.image_mobile_url) && canOptimize(current.image_mobile_url as string);
 
-  const image =
-    desktopOptimizable && (!current.image_mobile_url || mobileOptimizable) ? (
-      // Imagens do Supabase passam pelo otimizador: tamanho certo para a tela, em WebP/AVIF, com carregamento sob demanda.
-      <div className={imageOnly ? 'relative block w-full h-full' : 'relative block h-full w-full'}>
+  const bannerSrc = current.image_mobile_url || current.image_desktop_url;
+
+  const image = imageOnly ? (
+    <div className="relative block w-full h-full aspect-[801/207] overflow-hidden rounded-xl md:rounded-2xl">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={bannerSrc}
+        alt={alt}
+        loading={activeIndex === 0 ? 'eager' : 'lazy'}
+        fetchPriority={activeIndex === 0 ? 'high' : 'auto'}
+        decoding="async"
+        className="w-full h-full object-cover rounded-xl md:rounded-2xl block"
+        onError={(e) => {
+          // Se falhar a imagem mobile, tenta desktop se diferente
+          if (current.image_mobile_url && e.currentTarget.src !== current.image_desktop_url) {
+            e.currentTarget.src = current.image_desktop_url;
+          }
+        }}
+      />
+    </div>
+  ) : desktopOptimizable && (!current.image_mobile_url || mobileOptimizable) ? (
+    // Imagens do Supabase passam pelo otimizador quando acompanhadas de texto editorial
+    <div className="relative block h-full w-full">
+      <Image
+        src={current.image_desktop_url}
+        alt={alt}
+        fill
+        sizes="(max-width: 640px) 100vw, (max-width: 1280px) 100vw, 1280px"
+        quality={75}
+        priority={activeIndex === 0}
+        className={`${fit} ${current.image_mobile_url ? 'max-sm:hidden' : ''}`}
+      />
+      {current.image_mobile_url && (
         <Image
-          src={current.image_desktop_url}
+          src={current.image_mobile_url}
           alt={alt}
           fill
-          sizes="(max-width: 640px) 100vw, (max-width: 1280px) 100vw, 1280px"
+          sizes="100vw"
           quality={75}
           priority={activeIndex === 0}
-          className={`${fit} ${current.image_mobile_url ? 'max-sm:hidden' : ''}`}
+          className={`${fit} sm:hidden`}
         />
-        {current.image_mobile_url && (
-          <Image
-            src={current.image_mobile_url}
-            alt={alt}
-            fill
-            sizes="100vw"
-            quality={75}
-            priority={activeIndex === 0}
-            className={`${fit} sm:hidden`}
-          />
-        )}
-      </div>
-    ) : (
-      <picture className={imageOnly ? 'relative block w-full h-full' : 'block h-full'}>
-        {current.image_mobile_url && <source media="(max-width: 640px)" srcSet={current.image_mobile_url} />}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={current.image_desktop_url}
-          alt={alt}
-          loading={activeIndex === 0 ? 'eager' : 'lazy'}
-          fetchPriority={activeIndex === 0 ? 'high' : 'auto'}
-          decoding="async"
-          className={`h-full w-full ${fit}`}
-        />
-      </picture>
-    );
+      )}
+    </div>
+  ) : (
+    <picture className="block h-full">
+      {current.image_mobile_url && <source media="(max-width: 640px)" srcSet={current.image_mobile_url} />}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={current.image_desktop_url}
+        alt={alt}
+        loading={activeIndex === 0 ? 'eager' : 'lazy'}
+        fetchPriority={activeIndex === 0 ? 'high' : 'auto'}
+        decoding="async"
+        className={`h-full w-full ${fit}`}
+      />
+    </picture>
+  );
 
   return (
     <section
-      className="dh-container dh-mobile-visible-section py-4"
+      className="dh-container dh-mobile-visible-section py-2 md:py-4"
       aria-roledescription="carrossel"
       aria-label="Destaques"
       onMouseEnter={() => setPaused(true)}
@@ -117,17 +136,17 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
       <div
         className={`dh-carousel-card transition-opacity duration-300 ${
           imageOnly
-            ? 'is-image-only relative w-full aspect-16/9 sm:aspect-21/9 lg:aspect-[2.7/1] min-h-[190px] sm:min-h-[240px] md:min-h-[280px] max-h-[380px] !block overflow-hidden rounded-2xl'
+            ? 'is-image-only !bg-transparent !border-0 !shadow-none relative w-full aspect-[801/207] !block overflow-hidden rounded-xl md:rounded-2xl'
             : ''
         }`}
       >
         {imageOnly ? (
           current.cta_url ? (
-            <Link href={current.cta_url} className="relative block w-full h-full">
+            <Link href={current.cta_url} className="relative block w-full h-full aspect-[801/207]">
               {image}
             </Link>
           ) : (
-            <div className="relative block w-full h-full">{image}</div>
+            <div className="relative block w-full h-full aspect-[801/207]">{image}</div>
           )
         ) : (
           <>

@@ -265,6 +265,26 @@
   position: relative;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
+.dh-carousel-card.is-image-only {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  display: block !important;
+  position: relative !important;
+  width: 100% !important;
+  aspect-ratio: 801 / 207 !important;
+  height: auto !important;
+  min-height: auto !important;
+  margin: 16px 0 24px !important;
+  overflow: hidden !important;
+  border-radius: 14px !important;
+}
+.dh-carousel-card.is-image-only img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 14px !important;
+}
 .dh-carousel-card__content {
   padding: 40px;
 }
@@ -541,19 +561,24 @@
     margin-block: 16px;
   }
   .dh-carousel-card.is-image-only {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
     display: block !important;
     position: relative !important;
     width: 100% !important;
-    min-height: 190px !important;
-    aspect-ratio: 16 / 9;
-    max-height: 380px;
+    aspect-ratio: 801 / 207 !important;
+    height: auto !important;
+    min-height: auto !important;
+    margin: 8px 0 16px !important;
     overflow: hidden !important;
-    border-radius: 16px;
+    border-radius: 12px !important;
   }
   .dh-carousel-card.is-image-only img {
     object-fit: cover !important;
     width: 100% !important;
     height: 100% !important;
+    border-radius: 12px !important;
   }
   .dh-mobile-visible-section {
     display: block !important;
