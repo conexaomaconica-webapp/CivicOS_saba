@@ -91,6 +91,7 @@ export function AdminCreateEventModal({
     startTime: '19:30',
     endTime: '22:00',
     venueName: prefillLodgeName || '',
+    organizerName: prefillLodgeName || '',
     venueAddress: prefillAddress || '',
     city: prefillCity || '',
     coverImageUrl: '',
@@ -169,6 +170,7 @@ export function AdminCreateEventModal({
       startTime: formData.startTime,
       endTime: formData.endTime || undefined,
       venueName: formData.venueName.trim() || undefined,
+      organizerName: formData.organizerName.trim() || formData.venueName.trim() || undefined,
       venueAddress: formData.venueAddress.trim() || undefined,
       city: formData.city.trim() || undefined,
       coverImageUrl: formData.coverImageUrl.trim() || undefined,
@@ -399,7 +401,7 @@ export function AdminCreateEventModal({
           <div className="acm-grid">
             <div className="acm-field">
               <label className="acm-label" htmlFor="create-venueName">
-                {category === 'lodge' ? 'Loja Organizadora / Nome do Templo' : 'Local / Empresa Organizadora'}
+                {category === 'lodge' ? 'Nome do Templo / Local do Evento' : 'Nome do Local / Salão'}
               </label>
               <input
                 id="create-venueName"
@@ -407,10 +409,26 @@ export function AdminCreateEventModal({
                 className="acm-input"
                 value={formData.venueName}
                 onChange={(e) => handleChange('venueName', e.target.value)}
-                placeholder="Ex: A.R.L.S. Luz e Fraternidade nº 42"
+                placeholder="Ex: Templo da Loja 16 de Junho, Salão Nobre..."
               />
             </div>
 
+            <div className="acm-field">
+              <label className="acm-label" htmlFor="create-organizerName">
+                Realização / Loja Organizadora
+              </label>
+              <input
+                id="create-organizerName"
+                type="text"
+                className="acm-input"
+                value={formData.organizerName}
+                onChange={(e) => handleChange('organizerName', e.target.value)}
+                placeholder="Ex: Loja Maçônica 16 de Junho, Conexão Maçônica..."
+              />
+            </div>
+          </div>
+
+          <div className="acm-grid">
             <div className="acm-field">
               <label className="acm-label" htmlFor="create-city">Cidade / UF</label>
               <input
@@ -422,18 +440,17 @@ export function AdminCreateEventModal({
                 placeholder="Ex: Feira de Santana - BA"
               />
             </div>
-          </div>
-
-          <div className="acm-field">
-            <label className="acm-label" htmlFor="create-venueAddress">Endereço Completo</label>
-            <input
-              id="create-venueAddress"
-              type="text"
-              className="acm-input"
-              value={formData.venueAddress}
-              onChange={(e) => handleChange('venueAddress', e.target.value)}
-              placeholder="Ex: Rua Barão de Cotegipe, 120 - Centro"
-            />
+            <div className="acm-field">
+              <label className="acm-label" htmlFor="create-venueAddress">Endereço Completo</label>
+              <input
+                id="create-venueAddress"
+                type="text"
+                className="acm-input"
+                value={formData.venueAddress}
+                onChange={(e) => handleChange('venueAddress', e.target.value)}
+                placeholder="Ex: Rua das Acácias, nº 100 - Centro"
+              />
+            </div>
           </div>
 
           {/* DESCRIÇÃO */}

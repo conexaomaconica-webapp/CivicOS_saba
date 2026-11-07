@@ -38,13 +38,37 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
   const current = banners[activeIndex];
   if (!current) return null;
 
-  const bannerSrc = current.image_mobile_url || current.image_desktop_url;
-  const imageOnly = Boolean(bannerSrc);
+  const hasOverlayText = Boolean(current.subtitle?.trim() || current.cta_text?.trim());
   const goToPrevious = () => setActiveIndex((currentIndex) => (currentIndex - 1 + banners.length) % banners.length);
   const goToNext = () => setActiveIndex((currentIndex) => (currentIndex + 1) % banners.length);
 
   const alt = current.title || 'Banner institucional';
-  const fit = `object-cover ${imageOnly ? 'object-center' : ''}`;
+
+  const renderBannerMedia = () => (
+    <picture className="w-full h-full block">
+      {current.image_mobile_url ? (
+        <source media="(max-width: 639px)" srcSet={current.image_mobile_url} />
+      ) : null}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={current.image_desktop_url}
+        alt={alt}
+        loading={activeIndex === 0 ? 'eager' : 'lazy'}
+        fetchPriority={activeIndex === 0 ? 'high' : 'auto'}
+        decoding="async"
+        className={`w-full h-full block rounded-xl md:rounded-2xl ${
+          current.image_mobile_url
+            ? 'object-cover object-center'
+            : 'object-cover object-center'
+        }`}
+        onError={(e) => {
+          if (current.image_mobile_url && e.currentTarget.src !== current.image_desktop_url) {
+            e.currentTarget.src = current.image_desktop_url;
+          }
+        }}
+      />
+    </picture>
+  );
 
   return (
     <section
@@ -56,40 +80,20 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
     >
-      {imageOnly ? (
-        <div className="relative w-full aspect-[801/260] sm:aspect-[801/207] min-h-[105px] overflow-hidden rounded-xl md:rounded-2xl shadow-xs transition-opacity duration-300 bg-transparent">
+      {!hasOverlayText ? (
+        <div
+          className={`relative w-full overflow-hidden rounded-xl md:rounded-2xl shadow-xs transition-opacity duration-300 bg-neutral-900/5 ${
+            current.image_mobile_url
+              ? 'aspect-[16/9] sm:aspect-[801/240] md:aspect-[801/207]'
+              : 'aspect-[2.35/1] sm:aspect-[801/240] md:aspect-[801/207] min-h-[120px]'
+          }`}
+        >
           {current.cta_url ? (
-            <Link href={current.cta_url} className="block w-full h-full">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={bannerSrc}
-                alt={alt}
-                loading={activeIndex === 0 ? 'eager' : 'lazy'}
-                fetchPriority={activeIndex === 0 ? 'high' : 'auto'}
-                decoding="async"
-                className="w-full h-full object-cover block rounded-xl md:rounded-2xl"
-                onError={(e) => {
-                  if (current.image_mobile_url && e.currentTarget.src !== current.image_desktop_url) {
-                    e.currentTarget.src = current.image_desktop_url;
-                  }
-                }}
-              />
+            <Link href={current.cta_url} className="block w-full h-full cursor-pointer">
+              {renderBannerMedia()}
             </Link>
           ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={bannerSrc}
-              alt={alt}
-              loading={activeIndex === 0 ? 'eager' : 'lazy'}
-              fetchPriority={activeIndex === 0 ? 'high' : 'auto'}
-              decoding="async"
-              className="w-full h-full object-cover block rounded-xl md:rounded-2xl"
-              onError={(e) => {
-                if (current.image_mobile_url && e.currentTarget.src !== current.image_desktop_url) {
-                  e.currentTarget.src = current.image_desktop_url;
-                }
-              }}
-            />
+            renderBannerMedia()
           )}
 
           {banners.length > 1 && (
@@ -154,7 +158,7 @@ export function DirectoryCarousel({ banners = [] }: DirectoryCarouselProps) {
                 loading={activeIndex === 0 ? 'eager' : 'lazy'}
                 fetchPriority={activeIndex === 0 ? 'high' : 'auto'}
                 decoding="async"
-                className={`h-full w-full ${fit}`}
+                className="h-full w-full object-cover object-center"
               />
             </picture>
           </div>

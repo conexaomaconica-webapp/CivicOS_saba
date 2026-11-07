@@ -66,6 +66,7 @@ export interface PlatformEvent {
   registration_enabled: boolean;
   capacity: number | null;
   status?: string;
+  organizer_name?: string | null;
 }
 
 export interface RSVPInput {
@@ -980,6 +981,7 @@ export interface UpdatePlatformEventInput {
   registrationEnabled?: boolean;
   capacity?: number | null;
   status?: 'draft' | 'published' | 'canceled' | 'archived';
+  organizerName?: string | null;
 }
 
 export async function updatePlatformEventAction(
@@ -1011,6 +1013,7 @@ export async function updatePlatformEventAction(
     if (input.registrationEnabled !== undefined) updateData.registration_enabled = input.registrationEnabled;
     if (input.capacity !== undefined) updateData.capacity = input.capacity;
     if (input.status !== undefined) updateData.status = input.status;
+    if (input.organizerName !== undefined) updateData.organizer_name = input.organizerName?.trim() || null;
 
     updateData.updated_at = new Date().toISOString();
 
@@ -1062,6 +1065,7 @@ export interface CreatePlatformEventInput {
   registrationEnabled?: boolean;
   capacity?: number | null;
   status?: 'draft' | 'published' | 'canceled' | 'archived';
+  organizerName?: string;
 }
 
 function slugifyTitle(text: string): string {
@@ -1116,6 +1120,7 @@ export async function createPlatformEventAction(
         registration_enabled: input.registrationEnabled ?? true,
         capacity: input.capacity !== undefined && input.capacity !== null ? input.capacity : null,
         status: input.status || 'published',
+        organizer_name: input.organizerName?.trim() || null,
       })
       .select('id, slug')
       .single();

@@ -107,6 +107,7 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
     venueName: event.venue_name || '',
     venueAddress: event.venue_address || '',
     city: event.city || '',
+    organizerName: (event as any).organizer_name || '',
     coverImageUrl: event.cover_image_url || '',
     headerMediaType: event.header_media_type || 'logo' as 'logo' | 'banner',
     headerMediaSize: event.header_media_size || 'medium' as 'small' | 'medium' | 'large' | 'full',
@@ -144,6 +145,7 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
           venueName: full.venue_name || '',
           venueAddress: full.venue_address || '',
           city: full.city || '',
+          organizerName: (full as any).organizer_name || '',
           coverImageUrl: full.cover_image_url || '',
           headerMediaType: full.header_media_type || 'logo',
           headerMediaSize: full.header_media_size || 'medium',
@@ -231,6 +233,7 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
       venueName: formData.venueName.trim() || null as any,
       venueAddress: formData.venueAddress.trim() || null as any,
       city: formData.city.trim() || null as any,
+      organizerName: formData.organizerName.trim() || null as any,
       coverImageUrl: formData.coverImageUrl.trim() || null as any,
       headerMediaType: formData.headerMediaType,
       headerMediaSize: formData.headerMediaSize,
@@ -416,6 +419,21 @@ export function AdminEditEventModal({ event, onClose, onSuccess }: Props) {
                 onChange={(e) => handleChange('venueName', e.target.value)}
                 placeholder="Ex.: Salão de Eventos Grande Loja"
               />
+            </div>
+
+            {/* Realização / Loja Organizadora */}
+            <div className="aem-field aem-field--full">
+              <label htmlFor="aem-organizer">Realização / Loja Organizadora</label>
+              <input
+                id="aem-organizer"
+                type="text"
+                value={formData.organizerName}
+                onChange={(e) => handleChange('organizerName', e.target.value)}
+                placeholder="Ex.: Loja Maçônica 16 de Junho, Loja Cavaleiros de Aço..."
+              />
+              <span className="aem-hint" style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', display: 'block' }}>
+                Nome exibido no card oficial de realização do evento. Se vazio, utiliza o nome do local.
+              </span>
             </div>
 
             {/* Endereço */}

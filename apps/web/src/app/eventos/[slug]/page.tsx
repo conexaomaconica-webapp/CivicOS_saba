@@ -549,22 +549,40 @@ export default async function EventPage({ params }: PageProps) {
 
                   <div className="space-y-2">
                     {(() => {
-                      const isSameAsVenue = Boolean(
-                        event.organizer_name &&
-                        event.venue_name &&
-                        event.organizer_name.trim().toLowerCase() === event.venue_name.trim().toLowerCase()
-                      );
+                      let displayOrganizer = event.organizer_name?.trim() || '';
 
-                      const displayOrganizer =
-                        !isSameAsVenue && event.organizer_name
-                          ? event.organizer_name
-                          : event.organizer_type === 'platform' || event.category_id === 'institucional'
-                          ? 'Conexão Maçônica'
-                          : event.category_id === 'festividades'
-                          ? (event.title?.toLowerCase().includes('16') ? 'Loja Maçônica 16 de Junho' : 'Comissão Organizadora & Conexão Maçônica')
-                          : event.organizer_type === 'social_action'
-                          ? 'Ação Social Fraterna'
-                          : 'Loja Maçônica Promotora';
+                      if (
+                        !displayOrganizer ||
+                        displayOrganizer.toLowerCase() === 'loja maçônica promotora' ||
+                        displayOrganizer.toLowerCase() === 'loja maçônica'
+                      ) {
+                        if (
+                          event.venue_name &&
+                          (event.venue_name.toLowerCase().includes('loja') ||
+                            event.venue_name.toLowerCase().includes('templo') ||
+                            event.venue_name.toLowerCase().includes('augusta') ||
+                            event.venue_name.toLowerCase().includes('cavaleiro') ||
+                            event.venue_name.toLowerCase().includes('calaveiro') ||
+                            event.venue_name.toLowerCase().includes('16'))
+                        ) {
+                          displayOrganizer = event.venue_name;
+                        } else if (event.title?.toLowerCase().includes('16')) {
+                          displayOrganizer = 'Loja Maçônica 16 de Junho';
+                        } else if (
+                          event.title?.toLowerCase().includes('calaveiro') ||
+                          event.title?.toLowerCase().includes('cavaleiro')
+                        ) {
+                          displayOrganizer = 'Loja Maçônica Cavaleiros de Aço';
+                        } else if (event.organizer_type === 'platform' || event.category_id === 'institucional') {
+                          displayOrganizer = 'Conexão Maçônica';
+                        } else if (event.organizer_type === 'social_action') {
+                          displayOrganizer = 'Ação Social Fraterna';
+                        } else if (event.category_id === 'festividades') {
+                          displayOrganizer = 'Comissão Organizadora & Conexão Maçônica';
+                        } else {
+                          displayOrganizer = event.venue_name || 'Loja Maçônica Realizadora';
+                        }
+                      }
 
                       const explanationText =
                         event.organizer_type === 'platform' || event.category_id === 'institucional'
@@ -574,8 +592,8 @@ export default async function EventPage({ params }: PageProps) {
                           : event.organizer_type === 'business'
                           ? 'Empresa parceira com perfil homologado na vitrine comercial do Guia.'
                           : event.category_id === 'festividades'
-                          ? 'Comissão organizadora e integração da comunidade maçônica e amigos.'
-                          : 'Loja Maçônica regularizada e integrada à rede fraterna Conexão Maçônica.';
+                          ? `Organização e realização de ${displayOrganizer}, integrando a comunidade e a rede fraterna.`
+                          : `Realização oficial de ${displayOrganizer}, integrada à rede fraterna Conexão Maçônica.`;
 
                       return (
                         <>

@@ -556,6 +556,7 @@ function HomeBannerCarousel({
 
   const currentBanner = banners[currentIndex] ?? banners[0];
   if (!currentBanner) return null;
+  const hasMobileArt = Boolean(currentBanner.image_mobile_url);
   const bannerImg = currentBanner.image_mobile_url || currentBanner.image_desktop_url;
 
   const handlePrev = () => {
@@ -583,8 +584,22 @@ function HomeBannerCarousel({
     }
   };
 
+  const handleBannerClick = () => {
+    if (currentBanner.cta_url) {
+      const url = currentBanner.cta_url.trim();
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        window.open(url, '_blank');
+        return;
+      }
+      if (url.startsWith('/')) {
+        window.location.hash = url;
+        return;
+      }
+    }
+    onNavigate();
+  };
+
   const isImageOnly =
-    !currentBanner.title?.trim() &&
     !currentBanner.subtitle?.trim() &&
     !currentBanner.cta_text?.trim();
 
@@ -595,19 +610,23 @@ function HomeBannerCarousel({
       onTouchEnd={onTouchEnd}
     >
       <article
-        className="home-banner-card"
-        onClick={onNavigate}
+        className={`home-banner-card ${hasMobileArt ? 'is-mobile-art' : 'is-desktop-art'}`}
+        onClick={handleBannerClick}
         role="button"
         tabIndex={0}
       >
         {bannerImg && (
           <img
             src={bannerImg}
-            alt=""
-            className="home-banner-bg"
+            alt={currentBanner.title || 'Destaque'}
+            className={`home-banner-bg ${hasMobileArt ? 'object-cover' : 'object-contain'}`}
             loading="lazy"
             onError={(e) => {
-              e.currentTarget.style.display = 'none';
+              if (currentBanner.image_mobile_url && currentBanner.image_desktop_url && e.currentTarget.src !== currentBanner.image_desktop_url) {
+                e.currentTarget.src = currentBanner.image_desktop_url;
+              } else {
+                e.currentTarget.style.display = 'none';
+              }
             }}
           />
         )}

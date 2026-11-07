@@ -78,7 +78,7 @@ export default function AdminGuiaBannersPage() {
   const handleOpenModal = (banner?: Banner) => {
     if (banner) {
       setEditingBanner(banner);
-      setTitle(banner.title);
+      setTitle(banner.title || '');
       setSubtitle(banner.subtitle || '');
       setCtaText(banner.cta_text || '');
       setCtaUrl(banner.cta_url || '');
@@ -87,36 +87,41 @@ export default function AdminGuiaBannersPage() {
       setCity(banner.city || '');
       setDisplayOrder(banner.display_order);
       setIsActive(banner.is_active);
-      setContentMode(!banner.title?.trim() && !banner.subtitle?.trim() && !banner.cta_text?.trim() ? 'image_only' : 'image_text');
+      setContentMode(!banner.subtitle?.trim() && !banner.cta_text?.trim() ? 'image_only' : 'image_text');
     } else {
       setEditingBanner(null);
       setTitle('');
-      setSubtitle('DESTAQUE DA SEMANA');
-      setCtaText('Conhecer empresas');
+      setSubtitle('');
+      setCtaText('');
       setCtaUrl('/guia');
       setImageDesktopUrl('');
       setImageMobileUrl('');
       setCity('');
       setDisplayOrder(banners.length + 1);
       setIsActive(true);
-      setContentMode('image_text');
+      setContentMode('image_only');
     }
     setModalOpen(true);
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tenantId || !imageDesktopUrl || (contentMode === 'image_text' && !title.trim())) return;
+    if (!tenantId || !imageDesktopUrl) return;
+
+    if (!title.trim()) {
+      systemNotify({ type: 'warning', message: 'Preencha o título ou identificação do banner.' });
+      return;
+    }
 
     setSaving(true);
     try {
       const supabase = createClient();
       const payload = {
         tenant_id: tenantId,
-        title: contentMode === 'image_only' ? '' : title.trim(),
-        subtitle: contentMode === 'image_only' ? null : subtitle || null,
-        cta_text: contentMode === 'image_only' ? null : ctaText || null,
-        cta_url: contentMode === 'image_only' ? null : ctaUrl || null,
+        title: title.trim(),
+        subtitle: contentMode === 'image_only' ? null : subtitle.trim() || null,
+        cta_text: contentMode === 'image_only' ? null : ctaText.trim() || null,
+        cta_url: ctaUrl.trim() || null,
         image_desktop_url: imageDesktopUrl,
         image_mobile_url: imageMobileUrl || null,
         city: city || null,
@@ -192,11 +197,13 @@ export default function AdminGuiaBannersPage() {
           <div className="p-8 text-center text-gray-500 text-sm">Nenhum banner cadastrado. Clique no botão acima para adicionar o primeiro.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="bg-gray-50 text-gray-700 border-b font-semibold">
                 <tr>
-                  <th className="p-3">Ordem</th>
-                  <th className="p-3">Título</th>
+                  <th className="p-3 w-16">Ordem</th>
+                  <th className="p-3 w-28">Miniatura</th>
+                  <th className="p-3">Título / Identificação</th>
+                  <th className="p-3">Mobile</th>
                   <th className="p-3">Cidade</th>
                   <th className="p-3">Status</th>
                   <th className="p-3 text-right">Ações</th>
@@ -206,9 +213,50 @@ export default function AdminGuiaBannersPage() {
                 {banners.map((b) => (
                   <tr key={b.id} className="hover:bg-gray-50">
                     <td className="p-3 font-semibold text-amber-900">{b.display_order}</td>
+                    <td className="p-3">
+                      <div className="w-24 h-12 rounded border bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center relative shadow-2xs">
+                        {b.image_desktop_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={b.image_desktop_url}
+                            alt={b.title || 'Banner'}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-gray-400 text-xs">Sem foto</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="p-3 font-medium">
-                      <div>{b.title || 'Banner somente imagem'}</div>
-                      <div className="text-xs text-gray-400">{b.subtitle}</div>
+                      <div className="text-gray-900 font-semibold">{b.title || 'Banner sem título'}</div>
+                      {b.subtitle && <div className="text-xs text-gray-500">{b.subtitle}</div>}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                          {b.subtitle || b.cta_text ? 'Imagem com texto' : 'Somente imagem'}
+                        </span>
+                        {b.cta_url && (
+                          <span className="text-[10px] font-medium text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 truncate max-w-[200px]" title={b.cta_url}>
+                            Link: {b.cta_url}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      {b.image_mobile_url ? (
+                        <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium">
+                          <div className="w-9 h-9 rounded border overflow-hidden shrink-0 shadow-2xs">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={b.image_mobile_url} alt="Mobile" className="w-full h-full object-cover" />
+                          </div>
+                          <span className="text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded text-[11px] font-semibold border border-emerald-200">
+                            Mobile ✓
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                          Auto (Desktop)
+                        </span>
+                      )}
                     </td>
                     <td className="p-3">{b.city || 'Todas as Cidades'}</td>
                     <td className="p-3">
@@ -217,10 +265,10 @@ export default function AdminGuiaBannersPage() {
                       </span>
                     </td>
                     <td className="p-3 text-right space-x-2">
-                      <button onClick={() => handleOpenModal(b)} className="p-1.5 hover:bg-gray-100 rounded text-gray-700">
+                      <button onClick={() => handleOpenModal(b)} className="p-1.5 hover:bg-gray-100 rounded text-gray-700" title="Editar">
                         <Edit2 className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleDelete(b.id)} className="p-1.5 hover:bg-red-50 text-red-600 rounded">
+                      <button onClick={() => handleDelete(b.id)} className="p-1.5 hover:bg-red-50 text-red-600 rounded" title="Excluir">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </td>
@@ -247,54 +295,97 @@ export default function AdminGuiaBannersPage() {
               <fieldset>
                 <legend className="block text-xs font-semibold text-gray-700 mb-2">Formato do banner</legend>
                 <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => setContentMode('image_text')} className={`rounded-md border px-3 py-2 text-sm font-medium ${contentMode === 'image_text' ? 'border-amber-800 bg-amber-50 text-amber-900' : 'border-gray-200 text-gray-600'}`}>
-                    Imagem com texto
-                  </button>
                   <button type="button" onClick={() => setContentMode('image_only')} className={`rounded-md border px-3 py-2 text-sm font-medium ${contentMode === 'image_only' ? 'border-amber-800 bg-amber-50 text-amber-900' : 'border-gray-200 text-gray-600'}`}>
-                    Somente imagem
+                    Somente imagem (Arte Pronta)
+                  </button>
+                  <button type="button" onClick={() => setContentMode('image_text')} className={`rounded-md border px-3 py-2 text-sm font-medium ${contentMode === 'image_text' ? 'border-amber-800 bg-amber-50 text-amber-900' : 'border-gray-200 text-gray-600'}`}>
+                    Imagem com texto sobreposto
                   </button>
                 </div>
               </fieldset>
 
-              {contentMode === 'image_text' && <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Título Principal *</label>
-                  <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full px-3 py-1.5 border rounded-md text-sm" />
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Título / Identificação do Banner *</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                  placeholder="Ex: 51º Retrô Mega Flash Back, Palestra Dr. Lucas Almeida..."
+                  className="w-full px-3 py-1.5 border rounded-md text-sm"
+                />
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Serve para identificar o banner no painel e como texto alternativo (Alt/Acessibilidade/SEO).
+                </p>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Subtítulo / Tag</label>
-                  <input type="text" value={subtitle} onChange={(e) => setSubtitle(e.target.value)} className="w-full px-3 py-1.5 border rounded-md text-sm" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
+              {contentMode === 'image_text' ? (
+                <div className="space-y-3 bg-amber-50/50 p-3 rounded-lg border border-amber-100">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Texto do Botão CTA</label>
-                    <input type="text" value={ctaText} onChange={(e) => setCtaText(e.target.value)} className="w-full px-3 py-1.5 border rounded-md text-sm" />
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Subtítulo / Tag</label>
+                    <input
+                      type="text"
+                      value={subtitle}
+                      onChange={(e) => setSubtitle(e.target.value)}
+                      placeholder="Ex: DESTAQUE DA SEMANA, NOVIDADE..."
+                      className="w-full px-3 py-1.5 border rounded-md text-sm bg-white"
+                    />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Link do CTA (URL)</label>
-                    <input type="text" value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} className="w-full px-3 py-1.5 border rounded-md text-sm" />
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Texto do Botão CTA</label>
+                      <input
+                        type="text"
+                        value={ctaText}
+                        onChange={(e) => setCtaText(e.target.value)}
+                        placeholder="Ex: Conhecer empresas"
+                        className="w-full px-3 py-1.5 border rounded-md text-sm bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Link do CTA (URL)</label>
+                      <input
+                        type="text"
+                        value={ctaUrl}
+                        onChange={(e) => setCtaUrl(e.target.value)}
+                        placeholder="Ex: /guia ou /eventos/..."
+                        className="w-full px-3 py-1.5 border rounded-md text-sm bg-white"
+                      />
+                    </div>
                   </div>
                 </div>
-
-              </div>}
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Link de Destino ao Clicar no Banner (URL) (Opcional)</label>
+                  <input
+                    type="text"
+                    value={ctaUrl}
+                    onChange={(e) => setCtaUrl(e.target.value)}
+                    placeholder="Ex: /guia/empresa-slug ou /eventos/meu-evento ou https://..."
+                    className="w-full px-3 py-1.5 border rounded-md text-sm"
+                  />
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    Ao tocar ou clicar no banner, o usuário será direcionado para este endereço.
+                  </p>
+                </div>
+              )}
 
               <BannerImageField
-                label="Imagem Desktop *"
+                label="Imagem Desktop (Horizontal / Panorâmica) *"
                 value={imageDesktopUrl}
                 onChange={setImageDesktopUrl}
                 required
-                hint="Imagem larga (ex.: 851×207). É reduzida automaticamente (WebP, até ~450 KB)."
+                hint="Imagem horizontal larga (ex.: 851×207 ou 1200×400). Reduzida e otimizada automaticamente."
               />
 
               <BannerImageField
-                label="Imagem Mobile (opcional)"
+                label="Imagem Mobile (Específica para Celular - Opcional)"
                 value={imageMobileUrl}
                 onChange={setImageMobileUrl}
                 maxDimension={960}
                 maxBytes={220 * 1024}
-                hint="Sem uma imagem mobile, a imagem desktop também será usada no celular."
+                hint="Recomendado: Proporção 16:9 ou 4:3 (ex.: 800×450). Se não enviar, a imagem desktop será adaptada automaticamente sem cortes no celular."
               />
 
               <div className="grid grid-cols-2 gap-3">

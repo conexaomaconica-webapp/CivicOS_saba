@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
+import { uploadBrandAssetAction } from '@/app/actions/admin-brand-upload';
 import type { Database, Json } from '@/types/database.types';
 import {
   APPROVED_FONT_STACKS,
@@ -495,31 +496,23 @@ export default function BrandStudioPage() {
                 />
               </Field>
 
-              <Field label="Logotipo (URL)">
-                <input
-                  type="url"
-                  value={form.logoUrl}
-                  placeholder="https://…/logo.png"
-                  onChange={(e) => setField('logoUrl', e.target.value)}
-                  style={inputStyle}
-                />
-                {form.logoUrl && (
-                  <div style={{ marginTop: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                    <img src={form.logoUrl} alt="" width={40} height={40} style={{ objectFit: 'contain', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-tertiary)' }} />
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>Pré-visualização do logotipo.</span>
-                  </div>
-                )}
-              </Field>
+              <BrandAssetUploadField
+                label="Logotipo do portal"
+                value={form.logoUrl}
+                assetType="logo"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                hint="Exibido no cabeçalho e navegação. Recomendado: PNG com fundo transparente ou SVG vetorial."
+                onChange={(url) => setField('logoUrl', url)}
+              />
 
-              <Field label="Favicon (URL)">
-                <input
-                  type="url"
-                  value={form.faviconUrl}
-                  placeholder="https://…/favicon.ico"
-                  onChange={(e) => setField('faviconUrl', e.target.value)}
-                  style={inputStyle}
-                />
-              </Field>
+              <BrandAssetUploadField
+                label="Favicon do portal"
+                value={form.faviconUrl}
+                assetType="favicon"
+                accept="image/x-icon,image/vnd.microsoft.icon,image/png,image/svg+xml"
+                hint="Ícone exibido na aba do navegador e atalhos de celular. Recomendado: ICO ou PNG quadrado (32×32 ou 64×64)."
+                onChange={(url) => setField('faviconUrl', url)}
+              />
             </section>
 
             {/* Cores */}
@@ -704,11 +697,57 @@ export default function BrandStudioPage() {
                 boxShadow: 'var(--shadow-lg)',
               }}
             >
+              {/* Mock browser header com Favicon */}
+              <div
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  borderBottom: '1px solid var(--border-default)',
+                  padding: '6px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                }}
+              >
+                <div style={{ display: 'flex', gap: '5px' }}>
+                  <span style={{ width: 9, height: 9, borderRadius: '50%', backgroundColor: '#ef4444', display: 'inline-block' }} />
+                  <span style={{ width: 9, height: 9, borderRadius: '50%', backgroundColor: '#eab308', display: 'inline-block' }} />
+                  <span style={{ width: 9, height: 9, borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block' }} />
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    backgroundColor: 'var(--bg-primary)',
+                    padding: '2px 10px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    border: '1px solid var(--border-default)',
+                    maxWidth: '220px',
+                  }}
+                >
+                  {form.faviconUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={form.faviconUrl} alt="Favicon" width={14} height={14} style={{ objectFit: 'contain', flexShrink: 0 }} />
+                  ) : (
+                    <span style={{ width: 12, height: 12, borderRadius: '2px', backgroundColor: 'var(--accent)', flexShrink: 0 }} />
+                  )}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '500' }}>
+                    {form.appName || tenant?.name || 'Conexão Maçônica'}
+                  </span>
+                </div>
+              </div>
+
               {/* Mock app chrome */}
               <div style={{ display: 'flex', minHeight: 340 }}>
-                <aside style={{ width: 168, backgroundColor: 'var(--bg-secondary)', borderRight: '1px solid var(--border-default)', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                <aside style={{ width: 175, backgroundColor: 'var(--bg-secondary)', borderRight: '1px solid var(--border-default)', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border-default)' }}>
-                    <span style={{ width: 20, height: 20, borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--accent)', display: 'block' }} />
+                    {form.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={form.logoUrl} alt="Logo" style={{ maxHeight: 26, maxWidth: 44, objectFit: 'contain' }} />
+                    ) : (
+                      <span style={{ width: 20, height: 20, borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--accent)', display: 'block', flexShrink: 0 }} />
+                    )}
                     <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-bold)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {form.appName || tenant?.name || 'Portal'}
                     </span>
@@ -920,5 +959,161 @@ function ColorField({
         {invalid ? 'Código hex inválido — use o formato #RRGGBB.' : hint}
       </p>
     </Field>
+  );
+}
+
+function BrandAssetUploadField({
+  label,
+  value,
+  assetType,
+  hint,
+  accept,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  assetType: 'logo' | 'favicon';
+  hint: string;
+  accept: string;
+  onChange: (url: string) => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setError(null);
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.set('file', file);
+      const res = await uploadBrandAssetAction(formData, assetType);
+
+      if (!res.success) {
+        setError(res.error);
+        return;
+      }
+
+      onChange(res.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao enviar imagem.');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+      <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-bold)' }}>{label}</label>
+
+      {/* Miniatura do item atual salvo */}
+      {value ? (
+        <div
+          style={{
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 'var(--space-3)',
+            backgroundColor: '#1b090f',
+            border: '1px solid rgba(197, 155, 39, 0.3)',
+            borderRadius: 'var(--radius-lg)',
+            minHeight: assetType === 'logo' ? '85px' : '60px',
+            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3)',
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={value}
+            alt={label}
+            style={{
+              maxHeight: assetType === 'logo' ? '60px' : '36px',
+              maxWidth: '100%',
+              objectFit: 'contain',
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            title="Remover"
+            style={{
+              position: 'absolute',
+              top: '6px',
+              right: '6px',
+              padding: '2px 8px',
+              fontSize: '11px',
+              fontWeight: '600',
+              color: '#ef4444',
+              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              borderRadius: 'var(--radius-sm)',
+              cursor: 'pointer',
+            }}
+          >
+            Remover
+          </button>
+        </div>
+      ) : null}
+
+      {/* Botão de upload e input file */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={accept}
+          style={{ display: 'none' }}
+          onChange={handleFileChange}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          style={{
+            ...buttonStyle.secondary,
+            fontSize: 'var(--text-xs)',
+            padding: '6px 14px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            cursor: uploading ? 'not-allowed' : 'pointer',
+            backgroundColor: 'var(--accent-subtle)',
+            color: 'var(--accent-active)',
+            borderColor: 'var(--accent)',
+            fontWeight: '600',
+          }}
+        >
+          {uploading
+            ? 'Enviando…'
+            : value
+            ? `Trocar ${assetType === 'logo' ? 'Logotipo' : 'Favicon'}`
+            : `Fazer upload do ${assetType === 'logo' ? 'Logotipo' : 'Favicon'}`}
+        </button>
+        <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+          {assetType === 'logo' ? 'PNG, JPG, WebP ou SVG (máx. 2,5 MB)' : 'ICO, PNG ou SVG'}
+        </span>
+      </div>
+
+      {/* Input de texto para URL caso prefira digitar */}
+      <input
+        type="url"
+        value={value}
+        placeholder={assetType === 'logo' ? '…ou cole o link (URL) do logotipo' : '…ou cole o link (URL) do favicon'}
+        onChange={(e) => onChange(e.target.value)}
+        style={inputStyle}
+      />
+
+      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{hint}</span>
+
+      {error && (
+        <span style={{ fontSize: '11px', color: 'var(--color-error-500)', fontWeight: 'bold' }}>
+          {error}
+        </span>
+      )}
+    </div>
   );
 }
