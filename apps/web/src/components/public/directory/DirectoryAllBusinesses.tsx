@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import {
   Search,
@@ -14,7 +13,8 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { normalizeSearchTerm } from '@/lib/directory/normalize-search';
-import { BusinessCard } from './BusinessCard';
+import { BusinessCard, type BusinessCardData } from './BusinessCard';
+import { BusinessListCard } from './BusinessListCard';
 
 export type PublicSearchResultItem = {
   id: string;
@@ -313,62 +313,13 @@ export function DirectoryAllBusinesses({
         </div>
       ) : (
         /* List Mode */
-        <div className="space-y-3 my-6">
-          {items.map((biz) => (
-            <div key={biz.id} className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:shadow-sm transition-shadow">
-              <div className="flex items-center gap-4">
-                {(() => {
-                  const customBg = (biz as any).logo_background_color?.trim();
-                  const hasCustomBg = Boolean(
-                    customBg &&
-                    customBg.toLowerCase() !== '#ffffff' &&
-                    customBg.toLowerCase() !== '#fff' &&
-                    customBg.toLowerCase() !== 'white'
-                  );
-                  return (
-                    <div
-                      className={`w-12 h-12 rounded-lg border flex items-center justify-center shrink-0 overflow-hidden p-1 ${
-                        biz.logo_url ? '' : 'bg-amber-950 text-amber-400 font-bold border-amber-900'
-                      }`}
-                      style={
-                        biz.logo_url
-                          ? {
-                              backgroundColor: hasCustomBg ? customBg : '#ffffff',
-                              borderColor: hasCustomBg ? customBg : 'rgb(231 229 228)',
-                            }
-                          : undefined
-                      }
-                    >
-                      {biz.logo_url ? (
-                        <img
-                          src={biz.logo_url}
-                          alt={biz.name}
-                          loading="lazy"
-                          decoding="async"
-                          className="max-w-full max-h-full object-contain object-center"
-                        />
-                      ) : (
-                        biz.name.slice(0, 2).toUpperCase()
-                      )}
-                    </div>
-                  );
-                })()}
-                <div>
-                  <h3 className="font-bold text-gray-900 text-base">{biz.name}</h3>
-                  <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
-                    {biz.category_name && <span className="font-semibold text-amber-900">{biz.category_name}</span>}
-                    {biz.city && <span>· {biz.city}, {biz.state}</span>}
-                  </div>
-                </div>
-              </div>
-
-              <Link
-                href={`/guia/${biz.slug}`}
-                className="text-xs font-bold bg-amber-900 text-white px-4 py-2 rounded-md hover:bg-amber-800 transition-colors shrink-0"
-              >
-                Ver empresa
-              </Link>
-            </div>
+        <div className="space-y-4 my-6">
+          {items.map((biz, idx) => (
+            <BusinessListCard
+              key={biz.id}
+              data={biz as unknown as BusinessCardData}
+              priority={idx === 0}
+            />
           ))}
         </div>
       )}

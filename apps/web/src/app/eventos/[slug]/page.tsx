@@ -588,12 +588,12 @@ export default async function EventPage({ params }: PageProps) {
                         event.organizer_type === 'platform' || event.category_id === 'institucional'
                           ? 'Evento oficial promovido e coordenado pela plataforma Conexão Maçônica.'
                           : event.organizer_type === 'social_action'
-                          ? 'Iniciativa beneficente fraterna em prol da solidariedade e assistência social.'
-                          : event.organizer_type === 'business'
-                          ? 'Empresa parceira com perfil homologado na vitrine comercial do Guia.'
-                          : event.category_id === 'festividades'
-                          ? `Organização e realização de ${displayOrganizer}, integrando a comunidade e a rede fraterna.`
-                          : `Realização oficial de ${displayOrganizer}, integrada à rede fraterna Conexão Maçônica.`;
+                            ? 'Iniciativa beneficente fraterna em prol da solidariedade e assistência social.'
+                            : event.organizer_type === 'business'
+                              ? 'Empresa parceira com perfil homologado na vitrine comercial do Guia.'
+                              : event.category_id === 'festividades'
+                                ? `Organização e realização de ${displayOrganizer}, integrando a comunidade e a rede fraterna.`
+                                : `Realização oficial de ${displayOrganizer}, integrada à rede fraterna Conexão Maçônica.`;
 
                       return (
                         <>

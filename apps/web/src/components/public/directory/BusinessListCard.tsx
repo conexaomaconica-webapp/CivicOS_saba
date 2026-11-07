@@ -116,14 +116,14 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discover
   // Pedra Fundamental e Empresa Fundadora são reconhecimentos institucionais, não planos: aparecem à direita (selo)
   // e nunca no lugar do plano.
   const resolveBadge = () => {
-    const plan = (data.effective_plan_code || '').toLowerCase().trim();
+    const plan = (data.effective_plan_code || (data as any).plan_tier || '').toLowerCase().trim();
     if (plan === 'ouro' || plan === 'gold' || plan === 'ouro_founder' || plan === 'acacia') {
-      return { label: 'Acácia', bg: 'bg-[#fdf8eb] text-[#855e10] border-[#e8d7ad] font-semibold', icon: Crown };
+      return { label: 'Plano Acácia', bg: 'bg-[#fdf8eb] text-[#855e10] border-[#e8d7ad] font-semibold', icon: Crown };
     }
     if (plan === 'prata' || plan === 'silver' || plan === 'compasso') {
-      return { label: 'Compasso', bg: 'bg-slate-100 text-slate-800 border-slate-300 font-semibold', icon: Award };
+      return { label: 'Plano Compasso', bg: 'bg-slate-100 text-slate-800 border-slate-300 font-semibold', icon: Award };
     }
-    return { label: 'Esquadro', bg: 'bg-orange-50 text-amber-900 border-orange-200 font-semibold', icon: ShieldCheck };
+    return { label: 'Plano Esquadro', bg: 'bg-orange-50 text-amber-900 border-orange-200 font-semibold', icon: ShieldCheck };
   };
 
   const badge = resolveBadge();
@@ -152,7 +152,7 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discover
 
           return (
             <div
-              className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-2 flex items-center justify-center overflow-hidden shrink-0 shadow-xs p-2 transition-all duration-300 ease-out group-hover:scale-105 hover:!scale-115 hover:shadow-xl hover:border-amber-400 cursor-pointer ${
+              className={`relative w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 rounded-2xl border-2 flex items-center justify-center overflow-hidden shrink-0 shadow-xs p-2 md:p-3 transition-all duration-300 ease-out group-hover:scale-105 hover:!scale-110 hover:shadow-xl hover:border-amber-400 cursor-pointer ${
                 data.logo_url ? '' : 'bg-amber-950 text-amber-400 font-bold'
               }`}
               style={
@@ -174,39 +174,42 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discover
                   className="max-w-full max-h-full object-contain object-center transition-transform duration-300 ease-out group-hover:scale-105 hover:scale-110"
                 />
               ) : (
-                <span className="text-xl sm:text-2xl font-bold">{data.name.slice(0, 2).toUpperCase()}</span>
+                <span className="text-xl sm:text-2xl md:text-3xl font-bold">{data.name.slice(0, 2).toUpperCase()}</span>
               )}
             </div>
           );
         })()}
 
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-serif font-bold text-gray-900 text-base group-hover:text-amber-900 transition-colors">
+            <h3 className="font-serif font-bold text-gray-900 text-base md:text-lg group-hover:text-amber-900 transition-colors">
               {data.name}
             </h3>
             
-            {/* Selo Principal */}
-            <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-semibold ${badge.bg}`}>
-              <badge.icon className="w-3 h-3 shrink-0 text-amber-800" />
+            {/* Selo Principal do Plano */}
+            <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] md:text-xs font-semibold ${badge.bg}`}>
+              <badge.icon className="w-3 h-3 md:w-3.5 md:h-3.5 shrink-0 text-amber-800" />
               <span>{badge.label}</span>
             </div>
           </div>
 
-          <p className="text-xs text-stone-500 flex items-center gap-2 mt-1 flex-wrap">
+          <p className="text-xs md:text-sm text-stone-500 flex items-center gap-2 mt-1 flex-wrap">
             {data.category_name && <span className="font-semibold text-amber-900">{data.category_name}</span>}
             {locationStr && <span>· {locationStr}</span>}
             {hasRealRating && (
               <span className="flex items-center gap-1 font-semibold text-stone-700">
-                · <Star className="w-3 h-3 fill-amber-400 text-amber-400" /> {data.rating_average} ({data.reviews_count})
+                · <Star className="w-3 h-3 md:w-3.5 md:h-3.5 fill-amber-400 text-amber-400" /> {data.rating_average} ({data.reviews_count})
               </span>
             )}
-            {typeof data.views_count === 'number' && (
+            {data.views_count != null && (
               <span
-                className="flex items-center gap-1 font-medium text-stone-500"
+                className="inline-flex items-center gap-1 font-medium text-stone-600 bg-stone-100/90 px-2 py-0.5 rounded-md text-[11px] md:text-xs"
                 title="Visualizações da página da empresa"
               >
-                · <Eye className="w-3 h-3 text-stone-400" /> {data.views_count.toLocaleString('pt-BR')} {data.views_count === 1 ? 'visualização' : 'visualizações'}
+                <Eye className="w-3.5 h-3.5 text-stone-500 shrink-0" />
+                <span>
+                  {Number(data.views_count || 0).toLocaleString('pt-BR')} {Number(data.views_count || 0) === 1 ? 'view' : 'views'}
+                </span>
               </span>
             )}
           </p>
@@ -307,10 +310,10 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discover
             onClick={handleToggleFavorite}
             aria-pressed={favorited}
             title={favorited ? 'Remover dos favoritos' : 'Favoritar'}
-            className={`inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            className={`inline-flex min-h-9 md:min-h-10 items-center gap-1.5 rounded-xl border px-3 py-1.5 md:px-3.5 md:py-2 text-xs md:text-sm font-semibold transition-colors cursor-pointer ${
               favorited
-                ? 'border-red-200 bg-red-50 text-red-700'
-                : 'border-stone-300 bg-white text-stone-700 hover:border-red-200 hover:bg-red-50 hover:text-red-700'
+                ? 'border-red-200 bg-red-50 text-red-700 shadow-2xs'
+                : 'border-stone-300 bg-white text-stone-700 hover:border-red-200 hover:bg-red-50 hover:text-red-700 shadow-2xs'
             }`}
           >
             <Heart className={`h-4 w-4 ${favorited ? 'fill-red-600 text-red-600' : ''}`} />
@@ -323,7 +326,7 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discover
             onClick={handleShare}
             title="Indicar empresa"
             aria-label="Indicar empresa"
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-900"
+            className="inline-flex min-h-9 md:min-h-10 items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3 py-1.5 md:px-3.5 md:py-2 text-xs md:text-sm font-semibold text-stone-700 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-900 cursor-pointer shadow-2xs"
           >
             <Share2 className="h-4 w-4" />
             <span>Indicar</span>
@@ -334,7 +337,7 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discover
           {onViewOnMap && (
             <button
               onClick={() => onViewOnMap(data.slug)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-stone-300 text-stone-700 font-semibold text-xs hover:bg-stone-100 transition-colors"
+              className="inline-flex items-center gap-1 px-3 py-1.5 md:min-h-10 rounded-xl border border-stone-300 text-stone-700 font-semibold text-xs md:text-sm hover:bg-stone-100 transition-colors cursor-pointer shadow-2xs"
             >
               <Map className="w-3.5 h-3.5 text-stone-500" />
               <span>Ver no mapa</span>
@@ -343,7 +346,7 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discover
 
           <Link
             href={discoverySource ? `/guia/${data.slug}?src=${discoverySource}` : `/guia/${data.slug}`}
-            className="inline-flex items-center justify-center px-4 py-1.5 rounded-xl border border-[#5d1523] text-[#5d1523] font-bold text-xs hover:bg-[#5d1523] hover:text-white transition-colors"
+            className="inline-flex items-center justify-center px-4 py-1.5 md:px-5 md:py-2 md:min-h-10 rounded-xl border border-[#5d1523] text-[#5d1523] font-bold text-xs md:text-sm hover:bg-[#5d1523] hover:text-white transition-colors cursor-pointer shadow-2xs"
           >
             Ver empresa
           </Link>
