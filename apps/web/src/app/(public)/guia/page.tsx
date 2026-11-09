@@ -15,6 +15,7 @@ import { DirectoryHero } from '@/components/public/directory/DirectoryHero';
 import { DirectoryCarousel, type DirectoryBannerItem } from '@/components/public/directory/DirectoryCarousel';
 import { DirectoryCategories, type DirectoryCategoryItem } from '@/components/public/directory/DirectoryCategories';
 import { DirectorySponsored, type DirectorySponsoredItem } from '@/components/public/directory/DirectorySponsored';
+import { DirectoryFoundersMarquee } from '@/components/public/directory/DirectoryFoundersMarquee';
 import { DirectoryAllBusinesses, type PublicSearchResultItem } from '@/components/public/directory/DirectoryAllBusinesses';
 import { DirectoryMapExplore } from '@/components/public/directory/DirectoryMapExplore';
 import { DirectoryLodgesGuide } from '@/components/public/directory/DirectoryLodgesGuide';
@@ -424,6 +425,67 @@ export default async function GuiaPage({ searchParams }: Props) {
     } catch (_spErr) { }
   }
 
+  // Empresas Fundadoras — Pedra Fundamental (reconhecimento histórico dedicado)
+  let foundersItems: DirectorySponsoredItem[] = [];
+  try {
+    const { data: pfRecs } = await (supabase as any)
+      .from('business_recognitions')
+      .select('business_id, businesses!inner(id, slug, name, description, logo_url, plan_tier, category, is_active, publication_status, business_locations(city, state, is_headquarters))')
+      .eq('recognition_key', 'pedra_fundamental')
+      .eq('is_active', true)
+      .eq('businesses.is_active', true)
+      .eq('businesses.publication_status', 'published');
+
+    if (pfRecs && pfRecs.length > 0) {
+      foundersItems = pfRecs.map((r: any) => {
+        const b = r.businesses;
+        const locs = pickHeadquarters(b.business_locations) ?? { city: null, state: null };
+        return {
+          id: b.id,
+          slug: b.slug,
+          name: b.name,
+          short_description: b.description ? b.description.slice(0, 200) : '',
+          logo_url: b.logo_url,
+          cover_url: null,
+          category_name: b.category,
+          city: locs.city || null,
+          state: locs.state || null,
+          is_pedra_fundamental: true,
+        };
+      });
+    }
+
+    // Fallback: se não houver registros em business_recognitions, buscar por flag is_pedra_fundamental
+    if (foundersItems.length === 0) {
+      const { data: pfBiz } = await (supabase as any)
+        .from('businesses')
+        .select('id, slug, name, description, logo_url, plan_tier, category, business_locations(city, state, is_headquarters)')
+        .eq('is_pedra_fundamental', true)
+        .eq('publication_status', 'published')
+        .eq('is_active', true);
+
+      if (pfBiz && pfBiz.length > 0) {
+        foundersItems = pfBiz.map((b: any) => {
+          const locs = pickHeadquarters(b.business_locations) ?? { city: null, state: null };
+          return {
+            id: b.id,
+            slug: b.slug,
+            name: b.name,
+            short_description: b.description ? b.description.slice(0, 200) : '',
+            logo_url: b.logo_url,
+            cover_url: null,
+            category_name: b.category,
+            city: locs.city || null,
+            state: locs.state || null,
+            is_pedra_fundamental: true,
+          };
+        });
+      }
+    }
+  } catch (_pfErr) {
+    // Degradação graciosa
+  }
+
   // Fallback exclusivo de empresas comerciais publicadas (SEM incluir organizações/Lojas Maçônicas)
   if (!availableCities || availableCities.length === 0) {
     try {
@@ -495,6 +557,7 @@ export default async function GuiaPage({ searchParams }: Props) {
     new Set([
       ...businessItems.map((b) => b.id),
       ...sponsored.map((b) => b.id),
+      ...foundersItems.map((b) => b.id),
     ].filter(Boolean))
   );
 
@@ -540,6 +603,10 @@ export default async function GuiaPage({ searchParams }: Props) {
         item.logo_background_color = logoBgMap[item.id] || null;
       });
       sponsored.forEach((item) => {
+        item.views_count = countsMap[item.id] ?? 0;
+        item.logo_background_color = logoBgMap[item.id] || null;
+      });
+      foundersItems.forEach((item) => {
         item.views_count = countsMap[item.id] ?? 0;
         item.logo_background_color = logoBgMap[item.id] || null;
       });
@@ -662,12 +729,14 @@ export default async function GuiaPage({ searchParams }: Props) {
     // Convite em destaque: registrar visita ou negócio com foto e comentário
     connections_cta: <DirectoryConnectionsCta />,
     categories: <DirectoryCategories categories={homeCategories} />,
+    pedra_fundamental: <DirectoryFoundersMarquee items={foundersItems} />,
     sponsored: (
       <DirectorySponsored
         items={sponsored}
         displayMode={sponsoredDisplayMode}
         speed={sponsoredSpeed}
         logoStyle={sponsoredLogoStyle}
+        title="Empresas em Destaque"
       />
     ),
     // Mural de Conexões: prova social e convite para registrar uma conexão (fotos opcionais)

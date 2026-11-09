@@ -11,12 +11,14 @@ type DirectorySponsoredProps = {
   displayMode?: 'cards' | 'logos';
   speed?: number;
   logoStyle?: 'standard' | 'clean';
+  title?: string;
 };
 
 export function DirectorySponsored({
   items = [],
   displayMode = 'logos',
   speed = 40,
+  title = 'Empresas em Destaque',
 }: DirectorySponsoredProps) {
   if (!items.length) return null;
 
@@ -30,10 +32,9 @@ export function DirectorySponsored({
 
     return (
       <section className="dh-container dh-mobile-visible-section py-4" id="patrocinadas">
-        {/* Título Pequeno e Discreto: Empresas — Pedra Fundamental (substituindo o título grande) */}
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs font-bold uppercase tracking-wider text-[#4b161b]">
-            Empresas — Pedra Fundamental
+            {title}
           </p>
         </div>
 
@@ -65,6 +66,7 @@ export function DirectorySponsored({
                     style={{ backgroundColor: bgColor }}
                   >
                     {biz.logo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={biz.logo_url}
                         alt={biz.name || 'Logo da empresa'}
@@ -95,11 +97,11 @@ export function DirectorySponsored({
     <section className="dh-container dh-mobile-visible-section py-4" id="patrocinadas">
       <div className="mb-3">
         <p className="text-xs font-bold uppercase tracking-wider text-[#4b161b]">
-          Empresas — Pedra Fundamental
+          {title}
         </p>
       </div>
 
-      {/* Grid de 3 colunas para Empresas Patrocinadas */}
+      {/* Grid de 3 colunas para Empresas Patrocinadas / Destaques */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
         {items.map((biz, idx) => (
           <BusinessCard key={biz.id} data={biz} variant="featured" discoverySource="featured_sponsored" priority={idx === 0} />

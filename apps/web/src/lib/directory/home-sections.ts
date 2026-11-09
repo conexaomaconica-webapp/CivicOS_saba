@@ -7,7 +7,7 @@ export const HOME_SECTIONS = [
   { id: 'carousel', label: 'Banner Carrossel (Destaque da Semana)' },
   { id: 'connections_cta', label: 'Card de divulgação do Mural de Conexões' },
   { id: 'categories', label: 'Categorias em Destaque' },
-  { id: 'sponsored', label: 'Empresas Patrocinadas' },
+  { id: 'sponsored', label: 'Empresas em Destaque / Patrocinadas' },
   { id: 'connections_mural', label: 'Mural de Conexões' },
   { id: 'all_businesses', label: 'Diretório "Todas as Empresas" (Com Paginação)' },
   { id: 'map', label: 'Mapa "Explore perto de você"' },

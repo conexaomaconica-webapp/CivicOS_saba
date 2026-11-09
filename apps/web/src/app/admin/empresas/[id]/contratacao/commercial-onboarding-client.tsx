@@ -37,6 +37,7 @@ import {
 import type { AdminBusiness360DTO } from '@/lib/admin/admin-businesses-service';
 import {
   confirmAdminCommercialTermsAction,
+  confirmAdminPermutaOrParceriaPaymentAction,
   saveAdminBusinessContractAddressAction,
   reconcileMasonicCommercialStatus,
 } from '@/lib/admin/admin-businesses-service';
@@ -144,9 +145,13 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
   const [billingCycle, setBillingCycle] = useState<'annual' | 'biennial'>(
     savedTerms?.billing_cycle || (business.is_pedra_fundamental ? 'biennial' : 'annual')
   );
-  const [paymentMethod, setPaymentMethod] = useState<'avista' | 'parcelado'>(
-    savedTerms?.payment_method || 'avista'
+  const [paymentMethod, setPaymentMethod] = useState<'avista' | 'parcelado' | 'permuta_100' | 'permuta_50' | 'parceria'>(
+    (savedTerms?.payment_method as any) || 'avista'
   );
+  const [permutaDescription, setPermutaDescription] = useState<string>(
+    (savedTerms as any)?.permuta_description || ''
+  );
+  const [isConfirmingPermuta, setIsConfirmingPermuta] = useState(false);
   const [installmentsCount, setInstallmentsCount] = useState<number>(
     savedTerms?.installments_count ||
       (savedTerms?.payment_method === 'parcelado' ? (isPedraFundamental ? 4 : 2) : 1)
@@ -449,13 +454,21 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
     }
   };
 
-  const handlePaymentMethodChange = (method: 'avista' | 'parcelado') => {
+  const handlePaymentMethodChange = (method: 'avista' | 'parcelado' | 'permuta_100' | 'permuta_50' | 'parceria') => {
     setPaymentMethod(method);
     setFeedback(null);
+    if (method === 'permuta_100' || method === 'parceria') {
+      setAmountCents(0);
+      setInstallmentsCount(1);
+      return;
+    }
     if (isPedraFundamental) {
       if (method === 'avista') {
         setAmountCents(120000);
         setInstallmentsCount(1);
+      } else if (method === 'permuta_50') {
+        setAmountCents(60000);
+        setInstallmentsCount(2);
       } else {
         setAmountCents(130000);
         setInstallmentsCount(4);
@@ -465,6 +478,9 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
       if (method === 'avista') {
         setAmountCents(preset.payInFullCents);
         setInstallmentsCount(1);
+      } else if (method === 'permuta_50') {
+        setAmountCents(Math.round(preset.payInFullCents / 2));
+        setInstallmentsCount(2);
       } else {
         setAmountCents(preset.installmentTotalCents);
         setInstallmentsCount(preset.installmentsMax);
@@ -472,9 +488,29 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
     }
   };
 
+  const handleConfirmPermutaPayment = async () => {
+    setIsConfirmingPermuta(true);
+    try {
+      const res = await confirmAdminPermutaOrParceriaPaymentAction(
+        business.id,
+        permutaDescription ? `Permuta/Parceria: ${permutaDescription}` : undefined
+      );
+      if (res.success) {
+        setCommercialStatus('pagamento_confirmado');
+        setFeedback({ type: 'success', message: 'Permuta/Parceria confirmada! Prontuário 360 liberado para configuração.' });
+      } else {
+        setFeedback({ type: 'error', message: res.error || 'Falha ao confirmar permuta/parceria.' });
+      }
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err?.message || 'Erro inesperado.' });
+    } finally {
+      setIsConfirmingPermuta(false);
+    }
+  };
+
   const maxInstallmentsAllowed = isPedraFundamental ? 4 : PLAN_PRESETS[selectedPlan].installmentsMax;
   const calculatedInstallmentValueCents =
-    paymentMethod === 'avista'
+    paymentMethod === 'avista' || paymentMethod === 'permuta_100' || paymentMethod === 'parceria'
       ? amountCents
       : Math.round(amountCents / Math.max(1, installmentsCount));
 
@@ -482,8 +518,10 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
   const handleConfirmCommercialTerms = () => {
     setFeedback(null);
 
+    const isFree = paymentMethod === 'permuta_100' || paymentMethod === 'parceria';
+
     // Validação client-side
-    if (amountCents <= 0) {
+    if (!isFree && amountCents <= 0) {
       setFeedback({ type: 'error', message: 'O valor contratado deve ser maior que zero.' });
       return;
     }
@@ -494,9 +532,11 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
         plan_code: selectedPlan,
         billing_cycle: billingCycle,
         payment_method: paymentMethod,
-        amount_cents: amountCents,
-        installments_count: paymentMethod === 'avista' ? 1 : installmentsCount,
-        installment_amount_cents: calculatedInstallmentValueCents,
+        commercial_modality: isFree ? paymentMethod : paymentMethod === 'permuta_50' ? 'permuta_50' : 'padrao',
+        permuta_description: permutaDescription.trim() || undefined,
+        amount_cents: isFree ? 0 : amountCents,
+        installments_count: (paymentMethod === 'avista' || isFree) ? 1 : installmentsCount,
+        installment_amount_cents: isFree ? 0 : calculatedInstallmentValueCents,
         is_pedra_fundamental: isPedraFundamental,
         notes: notes.trim() || undefined,
         contract_start_date: contractStartDate.trim() || null,
@@ -1808,16 +1848,16 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
             )}
           </div>
 
-          {/* Forma de Pagamento */}
+          {/* Forma de Pagamento / Condição Comercial */}
           <div className="space-y-3">
             <span className="text-xs font-bold text-stone-700 uppercase tracking-wider block">
-              3. Condição de Pagamento
+              3. Condição de Pagamento & Modalidade Comercial
             </span>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => handlePaymentMethodChange('avista')}
-                className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 rounded-xl border text-xs font-bold transition ${paymentMethod === 'avista'
+                className={`flex flex-col items-start justify-between gap-1.5 p-3 rounded-xl border text-xs font-bold transition text-left ${paymentMethod === 'avista'
                   ? 'border-[#3B0B14] bg-[#3B0B14]/5 text-[#3B0B14]'
                   : 'border-stone-200 text-stone-600 hover:bg-stone-50'
                   }`}
@@ -1826,15 +1866,17 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
                   <CreditCard className="h-4 w-4 shrink-0" />
                   <span>À vista (PIX / Cartão 1x)</span>
                 </div>
-                {isPedraFundamental && (
+                {isPedraFundamental ? (
                   <span className="text-[10px] font-semibold text-stone-500">R$ 1.200,00</span>
+                ) : (
+                  <span className="text-[10px] font-semibold text-stone-500">100% faturado à vista</span>
                 )}
               </button>
 
               <button
                 type="button"
                 onClick={() => handlePaymentMethodChange('parcelado')}
-                className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 rounded-xl border text-xs font-bold transition ${paymentMethod === 'parcelado'
+                className={`flex flex-col items-start justify-between gap-1.5 p-3 rounded-xl border text-xs font-bold transition text-left ${paymentMethod === 'parcelado'
                   ? 'border-[#3B0B14] bg-[#3B0B14]/5 text-[#3B0B14]'
                   : 'border-stone-200 text-stone-600 hover:bg-stone-50'
                   }`}
@@ -1843,11 +1885,82 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
                   <CreditCard className="h-4 w-4 shrink-0" />
                   <span>Parcelado no Cartão</span>
                 </div>
-                {isPedraFundamental && (
+                {isPedraFundamental ? (
                   <span className="text-[10px] font-semibold text-emerald-700">Até 4x de R$ 325,00</span>
+                ) : (
+                  <span className="text-[10px] font-semibold text-emerald-700">Até {PLAN_PRESETS[selectedPlan].installmentsMax}x sem juros</span>
                 )}
               </button>
+
+              <button
+                type="button"
+                onClick={() => handlePaymentMethodChange('permuta_100')}
+                className={`flex flex-col items-start justify-between gap-1.5 p-3 rounded-xl border text-xs font-bold transition text-left ${paymentMethod === 'permuta_100'
+                  ? 'border-emerald-600 bg-emerald-50 text-emerald-900 shadow-2xs'
+                  : 'border-stone-200 text-stone-600 hover:bg-stone-50'
+                  }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span>Permuta 100%</span>
+                </div>
+                <span className="text-[10px] font-semibold text-emerald-700">Sem cobrança (Contrapartida total)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handlePaymentMethodChange('permuta_50')}
+                className={`flex flex-col items-start justify-between gap-1.5 p-3 rounded-xl border text-xs font-bold transition text-left ${paymentMethod === 'permuta_50'
+                  ? 'border-emerald-600 bg-emerald-50 text-emerald-900 shadow-2xs'
+                  : 'border-stone-200 text-stone-600 hover:bg-stone-50'
+                  }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span>Permuta 50%</span>
+                </div>
+                <span className="text-[10px] font-semibold text-emerald-700">50% abatido + 50% pago</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handlePaymentMethodChange('parceria')}
+                className={`flex flex-col items-start justify-between gap-1.5 p-3 rounded-xl border text-xs font-bold transition text-left ${paymentMethod === 'parceria'
+                  ? 'border-emerald-600 bg-emerald-50 text-emerald-900 shadow-2xs'
+                  : 'border-stone-200 text-stone-600 hover:bg-stone-50'
+                  }`}
+              >
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span>Parceria / Cortesia</span>
+                </div>
+                <span className="text-[10px] font-semibold text-emerald-700">Sem cobrança financeira</span>
+              </button>
             </div>
+
+            {/* Descrição da Permuta ou Parceria quando selecionado */}
+            {(paymentMethod === 'permuta_100' || paymentMethod === 'permuta_50' || paymentMethod === 'parceria') && (
+              <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2 mt-2">
+                <label className="text-xs font-bold text-emerald-950 uppercase tracking-wider block">
+                  Descrição da Permuta / Contrapartida ou Parceria
+                </label>
+                <input
+                  type="text"
+                  value={permutaDescription}
+                  onChange={(e) => {
+                    setPermutaDescription(e.target.value);
+                    setFeedback(null);
+                  }}
+                  placeholder="Ex: Fornecimento de som, cantor, brindes, divulgação do lançamento ou esposa de irmão anunciando sem custo"
+                  className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2 text-xs text-stone-800 placeholder-stone-400 focus:border-emerald-600 focus:ring-emerald-600"
+                />
+                <p className="text-[11px] text-emerald-800">
+                  {paymentMethod === 'permuta_100' || paymentMethod === 'parceria'
+                    ? 'Esta empresa NÃO será contabilizada como débito ou pendência financeira no sistema.'
+                    : 'Apenas os 50% devidos serão lançados para faturamento financeiro.'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1858,9 +1971,11 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
             <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block">
               Quantidade de Parcelas
             </label>
-            {paymentMethod === 'avista' ? (
+            {paymentMethod === 'avista' || paymentMethod === 'permuta_100' || paymentMethod === 'parceria' ? (
               <div className="p-2.5 rounded-xl bg-stone-50 border border-stone-200 text-xs font-medium text-stone-600">
-                1x (Pagamento integral à vista)
+                {paymentMethod === 'permuta_100' || paymentMethod === 'parceria'
+                  ? 'Isento de parcelamento (R$ 0,00)'
+                  : '1x (Pagamento integral à vista)'}
               </div>
             ) : (
               <select
@@ -1879,7 +1994,9 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
               </select>
             )}
             <p className="text-[11px] text-stone-500">
-              Máximo de {maxInstallmentsAllowed}x sem juros para este plano.
+              {paymentMethod === 'permuta_100' || paymentMethod === 'parceria'
+                ? 'Sem faturamento financeiro gerado.'
+                : `Máximo de ${maxInstallmentsAllowed}x sem juros para este plano.`}
             </p>
           </div>
 
@@ -1895,18 +2012,23 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
               <input
                 type="number"
                 step="0.01"
-                min="1"
+                min="0"
+                disabled={paymentMethod === 'permuta_100' || paymentMethod === 'parceria'}
                 value={(amountCents / 100).toFixed(2)}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);
                   setAmountCents(isNaN(val) ? 0 : Math.round(val * 100));
                   setFeedback(null);
                 }}
-                className="w-full rounded-xl border border-stone-300 bg-white pl-9 pr-3 py-2.5 text-xs font-mono font-bold text-stone-900 focus:border-[#3B0B14] focus:ring-[#3B0B14]"
+                className={`w-full rounded-xl border border-stone-300 bg-white pl-9 pr-3 py-2.5 text-xs font-mono font-bold text-stone-900 focus:border-[#3B0B14] focus:ring-[#3B0B14] ${
+                  (paymentMethod === 'permuta_100' || paymentMethod === 'parceria') ? 'bg-stone-100 cursor-not-allowed opacity-80' : ''
+                }`}
               />
             </div>
             <p className="text-[11px] text-stone-500">
-              {paymentMethod === 'parcelado'
+              {paymentMethod === 'permuta_100' || paymentMethod === 'parceria'
+                ? 'Valor financeiro zerado (Permuta / Parceria).'
+                : paymentMethod === 'parcelado'
                 ? `Equivalente a ${installmentsCount}x de ${formatCentsToReais(calculatedInstallmentValueCents)}`
                 : 'Valor cobrado em parcela única.'}
             </p>
@@ -2390,6 +2512,33 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
               </button>
             )}
           </div>
+
+          {/* Card Especial de Permuta / Parceria sem cobrança financeira */}
+          {(paymentMethod === 'permuta_100' || paymentMethod === 'parceria' || lastSaved?.payment_method === 'permuta_100' || lastSaved?.payment_method === 'parceria' || amountCents === 0) && (
+            <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs">
+              <div className="space-y-1">
+                <span className="inline-flex items-center gap-1.5 font-bold text-xs text-emerald-950">
+                  <Sparkles className="h-4 w-4 text-emerald-600" />
+                  {lastSaved?.payment_method === 'permuta_100' ? 'Modalidade Permuta 100% (Sem Cobrança)' : 'Modalidade Parceria Institucional / Cortesia'}
+                </span>
+                <p className="text-xs text-emerald-800">
+                  Esta empresa foi contratada sob regime de permuta/parceria sem cobrança monetária. Não gera faturamento nem pendência financeira no sistema.
+                  {commercialStatus !== 'pagamento_confirmado' && ' Clique ao lado para confirmar o regime e liberar o Prontuário 360 imediatamente.'}
+                </p>
+              </div>
+              {commercialStatus !== 'pagamento_confirmado' && (
+                <button
+                  type="button"
+                  disabled={isConfirmingPermuta}
+                  onClick={handleConfirmPermutaPayment}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2.5 text-xs font-bold transition shadow-xs cursor-pointer shrink-0"
+                >
+                  <Check className="h-4 w-4 stroke-[3]" />
+                  {isConfirmingPermuta ? 'Confirmando...' : 'Confirmar Permuta & Liberar'}
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Se o link já foi gerado */}
           {signatureTokenData?.public_url ? (

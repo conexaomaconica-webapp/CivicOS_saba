@@ -495,7 +495,9 @@ export interface AdminBusiness360DTO {
     plan_code: string;
     plan_name: string;
     billing_cycle: 'annual' | 'biennial';
-    payment_method: 'avista' | 'parcelado';
+    payment_method: 'avista' | 'parcelado' | 'permuta_100' | 'permuta_50' | 'parceria';
+    commercial_modality?: 'padrao' | 'permuta_100' | 'permuta_50' | 'parceria';
+    permuta_description?: string | null;
     amount_cents: number;
     installments_count: number;
     installment_amount_cents: number;
@@ -668,15 +670,16 @@ export async function getAdminBusinessesListAction(params?: {
       }
     };
 
-    const [subsRows, recRows, invoiceRows, locRows, contactRows, categoryRows, linkRows, responsibleRows] = await Promise.all([
+    const [subsRows, recRows, invoiceRows, locRows, contactRows, categoryRows, linkRows, responsibleRows, termsRows] = await Promise.all([
       rowsOf((supabase as any).from('subscriptions').select('business_id, status, created_at, plan_versions!inner(plans!inner(code))')),
       rowsOf((supabase as any).from('business_recognitions').select('business_id, recognition_key').eq('is_active', true)),
       rowsOf((supabase as any).from('invoices').select('business_id, status')),
       rowsOf((supabase as any).from('business_locations').select('business_id, city, state, is_headquarters')),
       rowsOf((supabase as any).from('business_contacts').select('business_id, type, value')),
       rowsOf((supabase as any).from('business_categories').select('business_id, category_id, is_primary, categories(name)').order('is_primary', { ascending: false })),
-      rowsOf((supabase as any).from('business_masonic_links').select('business_id, status').eq('status', 'verified')),
+      rowsOf((supabase as any).from('business_masonic_links').select('business_id, status').in('status', ['approved', 'active', 'verified'])),
       rowsOf((supabase as any).from('business_responsibles').select('business_id, name')),
+      rowsOf((supabase as any).from('business_commercial_terms').select('business_id, payment_method, amount_cents')),
     ]);
 
     // Plano efetivo: assinatura ativa vale mais que pendente; entre iguais, a mais recente.
@@ -709,6 +712,13 @@ export async function getAdminBusinessesListAction(params?: {
       else if (current === 'paid') continue;
       else if (inv.status === 'overdue') paymentMap[inv.business_id] = 'overdue';
       else if (!current && ['draft', 'open', 'pending'].includes(inv.status)) paymentMap[inv.business_id] = 'pending';
+    }
+    // Anunciantes de Permuta 100% ou Parceria são isentos e contam como quitados / regulares
+    for (const term of termsRows) {
+      if (!term.business_id) continue;
+      if (term.payment_method === 'permuta_100' || term.payment_method === 'parceria' || term.amount_cents === 0) {
+        paymentMap[term.business_id] = 'paid';
+      }
     }
 
     const locationMap: Record<string, { city: string; state: string }> = {};
@@ -1780,7 +1790,7 @@ export async function toggleRecognitionAction(
 
     const { data: bData } = await (supabase as any)
       .from('businesses')
-      .select('id, tenant_id, slug')
+      .select('id, tenant_id, slug, owner_id')
       .eq('id', businessId)
       .maybeSingle();
 
@@ -1797,29 +1807,46 @@ export async function toggleRecognitionAction(
         .eq('business_id', businessId)
         .maybeSingle();
 
-      const newStatus = newValue ? 'verified' : 'rejected';
+      const dbStatus = newValue ? 'approved' : 'rejected';
+      const targetDeclaringUserId = (bData.owner_id && bData.owner_id !== user.id) ? bData.owner_id : null;
+
       if (linkRow) {
         await (supabase as any)
           .from('business_masonic_links')
           .update({
-            status: newStatus,
+            status: dbStatus,
             verified_at: newValue ? new Date().toISOString() : null,
-            verified_by: user.id,
+            verified_by: newValue ? user.id : null,
             updated_at: new Date().toISOString(),
           })
           .eq('id', linkRow.id).throwOnError();
       } else {
-        await (supabase as any)
+        // 1. Inserir como draft conforme exigido pelo gatilho bml_guard_approval_flow
+        const { data: newLink } = await (supabase as any)
           .from('business_masonic_links')
           .insert({
             tenant_id: bData.tenant_id,
             business_id: businessId,
-            declaring_user_id: user.id,
+            declaring_user_id: targetDeclaringUserId,
             link_type: 'owner',
-            status: newStatus,
-            verified_at: newValue ? new Date().toISOString() : null,
-            verified_by: user.id,
-          }).throwOnError();
+            status: 'draft',
+          })
+          .select('id')
+          .single()
+          .throwOnError();
+
+        // 2. Se newValue for true, promover para approved
+        if (newLink?.id && newValue) {
+          await (supabase as any)
+            .from('business_masonic_links')
+            .update({
+              status: dbStatus,
+              verified_at: newValue ? new Date().toISOString() : null,
+              verified_by: newValue ? user.id : null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', newLink.id).throwOnError();
+        }
       }
       auditAction = newValue ? 'VERIFY_BUSINESS_LINK' : 'REVOKE_BUSINESS_LINK';
     } else {
@@ -2986,7 +3013,9 @@ export interface ConfirmAdminCommercialTermsInput {
   business_id: string;
   plan_code: string;
   billing_cycle: 'annual' | 'biennial';
-  payment_method: 'avista' | 'parcelado';
+  payment_method: 'avista' | 'parcelado' | 'permuta_100' | 'permuta_50' | 'parceria';
+  commercial_modality?: 'padrao' | 'permuta_100' | 'permuta_50' | 'parceria';
+  permuta_description?: string;
   amount_cents: number;
   installments_count: number;
   installment_amount_cents?: number;
@@ -3166,11 +3195,13 @@ export async function confirmAdminCommercialTermsAction(
     if (!input.billing_cycle || !['annual', 'biennial'].includes(input.billing_cycle)) {
       return { success: false, error: 'Vigência do contrato é obrigatória (anual ou bienal).' };
     }
-    if (!input.payment_method || !['avista', 'parcelado'].includes(input.payment_method)) {
-      return { success: false, error: 'Condição de pagamento é obrigatória (à vista ou parcelado).' };
+    const validPaymentMethods = ['avista', 'parcelado', 'permuta_100', 'permuta_50', 'parceria'];
+    if (!input.payment_method || !validPaymentMethods.includes(input.payment_method)) {
+      return { success: false, error: 'Condição de pagamento é obrigatória (à vista, parcelado, permuta ou parceria).' };
     }
-    if (typeof input.amount_cents !== 'number' || input.amount_cents <= 0) {
-      return { success: false, error: 'Valor contratado deve ser maior que zero.' };
+    const isFreeModality = input.payment_method === 'permuta_100' || input.payment_method === 'parceria';
+    if (typeof input.amount_cents !== 'number' || (isFreeModality ? input.amount_cents < 0 : input.amount_cents <= 0)) {
+      return { success: false, error: isFreeModality ? 'Valor contratado não pode ser negativo.' : 'Valor contratado deve ser maior que zero.' };
     }
     if (typeof input.installments_count !== 'number' || input.installments_count < 1) {
       return { success: false, error: 'Quantidade de parcelas deve ser de no mínimo 1.' };
@@ -3229,15 +3260,19 @@ export async function confirmAdminCommercialTermsAction(
     }
 
     // 4. Preparação dos dados para persistência
-    const installmentsCount = input.payment_method === 'avista' ? 1 : input.installments_count;
-    const installmentAmountCents =
-      input.installment_amount_cents && input.installment_amount_cents > 0
-        ? input.installment_amount_cents
-        : Math.round(input.amount_cents / installmentsCount);
+    const installmentsCount = (input.payment_method === 'avista' || isFreeModality) ? 1 : input.installments_count;
+    const finalAmountCents = isFreeModality ? 0 : input.amount_cents;
+    const installmentAmountCents = isFreeModality
+      ? 0
+      : (input.installment_amount_cents && input.installment_amount_cents > 0
+          ? input.installment_amount_cents
+          : Math.round(finalAmountCents / installmentsCount));
 
     const planName = input.is_pedra_fundamental
       ? 'Plano Acácia (Pedra Fundamental)'
       : `Plano ${getCommercialPlanName(input.plan_code)}`;
+
+    const modality = input.commercial_modality || (isFreeModality ? input.payment_method : input.payment_method === 'permuta_50' ? 'permuta_50' : 'padrao');
 
     const termsPayload = {
       business_id: biz.id,
@@ -3246,7 +3281,9 @@ export async function confirmAdminCommercialTermsAction(
       plan_name: planName,
       billing_cycle: input.billing_cycle,
       payment_method: input.payment_method,
-      amount_cents: input.amount_cents,
+      commercial_modality: modality,
+      permuta_description: input.permuta_description?.trim() || null,
+      amount_cents: finalAmountCents,
       installments_count: installmentsCount,
       installment_amount_cents: installmentAmountCents,
       is_pedra_fundamental: Boolean(input.is_pedra_fundamental),
@@ -3381,6 +3418,67 @@ export async function confirmAdminCommercialTermsAction(
       success: false,
       error: err.message || 'Erro inesperado ao conferir dados comerciais.',
     };
+  }
+}
+
+export async function confirmAdminPermutaOrParceriaPaymentAction(
+  businessId: string,
+  justification?: string
+): Promise<{ success: boolean; error?: string; commercial_status?: string }> {
+  try {
+    const { supabase, user } = await assertPlatformAdminAccess();
+
+    const { data: biz, error: bizErr } = await (supabase as any)
+      .from('businesses')
+      .select('id, tenant_id, commercial_status')
+      .eq('id', businessId)
+      .maybeSingle();
+
+    if (bizErr || !biz) {
+      return { success: false, error: 'Empresa não encontrada.' };
+    }
+
+    const { data: terms } = await (supabase as any)
+      .from('business_commercial_terms')
+      .select('*')
+      .eq('business_id', businessId)
+      .maybeSingle();
+
+    const isFree = terms?.payment_method === 'permuta_100' || terms?.payment_method === 'parceria' || terms?.amount_cents === 0;
+    const now = new Date().toISOString();
+
+    await (supabase as any)
+      .from('businesses')
+      .update({
+        commercial_status: 'pagamento_confirmado',
+        updated_at: now,
+      })
+      .eq('id', businessId)
+      .throwOnError();
+
+    await (supabase as any).from('admin_audit_logs').insert({
+      tenant_id: biz.tenant_id,
+      actor_id: user.id,
+      action: 'CONFIRM_PERMUTA_PARCERIA_PAYMENT',
+      entity_type: 'businesses',
+      entity_id: businessId,
+      before_value: { commercial_status: biz.commercial_status },
+      after_value: {
+        commercial_status: 'pagamento_confirmado',
+        payment_method: terms?.payment_method,
+        amount_cents: terms?.amount_cents,
+      },
+      reason: justification || (isFree ? 'Confirmação de liberação por Permuta 100% ou Parceria Institucional sem cobrança financeira.' : 'Confirmação de pagamento ou contrapartida comercial.'),
+    });
+
+    revalidatePath(`/admin/empresas/${businessId}/contratacao`);
+    revalidatePath(`/admin/empresas/${businessId}`);
+    revalidatePath('/admin/empresas');
+    revalidatePath('/admin/pagamentos');
+
+    return { success: true, commercial_status: 'pagamento_confirmado' };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Falha ao confirmar permuta/parceria.' };
   }
 }
 

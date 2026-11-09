@@ -305,3 +305,24 @@ export function formatDataInicioVigencia(startDate?: string | Date | null): stri
     year: 'numeric',
   }).format(d);
 }
+
+/**
+ * Formata a forma de pagamento para exibição formal no contrato.
+ */
+export function formatPaymentMethodContrato(method?: string | null): string {
+  const m = String(method || '').trim().toLowerCase();
+  switch (m) {
+    case 'avista':
+      return 'À vista';
+    case 'parcelado':
+      return 'Parcelado';
+    case 'permuta_100':
+      return 'Permuta 100% (Contrapartida de Bens/Serviços)';
+    case 'permuta_50':
+      return 'Permuta 50% + Saldo Faturado';
+    case 'parceria':
+      return 'Parceria Institucional / Cortesia Fraterna';
+    default:
+      return method || 'À vista';
+  }
+}

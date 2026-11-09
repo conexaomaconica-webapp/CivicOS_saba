@@ -44,7 +44,10 @@ export default function AdminGuiaBannersPage() {
   const [city, setCity] = useState('');
   const [displayOrder, setDisplayOrder] = useState(1);
   const [isActive, setIsActive] = useState(true);
+  const [startAt, setStartAt] = useState('');
+  const [endAt, setEndAt] = useState('');
   const [contentMode, setContentMode] = useState<BannerContentMode>('image_text');
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const fetchBanners = async () => {
     try {
@@ -87,6 +90,8 @@ export default function AdminGuiaBannersPage() {
       setCity(banner.city || '');
       setDisplayOrder(banner.display_order);
       setIsActive(banner.is_active);
+      setStartAt(banner.start_at ? banner.start_at.slice(0, 16) : '');
+      setEndAt(banner.end_at ? banner.end_at.slice(0, 16) : '');
       setContentMode(!banner.subtitle?.trim() && !banner.cta_text?.trim() ? 'image_only' : 'image_text');
     } else {
       setEditingBanner(null);
@@ -99,9 +104,41 @@ export default function AdminGuiaBannersPage() {
       setCity('');
       setDisplayOrder(banners.length + 1);
       setIsActive(true);
+      setStartAt('');
+      setEndAt('');
       setContentMode('image_only');
     }
     setModalOpen(true);
+  };
+
+  const handleToggleActive = async (banner: Banner) => {
+    setTogglingId(banner.id);
+    const newActive = !banner.is_active;
+    try {
+      const supabase = createClient();
+      const { error } = await (supabase as any)
+        .from('directory_banners')
+        .update({
+          is_active: newActive,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', banner.id);
+
+      if (error) throw error;
+
+      setBanners((prev) =>
+        prev.map((b) => (b.id === banner.id ? { ...b, is_active: newActive } : b))
+      );
+      systemNotify({
+        type: 'success',
+        message: newActive ? `Banner "${banner.title}" ativado com sucesso!` : `Banner "${banner.title}" desativado!`,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao alterar status do banner';
+      systemNotify({ type: 'danger', message: msg });
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -127,6 +164,8 @@ export default function AdminGuiaBannersPage() {
         city: city || null,
         display_order: displayOrder,
         is_active: isActive,
+        start_at: startAt ? new Date(startAt).toISOString() : null,
+        end_at: endAt ? new Date(endAt).toISOString() : null,
         updated_at: new Date().toISOString(),
       };
 
@@ -260,9 +299,65 @@ export default function AdminGuiaBannersPage() {
                     </td>
                     <td className="p-3">{b.city || 'Todas as Cidades'}</td>
                     <td className="p-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${b.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                        {b.is_active ? 'Ativo' : 'Inativo'}
-                      </span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <button
+                          type="button"
+                          disabled={togglingId === b.id}
+                          onClick={() => handleToggleActive(b)}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer shadow-2xs hover:opacity-90 disabled:opacity-50 ${
+                            b.is_active
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200'
+                              : 'bg-stone-100 text-stone-600 border border-stone-300 hover:bg-stone-200'
+                          }`}
+                          title="Clique para alternar o status do banner diretamente"
+                        >
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              b.is_active ? 'bg-emerald-600' : 'bg-stone-400'
+                            }`}
+                          />
+                          {togglingId === b.id ? (
+                            <span className="flex items-center gap-1">
+                              <Loader2 className="w-3 h-3 animate-spin" /> ...
+                            </span>
+                          ) : b.is_active ? (
+                            'Ativo'
+                          ) : (
+                            'Inativo'
+                          )}
+                        </button>
+
+                        {/* Indicador de Desativação Automática ou Expiração */}
+                        {b.end_at && (
+                          <span
+                            className={`text-[10px] ${
+                              new Date(b.end_at).getTime() < Date.now()
+                                ? 'text-rose-600 font-semibold'
+                                : 'text-stone-500'
+                            }`}
+                            title={`Data de desativação: ${new Date(b.end_at).toLocaleString('pt-BR')}`}
+                          >
+                            {new Date(b.end_at).getTime() < Date.now() ? (
+                              '⚠️ Expirado em ' +
+                              new Date(b.end_at).toLocaleDateString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                              })
+                            ) : (
+                              'Desativa: ' +
+                              new Date(b.end_at).toLocaleDateString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                              }) +
+                              ' às ' +
+                              new Date(b.end_at).toLocaleTimeString('pt-BR', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            )}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3 text-right space-x-2">
                       <button onClick={() => handleOpenModal(b)} className="p-1.5 hover:bg-gray-100 rounded text-gray-700" title="Editar">
@@ -396,6 +491,42 @@ export default function AdminGuiaBannersPage() {
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">Ordem de Exibição</label>
                   <input type="number" min={1} value={displayOrder} onChange={(e) => setDisplayOrder(parseInt(e.target.value) || 1)} className="w-full px-3 py-1.5 border rounded-md text-sm" />
+                </div>
+              </div>
+
+              <div className="bg-stone-50 border border-stone-200 rounded-lg p-3 space-y-2.5">
+                <span className="block text-xs font-semibold text-stone-800">
+                  Agendamento e Desativação Automática
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-stone-600 mb-1">
+                      Data/Hora de Desativação Automática
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={endAt}
+                      onChange={(e) => setEndAt(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border rounded-md text-xs bg-white text-stone-900"
+                    />
+                    <p className="text-[10px] text-stone-500 mt-0.5">
+                      Ao atingir esta data e hora, o banner sairá automaticamente da página inicial.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-stone-600 mb-1">
+                      Data/Hora de Início da Exibição (Opcional)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={startAt}
+                      onChange={(e) => setStartAt(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border rounded-md text-xs bg-white text-stone-900"
+                    />
+                    <p className="text-[10px] text-stone-500 mt-0.5">
+                      Se preenchido, o banner só passará a ser exibido a partir deste momento.
+                    </p>
+                  </div>
                 </div>
               </div>
 
