@@ -39,6 +39,7 @@ import {
   Pipette,
   Copy,
   Rocket,
+  X,
 } from 'lucide-react';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { FormattedText } from '@/components/ui/formatted-text';
@@ -128,6 +129,9 @@ export default function Company360Client({ initialData }: Props) {
   const [whatsapp, setWhatsapp] = useState(formatPhone(data.business.whatsapp || ''));
   const [category, setCategory] = useState(data.business.category || '');
   const [categoryId, setCategoryId] = useState(data.business.category_id || '');
+  const [secondaryCategoryIds, setSecondaryCategoryIds] = useState<string[]>(
+    data.business.secondary_category_ids || data.business.secondary_categories?.map((c) => c.id) || []
+  );
   const [categoryOptions, setCategoryOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -857,6 +861,7 @@ export default function Company360Client({ initialData }: Props) {
         whatsapp,
         category_id: categoryId,
         category,
+        secondary_category_ids: secondaryCategoryIds,
         email,
         website,
         instagram,
@@ -898,6 +903,8 @@ export default function Company360Client({ initialData }: Props) {
             whatsapp: res.data.whatsapp || whatsapp,
             category_id: res.data.category_id || categoryId,
             category: res.data.category,
+            secondary_category_ids: res.data.secondary_category_ids || secondaryCategoryIds,
+            secondary_categories: categoryOptions.filter((c) => (res.data.secondary_category_ids || secondaryCategoryIds).includes(c.id)),
             email: res.data.email,
             website: res.data.website,
             instagram: instagram,
@@ -2225,7 +2232,12 @@ export default function Company360Client({ initialData }: Props) {
               )}
             </div>
             <div className="text-xs text-stone-300 mt-1 flex items-center gap-1.5 flex-wrap">
-              <span>{data.business.category}</span>
+              <span className="font-semibold text-white">{data.business.category}</span>
+              {data.business.secondary_categories && data.business.secondary_categories.length > 0 && (
+                <span className="text-[10px] text-stone-400" title={`Categorias secundárias: ${data.business.secondary_categories.map((c) => c.name).join(', ')}`}>
+                  (+{data.business.secondary_categories.length} {data.business.secondary_categories.length === 1 ? 'secundária' : 'secundárias'})
+                </span>
+              )}
               <span>•</span>
               <span>Responsável: <strong className="text-white">{data.owner.full_name}</strong></span>
               <span className="px-2 py-0.5 rounded-full bg-white/10 text-[10px] text-[#C9A227] font-bold">
@@ -2595,6 +2607,69 @@ export default function Company360Client({ initialData }: Props) {
                   className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 font-bold text-amber-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
                   required
                 />
+              </div>
+
+              <div className="md:col-span-2 rounded-2xl border border-stone-200/90 bg-stone-50/70 p-4 shadow-2xs">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-bold text-stone-800">
+                    Categorias Secundárias / Adicionais (Descoberta & Busca)
+                  </label>
+                  <span className="text-xs text-stone-500 font-medium">Opcional</span>
+                </div>
+                <p className="text-xs text-stone-600 mb-3 leading-relaxed">
+                  Permite que a empresa seja encontrada quando o visitante filtrar ou buscar por essas áreas no Guia, mantendo a Categoria Principal como identidade visual nos cards da vitrine.
+                </p>
+                <div className="flex gap-2 mb-3">
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      if (selectedId && !secondaryCategoryIds.includes(selectedId)) {
+                        setSecondaryCategoryIds((prev) => [...prev, selectedId]);
+                      }
+                    }}
+                    disabled={loadingCategories}
+                    className="min-w-0 flex-1 px-3 py-2 border border-stone-300 rounded-xl bg-white text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14] disabled:opacity-60 text-sm"
+                  >
+                    <option value="">+ Selecionar categoria complementar para adicionar...</option>
+                    {categoryOptions
+                      .filter((item) => item.id !== categoryId && !secondaryCategoryIds.includes(item.id))
+                      .map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                {secondaryCategoryIds.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {secondaryCategoryIds.map((secId) => {
+                      const secCat = categoryOptions.find((c) => c.id === secId) ||
+                        data.business.secondary_categories?.find((c) => c.id === secId);
+                      return (
+                        <span
+                          key={secId}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200/80 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-950 shadow-2xs"
+                        >
+                          {secCat?.name || secId}
+                          <button
+                            type="button"
+                            onClick={() => setSecondaryCategoryIds((prev) => prev.filter((id) => id !== secId))}
+                            className="text-stone-400 hover:text-rose-600 transition p-0.5 rounded cursor-pointer"
+                            title="Remover categoria"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-stone-400 italic">
+                    Nenhuma categoria secundária vinculada. Adicione áreas complementares acima para ampliar a visibilidade nas buscas.
+                  </p>
+                )}
               </div>
 
               {showCategoryModal && (

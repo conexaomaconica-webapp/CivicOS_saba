@@ -176,6 +176,18 @@ export async function createAdminAdvertiserAction(
       return { success: false, error: businessError?.message ?? 'Não foi possível criar a empresa.' };
     }
 
+    // Vincula a categoria principal na tabela relacional business_categories
+    try {
+      await (adminClient as any).from('business_categories').upsert({
+        tenant_id: tenantId,
+        business_id: business.id,
+        category_id: category.id,
+        is_primary: true,
+      }, { onConflict: 'business_id,category_id' });
+    } catch (_catErr) {
+      // Silencia falha não impeditiva no vínculo relacional
+    }
+
     try {
       await provisionAuthorizedMembership(adminClient, {
         userId: ownerId,

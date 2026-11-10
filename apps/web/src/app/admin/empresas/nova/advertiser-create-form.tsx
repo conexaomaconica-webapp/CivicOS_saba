@@ -214,15 +214,18 @@ export default function AdvertiserCreateForm({
             />
           </label>
           <label className="space-y-1.5 text-xs font-bold text-stone-700">
-            Categoria
+            Categoria Principal *
             <select required name="categoryId" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass}>
-              <option value="">Selecione uma categoria</option>
+              <option value="">Selecione a categoria principal</option>
               {categories.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
                 </option>
               ))}
             </select>
+            <p className="text-[11px] font-normal text-stone-500">
+              Esta é a categoria de destaque exibida nos cards da vitrine. Categorias secundárias adicionais podem ser vinculadas no Prontuário 360 da empresa.
+            </p>
             {!addingCategory ? (
               <button
                 type="button"

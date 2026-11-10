@@ -400,6 +400,8 @@ export interface AdminBusiness360DTO {
     cnpj_cpf?: string;
     category_id?: string;
     category: string;
+    secondary_category_ids?: string[];
+    secondary_categories?: Array<{ id: string; name: string }>;
     description?: string;
     city: string;
     state: string;
@@ -868,15 +870,26 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
     const b = bRaw as any;
 
     let primaryCategory: { id: string; name: string } | null = null;
+    let secondaryCategories: Array<{ id: string; name: string }> = [];
     try {
       const { data: businessCategoryRows } = await (supabase as any)
         .from('business_categories')
         .select('category_id, is_primary, categories(id, name)')
         .eq('business_id', businessId)
         .order('is_primary', { ascending: false });
-      const selectedCategory = businessCategoryRows?.[0]?.categories;
-      if (selectedCategory?.id && selectedCategory?.name) {
-        primaryCategory = { id: selectedCategory.id, name: selectedCategory.name };
+      for (const row of businessCategoryRows || []) {
+        const cat = row.categories;
+        if (cat?.id && cat?.name) {
+          if (row.is_primary && !primaryCategory) {
+            primaryCategory = { id: cat.id, name: cat.name };
+          } else {
+            secondaryCategories.push({ id: cat.id, name: cat.name });
+          }
+        }
+      }
+      if (!primaryCategory && businessCategoryRows?.[0]?.categories) {
+        primaryCategory = { id: businessCategoryRows[0].categories.id, name: businessCategoryRows[0].categories.name };
+        secondaryCategories = secondaryCategories.filter((c) => c.id !== primaryCategory!.id);
       }
     } catch (_e) { }
 
@@ -1576,6 +1589,8 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
         commercial_status: b.commercial_status || 'pre_cadastro',
         category_id: primaryCategory?.id,
         category: primaryCategory?.name || b.category || 'Geral',
+        secondary_category_ids: secondaryCategories.map((c) => c.id),
+        secondary_categories: secondaryCategories,
         description: b.description || undefined,
         city: locationData.city || b.city || '',
         state: locationData.state || b.state || '',
@@ -1935,6 +1950,7 @@ export async function updateAdminBusinessDetailsAction(
     logo_background_color?: string;
     category_id?: string;
     category?: string;
+    secondary_category_ids?: string[];
     email?: string;
     website?: string;
     instagram?: string;
@@ -2210,6 +2226,32 @@ export async function updateAdminBusinessDetailsAction(
       }
     }
 
+    if (payload.secondary_category_ids !== undefined) {
+      const activePrimaryId = selectedCategory?.id || (existing as any).category_id;
+      const cleanSecondaryIds = Array.from(new Set(payload.secondary_category_ids))
+        .filter((id): id is string => Boolean(id) && id !== activePrimaryId);
+
+      // Exclui categorias secundárias anteriores deste negócio
+      await (supabase as any)
+        .from('business_categories')
+        .delete()
+        .eq('tenant_id', existing.tenant_id)
+        .eq('business_id', businessId)
+        .eq('is_primary', false);
+
+      // Insere as novas secundárias
+      for (const secId of cleanSecondaryIds) {
+        await (supabase as any)
+          .from('business_categories')
+          .upsert({
+            tenant_id: existing.tenant_id,
+            business_id: businessId,
+            category_id: secId,
+            is_primary: false,
+          }, { onConflict: 'business_id,category_id' });
+      }
+    }
+
     const upsertContact = async (contactType: string, contactVal?: string) => {
 
       if (contactVal === undefined) return;
@@ -2435,6 +2477,7 @@ export async function updateAdminBusinessDetailsAction(
         slug: nextSlug,
         category_id: selectedCategory?.id,
         category: selectedCategory?.name || updated.category,
+        secondary_category_ids: payload.secondary_category_ids,
         cnpj_cpf: updated.cnpj || payload.cnpj_cpf,
         whatsapp: payload.whatsapp || updated.phone,
         city: payload.city,

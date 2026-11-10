@@ -174,7 +174,7 @@ export default async function GuiaPage({ searchParams }: Props) {
     try {
       let directQuery = (supabase as any)
         .from('businesses')
-        .select('id, slug, name, description, logo_url, plan_tier, publication_status, is_active, category, business_locations(city, state, latitude, longitude, is_headquarters)')
+        .select('id, slug, name, description, logo_url, plan_tier, publication_status, is_active, category, business_locations(city, state, latitude, longitude, is_headquarters), business_categories(is_primary, categories(slug, name))')
         .eq('publication_status', 'published')
         .eq('is_active', true);
 
@@ -187,7 +187,14 @@ export default async function GuiaPage({ searchParams }: Props) {
 
       if (cat) {
         const normCat = cat.toLowerCase();
-        filteredBiz = filteredBiz.filter((b: any) => b.category?.toLowerCase() === normCat);
+        filteredBiz = filteredBiz.filter((b: any) => {
+          if (b.category?.toLowerCase() === normCat) return true;
+          const bCats = Array.isArray(b.business_categories) ? b.business_categories : [];
+          return bCats.some((bc: any) => 
+            bc.categories?.slug?.toLowerCase() === normCat || 
+            bc.categories?.name?.toLowerCase() === normCat
+          );
+        });
       }
 
       if (city) {
