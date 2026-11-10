@@ -15,6 +15,8 @@ import {
 } from '@/lib/commercial-onboarding-status';
 import { listPublicMemberDTOs } from '@/lib/member/profile-access-service';
 
+export type CommercialModalityType = 'padrao' | 'permuta_100' | 'permuta_50' | 'parceria';
+
 export interface AdminPaymentListItem {
   id: string;
   webhook_event_id?: string | null;
@@ -25,7 +27,13 @@ export interface AdminPaymentListItem {
   owner_email: string;
   plan_code: string;
   amount_cents: number;
-  payment_method: 'credit_card' | 'pix';
+  original_amount_cents?: number;
+  payment_method: 'credit_card' | 'pix' | 'permuta_100' | 'permuta_50' | 'parceria';
+  commercial_modality: CommercialModalityType;
+  is_pedra_fundamental: boolean;
+  has_discount: boolean;
+  permuta_description?: string;
+  is_virtual_terms_record?: boolean;
   installments: number;
   due_date: string;
   paid_at?: string;
@@ -41,10 +49,13 @@ export interface AdminPaymentListItem {
 export interface AdminPaymentsDashboardDTO {
   kpis: {
     monthlyReceivedBrl: number;
+    totalReceivedBrl: number;
+    periodReceivedBrl: number;
     toReceiveBrl: number;
     overdueBrl: number;
     failedCount: number;
     activeSubscriptionsCount: number;
+    permutaParceriaCount: number;
   };
   reconciliationRequired: Array<{
     id: string;
@@ -56,6 +67,7 @@ export interface AdminPaymentsDashboardDTO {
     amount_cents: number;
   }>;
   items: AdminPaymentListItem[];
+  availableMonths: Array<{ value: string; label: string }>;
   counts: {
     total: number;
     paid: number;
@@ -64,6 +76,47 @@ export interface AdminPaymentsDashboardDTO {
     failed: number;
     divergent: number;
   };
+}
+
+function normalizeCanonicalPlanCode(code?: string | null): string {
+  const c = (code || '').trim().toLowerCase();
+  if (c === 'ouro') return 'acacia';
+  if (c === 'prata') return 'compasso';
+  if (c === 'bronze') return 'esquadro';
+  return c;
+}
+
+function resolveCommercialModality(terms: any): CommercialModalityType {
+  if (!terms) return 'padrao';
+  const raw = String(terms.commercial_modality || terms.payment_method || '').trim().toLowerCase();
+  if (raw === 'permuta_100') return 'permuta_100';
+  if (raw === 'permuta_50') return 'permuta_50';
+  if (raw === 'parceria') return 'parceria';
+  return 'padrao';
+}
+
+function extractYearMonthBR(isoOrDate?: string | null): string | null {
+  if (!isoOrDate) return null;
+  const trimmed = String(isoOrDate).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed.slice(0, 7);
+  }
+  const d = new Date(trimmed);
+  if (Number.isNaN(d.getTime())) return null;
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(d);
+  const year = parts.find((p) => p.type === 'year')?.value;
+  const month = parts.find((p) => p.type === 'month')?.value;
+  return year && month ? `${year}-${month}` : null;
+}
+
+function formatMonthLabel(ym: string): string {
+  const [y, m] = ym.split('-').map(Number);
+  const names = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  return `${names[(m || 1) - 1] || m}/${y}`;
 }
 
 /**
@@ -92,24 +145,31 @@ export async function getAdminPaymentsDashboardAction(params?: {
   query?: string;
   statusFilter?: string;
   methodFilter?: string;
+  modalityFilter?: string;
   planFilter?: string;
+  monthFilter?: string;
 }): Promise<AdminPaymentsDashboardDTO> {
   const { supabase: ssrClient } = await assertPlatformAdminAccess();
   const db = getAdminPaymentsClient(ssrClient);
 
   const statusFilter = params?.statusFilter || 'todos';
   const methodFilter = params?.methodFilter || 'todos';
+  const modalityFilter = params?.modalityFilter || 'todos';
   const planFilter = params?.planFilter || 'todos';
+  const monthFilter = params?.monthFilter || 'todos';
   const query = (params?.query || '').toLowerCase().trim();
 
   try {
     // 1. Consultar empresas
     const { data: businesses } = await (db as any)
       .from('businesses')
-      .select('id, name, owner_id, plan_tier, publication_status, is_active, phone, email');
+      .select('id, name, owner_id, plan_tier, publication_status, is_active, phone, email, commercial_status, created_at');
+
+    const businessList = businesses || [];
+    const businessesMap = new Map<string, any>(businessList.map((b: any) => [b.id, b]));
 
     // 2. Consultar somente a projeção pública dos donos; e-mail vem da empresa.
-    const ownerIds = (businesses || []).map((business: any) => business.owner_id).filter(Boolean);
+    const ownerIds = businessList.map((business: any) => business.owner_id).filter(Boolean);
     const profiles = await listPublicMemberDTOs(db, ownerIds);
     const profilesMap = new Map(profiles.map((profile) => [profile.public_id, profile]));
 
@@ -122,6 +182,34 @@ export async function getAdminPaymentsDashboardAction(params?: {
       subscriptions = subsData || [];
     } catch {
       subscriptions = [];
+    }
+
+    // 3.1. Consultar termos comerciais negociados (permutas, parcerias, descontos e Pedra Fundamental)
+    const termsMap = new Map<string, any>();
+    try {
+      const { data: termsData } = await (db as any)
+        .from('business_commercial_terms')
+        .select('business_id, plan_code, plan_name, billing_cycle, payment_method, commercial_modality, permuta_description, amount_cents, installments_count, is_pedra_fundamental, notes, status, conferred_at, updated_at, created_at');
+      for (const row of termsData || []) {
+        if (row?.business_id) termsMap.set(row.business_id, row);
+      }
+    } catch {
+      // Silencia em ambientes/mocks sem business_commercial_terms
+    }
+
+    // 3.2. Consultar valores padrão dos planos para identificar descontos aplicados
+    const planPriceMap = new Map<string, number>();
+    try {
+      const { data: rulesData } = await (db as any)
+        .from('plan_payment_rules')
+        .select('plan_code, amount_cents');
+      for (const rule of rulesData || []) {
+        if (rule?.plan_code && typeof rule.amount_cents === 'number') {
+          planPriceMap.set(normalizeCanonicalPlanCode(rule.plan_code), rule.amount_cents);
+        }
+      }
+    } catch {
+      // Silencia caso tabela indisponível
     }
 
     // 4. Consultar faturas
@@ -137,6 +225,7 @@ export async function getAdminPaymentsDashboardAction(params?: {
 
     const items: AdminPaymentListItem[] = [];
     const reconciliationRequired: AdminPaymentsDashboardDTO['reconciliationRequired'] = [];
+    const invoicedBusinessIds = new Set<string>();
 
     const invoiceList = invoicesData || [];
     let providerEvents: any[] = [];
@@ -153,20 +242,70 @@ export async function getAdminPaymentsDashboardAction(params?: {
 
     if (invoiceList.length > 0) {
       for (const inv of invoiceList) {
-        const biz = (businesses || []).find((b: any) => b.id === inv.business_id);
+        invoicedBusinessIds.add(inv.business_id);
+        const biz = businessesMap.get(inv.business_id);
         const sub = (subscriptions || []).find((s: any) => s.business_id === inv.business_id);
         const owner = biz?.owner_id ? profilesMap.get(biz.owner_id) : null;
+        const terms = termsMap.get(inv.business_id);
 
-        const planCode = sub?.plan_versions?.plans?.code || biz?.plan_tier || 'ouro';
-        const amountCents = inv.amount_cents ?? (inv.amount_due ? Math.round(inv.amount_due * 100) : 0);
+        const planCode = terms?.plan_code || sub?.plan_versions?.plans?.code || biz?.plan_tier || 'ouro';
+        const modality = resolveCommercialModality(terms);
+        const isPedraFundamental = Boolean(terms?.is_pedra_fundamental);
+        const rawInvDueCents = inv.amount_cents ?? (inv.amount_due != null ? Math.round(Number(inv.amount_due) * 100) : 0);
+        const rawInvPaidCents = inv.amount_paid != null && Number(inv.amount_paid) > 0 ? Math.round(Number(inv.amount_paid) * 100) : null;
+        const standardPlanCents = terms?.billing_cycle !== 'monthly'
+          ? planPriceMap.get(normalizeCanonicalPlanCode(planCode))
+          : undefined;
+
+        let amountCents = rawInvDueCents;
+        let originalAmountCents: number | undefined;
+
+        if (modality === 'permuta_100' || modality === 'parceria') {
+          amountCents = typeof terms?.amount_cents === 'number' ? terms.amount_cents : 0;
+          const baseline = Math.max(rawInvDueCents, standardPlanCents || 0);
+          if (baseline > amountCents) originalAmountCents = baseline;
+        } else if (terms && typeof terms.amount_cents === 'number' && terms.amount_cents >= 0) {
+          // Quando há termos comerciais corrigidos (desconto, permuta 50% ou Pedra Fundamental),
+          // o valor negociado prevalece sobre faturas antigas com valor integral.
+          amountCents = terms.amount_cents;
+          const baseline = Math.max(rawInvDueCents, standardPlanCents || 0);
+          if (baseline > amountCents) originalAmountCents = baseline;
+        } else if (inv.status === 'paid' && rawInvPaidCents !== null) {
+          amountCents = rawInvPaidCents;
+          const baseline = Math.max(rawInvDueCents, standardPlanCents || 0);
+          if (baseline > amountCents) originalAmountCents = baseline;
+        } else if (standardPlanCents && standardPlanCents > amountCents) {
+          originalAmountCents = standardPlanCents;
+        }
+
+        const hasDiscount = Boolean(originalAmountCents && originalAmountCents > amountCents && modality === 'padrao');
+
         const canonical = deriveCanonicalBillingStatus({
           invoiceStatus: inv.status,
           subscriptionStatus: sub?.status,
           hasInvoices: true,
         });
-        const status = canonical.status === 'paid' ? 'paid' : canonical.status === 'overdue' ? 'overdue' : canonical.status === 'failed' ? 'failed' : 'pending';
-        const gatewayStatus = status === 'paid' ? 'RECEIVED' : status === 'overdue' ? 'OVERDUE' : 'PENDING';
-        const platformStatus = sub?.status || 'pending';
+        let status: AdminPaymentListItem['status'] =
+          canonical.status === 'paid' ? 'paid' : canonical.status === 'overdue' ? 'overdue' : canonical.status === 'failed' ? 'failed' : 'pending';
+        let paidAt: string | undefined = inv.paid_at || undefined;
+
+        const bizConfirmed = ['pagamento_confirmado', 'prontuario_liberado', 'publicado'].includes(biz?.commercial_status || '');
+        if ((modality === 'permuta_100' || modality === 'parceria') && bizConfirmed) {
+          status = 'paid';
+          paidAt = inv.paid_at || terms?.conferred_at || terms?.updated_at || inv.created_at;
+        }
+
+        const gatewayStatus =
+          modality === 'permuta_100'
+            ? 'PERMUTA 100%'
+            : modality === 'parceria'
+            ? 'PARCERIA 100%'
+            : status === 'paid'
+            ? 'RECEIVED'
+            : status === 'overdue'
+            ? 'OVERDUE'
+            : 'PENDING';
+        const platformStatus = sub?.status || (bizConfirmed ? 'active' : 'pending');
         const webhookEvent = providerEvents.find((event: any) => {
           const payload = event?.payload || event?.raw_payload || {};
           const payment = payload?.payment || {};
@@ -184,6 +323,12 @@ export async function getAdminPaymentsDashboardAction(params?: {
         });
 
         const hasDivergence = gatewayStatus === 'RECEIVED' && platformStatus === 'past_due';
+        const effectiveMethod: AdminPaymentListItem['payment_method'] =
+          modality === 'permuta_100' || modality === 'permuta_50' || modality === 'parceria'
+            ? modality
+            : inv.payment_method === 'pix'
+            ? 'pix'
+            : 'credit_card';
 
         items.push({
           id: inv.id,
@@ -195,16 +340,26 @@ export async function getAdminPaymentsDashboardAction(params?: {
           owner_email: biz?.email || 'contato@anunciante.com',
           plan_code: planCode,
           amount_cents: amountCents,
-          payment_method: inv.payment_method === 'pix' ? 'pix' : 'credit_card',
-          installments: 1,
+          original_amount_cents: originalAmountCents,
+          payment_method: effectiveMethod,
+          commercial_modality: modality,
+          is_pedra_fundamental: isPedraFundamental,
+          has_discount: hasDiscount,
+          permuta_description: terms?.permuta_description || terms?.notes || undefined,
+          installments: terms?.installments_count || 1,
           due_date: inv.due_date || inv.created_at,
-          paid_at: inv.paid_at || undefined,
+          paid_at: paidAt,
           status,
           gateway_status: gatewayStatus,
           platform_status: platformStatus,
           has_divergence: hasDivergence,
           divergence_reason: hasDivergence ? 'Pagamento confirmado no Asaas porém assinatura pendente de conciliação' : undefined,
-          last_event_title: `${gatewayStatus} · ${inv.payment_method === 'pix' ? 'PIX' : 'Cartão'}`,
+          last_event_title:
+            modality === 'permuta_100'
+              ? 'PERMUTA 100% · Sem cobrança'
+              : modality === 'parceria'
+              ? 'PARCERIA 100% · Cortesia'
+              : `${gatewayStatus} · ${inv.payment_method === 'pix' ? 'PIX' : 'Cartão'}`,
           created_at: inv.created_at,
         });
 
@@ -222,72 +377,218 @@ export async function getAdminPaymentsDashboardAction(params?: {
       }
     }
 
-    // Filtragem dinâmica
-    let filteredItems = items;
-    if (statusFilter !== 'todos') {
-      filteredItems = filteredItems.filter((i) => i.status === statusFilter);
+    // 4.1. Incluir empresas com Permuta / Parceria ou pagamento comercial confirmado sem fatura Asaas gerada
+    for (const [bizId, terms] of termsMap.entries()) {
+      if (invoicedBusinessIds.has(bizId)) continue;
+      const biz = businessesMap.get(bizId);
+      if (!biz) continue;
+
+      const modality = resolveCommercialModality(terms);
+      const bizConfirmed = ['pagamento_confirmado', 'prontuario_liberado', 'publicado'].includes(biz.commercial_status || '');
+      if (modality === 'padrao' && !bizConfirmed) continue;
+
+      const owner = biz.owner_id ? profilesMap.get(biz.owner_id) : null;
+      const sub = (subscriptions || []).find((s: any) => s.business_id === bizId);
+      const planCode = terms.plan_code || sub?.plan_versions?.plans?.code || biz.plan_tier || 'acacia';
+      const isPedraFundamental = Boolean(terms.is_pedra_fundamental);
+      const amountCents = typeof terms.amount_cents === 'number' ? terms.amount_cents : 0;
+      const standardPlanCents = terms.billing_cycle !== 'monthly'
+        ? planPriceMap.get(normalizeCanonicalPlanCode(planCode))
+        : undefined;
+      const originalAmountCents = standardPlanCents && standardPlanCents > amountCents ? standardPlanCents : undefined;
+      const hasDiscount = Boolean(originalAmountCents && originalAmountCents > amountCents && modality === 'padrao');
+      const isConfirmed = bizConfirmed || sub?.status === 'active';
+      const refDate = terms.conferred_at || terms.updated_at || terms.created_at || biz.created_at;
+
+      items.push({
+        id: `terms_${bizId}`,
+        webhook_event_id: null,
+        asaas_payment_id:
+          modality === 'permuta_100'
+            ? 'PERMUTA-100%'
+            : modality === 'parceria'
+            ? 'PARCERIA-100%'
+            : modality === 'permuta_50'
+            ? 'PERMUTA-50%'
+            : 'ACORDO-DIRETO',
+        business_id: bizId,
+        business_name: biz.name || 'Empresa Anunciante',
+        owner_name: owner?.display_name || 'Anunciante Titular',
+        owner_email: biz.email || 'contato@anunciante.com',
+        plan_code: planCode,
+        amount_cents: amountCents,
+        original_amount_cents: originalAmountCents,
+        payment_method:
+          modality === 'permuta_100' || modality === 'permuta_50' || modality === 'parceria'
+            ? modality
+            : 'pix',
+        commercial_modality: modality,
+        is_pedra_fundamental: isPedraFundamental,
+        has_discount: hasDiscount,
+        permuta_description: terms.permuta_description || terms.notes || undefined,
+        is_virtual_terms_record: true,
+        installments: terms.installments_count || 1,
+        due_date: refDate,
+        paid_at: isConfirmed ? refDate : undefined,
+        status: isConfirmed ? 'paid' : 'pending',
+        gateway_status:
+          modality === 'permuta_100'
+            ? 'PERMUTA 100%'
+            : modality === 'parceria'
+            ? 'PARCERIA 100%'
+            : isConfirmed
+            ? 'CONFIRMADO'
+            : 'PENDING',
+        platform_status: sub?.status || (isConfirmed ? 'active' : 'pending'),
+        has_divergence: false,
+        last_event_title:
+          modality === 'permuta_100'
+            ? 'PERMUTA 100% · Sem cobrança'
+            : modality === 'parceria'
+            ? 'PARCERIA 100% · Cortesia'
+            : modality === 'permuta_50'
+            ? 'PERMUTA 50% · Contrapartida'
+            : 'Acordo Comercial Admin',
+        created_at: terms.created_at || biz.created_at,
+      });
     }
+
+    // Ordenar todos os itens do mais recente para o mais antigo
+    items.sort((a, b) => {
+      const dateA = new Date(a.paid_at || a.due_date || a.created_at).getTime() || 0;
+      const dateB = new Date(b.paid_at || b.due_date || b.created_at).getTime() || 0;
+      return dateB - dateA;
+    });
+
+    // Construir lista de meses disponíveis (meses com registros + últimos 6 meses)
+    const monthSet = new Set<string>();
+    const now = new Date();
+    for (let offset = 0; offset < 6; offset += 1) {
+      const d = new Date(now.getFullYear(), now.getMonth() - offset, 15);
+      const ym = extractYearMonthBR(d.toISOString());
+      if (ym) monthSet.add(ym);
+    }
+    for (const item of items) {
+      const ymPaid = extractYearMonthBR(item.paid_at);
+      const ymDue = extractYearMonthBR(item.due_date);
+      const ymCreated = extractYearMonthBR(item.created_at);
+      if (ymPaid) monthSet.add(ymPaid);
+      if (ymDue) monthSet.add(ymDue);
+      if (ymCreated) monthSet.add(ymCreated);
+    }
+    const availableMonths = Array.from(monthSet)
+      .sort((a, b) => b.localeCompare(a))
+      .map((ym) => ({ value: ym, label: formatMonthLabel(ym) }));
+
+    // Filtragem por mês/período
+    const periodItems =
+      monthFilter && monthFilter !== 'todos'
+        ? items.filter((item) => {
+            const refDate = item.status === 'paid' && item.paid_at ? item.paid_at : (item.due_date || item.created_at);
+            return extractYearMonthBR(refDate) === monthFilter;
+          })
+        : items;
+
+    // Demais filtros (método, modalidade, plano, busca textual)
+    let itemsBeforeStatus = periodItems;
     if (methodFilter !== 'todos') {
-      filteredItems = filteredItems.filter((i) => i.payment_method === methodFilter);
+      if (methodFilter === 'sem_cobranca') {
+        itemsBeforeStatus = itemsBeforeStatus.filter(
+          (i) => i.commercial_modality === 'permuta_100' || i.commercial_modality === 'parceria'
+        );
+      } else {
+        itemsBeforeStatus = itemsBeforeStatus.filter((i) => i.payment_method === methodFilter);
+      }
+    }
+    if (modalityFilter !== 'todos') {
+      if (modalityFilter === 'pedra_fundamental') {
+        itemsBeforeStatus = itemsBeforeStatus.filter((i) => i.is_pedra_fundamental);
+      } else if (modalityFilter === 'desconto') {
+        itemsBeforeStatus = itemsBeforeStatus.filter((i) => i.has_discount || (i.original_amount_cents != null && i.original_amount_cents > i.amount_cents));
+      } else {
+        itemsBeforeStatus = itemsBeforeStatus.filter((i) => i.commercial_modality === modalityFilter);
+      }
     }
     if (planFilter !== 'todos') {
-      filteredItems = filteredItems.filter((i) => i.plan_code === planFilter);
+      const normFilter = normalizeCanonicalPlanCode(planFilter);
+      itemsBeforeStatus = itemsBeforeStatus.filter(
+        (i) => normalizeCanonicalPlanCode(i.plan_code) === normFilter
+      );
     }
     if (query) {
-      filteredItems = filteredItems.filter(
+      itemsBeforeStatus = itemsBeforeStatus.filter(
         (i) =>
           i.business_name.toLowerCase().includes(query) ||
+          i.owner_name.toLowerCase().includes(query) ||
           i.asaas_payment_id.toLowerCase().includes(query) ||
-          i.owner_email.toLowerCase().includes(query)
+          i.owner_email.toLowerCase().includes(query) ||
+          (i.permuta_description && i.permuta_description.toLowerCase().includes(query))
       );
     }
 
-    const paidCount = items.filter((i) => i.status === 'paid').length;
-    const pendingCount = items.filter((i) => i.status === 'pending').length;
-    const overdueCount = items.filter((i) => i.status === 'overdue').length;
-    const failedCount = items.filter((i) => i.status === 'failed').length;
+    const paidCount = itemsBeforeStatus.filter((i) => i.status === 'paid').length;
+    const pendingCount = itemsBeforeStatus.filter((i) => i.status === 'pending').length;
+    const overdueCount = itemsBeforeStatus.filter((i) => i.status === 'overdue').length;
+    const failedCount = itemsBeforeStatus.filter((i) => i.status === 'failed').length;
+    const divergentInScope = itemsBeforeStatus.filter((i) => i.has_divergence).length;
+
+    let filteredItems = itemsBeforeStatus;
+    if (statusFilter === 'divergentes') {
+      filteredItems = itemsBeforeStatus.filter((i) => i.has_divergence);
+    } else if (statusFilter !== 'todos') {
+      filteredItems = itemsBeforeStatus.filter((i) => i.status === statusFilter);
+    }
 
     const activeSubs = (subscriptions || []).filter((s: any) => s.status === 'active');
     const activeSubscriptionsCount = activeSubs.length;
 
-    // Receita realizada: somente faturas realmente pagas no mês corrente.
-    // Assinatura ativa, publicação ou cadastro não comprovam recebimento.
-    const now = new Date();
+    const currentYm = extractYearMonthBR(now.toISOString());
     const monthlyReceivedBrl = items
       .filter((item) => {
         if (item.status !== 'paid' || !item.paid_at) return false;
-        const paidAt = new Date(item.paid_at);
-        return !Number.isNaN(paidAt.getTime())
-          && paidAt.getFullYear() === now.getFullYear()
-          && paidAt.getMonth() === now.getMonth();
+        return extractYearMonthBR(item.paid_at) === currentYm;
       })
       .reduce((total, item) => total + item.amount_cents / 100, 0);
 
-    const toReceiveBrl = items
+    const totalReceivedBrl = items
+      .filter((item) => item.status === 'paid')
+      .reduce((total, item) => total + item.amount_cents / 100, 0);
+
+    const periodReceivedBrl = itemsBeforeStatus
+      .filter((item) => item.status === 'paid')
+      .reduce((total, item) => total + item.amount_cents / 100, 0);
+
+    const toReceiveBrl = itemsBeforeStatus
       .filter((i) => i.status === 'pending')
       .reduce((acc, curr) => acc + curr.amount_cents / 100, 0);
 
-    const overdueBrl = items
+    const overdueBrl = itemsBeforeStatus
       .filter((i) => i.status === 'overdue')
       .reduce((acc, curr) => acc + curr.amount_cents / 100, 0);
+
+    const permutaParceriaCount = items.filter((i) => i.commercial_modality !== 'padrao').length;
 
     return {
       kpis: {
         monthlyReceivedBrl,
+        totalReceivedBrl,
+        periodReceivedBrl,
         toReceiveBrl,
         overdueBrl,
         failedCount,
         activeSubscriptionsCount,
+        permutaParceriaCount,
       },
       reconciliationRequired,
       items: filteredItems,
+      availableMonths,
       counts: {
-        total: items.length,
+        total: itemsBeforeStatus.length,
         paid: paidCount,
         pending: pendingCount,
         overdue: overdueCount,
         failed: failedCount,
-        divergent: reconciliationRequired.length,
+        divergent: divergentInScope,
       },
     };
   } catch (err: any) {
@@ -295,13 +596,17 @@ export async function getAdminPaymentsDashboardAction(params?: {
     return {
       kpis: {
         monthlyReceivedBrl: 0,
+        totalReceivedBrl: 0,
+        periodReceivedBrl: 0,
         toReceiveBrl: 0,
         overdueBrl: 0,
         failedCount: 0,
         activeSubscriptionsCount: 0,
+        permutaParceriaCount: 0,
       },
       reconciliationRequired: [],
       items: [],
+      availableMonths: [],
       counts: { total: 0, paid: 0, pending: 0, overdue: 0, failed: 0, divergent: 0 },
     };
   }

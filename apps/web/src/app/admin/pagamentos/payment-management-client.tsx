@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   CreditCard,
@@ -16,6 +16,9 @@ import {
   AlertTriangle,
   Loader2,
   FileText,
+  Calendar,
+  Tag,
+  RotateCcw,
 } from 'lucide-react';
 import {
   getAdminPaymentsDashboardAction,
@@ -33,6 +36,63 @@ export interface PaymentManagementClientProps {
   asaasEnvironment: string;
 }
 
+function renderConditionBadges(item: AdminPaymentListItem, align: 'center' | 'start' = 'center') {
+  const hasAny =
+    item.commercial_modality !== 'padrao' ||
+    item.is_pedra_fundamental ||
+    item.has_discount;
+  if (!hasAny) return null;
+
+  return (
+    <div className={`flex flex-wrap items-center ${align === 'center' ? 'justify-center' : 'justify-start'} gap-1 mt-1`}>
+      {item.commercial_modality === 'permuta_100' && (
+        <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-300 font-bold text-[10px]">
+          Permuta 100%
+        </span>
+      )}
+      {item.commercial_modality === 'parceria' && (
+        <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-900 border border-sky-300 font-bold text-[10px]">
+          Parceria 100%
+        </span>
+      )}
+      {item.commercial_modality === 'permuta_50' && (
+        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10px]">
+          Permuta 50%
+        </span>
+      )}
+      {item.is_pedra_fundamental && (
+        <span className="px-2 py-0.5 rounded-full bg-[#3B0B14] text-[#C9A227] border border-[#C9A227]/50 font-bold text-[10px]">
+          Pedra Fundamental
+        </span>
+      )}
+      {item.has_discount && (
+        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-[10px]">
+          Com Desconto
+        </span>
+      )}
+    </div>
+  );
+}
+
+function formatPaymentMethodLabel(item: AdminPaymentListItem): { title: string; subtitle: string } {
+  if (item.commercial_modality === 'permuta_100') {
+    return { title: 'Permuta 100%', subtitle: 'Sem cobrança financeira' };
+  }
+  if (item.commercial_modality === 'parceria') {
+    return { title: 'Parceria Institucional', subtitle: 'Cortesia 100%' };
+  }
+  if (item.commercial_modality === 'permuta_50') {
+    return {
+      title: 'Permuta 50% + Saldo',
+      subtitle: item.installments > 1 ? `${item.installments}x sem juros` : 'À vista',
+    };
+  }
+  return {
+    title: item.payment_method === 'credit_card' ? 'Cartão de Crédito' : 'PIX QrCode',
+    subtitle: item.installments > 1 ? `${item.installments}x sem juros` : 'À vista',
+  };
+}
+
 export default function PaymentManagementClient({
   isAsaasConfigured: _isAsaasConfigured,
   asaasEnvironment: _asaasEnvironment,
@@ -40,6 +100,10 @@ export default function PaymentManagementClient({
   const [data, setData] = useState<AdminPaymentsDashboardDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<string>('todos');
+  const [monthFilter, setMonthFilter] = useState<string>('todos');
+  const [modalityFilter, setModalityFilter] = useState<string>('todos');
+  const [methodFilter, setMethodFilter] = useState<string>('todos');
+  const [planFilter, setPlanFilter] = useState<string>('todos');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [_activeMainTab, _setActiveMainTab] = useState<'visao_geral' | 'transacoes' | 'conciliacao' | 'assinaturas' | 'gateway'>('visao_geral');
   const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<AdminPaymentListItem | null>(null);
@@ -47,19 +111,45 @@ export default function PaymentManagementClient({
   const [manualConfirmingId, setManualConfirmingId] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const loadDashboard = async (filter: string) => {
+  const loadDashboard = useCallback(async () => {
     setLoading(true);
     const res = await getAdminPaymentsDashboardAction({
-      statusFilter: filter,
+      statusFilter: selectedFilter,
+      monthFilter,
+      modalityFilter,
+      methodFilter,
+      planFilter,
       query: searchQuery,
     });
     setData(res);
     setLoading(false);
-  };
+  }, [selectedFilter, monthFilter, modalityFilter, methodFilter, planFilter, searchQuery]);
 
   useEffect(() => {
-    loadDashboard(selectedFilter);
-  }, [selectedFilter, searchQuery]);
+    void loadDashboard();
+  }, [loadDashboard]);
+
+  const hasActiveFilters =
+    selectedFilter !== 'todos' ||
+    monthFilter !== 'todos' ||
+    modalityFilter !== 'todos' ||
+    methodFilter !== 'todos' ||
+    planFilter !== 'todos' ||
+    searchQuery.trim().length > 0;
+
+  const handleClearFilters = () => {
+    setSelectedFilter('todos');
+    setMonthFilter('todos');
+    setModalityFilter('todos');
+    setMethodFilter('todos');
+    setPlanFilter('todos');
+    setSearchQuery('');
+  };
+
+  const selectedMonthLabel =
+    monthFilter === 'todos'
+      ? null
+      : data?.availableMonths?.find((m) => m.value === monthFilter)?.label || monthFilter;
 
   const handleReprocessWebhook = async (recordId: string) => {
     setReprocessingId(recordId);
@@ -68,7 +158,7 @@ export default function PaymentManagementClient({
       const res = await reprocessPaymentWebhookAction(recordId);
       if (res.success) {
         setActionMsg({ type: 'success', text: res.message || 'Evento reprocessado com sucesso.' });
-        await loadDashboard(selectedFilter);
+        await loadDashboard();
       } else {
         setActionMsg({ type: 'error', text: res.error || 'Falha ao reprocessar evento.' });
       }
@@ -94,7 +184,7 @@ export default function PaymentManagementClient({
       const res = await confirmPaymentManuallyAction(invoiceId);
       if (res.success) {
         setActionMsg({ type: 'success', text: res.message || 'Pagamento confirmado manualmente.' });
-        await loadDashboard(selectedFilter);
+        await loadDashboard();
         setSelectedPaymentDetail((prev) => prev ? { ...prev, status: 'paid', gateway_status: 'RECEIVED' } : prev);
       } else {
         setActionMsg({ type: 'error', text: res.error || 'Falha ao confirmar pagamento manualmente.' });
@@ -112,16 +202,23 @@ export default function PaymentManagementClient({
       <section className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <div className="p-4 bg-[#3B0B14] text-white border border-[#C9A227]/50 rounded-2xl shadow-md">
           <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-[#C9A227]">
-            <span>Recebido no Mês</span>
+            <span>{selectedMonthLabel ? `Recebido em ${selectedMonthLabel}` : 'Total Recebido (Histórico)'}</span>
             <DollarSign className="w-4 h-4 text-[#C9A227]" />
           </div>
           <p className="text-2xl font-serif font-bold mt-1 text-white">
             {loading && !data ? (
               <span className="text-sm font-normal text-stone-300">Carregando...</span>
             ) : (
-              `R$ ${(data?.kpis?.monthlyReceivedBrl ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+              `R$ ${(selectedMonthLabel ? (data?.kpis?.periodReceivedBrl ?? 0) : (data?.kpis?.totalReceivedBrl ?? 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
             )}
           </p>
+          {data && (
+            <p className="text-[11px] text-[#C9A227]/90 mt-1 font-medium">
+              {selectedMonthLabel
+                ? `Histórico geral: R$ ${(data.kpis.totalReceivedBrl ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                : `Mês atual: R$ ${(data.kpis.monthlyReceivedBrl ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+            </p>
+          )}
         </div>
 
         <div className="p-4 bg-white border border-stone-300 rounded-2xl shadow-xs">
@@ -136,6 +233,9 @@ export default function PaymentManagementClient({
               `R$ ${(data?.kpis?.toReceiveBrl ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
             )}
           </p>
+          {selectedMonthLabel && (
+            <p className="text-[11px] text-stone-500 mt-1">Período: {selectedMonthLabel}</p>
+          )}
         </div>
 
         <div className="p-4 bg-white border border-stone-300 rounded-2xl shadow-xs">
@@ -170,6 +270,11 @@ export default function PaymentManagementClient({
           <p className="text-2xl font-serif font-bold text-emerald-900 mt-1">
             {loading && !data ? '-' : (data?.kpis?.activeSubscriptionsCount ?? 0)}
           </p>
+          {data && (data.kpis.permutaParceriaCount ?? 0) > 0 && (
+            <p className="text-[11px] text-purple-800 font-semibold mt-1">
+              {data.kpis.permutaParceriaCount} em permuta / parceria
+            </p>
+          )}
         </div>
       </section>
 
@@ -231,21 +336,88 @@ export default function PaymentManagementClient({
 
       {/* 3. BUSCA & FILTROS OPERACIONAIS */}
       <div className="bg-white border border-stone-300 rounded-2xl p-4 shadow-xs space-y-3">
-        <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
           <div className="relative flex-1 w-full">
             <Search className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder="Buscar cobrança por empresa, responsável ou e-mail..."
+              placeholder="Buscar cobrança por empresa, responsável, e-mail ou contrapartida..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs text-stone-900 outline-none focus:border-[#3B0B14]"
             />
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 scrollbar-none">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:flex items-center gap-2">
+            {/* Filtro de Mês / Período */}
+            <div className="relative">
+              <Calendar className="w-3.5 h-3.5 text-stone-500 absolute left-2.5 top-2.5 pointer-events-none" />
+              <select
+                aria-label="Filtrar por mês"
+                value={monthFilter}
+                onChange={(e) => setMonthFilter(e.target.value)}
+                className="w-full lg:w-auto pl-8 pr-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-semibold text-stone-800 outline-none focus:border-[#3B0B14]"
+              >
+                <option value="todos">Todos os meses</option>
+                {(data?.availableMonths || []).map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Filtro de Condição Comercial / Desconto */}
+            <div className="relative">
+              <Tag className="w-3.5 h-3.5 text-stone-500 absolute left-2.5 top-2.5 pointer-events-none" />
+              <select
+                aria-label="Filtrar por condição comercial"
+                value={modalityFilter}
+                onChange={(e) => setModalityFilter(e.target.value)}
+                className="w-full lg:w-auto pl-8 pr-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-semibold text-stone-800 outline-none focus:border-[#3B0B14]"
+              >
+                <option value="todos">Todas condições</option>
+                <option value="permuta_100">Permuta 100%</option>
+                <option value="parceria">Parceria 100%</option>
+                <option value="permuta_50">Permuta 50%</option>
+                <option value="desconto">Com Desconto</option>
+                <option value="pedra_fundamental">Pedra Fundamental</option>
+                <option value="padrao">Cobrança Padrão</option>
+              </select>
+            </div>
+
+            {/* Filtro de Forma */}
+            <select
+              aria-label="Filtrar por forma de pagamento"
+              value={methodFilter}
+              onChange={(e) => setMethodFilter(e.target.value)}
+              className="w-full lg:w-auto px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-semibold text-stone-800 outline-none focus:border-[#3B0B14]"
+            >
+              <option value="todos">Todas formas</option>
+              <option value="credit_card">Cartão de Crédito</option>
+              <option value="pix">PIX QrCode</option>
+              <option value="sem_cobranca">Sem Cobrança (Permuta/Parceria)</option>
+            </select>
+
+            {/* Filtro de Plano */}
+            <select
+              aria-label="Filtrar por plano"
+              value={planFilter}
+              onChange={(e) => setPlanFilter(e.target.value)}
+              className="w-full lg:w-auto px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-semibold text-stone-800 outline-none focus:border-[#3B0B14]"
+            >
+              <option value="todos">Todos os planos</option>
+              <option value="acacia">Plano Acácia</option>
+              <option value="compasso">Plano Compasso</option>
+              <option value="esquadro">Plano Esquadro</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-stone-100">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
             <Filter className="w-4 h-4 text-stone-500 shrink-0" />
-            <span className="text-xs font-bold text-stone-600 shrink-0">Filtro:</span>
+            <span className="text-xs font-bold text-stone-600 shrink-0">Status:</span>
 
             {[
               { id: 'todos', label: `Todos (${data?.counts.total || 0})` },
@@ -268,6 +440,17 @@ export default function PaymentManagementClient({
               </button>
             ))}
           </div>
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-[#3B0B14] bg-amber-50 hover:bg-amber-100 border border-amber-200 transition cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Limpar filtros</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -283,6 +466,15 @@ export default function PaymentManagementClient({
             <p className="text-sm font-bold text-stone-800">
               Nenhuma cobrança encontrada neste filtro.
             </p>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                className="text-xs font-bold text-[#3B0B14] underline cursor-pointer"
+              >
+                Ver todos os registros
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -290,82 +482,116 @@ export default function PaymentManagementClient({
               <thead>
                 <tr className="bg-stone-100 border-b border-stone-200 text-stone-700 font-bold uppercase tracking-wider">
                   <th className="py-3 px-4">Empresa</th>
-                  <th className="py-3 px-4 text-center">Plano</th>
-                  <th className="py-3 px-4 text-right">Valor Anual</th>
+                  <th className="py-3 px-4 text-center">Plano & Condição</th>
+                  <th className="py-3 px-4 text-right">Valor Negociado</th>
                   <th className="py-3 px-4 text-center">Forma & Parcelas</th>
-                  <th className="py-3 px-4 text-center">Vencimento</th>
+                  <th className="py-3 px-4 text-center">Data</th>
                   <th className="py-3 px-4 text-center">Status</th>
                   <th className="py-3 px-4 text-right">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-200">
-                {data.items.map((item) => (
-                  <tr key={item.id} className="hover:bg-stone-50/80 transition-colors">
-                    {/* EMPRESA */}
-                    <td className="py-3.5 px-4">
-                      <div className="font-serif font-bold text-sm text-stone-900 line-clamp-1">
-                        {item.business_name}
-                      </div>
-                      <span className="text-[11px] text-stone-500 font-mono">{item.owner_name} • {item.owner_email}</span>
-                    </td>
+                {data.items.map((item) => {
+                  const methodLabel = formatPaymentMethodLabel(item);
+                  const hasDiscountedDiff =
+                    typeof item.original_amount_cents === 'number' &&
+                    item.original_amount_cents > item.amount_cents;
 
-                    {/* PLANO */}
-                    <td className="py-3.5 px-4 text-center">
-                      <span className="px-2.5 py-1 rounded-full bg-stone-100 text-stone-900 font-extrabold text-[10px] uppercase border border-stone-300">
-                        {getCommercialPlanName(item.plan_code)}
-                      </span>
-                    </td>
+                  return (
+                    <tr key={item.id} className="hover:bg-stone-50/80 transition-colors">
+                      {/* EMPRESA */}
+                      <td className="py-3.5 px-4">
+                        <div className="font-serif font-bold text-sm text-stone-900 line-clamp-1">
+                          {item.business_name}
+                        </div>
+                        <span className="text-[11px] text-stone-500 font-mono">{item.owner_name} • {item.owner_email}</span>
+                        {item.permuta_description && (
+                          <p className="text-[11px] text-purple-800 font-medium mt-0.5 line-clamp-1">
+                            Contrapartida: {item.permuta_description}
+                          </p>
+                        )}
+                      </td>
 
-                    {/* VALOR */}
-                    <td className="py-3.5 px-4 text-right font-mono font-bold text-stone-900 text-sm">
-                      R$ {(item.amount_cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
-
-                    {/* FORMA & PARCELAS */}
-                    <td className="py-3.5 px-4 text-center">
-                      <span className="font-semibold text-stone-800 block">
-                        {item.payment_method === 'credit_card' ? 'Cartão de Crédito' : 'PIX QrCode'}
-                      </span>
-                      <span className="text-[11px] text-stone-500 font-semibold">
-                        {item.installments > 1 ? `${item.installments}x sem juros` : 'À vista'}
-                      </span>
-                    </td>
-
-                    {/* VENCIMENTO */}
-                    <td className="py-3.5 px-4 text-center font-mono text-stone-700">
-                      {formatDateBR(item.due_date)}
-                    </td>
-
-                    {/* STATUS */}
-                    <td className="py-3.5 px-4 text-center">
-                      {item.status === 'paid' ? (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-[10px]">
-                          ✓ Confirmado
+                      {/* PLANO & CONDIÇÃO */}
+                      <td className="py-3.5 px-4 text-center">
+                        <span className="px-2.5 py-1 rounded-full bg-stone-100 text-stone-900 font-extrabold text-[10px] uppercase border border-stone-300">
+                          {getCommercialPlanName(item.plan_code)}
                         </span>
-                      ) : item.has_divergence ? (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10px]">
-                          ⚠ Divergência
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-300 font-bold text-[10px]">
-                          Pendente
-                        </span>
-                      )}
-                    </td>
+                        {renderConditionBadges(item, 'center')}
+                      </td>
 
-                    {/* AÇÃO: VER DETALHES */}
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPaymentDetail(item)}
-                        className="px-3.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-900 font-bold text-xs rounded-xl border border-stone-300 transition-all inline-flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>Ver Detalhes</span>
-                        <ArrowRight className="w-3.5 h-3.5 text-stone-600" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      {/* VALOR */}
+                      <td className="py-3.5 px-4 text-right font-mono">
+                        <div className="font-bold text-stone-900 text-sm">
+                          R$ {(item.amount_cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </div>
+                        {hasDiscountedDiff && (
+                          <div className="text-[11px] text-stone-400 line-through">
+                            R$ {((item.original_amount_cents || 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* FORMA & PARCELAS */}
+                      <td className="py-3.5 px-4 text-center">
+                        <span className="font-semibold text-stone-800 block">
+                          {methodLabel.title}
+                        </span>
+                        <span className="text-[11px] text-stone-500 font-semibold">
+                          {methodLabel.subtitle}
+                        </span>
+                      </td>
+
+                      {/* DATA */}
+                      <td className="py-3.5 px-4 text-center font-mono text-stone-700">
+                        {item.status === 'paid' && item.paid_at ? (
+                          <div>
+                            <span className="block text-[10px] text-emerald-700 font-sans font-bold uppercase">Pago em</span>
+                            <span>{formatDateBR(item.paid_at)}</span>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="block text-[10px] text-stone-500 font-sans font-bold uppercase">Vencimento</span>
+                            <span>{formatDateBR(item.due_date)}</span>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* STATUS */}
+                      <td className="py-3.5 px-4 text-center">
+                        {item.status === 'paid' ? (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-[10px]">
+                            ✓ {item.commercial_modality === 'permuta_100' ? 'Liberado (Permuta)' : item.commercial_modality === 'parceria' ? 'Liberado (Parceria)' : 'Confirmado'}
+                          </span>
+                        ) : item.has_divergence ? (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10px]">
+                            ⚠ Divergência
+                          </span>
+                        ) : item.status === 'overdue' ? (
+                          <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-900 border border-rose-300 font-bold text-[10px]">
+                            Em Atraso
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-300 font-bold text-[10px]">
+                            Pendente
+                          </span>
+                        )}
+                      </td>
+
+                      {/* AÇÃO: VER DETALHES */}
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPaymentDetail(item)}
+                          className="px-3.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-900 font-bold text-xs rounded-xl border border-stone-300 transition-all inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Ver Detalhes</span>
+                          <ArrowRight className="w-3.5 h-3.5 text-stone-600" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -384,11 +610,12 @@ export default function PaymentManagementClient({
                 <h3 className="font-serif font-bold text-lg text-stone-900 mt-1">
                   {selectedPaymentDetail.business_name}
                 </h3>
+                {renderConditionBadges(selectedPaymentDetail, 'start')}
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedPaymentDetail(null)}
-                className="text-stone-400 hover:text-stone-600 font-bold text-lg"
+                className="text-stone-400 hover:text-stone-600 font-bold text-lg cursor-pointer"
               >
                 ✕
               </button>
@@ -396,28 +623,50 @@ export default function PaymentManagementClient({
 
             <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 text-xs space-y-2">
               <div className="flex justify-between">
-                <span className="text-stone-600">ID da Cobrança Asaas:</span>
+                <span className="text-stone-600">Referência / ID:</span>
                 <strong className="font-mono text-stone-900">{selectedPaymentDetail.asaas_payment_id}</strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-stone-600">Plano Comercial:</span>
                 <strong className="font-bold text-[#3B0B14]">{getCommercialPlanName(selectedPaymentDetail.plan_code)}</strong>
               </div>
+              {typeof selectedPaymentDetail.original_amount_cents === 'number' &&
+                selectedPaymentDetail.original_amount_cents > selectedPaymentDetail.amount_cents && (
+                  <div className="flex justify-between">
+                    <span className="text-stone-600">Valor Integral do Plano:</span>
+                    <span className="font-mono text-stone-500 line-through">
+                      R$ {(selectedPaymentDetail.original_amount_cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
               <div className="flex justify-between">
-                <span className="text-stone-600">Valor Anual:</span>
-                <strong className="font-mono text-stone-900">
+                <span className="text-stone-600">Valor Negociado / Cobrado:</span>
+                <strong className="font-mono text-stone-900 text-sm">
                   R$ {(selectedPaymentDetail.amount_cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-stone-600">Condição de Pagamento:</span>
                 <strong>
-                  {selectedPaymentDetail.payment_method === 'credit_card' ? 'Cartão de Crédito' : 'PIX QrCode'} (
-                  {selectedPaymentDetail.installments}x)
+                  {formatPaymentMethodLabel(selectedPaymentDetail).title} ({formatPaymentMethodLabel(selectedPaymentDetail).subtitle})
                 </strong>
               </div>
-              <div className="flex justify-between">
-                <span className="text-stone-600">Último Evento Gateway:</span>
+              {selectedPaymentDetail.paid_at && (
+                <div className="flex justify-between">
+                  <span className="text-stone-600">Data de Confirmação / Pagamento:</span>
+                  <strong className="font-mono text-emerald-800">{formatDateBR(selectedPaymentDetail.paid_at)}</strong>
+                </div>
+              )}
+              {selectedPaymentDetail.permuta_description && (
+                <div className="pt-2 border-t border-stone-200">
+                  <span className="text-stone-600 block font-bold mb-1">Descrição / Contrapartida:</span>
+                  <p className="text-stone-800 bg-white p-2.5 rounded-xl border border-stone-200">
+                    {selectedPaymentDetail.permuta_description}
+                  </p>
+                </div>
+              )}
+              <div className="flex justify-between pt-1">
+                <span className="text-stone-600">Último Evento / Registro:</span>
                 <strong className="text-amber-800 font-mono">{selectedPaymentDetail.last_event_title}</strong>
               </div>
             </div>
@@ -431,46 +680,48 @@ export default function PaymentManagementClient({
                 <span>Abrir Prontuário da Empresa →</span>
               </Link>
 
-              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                {selectedPaymentDetail.status !== 'paid' && (
+              {!selectedPaymentDetail.is_virtual_terms_record && (
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                  {selectedPaymentDetail.status !== 'paid' && (
+                    <button
+                      type="button"
+                      onClick={() => handleManualConfirmPayment(selectedPaymentDetail.id)}
+                      disabled={manualConfirmingId === selectedPaymentDetail.id}
+                      className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs border border-emerald-900/20 disabled:opacity-60"
+                    >
+                      {manualConfirmingId === selectedPaymentDetail.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <ShieldCheck className="w-3.5 h-3.5 text-white" />
+                      )}
+                      <span>Confirmar pagamento manualmente</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
-                    onClick={() => handleManualConfirmPayment(selectedPaymentDetail.id)}
-                    disabled={manualConfirmingId === selectedPaymentDetail.id}
-                    className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs border border-emerald-900/20 disabled:opacity-60"
+                    onClick={() => {
+                      if (!selectedPaymentDetail.webhook_event_id) {
+                        setActionMsg({
+                          type: 'error',
+                          text: 'Esta cobrança ainda não possui evento do Asaas registrado. Reenvie o webhook no painel do Asaas depois de corrigir URL e token.',
+                        });
+                        return;
+                      }
+                      handleReprocessWebhook(selectedPaymentDetail.webhook_event_id);
+                    }}
+                    disabled={!selectedPaymentDetail.webhook_event_id || (Boolean(selectedPaymentDetail.webhook_event_id) && reprocessingId === selectedPaymentDetail.webhook_event_id)}
+                    className="px-4 py-2 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs border border-[#C9A227]/40 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {manualConfirmingId === selectedPaymentDetail.id ? (
+                    {Boolean(selectedPaymentDetail.webhook_event_id) && reprocessingId === selectedPaymentDetail.webhook_event_id ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
-                      <ShieldCheck className="w-3.5 h-3.5 text-white" />
+                      <RefreshCw className="w-3.5 h-3.5 text-[#C9A227]" />
                     )}
-                    <span>Confirmar pagamento manualmente</span>
+                    <span>Reprocessar Evento Asaas</span>
                   </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!selectedPaymentDetail.webhook_event_id) {
-                      setActionMsg({
-                        type: 'error',
-                        text: 'Esta cobrança ainda não possui evento do Asaas registrado. Reenvie o webhook no painel do Asaas depois de corrigir URL e token.',
-                      });
-                      return;
-                    }
-                    handleReprocessWebhook(selectedPaymentDetail.webhook_event_id);
-                  }}
-                  disabled={!selectedPaymentDetail.webhook_event_id || (Boolean(selectedPaymentDetail.webhook_event_id) && reprocessingId === selectedPaymentDetail.webhook_event_id)}
-                  className="px-4 py-2 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs border border-[#C9A227]/40 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                {Boolean(selectedPaymentDetail.webhook_event_id) && reprocessingId === selectedPaymentDetail.webhook_event_id ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-3.5 h-3.5 text-[#C9A227]" />
-                )}
-                <span>Reprocessar Evento Asaas</span>
-                </button>
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

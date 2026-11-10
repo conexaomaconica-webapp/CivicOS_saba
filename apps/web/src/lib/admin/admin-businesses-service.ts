@@ -3447,10 +3447,26 @@ export async function confirmAdminCommercialTermsAction(
       };
     }
 
+    // 6. Sincroniza faturas em aberto com o novo valor comercial negociado
+    try {
+      const syncedAmountDue = Number((finalAmountCents / 100).toFixed(2));
+      await (supabase as any)
+        .from('invoices')
+        .update({
+          amount_due: syncedAmountDue,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('business_id', biz.id)
+        .in('status', ['draft', 'open', 'overdue']);
+    } catch {
+      // Silencia se não houver faturas ou em mocks simplificados
+    }
+
     // 7. Revalidação das rotas
     revalidatePath(`/admin/empresas/${biz.id}/contratacao`);
     revalidatePath(`/admin/empresas/${biz.id}`);
     revalidatePath('/admin/empresas');
+    revalidatePath('/admin/pagamentos');
 
     return {
       success: true,
@@ -3498,6 +3514,24 @@ export async function confirmAdminPermutaOrParceriaPaymentAction(
       })
       .eq('id', businessId)
       .throwOnError();
+
+    if (isFree) {
+      try {
+        await (supabase as any)
+          .from('invoices')
+          .update({
+            status: 'paid',
+            amount_due: 0,
+            amount_paid: 0,
+            paid_at: now,
+            updated_at: now,
+          })
+          .eq('business_id', businessId)
+          .in('status', ['draft', 'open', 'overdue']);
+      } catch {
+        // Silencia caso não existam faturas prévias
+      }
+    }
 
     await (supabase as any).from('admin_audit_logs').insert({
       tenant_id: biz.tenant_id,
