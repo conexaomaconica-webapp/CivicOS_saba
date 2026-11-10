@@ -187,7 +187,7 @@ export async function getPlatformEventBySlugAction(
             slug: 'conexao-empresarial-2026',
             title: 'Conexão Empresarial da Família Maçônica',
             subtitle: 'Relacionamentos que aproximam! Negócios que fortalecem!',
-            description: 'Encontro exclusivo de integração e fortalecimento da rede fraterna de negócios com as palestras "Ninguém prospera sozinho" com Dr. Lucas Almeida (Empresário, Médico e Advogado) e "Síndrome dos Pais Culpados" com Dr. Alfredo Morais (Psicólogo).',
+            description: 'Encontro exclusivo de integração e fortalecimento da rede fraterna de negócios com as palestras "Ninguém prospera sozinho" com Dr. Luccas Almeida (Empresário, Médico e Advogado) e "Síndrome dos Pais Culpados" com Dr. Alfredo Morais (Psicólogo).',
             event_date: '2026-11-24',
             start_time: '19:00:00',
             end_time: '22:00:00',
@@ -374,18 +374,18 @@ export async function getUnifiedEventBySlugOrIdAction(
         cat.id === 'sociais' || badgeLower.includes('social')
           ? 'social_action'
           : cat.id === 'empresas' || badgeLower.includes('empresa')
-          ? 'business'
-          : cat.id === 'festividades' || cat.id === 'palestras' || badgeLower.includes('institucional')
-          ? 'platform'
-          : 'lodge';
+            ? 'business'
+            : cat.id === 'festividades' || cat.id === 'palestras' || badgeLower.includes('institucional')
+              ? 'platform'
+              : 'lodge';
 
       const price = extractPriceInfo(pData.badge_text, pData.subtitle, pData.description, orgType);
 
       const isLodgeVenue = Boolean(
         pData.venue_name &&
         (pData.venue_name.toLowerCase().includes('loja') ||
-         pData.venue_name.toLowerCase().includes('templo') ||
-         pData.venue_name.toLowerCase().includes('augusta'))
+          pData.venue_name.toLowerCase().includes('templo') ||
+          pData.venue_name.toLowerCase().includes('augusta'))
       );
 
       const resolvedOrganizerName =
@@ -393,12 +393,12 @@ export async function getUnifiedEventBySlugOrIdAction(
         (orgType === 'platform' || cat.id === 'institucional'
           ? 'Conexão Maçônica'
           : cat.id === 'festividades'
-          ? (pData.title?.toLowerCase().includes('16') ? 'Loja Maçônica 16 de Junho' : 'Comissão Organizadora')
-          : orgType === 'social_action'
-          ? 'Ação Social Fraterna'
-          : isLodgeVenue
-          ? pData.venue_name
-          : (pData.title?.toLowerCase().includes('loja') ? 'Loja Maçônica Responsável' : 'Conexão Maçônica'));
+            ? (pData.title?.toLowerCase().includes('16') ? 'Loja Maçônica 16 de Junho' : 'Comissão Organizadora')
+            : orgType === 'social_action'
+              ? 'Ação Social Fraterna'
+              : isLodgeVenue
+                ? pData.venue_name
+                : (pData.title?.toLowerCase().includes('loja') ? 'Loja Maçônica Responsável' : 'Conexão Maçônica'));
 
       return {
         success: true,
@@ -514,7 +514,7 @@ export async function getUnifiedEventBySlugOrIdAction(
           slug: 'conexao-empresarial-2026',
           title: 'Conexão Empresarial da Família Maçônica',
           subtitle: 'Relacionamentos que aproximam! Negócios que fortalecem!',
-          description: 'Encontro exclusivo de integração e fortalecimento da rede fraterna de negócios com as palestras "Ninguém prospera sozinho" com Dr. Lucas Almeida (Empresário, Médico e Advogado) e "Síndrome dos Pais Culpados" com Dr. Alfredo Morais (Psicólogo).',
+          description: 'Encontro exclusivo de integração e fortalecimento da rede fraterna de negócios com as palestras "Ninguém prospera sozinho" com Dr. Luccas Almeida (Empresário, Médico e Advogado) e "Síndrome dos Pais Culpados" com Dr. Alfredo Morais (Psicólogo).',
           event_date: '2026-11-24',
           start_time: '19:00',
           end_time: '22:00',
@@ -605,19 +605,19 @@ export async function upsertEventRegistrationAction(
     const supabase = await getSupabaseServerOrAdminClient();
 
     const { data, error } = await supabase.rpc('upsert_event_registration', {
-      p_event_id:             input.eventId,
-      p_full_name:            input.fullName.trim(),
-      p_whatsapp:             whatsappClean,
-      p_email:                input.email?.trim().toLowerCase() ?? null,
-      p_attendee_type:        input.attendeeType,
+      p_event_id: input.eventId,
+      p_full_name: input.fullName.trim(),
+      p_whatsapp: whatsappClean,
+      p_email: input.email?.trim().toLowerCase() ?? null,
+      p_attendee_type: input.attendeeType,
       p_masonic_organization: masonicOrgClean,
-      p_company_name:         input.companyName?.trim() ?? null,
-      p_city:                 input.city?.trim() ?? null,
-      p_attendance_status:    input.attendanceStatus,
-      p_source:               input.source ?? null,
-      p_utm_source:           input.utmSource ?? null,
-      p_utm_medium:           input.utmMedium ?? null,
-      p_utm_campaign:         input.utmCampaign ?? null,
+      p_company_name: input.companyName?.trim() ?? null,
+      p_city: input.city?.trim() ?? null,
+      p_attendance_status: input.attendanceStatus,
+      p_source: input.source ?? null,
+      p_utm_source: input.utmSource ?? null,
+      p_utm_medium: input.utmMedium ?? null,
+      p_utm_campaign: input.utmCampaign ?? null,
     });
 
     if (error) {
@@ -644,12 +644,12 @@ export async function upsertEventRegistrationAction(
     return {
       success: true,
       data: {
-        registrationId:   data[0]!.registration_id,
+        registrationId: data[0]!.registration_id,
         confirmationCode: data[0]!.confirmation_code,
-        isNew:            data[0]!.is_new,
-        fullName:         data[0]!.full_name,
+        isNew: data[0]!.is_new,
+        fullName: data[0]!.full_name,
         attendanceStatus: data[0]!.attendance_status as AttendanceStatus,
-        checkinToken:     (data[0] as any)?.checkin_token,
+        checkinToken: (data[0] as any)?.checkin_token,
       },
     };
   } catch (err) {
@@ -722,11 +722,11 @@ export async function getAdminEventDashboardAction(
       success: true,
       data: {
         total_registrations: row.total_registrations ?? 0,
-        total_confirmed:     row.total_confirmed ?? 0,
-        total_declined:      row.total_declined ?? 0,
-        total_checkins:      row.total_checkins ?? 0,
-        by_attendee_type:    (row.by_attendee_type as Record<string, number>) ?? {},
-        by_source:           (row.by_source as Record<string, number>) ?? {},
+        total_confirmed: row.total_confirmed ?? 0,
+        total_declined: row.total_declined ?? 0,
+        total_checkins: row.total_checkins ?? 0,
+        by_attendee_type: (row.by_attendee_type as Record<string, number>) ?? {},
+        by_source: (row.by_source as Record<string, number>) ?? {},
       },
     };
   } catch (err) {
@@ -753,15 +753,15 @@ export async function getAdminEventRegistrationsAction(params: {
     const supabase = await createServerSideClient();
 
     const { data, error } = await supabase.rpc('admin_list_event_registrations', {
-      p_event_id:          params.eventId,
-      p_search:            params.search?.trim() || null,
+      p_event_id: params.eventId,
+      p_search: params.search?.trim() || null,
       p_attendance_status: params.attendanceStatus ?? null,
-      p_attendee_type:     params.attendeeType ?? null,
-      p_city:              params.city ?? null,
-      p_source:            params.source ?? null,
-      p_limit:             params.limit ?? 50,
-      p_offset:            params.offset ?? 0,
-      p_has_checkin:       params.hasCheckin ?? null,
+      p_attendee_type: params.attendeeType ?? null,
+      p_city: params.city ?? null,
+      p_source: params.source ?? null,
+      p_limit: params.limit ?? 50,
+      p_offset: params.offset ?? 0,
+      p_has_checkin: params.hasCheckin ?? null,
     });
 
     if (error) {
@@ -812,11 +812,11 @@ export async function adminCheckinRegistrationAction(
     return {
       success: true,
       data: {
-        registrationId:   row.registration_id,
-        fullName:         row.full_name,
+        registrationId: row.registration_id,
+        fullName: row.full_name,
         confirmationCode: row.confirmation_code,
-        checkedInAt:      row.checked_in_at,
-        alreadyChecked:   row.already_checked,
+        checkedInAt: row.checked_in_at,
+        alreadyChecked: row.already_checked,
       },
     };
   } catch (err) {
@@ -853,10 +853,10 @@ export async function adminUndoCheckinAction(
     return {
       success: true,
       data: {
-        registrationId:   row.registration_id,
-        fullName:         row.full_name,
+        registrationId: row.registration_id,
+        fullName: row.full_name,
         confirmationCode: row.confirmation_code,
-        success:          row.success,
+        success: row.success,
       },
     };
   } catch (err) {
@@ -881,7 +881,7 @@ export async function getRegistrationByCheckinTokenAction(
 
     const { data, error } = await supabase.rpc('admin_get_registration_by_token', {
       p_event_id: eventId,
-      p_token:    token.trim(),
+      p_token: token.trim(),
     });
 
     if (error) {
@@ -899,23 +899,23 @@ export async function getRegistrationByCheckinTokenAction(
     return {
       success: true,
       data: {
-        id:                   row.id,
-        full_name:            row.full_name,
-        whatsapp:             row.whatsapp,
-        email:                row.email,
-        attendee_type:        row.attendee_type,
+        id: row.id,
+        full_name: row.full_name,
+        whatsapp: row.whatsapp,
+        email: row.email,
+        attendee_type: row.attendee_type,
         masonic_organization: row.masonic_organization,
-        company_name:         row.company_name,
-        city:                 row.city,
-        attendance_status:    row.attendance_status,
-        confirmation_code:    row.confirmation_code,
-        source:               null,
-        utm_source:           null,
-        utm_campaign:         null,
-        checked_in_at:        row.checked_in_at,
-        created_at:           '',
-        total_count:          1,
-        checkin_token:        row.checkin_token,
+        company_name: row.company_name,
+        city: row.city,
+        attendance_status: row.attendance_status,
+        confirmation_code: row.confirmation_code,
+        source: null,
+        utm_source: null,
+        utm_campaign: null,
+        checked_in_at: row.checked_in_at,
+        created_at: '',
+        total_count: 1,
+        checkin_token: row.checkin_token,
       },
     };
   } catch (err) {
@@ -937,8 +937,8 @@ export async function exportEventRegistrationsCSVAction(
     // Buscar todas as inscrições (sem paginação para export)
     const { data, error } = await supabase.rpc('admin_list_event_registrations', {
       p_event_id: eventId,
-      p_limit:    1000,
-      p_offset:   0,
+      p_limit: 1000,
+      p_offset: 0,
     });
 
     if (error) {
@@ -1133,7 +1133,7 @@ export async function createPlatformEventAction(
     try {
       revalidatePath('/admin/eventos');
       revalidatePath('/eventos');
-    } catch (_e) {}
+    } catch (_e) { }
 
     return { success: true, data: { eventId: newEvent.id, slug: newEvent.slug } };
   } catch (err) {
@@ -1186,7 +1186,7 @@ export async function deletePlatformEventAction(
     // 1. Apaga inscrições relacionadas
     try {
       await (supabase as any).from('event_registrations').delete().eq('event_id', eventId);
-    } catch (_e) {}
+    } catch (_e) { }
 
     // 2. Apaga o evento
     const { error } = await (supabase as any)
@@ -1202,7 +1202,7 @@ export async function deletePlatformEventAction(
     try {
       revalidatePath('/admin/eventos');
       revalidatePath('/eventos');
-    } catch (_e) {}
+    } catch (_e) { }
 
     return { success: true, data: { eventId } };
   } catch (err) {

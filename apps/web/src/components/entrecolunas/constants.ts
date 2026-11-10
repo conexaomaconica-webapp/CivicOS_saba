@@ -37,7 +37,7 @@ export const EVENT_VENUE_ADDRESS = 'R. Tupinambás - São João, Feira de Santan
 export const EVENT_LECTURES = [
   {
     theme: 'Ninguém prospera sozinho',
-    speaker: 'Dr. Lucas Almeida',
+    speaker: 'Dr. Luccas Almeida',
     role: 'Empresário, Médico e Advogado',
   },
   {
@@ -48,6 +48,6 @@ export const EVENT_LECTURES = [
 ] as const;
 
 export const EVENT_LECTURE_TITLE = 'Ninguém prospera sozinho & Síndrome dos Pais Culpados';
-export const EVENT_LECTURE_SPEAKER = 'Dr. Lucas Almeida (Empresário, Médico e Advogado) & Dr. Alfredo Morais (Psicólogo)';
+export const EVENT_LECTURE_SPEAKER = 'Dr. Luccas Almeida (Empresário, Médico e Advogado) & Dr. Alfredo Morais (Psicólogo)';
 export const EVENT_ORGANIZERS = 'IIr.·. Douglas Ramos / Eduardo Saba / Henrique Oliveira';
 export const EVENT_PHONE_FORMATTED = '(75) 98152-4838';

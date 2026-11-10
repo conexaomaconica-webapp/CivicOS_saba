@@ -304,17 +304,15 @@ export default function AdminGuiaBannersPage() {
                           type="button"
                           disabled={togglingId === b.id}
                           onClick={() => handleToggleActive(b)}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer shadow-2xs hover:opacity-90 disabled:opacity-50 ${
-                            b.is_active
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer shadow-2xs hover:opacity-90 disabled:opacity-50 ${b.is_active
                               ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200'
                               : 'bg-stone-100 text-stone-600 border border-stone-300 hover:bg-stone-200'
-                          }`}
+                            }`}
                           title="Clique para alternar o status do banner diretamente"
                         >
                           <span
-                            className={`w-2 h-2 rounded-full ${
-                              b.is_active ? 'bg-emerald-600' : 'bg-stone-400'
-                            }`}
+                            className={`w-2 h-2 rounded-full ${b.is_active ? 'bg-emerald-600' : 'bg-stone-400'
+                              }`}
                           />
                           {togglingId === b.id ? (
                             <span className="flex items-center gap-1">
@@ -330,11 +328,10 @@ export default function AdminGuiaBannersPage() {
                         {/* Indicador de Desativação Automática ou Expiração */}
                         {b.end_at && (
                           <span
-                            className={`text-[10px] ${
-                              new Date(b.end_at).getTime() < Date.now()
+                            className={`text-[10px] ${new Date(b.end_at).getTime() < Date.now()
                                 ? 'text-rose-600 font-semibold'
                                 : 'text-stone-500'
-                            }`}
+                              }`}
                             title={`Data de desativação: ${new Date(b.end_at).toLocaleString('pt-BR')}`}
                           >
                             {new Date(b.end_at).getTime() < Date.now() ? (
@@ -406,7 +403,7 @@ export default function AdminGuiaBannersPage() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   required
-                  placeholder="Ex: 51º Retrô Mega Flash Back, Palestra Dr. Lucas Almeida..."
+                  placeholder="Ex: 51º Retrô Mega Flash Back, Palestra Dr. Luccas Almeida..."
                   className="w-full px-3 py-1.5 border rounded-md text-sm"
                 />
                 <p className="text-[11px] text-gray-500 mt-0.5">

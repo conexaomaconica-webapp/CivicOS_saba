@@ -129,9 +129,9 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
   const { business, owner, masonic_link_detail, commercial_terms: savedTerms } = dto;
   const [isPending, startTransition] = useTransition();
 
-  // Normalização do plano inicial
+  // Normalização do plano inicial (prioriza o plano ativo do cadastro em businesses)
   const initialPlanTier: 'bronze' | 'prata' | 'ouro' = useMemo(() => {
-    const raw = savedTerms?.plan_code || business.plan_code || 'bronze';
+    const raw = business.plan_code || savedTerms?.plan_code || 'bronze';
     if (raw === 'acacia' || raw === 'ouro') return 'ouro';
     if (raw === 'compasso' || raw === 'prata') return 'prata';
     return 'bronze';
@@ -357,14 +357,21 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
     }
   };
 
-  // Vínculo maçônico verificado
+  // Vínculo maçônico verificado (inclui todas as etapas posteriores do onboarding)
   const isMasonicVerified =
     masonic_link_detail?.status === 'verified' ||
-    commercialStatus === 'vinculo_verificado' ||
-    commercialStatus === 'dados_comerciais_conferidos' ||
-    commercialStatus === 'contrato_gerado' ||
-    commercialStatus === 'contrato_enviado' ||
-    commercialStatus === 'contrato_assinado';
+    [
+      'vinculo_verificado',
+      'dados_comerciais_conferidos',
+      'contrato_gerado',
+      'contrato_enviado',
+      'contrato_assinado',
+      'aguardando_pagamento',
+      'pagamento_confirmado',
+      'prontuario_em_configuracao',
+      'pronto_para_publicar',
+      'publicado',
+    ].includes(commercialStatus);
 
   // Bloqueio de conferência se vínculo não estiver verificado
   const isBlockedByMasonicLink = !isMasonicVerified;
@@ -393,11 +400,17 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
     }
   };
 
+  const toFormPlanTier = (raw?: string | null): 'bronze' | 'prata' | 'ouro' => {
+    if (raw === 'acacia' || raw === 'ouro') return 'ouro';
+    if (raw === 'compasso' || raw === 'prata') return 'prata';
+    return 'bronze';
+  };
+
   // Detecção de alterações em relação ao que foi formalmente gravado
   const isDirty = useMemo(() => {
     if (!lastSaved) return true;
     return (
-      selectedPlan !== lastSaved.plan_code ||
+      selectedPlan !== toFormPlanTier(lastSaved.plan_code) ||
       billingCycle !== lastSaved.billing_cycle ||
       paymentMethod !== lastSaved.payment_method ||
       installmentsCount !== lastSaved.installments_count ||
@@ -422,10 +435,25 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
   const handlePlanChange = (plan: 'bronze' | 'prata' | 'ouro') => {
     setSelectedPlan(plan);
     setFeedback(null);
-    if (!isPedraFundamental) {
+    const nextIsPedra = plan === 'ouro' ? isPedraFundamental : false;
+    if (plan !== 'ouro' && isPedraFundamental) {
+      setIsPedraFundamental(false);
+      setBillingCycle('annual');
+    }
+    if (paymentMethod === 'permuta_100' || paymentMethod === 'parceria') {
+      setAmountCents(0);
+      setInstallmentsCount(1);
+      return;
+    }
+    if (!nextIsPedra) {
       const preset = PLAN_PRESETS[plan];
       if (paymentMethod === 'avista') {
         setAmountCents(preset.payInFullCents);
+      } else if (paymentMethod === 'permuta_50') {
+        setAmountCents(Math.round(preset.payInFullCents / 2));
+        if (installmentsCount > preset.installmentsMax) {
+          setInstallmentsCount(preset.installmentsMax);
+        }
       } else {
         setAmountCents(preset.installmentTotalCents);
         if (installmentsCount > preset.installmentsMax) {
@@ -571,9 +599,9 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
             : PLAN_PRESETS[selectedPlan].name,
           billing_cycle: billingCycle,
           payment_method: paymentMethod,
-          amount_cents: amountCents,
-          installments_count: paymentMethod === 'avista' ? 1 : installmentsCount,
-          installment_amount_cents: calculatedInstallmentValueCents,
+          amount_cents: isFree ? 0 : amountCents,
+          installments_count: (paymentMethod === 'avista' || isFree) ? 1 : installmentsCount,
+          installment_amount_cents: isFree ? 0 : calculatedInstallmentValueCents,
           is_pedra_fundamental: isPedraFundamental,
           notes: notes.trim() || null,
           status: 'conferido',
@@ -2105,6 +2133,55 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
           <p className="text-[11px] text-stone-500">
             Obrigatório. Será salvo nos termos comerciais protegidos e utilizado na qualificação da minuta contratual.
           </p>
+        </div>
+
+        {/* Barra de Salvamento Direto da Conferência Comercial */}
+        <div className="pt-4 border-t border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="text-xs">
+            {feedback && (
+              <p className={`font-semibold ${feedback.type === 'success' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                {feedback.message}
+              </p>
+            )}
+            {!feedback && isBlockedByMasonicLink && (
+              <p className="text-amber-700 font-medium">
+                Aprove primeiro o vínculo maçônico para liberar o salvamento comercial.
+              </p>
+            )}
+            {!feedback && !isBlockedByMasonicLink && isDirty && (
+              <p className="text-amber-800 font-medium">
+                Há alterações pendentes (plano, desconto ou condições). Clique ao lado para gravar e sincronizar.
+              </p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            disabled={isBlockedByMasonicLink || isPending}
+            onClick={handleConfirmCommercialTerms}
+            className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+              isConferred
+                ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                : 'bg-[#3B0B14] hover:bg-[#2b080f] text-[#C9A227] border border-[#C9A227]/40'
+            }`}
+          >
+            {isPending ? (
+              <>
+                <Clock className="h-4 w-4 animate-spin" />
+                Salvando Alterações...
+              </>
+            ) : isConferred ? (
+              <>
+                <Check className="h-4 w-4 stroke-[3]" />
+                Termos Salvos & Sincronizados ✓
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                Salvar Plano e Termos Comerciais
+              </>
+            )}
+          </button>
         </div>
       </section>
 

@@ -38,6 +38,7 @@ export interface AdminPaymentListItem {
   due_date: string;
   paid_at?: string;
   status: 'paid' | 'pending' | 'overdue' | 'refunded' | 'failed';
+  raw_invoice_status?: 'draft' | 'open' | 'paid' | 'overdue' | 'void';
   gateway_status: string;
   platform_status: string;
   has_divergence: boolean;
@@ -248,7 +249,7 @@ export async function getAdminPaymentsDashboardAction(params?: {
         const owner = biz?.owner_id ? profilesMap.get(biz.owner_id) : null;
         const terms = termsMap.get(inv.business_id);
 
-        const planCode = terms?.plan_code || sub?.plan_versions?.plans?.code || biz?.plan_tier || 'ouro';
+        const planCode = normalizeCanonicalPlanCode(biz?.plan_tier) || terms?.plan_code || sub?.plan_versions?.plans?.code || 'esquadro';
         const modality = resolveCommercialModality(terms);
         const isPedraFundamental = Boolean(terms?.is_pedra_fundamental);
         const rawInvDueCents = inv.amount_cents ?? (inv.amount_due != null ? Math.round(Number(inv.amount_due) * 100) : 0);
@@ -289,7 +290,13 @@ export async function getAdminPaymentsDashboardAction(params?: {
           canonical.status === 'paid' ? 'paid' : canonical.status === 'overdue' ? 'overdue' : canonical.status === 'failed' ? 'failed' : 'pending';
         let paidAt: string | undefined = inv.paid_at || undefined;
 
-        const bizConfirmed = ['pagamento_confirmado', 'prontuario_liberado', 'publicado'].includes(biz?.commercial_status || '');
+        const bizConfirmed = [
+          'pagamento_confirmado',
+          'prontuario_em_configuracao',
+          'pronto_para_publicar',
+          'prontuario_liberado',
+          'publicado',
+        ].includes(biz?.commercial_status || '');
         if ((modality === 'permuta_100' || modality === 'parceria') && bizConfirmed) {
           status = 'paid';
           paidAt = inv.paid_at || terms?.conferred_at || terms?.updated_at || inv.created_at;
@@ -350,6 +357,7 @@ export async function getAdminPaymentsDashboardAction(params?: {
           due_date: inv.due_date || inv.created_at,
           paid_at: paidAt,
           status,
+          raw_invoice_status: (inv.status || 'open') as AdminPaymentListItem['raw_invoice_status'],
           gateway_status: gatewayStatus,
           platform_status: platformStatus,
           has_divergence: hasDivergence,
@@ -384,12 +392,18 @@ export async function getAdminPaymentsDashboardAction(params?: {
       if (!biz) continue;
 
       const modality = resolveCommercialModality(terms);
-      const bizConfirmed = ['pagamento_confirmado', 'prontuario_liberado', 'publicado'].includes(biz.commercial_status || '');
+      const bizConfirmed = [
+        'pagamento_confirmado',
+        'prontuario_em_configuracao',
+        'pronto_para_publicar',
+        'prontuario_liberado',
+        'publicado',
+      ].includes(biz.commercial_status || '');
       if (modality === 'padrao' && !bizConfirmed) continue;
 
       const owner = biz.owner_id ? profilesMap.get(biz.owner_id) : null;
       const sub = (subscriptions || []).find((s: any) => s.business_id === bizId);
-      const planCode = terms.plan_code || sub?.plan_versions?.plans?.code || biz.plan_tier || 'acacia';
+      const planCode = normalizeCanonicalPlanCode(biz.plan_tier) || terms.plan_code || sub?.plan_versions?.plans?.code || 'acacia';
       const isPedraFundamental = Boolean(terms.is_pedra_fundamental);
       const amountCents = typeof terms.amount_cents === 'number' ? terms.amount_cents : 0;
       const standardPlanCents = terms.billing_cycle !== 'monthly'
@@ -397,7 +411,7 @@ export async function getAdminPaymentsDashboardAction(params?: {
         : undefined;
       const originalAmountCents = standardPlanCents && standardPlanCents > amountCents ? standardPlanCents : undefined;
       const hasDiscount = Boolean(originalAmountCents && originalAmountCents > amountCents && modality === 'padrao');
-      const isConfirmed = bizConfirmed || sub?.status === 'active';
+      const isConfirmed = bizConfirmed;
       const refDate = terms.conferred_at || terms.updated_at || terms.created_at || biz.created_at;
 
       items.push({

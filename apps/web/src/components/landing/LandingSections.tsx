@@ -128,7 +128,7 @@ export function LandingLaunchSection() {
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#C9A227]">Palestras da Noite</p>
             <div className="space-y-0.5">
               <p className="text-sm font-semibold text-white/95">&ldquo;Ninguém prospera sozinho&rdquo;</p>
-              <p className="text-xs text-white/70">com <strong className="text-[#C9A227] font-semibold">Dr. Lucas Almeida</strong> — Empresário, Médico e Advogado</p>
+              <p className="text-xs text-white/70">com <strong className="text-[#C9A227] font-semibold">Dr. Luccas Almeida</strong> — Empresário, Médico e Advogado</p>
             </div>
             <div className="h-[1px] w-full bg-[#C9A227]/20" />
             <div className="space-y-0.5">

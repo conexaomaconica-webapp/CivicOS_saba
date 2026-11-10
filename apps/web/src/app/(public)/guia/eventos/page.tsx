@@ -97,8 +97,8 @@ export default async function PublicEventsDirectoryPage({ searchParams }: Props)
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const dbReader = supabaseUrl && serviceRoleKey
     ? createClient<Database>(supabaseUrl, serviceRoleKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      })
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
     : supabase;
 
   // Regra Estrita: Eventos passados saem automaticamente da página (considerando o fuso da Bahia / America/Bahia)
@@ -177,7 +177,7 @@ export default async function PublicEventsDirectoryPage({ searchParams }: Props)
           slug: 'conexao-empresarial-2026',
           title: 'Conexão Empresarial da Família Maçônica',
           subtitle: 'Relacionamentos que aproximam! Negócios que fortalecem!',
-          description: 'Encontro exclusivo de integração e fortalecimento da rede fraterna de negócios com as palestras "Ninguém prospera sozinho" com Dr. Lucas Almeida (Empresário, Médico e Advogado) e "Síndrome dos Pais Culpados" com Dr. Alfredo Morais (Psicólogo).',
+          description: 'Encontro exclusivo de integração e fortalecimento da rede fraterna de negócios com as palestras "Ninguém prospera sozinho" com Dr. Luccas Almeida (Empresário, Médico e Advogado) e "Síndrome dos Pais Culpados" com Dr. Alfredo Morais (Psicólogo).',
           event_date: '2026-11-24',
           start_time: '19:00:00',
           end_time: '22:00:00',
@@ -226,10 +226,10 @@ export default async function PublicEventsDirectoryPage({ searchParams }: Props)
         cat.id === 'sociais' || badgeLower.includes('social')
           ? 'social_action'
           : cat.id === 'empresas' || badgeLower.includes('empresa')
-          ? 'business'
-          : cat.id === 'festividades' || cat.id === 'palestras' || badgeLower.includes('institucional')
-          ? 'platform'
-          : 'lodge';
+            ? 'business'
+            : cat.id === 'festividades' || cat.id === 'palestras' || badgeLower.includes('institucional')
+              ? 'platform'
+              : 'lodge';
       const price = extractPriceInfo(p.badge_text, p.subtitle, p.description, orgType);
       const dateFormatted = formatEventCardDate(p.event_date, p.start_time);
       const locLine = [p.city, p.venue_name].filter(Boolean).join(' · ') || 'Feira de Santana, BA';
@@ -237,8 +237,8 @@ export default async function PublicEventsDirectoryPage({ searchParams }: Props)
       const isLodgeVenue = Boolean(
         p.venue_name &&
         (p.venue_name.toLowerCase().includes('loja') ||
-         p.venue_name.toLowerCase().includes('templo') ||
-         p.venue_name.toLowerCase().includes('augusta'))
+          p.venue_name.toLowerCase().includes('templo') ||
+          p.venue_name.toLowerCase().includes('augusta'))
       );
 
       const resolvedOrganizerName =
@@ -246,12 +246,12 @@ export default async function PublicEventsDirectoryPage({ searchParams }: Props)
         (orgType === 'platform' || cat.id === 'institucional'
           ? 'Conexão Maçônica'
           : cat.id === 'festividades'
-          ? (p.title?.toLowerCase().includes('16') ? 'Loja Maçônica 16 de Junho' : 'Comissão Organizadora')
-          : orgType === 'social_action'
-          ? 'Ação Social Fraterna'
-          : isLodgeVenue
-          ? p.venue_name
-          : (p.title?.toLowerCase().includes('loja') ? 'Loja Maçônica Responsável' : 'Conexão Maçônica'));
+            ? (p.title?.toLowerCase().includes('16') ? 'Loja Maçônica 16 de Junho' : 'Comissão Organizadora')
+            : orgType === 'social_action'
+              ? 'Ação Social Fraterna'
+              : isLodgeVenue
+                ? p.venue_name
+                : (p.title?.toLowerCase().includes('loja') ? 'Loja Maçônica Responsável' : 'Conexão Maçônica'));
 
       return {
         id: p.id,

@@ -934,7 +934,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       subData = null;
     }
 
-    const planCode = subData?.plan_versions?.plans?.code || b.plan_tier || b.plan_code || 'bronze';
+    const planCode = b.plan_tier || b.plan_code || subData?.plan_versions?.plans?.code || 'esquadro';
 
     let availablePlans: AdminBusiness360DTO['available_plans'] = [];
     try {
@@ -1545,7 +1545,9 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       }
     } catch (_e) { }
 
-    const effectivePlanCode = subData?.plan_versions?.plans?.code || commercialTermsDetail?.plan_code || planCode;
+    const effectivePlanCode = normalizeCanonicalPlanCode(
+      b.plan_tier || b.plan_code || commercialTermsDetail?.plan_code || subData?.plan_versions?.plans?.code || planCode
+    );
     const firstConfirmedPayment = payments_history
       .filter((payment) => ['paid', 'succeeded'].includes(payment.status) && Boolean(payment.date))
       .sort((a, b) => new Date(a.date as string).getTime() - new Date(b.date as string).getTime())[0];
@@ -1665,11 +1667,14 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       },
       subscription: {
         plan_code: effectivePlanCode,
-        plan_name: commercialTermsDetail?.plan_name || `Plano ${getCommercialPlanName(effectivePlanCode)}`,
-        amount_brl: subData?.plan_versions?.price_annual != null
-          ? Number(subData.plan_versions.price_annual)
-          : commercialTermsDetail
-            ? commercialTermsDetail.amount_cents / 100
+        plan_name:
+          commercialTermsDetail?.is_pedra_fundamental && effectivePlanCode === 'acacia'
+            ? 'Plano Acácia (Pedra Fundamental)'
+            : `Plano ${getCommercialPlanName(effectivePlanCode)}`,
+        amount_brl: commercialTermsDetail
+          ? commercialTermsDetail.amount_cents / 100
+          : subData?.plan_versions?.price_annual != null
+            ? Number(subData.plan_versions.price_annual)
             : null,
         periodicity: subData?.contract_term || commercialTermsDetail?.billing_cycle || null,
         status: subData?.status || (hasConfirmedCommercialPayment ? 'active' : 'not_found'),
@@ -3447,10 +3452,28 @@ export async function confirmAdminCommercialTermsAction(
       };
     }
 
-    // 6. Sincroniza faturas em aberto com o novo valor comercial negociado
+    // 6. Sincroniza plano em businesses, subscriptions e faturas em aberto com as 3 telas
+    const canonicalTermsPlan = normalizeCanonicalPlanCode(input.plan_code);
+    if (canonicalTermsPlan !== normalizeCanonicalPlanCode(biz.plan_tier)) {
+      try {
+        await (supabase as any).rpc('admin_set_business_plan_tier', {
+          p_business_id: biz.id,
+          p_plan_code: canonicalTermsPlan,
+          p_justification: 'Sincronização de plano na conferência dos termos comerciais (/contratacao)',
+        });
+      } catch {
+        // Segue se RPC indisponível em mock
+      }
+    }
+
+    await syncAdminBusinessSubscription(supabase, biz.tenant_id, biz.id, canonicalTermsPlan, {
+      forceActiveStatus: false,
+    });
+
     try {
+      const dbAdmin = getAdminServiceClientSafe(supabase);
       const syncedAmountDue = Number((finalAmountCents / 100).toFixed(2));
-      await (supabase as any)
+      await (dbAdmin as any)
         .from('invoices')
         .update({
           amount_due: syncedAmountDue,
@@ -3559,6 +3582,165 @@ export async function confirmAdminPermutaOrParceriaPaymentAction(
   }
 }
 
+function getAdminServiceClientSafe(fallbackClient: any) {
+  if (process.env.VITEST) return fallbackClient;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (supabaseUrl && serviceRoleKey) {
+    return createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+  return fallbackClient;
+}
+
+/**
+ * Sincroniza a assinatura em public.subscriptions com o plano (e opcionalmente o status),
+ * filtrando pelo tenant correto e usando client privilegiado após autorização admin.
+ */
+async function syncAdminBusinessSubscription(
+  supabase: any,
+  tenantId: string,
+  businessId: string,
+  planCode: string,
+  options?: {
+    forceActiveStatus?: boolean;
+    overrideStatus?: 'pending' | 'active' | 'past_due' | 'canceled';
+  }
+): Promise<{ id: string | null; status: string | null }> {
+  try {
+    const dbAdmin = getAdminServiceClientSafe(supabase);
+    const canonical = normalizeCanonicalPlanCode(planCode);
+    const codesToTry: string[] = [canonical];
+    if (canonical === 'acacia') codesToTry.push('ouro');
+    else if (canonical === 'compasso') codesToTry.push('prata');
+    else if (canonical === 'esquadro') codesToTry.push('bronze');
+
+    // 1. Busca assinatura existente
+    const { data: existingSub } = await (dbAdmin as any)
+      .from('subscriptions')
+      .select('id, status, plan_version_id, current_period_start, current_period_end, plan_versions(id, plans(code))')
+      .eq('tenant_id', tenantId)
+      .eq('business_id', businessId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const existingCode = existingSub?.plan_versions?.plans?.code?.toLowerCase();
+    const hasValidPeriod = existingSub?.current_period_end
+      ? new Date(existingSub.current_period_end).getTime() > Date.now()
+      : false;
+
+    const targetStatus =
+      options?.overrideStatus ||
+      (options?.forceActiveStatus ? 'active' : existingSub?.status || 'pending');
+
+    if (
+      existingSub?.id &&
+      existingSub.status === targetStatus &&
+      existingCode &&
+      codesToTry.includes(existingCode) &&
+      (targetStatus !== 'active' || hasValidPeriod)
+    ) {
+      return { id: existingSub.id, status: existingSub.status };
+    }
+
+    // 2. Busca o plan_version_id correspondente priorizando o tenant da empresa
+    let planVersionId: string | null = null;
+    try {
+      const { data: tenantPlans } = await (dbAdmin as any)
+        .from('plans')
+        .select('id, code')
+        .eq('tenant_id', tenantId);
+      const matchingPlanIds = (tenantPlans || [])
+        .filter((p: any) => codesToTry.includes(String(p.code || '').toLowerCase()))
+        .map((p: any) => p.id);
+
+      if (matchingPlanIds.length > 0) {
+        const { data: tenantPv } = await (dbAdmin as any)
+          .from('plan_versions')
+          .select('id, version')
+          .in('plan_id', matchingPlanIds)
+          .order('version', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        planVersionId = tenantPv?.id || null;
+      }
+    } catch {
+      planVersionId = null;
+    }
+
+    if (!planVersionId) {
+      const { data: pvList } = await (dbAdmin as any)
+        .from('plan_versions')
+        .select('id, version, plans(id, code)')
+        .order('version', { ascending: false });
+
+      const matchingPv = (pvList || []).find((pv: any) =>
+        codesToTry.includes(String(pv.plans?.code || '').toLowerCase())
+      ) || pvList?.[0];
+
+      planVersionId = matchingPv?.id || null;
+    }
+
+    if (!planVersionId) return { id: existingSub?.id || null, status: existingSub?.status || null };
+
+    const now = new Date().toISOString();
+    const oneYearLater = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+
+    if (existingSub?.id) {
+      const updatePatch: Record<string, any> = {
+        plan_version_id: planVersionId,
+        status: targetStatus,
+        updated_at: now,
+      };
+      if (targetStatus === 'active') {
+        updatePatch.current_period_start = existingSub.current_period_start || now;
+        updatePatch.current_period_end = hasValidPeriod ? existingSub.current_period_end : oneYearLater;
+        updatePatch.past_due_at = null;
+        updatePatch.grace_until = null;
+        updatePatch.canceled_at = null;
+      } else if (targetStatus === 'canceled') {
+        updatePatch.canceled_at = now;
+      } else if (targetStatus === 'pending') {
+        updatePatch.past_due_at = null;
+        updatePatch.canceled_at = null;
+      }
+
+      await (dbAdmin as any)
+        .from('subscriptions')
+        .update(updatePatch)
+        .eq('id', existingSub.id)
+        .throwOnError();
+      return { id: existingSub.id, status: targetStatus };
+    }
+
+    // Não cria nova subscription se não há pagamento e o chamador não pediu criação explícita
+    if (!options?.forceActiveStatus && !options?.overrideStatus) {
+      return { id: null, status: null };
+    }
+
+    const { data: inserted } = await (dbAdmin as any)
+      .from('subscriptions')
+      .insert({
+        tenant_id: tenantId,
+        business_id: businessId,
+        plan_version_id: planVersionId,
+        status: targetStatus,
+        contract_term: 'annual',
+        payment_schedule: 'lump_sum',
+        current_period_start: now,
+        current_period_end: oneYearLater,
+      })
+      .select('id, status')
+      .maybeSingle();
+    return { id: inserted?.id || null, status: inserted?.status || targetStatus };
+  } catch (err) {
+    console.warn('[syncAdminBusinessSubscription] Erro ao sincronizar assinatura:', err);
+    return { id: null, status: null };
+  }
+}
+
 /**
  * Garante que a empresa possua uma assinatura ativa em public.subscriptions
  * correspondente ao seu plan_tier (esquadro, compasso, acacia), evitando que
@@ -3571,85 +3753,10 @@ async function ensureAdminActiveSubscription(
   businessId: string,
   planCode: string
 ): Promise<string | null> {
-  try {
-    const canonical = normalizeCanonicalPlanCode(planCode);
-    const codesToTry: string[] = [canonical];
-    if (canonical === 'acacia') codesToTry.push('ouro');
-    else if (canonical === 'compasso') codesToTry.push('prata');
-    else if (canonical === 'esquadro') codesToTry.push('bronze');
-
-    // 1. Busca se já existe assinatura ativa com o plano correto
-    const { data: existingSub } = await (supabase as any)
-      .from('subscriptions')
-      .select('id, status, plan_version_id, current_period_end, plan_versions(id, plans(code))')
-      .eq('tenant_id', tenantId)
-      .eq('business_id', businessId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const existingCode = existingSub?.plan_versions?.plans?.code?.toLowerCase();
-    const hasValidPeriod = existingSub?.current_period_end
-      ? new Date(existingSub.current_period_end).getTime() > Date.now()
-      : false;
-
-    if (existingSub?.id && existingSub.status === 'active' && existingCode && codesToTry.includes(existingCode) && hasValidPeriod) {
-      return existingSub.id;
-    }
-
-    // 2. Busca o plan_version_id correspondente
-    const { data: pvList } = await (supabase as any)
-      .from('plan_versions')
-      .select('id, version, plans(id, code)')
-      .order('version', { ascending: false });
-
-    const matchingPv = (pvList || []).find((pv: any) =>
-      codesToTry.includes(String(pv.plans?.code || '').toLowerCase())
-    ) || pvList?.[0];
-
-    const planVersionId = matchingPv?.id;
-    if (!planVersionId) return null;
-
-    const now = new Date().toISOString();
-    const oneYearLater = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-
-    if (existingSub?.id) {
-      await (supabase as any)
-        .from('subscriptions')
-        .update({
-          plan_version_id: planVersionId,
-          status: 'active',
-          current_period_start: now,
-          current_period_end: oneYearLater,
-          past_due_at: null,
-          grace_until: null,
-          canceled_at: null,
-          updated_at: now,
-        })
-        .eq('id', existingSub.id)
-        .throwOnError();
-      return existingSub.id;
-    } else {
-      const { data: inserted } = await (supabase as any)
-        .from('subscriptions')
-        .insert({
-          tenant_id: tenantId,
-          business_id: businessId,
-          plan_version_id: planVersionId,
-          status: 'active',
-          contract_term: 'annual',
-          payment_schedule: 'lump_sum',
-          current_period_start: now,
-          current_period_end: oneYearLater,
-        })
-        .select('id')
-        .maybeSingle();
-      return inserted?.id || null;
-    }
-  } catch (err) {
-    console.warn('[ensureAdminActiveSubscription] Erro ao sincronizar assinatura:', err);
-    return null;
-  }
+  const res = await syncAdminBusinessSubscription(supabase, tenantId, businessId, planCode, {
+    forceActiveStatus: true,
+  });
+  return res.id;
 }
 
 export async function manageAdminServiceAction(
@@ -4407,7 +4514,12 @@ export async function updateAdminBusinessPlanAction(
   justification: string
 ): Promise<{
   success: boolean;
-  data?: { plan_code: 'esquadro' | 'compasso' | 'acacia'; plan_name: string; entitlements: Record<string, number> };
+  data?: {
+    plan_code: 'esquadro' | 'compasso' | 'acacia';
+    plan_name: string;
+    entitlements: Record<string, number>;
+    subscription_status?: string | null;
+  };
   error?: string;
 }> {
   try {
@@ -4419,7 +4531,7 @@ export async function updateAdminBusinessPlanAction(
 
     const { data: bData, error: findErr } = await (supabase as any)
       .from('businesses')
-      .select('id, tenant_id, slug, plan_tier')
+      .select('id, tenant_id, slug, plan_tier, commercial_status')
       .eq('id', businessId)
       .maybeSingle();
 
@@ -4440,7 +4552,36 @@ export async function updateAdminBusinessPlanAction(
       return { success: false, error: `Erro ao atualizar plano: ${updateErr.message}` };
     }
 
-    await ensureAdminActiveSubscription(supabase, bData.tenant_id, businessId, newPlanCode);
+    const dbAdmin = getAdminServiceClientSafe(supabase);
+    const subSync = await syncAdminBusinessSubscription(supabase, bData.tenant_id, businessId, newPlanCode, {
+      forceActiveStatus: false,
+    });
+
+    const newPlanName = newPlanCode === 'acacia' ? 'Plano Acácia' : newPlanCode === 'compasso' ? 'Plano Compasso' : 'Plano Esquadro';
+
+    // Sincroniza o plano nos termos comerciais (para manter /contratacao e /admin/pagamentos alinhados)
+    try {
+      const { data: existingTerms } = await (dbAdmin as any)
+        .from('business_commercial_terms')
+        .select('id, is_pedra_fundamental')
+        .eq('business_id', businessId)
+        .maybeSingle();
+
+      if (existingTerms?.id) {
+        const keepPedra = Boolean(existingTerms.is_pedra_fundamental) && newPlanCode === 'acacia';
+        await (dbAdmin as any)
+          .from('business_commercial_terms')
+          .update({
+            plan_code: newPlanCode,
+            plan_name: keepPedra ? 'Plano Acácia (Pedra Fundamental)' : newPlanName,
+            is_pedra_fundamental: keepPedra,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingTerms.id);
+      }
+    } catch {
+      // Silencia em ambientes sem business_commercial_terms
+    }
 
     await (supabase as any).from('admin_audit_logs').insert({
       tenant_id: bData.tenant_id,
@@ -4455,6 +4596,8 @@ export async function updateAdminBusinessPlanAction(
 
     revalidatePath(`/admin/empresas`);
     revalidatePath(`/admin/empresas/${businessId}`);
+    revalidatePath(`/admin/empresas/${businessId}/contratacao`);
+    revalidatePath(`/admin/pagamentos`);
     if (bData.slug) {
       revalidatePath(`/guia/${bData.slug}`);
     }
@@ -4478,12 +4621,277 @@ export async function updateAdminBusinessPlanAction(
       success: true,
       data: {
         plan_code: newPlanCode,
-        plan_name: newPlanCode === 'acacia' ? 'Plano Acácia' : newPlanCode === 'compasso' ? 'Plano Compasso' : 'Plano Esquadro',
+        plan_name: newPlanName,
         entitlements,
+        subscription_status: subSync.status,
       },
     };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao alterar plano comercial.' };
+  }
+}
+
+export interface CorrectBusinessBillingInput {
+  business_id: string;
+  invoice_id?: string | null;
+  plan_code: string;
+  subscription_status: 'pending' | 'active' | 'past_due' | 'canceled';
+  invoice_status: 'open' | 'paid' | 'overdue' | 'void';
+  amount_cents: number;
+  commercial_modality?: 'padrao' | 'permuta_100' | 'permuta_50' | 'parceria';
+  installments_count?: number;
+  notes?: string;
+  justification: string;
+  sync_commercial_status?: boolean;
+}
+
+/**
+ * Ação administrativa para corrigir manualmente plano, status de assinatura, fatura e modalidade
+ * comercial de forma unificada nas 3 telas (/admin/empresas/[id], /contratacao e /admin/pagamentos).
+ */
+export async function adminCorrectBusinessBillingAction(
+  input: CorrectBusinessBillingInput
+): Promise<{
+  success: boolean;
+  error?: string;
+  data?: {
+    plan_code: 'esquadro' | 'compasso' | 'acacia';
+    plan_name: string;
+    subscription_status: string;
+    invoice_status: string;
+    amount_cents: number;
+    commercial_status: string;
+  };
+}> {
+  try {
+    const { supabase, user } = await assertPlatformAdminAccess();
+    const justification = input.justification?.trim();
+    if (!justification) {
+      return { success: false, error: 'Informe a justificativa de auditoria para a correção financeira.' };
+    }
+    if (!input.business_id?.trim()) {
+      return { success: false, error: 'Identificador da empresa é obrigatório.' };
+    }
+
+    const dbAdmin = getAdminServiceClientSafe(supabase);
+    const { data: biz, error: bizErr } = await (dbAdmin as any)
+      .from('businesses')
+      .select('id, tenant_id, slug, plan_tier, commercial_status')
+      .eq('id', input.business_id)
+      .maybeSingle();
+
+    if (bizErr || !biz) {
+      return { success: false, error: 'Empresa não localizada no banco de dados.' };
+    }
+
+    const canonicalPlan = normalizeCanonicalPlanCode(input.plan_code);
+    const modality = input.commercial_modality || 'padrao';
+    const isFreeModality = modality === 'permuta_100' || modality === 'parceria';
+    const finalAmountCents = isFreeModality ? 0 : Math.max(0, Math.round(Number(input.amount_cents) || 0));
+    const installmentsCount = isFreeModality ? 1 : Math.max(1, Math.round(Number(input.installments_count) || 1));
+    const planName =
+      canonicalPlan === 'acacia'
+        ? 'Plano Acácia'
+        : canonicalPlan === 'compasso'
+          ? 'Plano Compasso'
+          : 'Plano Esquadro';
+    const now = new Date().toISOString();
+
+    // 1. Atualiza plan_tier via RPC se mudou
+    if (canonicalPlan !== normalizeCanonicalPlanCode(biz.plan_tier)) {
+      const { error: planErr } = await (supabase as any).rpc('admin_set_business_plan_tier', {
+        p_business_id: biz.id,
+        p_plan_code: canonicalPlan,
+        p_justification: justification,
+      });
+      if (planErr) {
+        return { success: false, error: `Falha ao atualizar plano da empresa: ${planErr.message}` };
+      }
+    }
+
+    // 2. Sincroniza assinatura (plan_version_id e status escolhido pelo admin)
+    await syncAdminBusinessSubscription(supabase, biz.tenant_id, biz.id, canonicalPlan, {
+      overrideStatus: input.subscription_status,
+    });
+
+    // 3. Sincroniza business_commercial_terms
+    const { data: existingTerms } = await (dbAdmin as any)
+      .from('business_commercial_terms')
+      .select('*')
+      .eq('business_id', biz.id)
+      .maybeSingle();
+
+    const paymentMethodForTerms =
+      modality === 'permuta_100'
+        ? 'permuta_100'
+        : modality === 'parceria'
+          ? 'parceria'
+          : modality === 'permuta_50'
+            ? 'permuta_50'
+            : installmentsCount > 1
+              ? 'parcelado'
+              : 'avista';
+
+    const keepPedra = Boolean(existingTerms?.is_pedra_fundamental) && canonicalPlan === 'acacia';
+    const finalPlanTitle = keepPedra ? 'Plano Acácia (Pedra Fundamental)' : planName;
+
+    if (existingTerms?.id) {
+      await (dbAdmin as any)
+        .from('business_commercial_terms')
+        .update({
+          plan_code: canonicalPlan,
+          plan_name: finalPlanTitle,
+          payment_method: paymentMethodForTerms,
+          commercial_modality: modality,
+          amount_cents: finalAmountCents,
+          installments_count: installmentsCount,
+          installment_amount_cents: Math.round(finalAmountCents / installmentsCount),
+          is_pedra_fundamental: keepPedra,
+          notes: input.notes !== undefined ? input.notes.trim() || null : existingTerms.notes,
+          updated_at: now,
+        })
+        .eq('id', existingTerms.id)
+        .throwOnError();
+    } else {
+      await (dbAdmin as any)
+        .from('business_commercial_terms')
+        .insert({
+          business_id: biz.id,
+          tenant_id: biz.tenant_id,
+          plan_code: canonicalPlan,
+          plan_name: finalPlanTitle,
+          billing_cycle: 'annual',
+          payment_method: paymentMethodForTerms,
+          commercial_modality: modality,
+          amount_cents: finalAmountCents,
+          installments_count: installmentsCount,
+          installment_amount_cents: Math.round(finalAmountCents / installmentsCount),
+          is_pedra_fundamental: false,
+          notes: input.notes?.trim() || justification,
+          status: 'conferido',
+          conferred_at: now,
+          conferred_by: user.id,
+        })
+        .throwOnError();
+    }
+
+    // 4. Sincroniza Fatura (invoices)
+    const amountBrl = Number((finalAmountCents / 100).toFixed(2));
+    const isRealInvoiceId = Boolean(input.invoice_id && !String(input.invoice_id).startsWith('terms_'));
+    let targetInvoice: any = null;
+
+    if (isRealInvoiceId) {
+      const { data: invRow } = await (dbAdmin as any)
+        .from('invoices')
+        .select('id, status, paid_at')
+        .eq('id', input.invoice_id)
+        .eq('business_id', biz.id)
+        .maybeSingle();
+      targetInvoice = invRow;
+    } else {
+      const { data: latestInv } = await (dbAdmin as any)
+        .from('invoices')
+        .select('id, status, paid_at')
+        .eq('business_id', biz.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      targetInvoice = latestInv;
+    }
+
+    if (targetInvoice?.id) {
+      await (dbAdmin as any)
+        .from('invoices')
+        .update({
+          status: input.invoice_status,
+          amount_due: amountBrl,
+          amount_paid: input.invoice_status === 'paid' ? amountBrl : 0,
+          paid_at: input.invoice_status === 'paid' ? targetInvoice.paid_at || now : null,
+          updated_at: now,
+        })
+        .eq('id', targetInvoice.id)
+        .throwOnError();
+    } else if (input.invoice_status !== 'void' && !isFreeModality) {
+      const todayIsoDate = now.slice(0, 10);
+      await (dbAdmin as any)
+        .from('invoices')
+        .insert({
+          tenant_id: biz.tenant_id,
+          business_id: biz.id,
+          invoice_number: `INV-CORR-${biz.id.slice(0, 8).toUpperCase()}-${Date.now().toString().slice(-4)}`,
+          amount_due: amountBrl,
+          amount_paid: input.invoice_status === 'paid' ? amountBrl : 0,
+          currency: 'BRL',
+          status: input.invoice_status,
+          due_date: todayIsoDate,
+          paid_at: input.invoice_status === 'paid' ? now : null,
+        })
+        .throwOnError();
+    }
+
+    // 5. Atualiza commercial_status se coerente com pagamento/pendência
+    let nextCommercialStatus = biz.commercial_status || 'pre_cadastro';
+    if (input.sync_commercial_status !== false) {
+      if (input.invoice_status !== 'paid' && input.subscription_status !== 'active') {
+        if (nextCommercialStatus === 'pagamento_confirmado') {
+          nextCommercialStatus = 'aguardando_pagamento';
+          await (dbAdmin as any)
+            .from('businesses')
+            .update({ commercial_status: nextCommercialStatus, updated_at: now })
+            .eq('id', biz.id);
+        }
+      } else if (input.invoice_status === 'paid' && input.subscription_status === 'active') {
+        if (['contrato_assinado', 'aguardando_pagamento', 'dados_comerciais_conferidos'].includes(nextCommercialStatus)) {
+          nextCommercialStatus = 'pagamento_confirmado';
+          await (dbAdmin as any)
+            .from('businesses')
+            .update({ commercial_status: nextCommercialStatus, updated_at: now })
+            .eq('id', biz.id);
+        }
+      }
+    }
+
+    // 6. Auditoria formal
+    await (dbAdmin as any).from('admin_audit_logs').insert({
+      tenant_id: biz.tenant_id,
+      actor_id: user.id,
+      action: 'ADMIN_CORRECT_BILLING',
+      entity_type: 'businesses',
+      entity_id: biz.id,
+      before_value: {
+        plan_tier: biz.plan_tier,
+        commercial_status: biz.commercial_status,
+      },
+      after_value: {
+        plan_code: canonicalPlan,
+        subscription_status: input.subscription_status,
+        invoice_status: input.invoice_status,
+        amount_cents: finalAmountCents,
+        commercial_modality: modality,
+        commercial_status: nextCommercialStatus,
+      },
+      reason: justification,
+    });
+
+    revalidatePath('/admin/pagamentos');
+    revalidatePath('/admin/empresas');
+    revalidatePath(`/admin/empresas/${biz.id}`);
+    revalidatePath(`/admin/empresas/${biz.id}/contratacao`);
+    if (biz.slug) revalidatePath(`/guia/${biz.slug}`);
+
+    return {
+      success: true,
+      data: {
+        plan_code: canonicalPlan,
+        plan_name: finalPlanTitle,
+        subscription_status: input.subscription_status,
+        invoice_status: input.invoice_status,
+        amount_cents: finalAmountCents,
+        commercial_status: nextCommercialStatus,
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Erro ao corrigir dados financeiros da empresa.' };
   }
 }
 

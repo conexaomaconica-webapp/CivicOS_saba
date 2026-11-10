@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   CheckCircle2,
   XCircle,
@@ -63,6 +64,7 @@ import {
   manageAdminBenefitAction,
   manageAdminMediaAction,
   updateAdminBusinessPlanAction,
+  adminCorrectBusinessBillingAction,
   uploadAdminResponsibleAvatarAction,
   uploadAdminBusinessAssetAction,
   listAdminBusinessCategoriesAction,
@@ -92,7 +94,12 @@ interface Props {
 }
 
 export default function Company360Client({ initialData }: Props) {
+  const router = useRouter();
   const [data, setData] = useState<AdminBusiness360DTO>(initialData);
+
+  useEffect(() => {
+    setData(initialData);
+  }, [initialData]);
   const [activeTab, setActiveTab] = useState<
     | 'resumo'
     | 'cadastro'
@@ -522,6 +529,104 @@ export default function Company360Client({ initialData }: Props) {
   const [updatingPlan, setUpdatingPlan] = useState(false);
   const [planMessage, setPlanMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // States para Correção Unificada de Pagamento / Assinatura / Plano (Aba Pagamentos)
+  const [billingEditModalOpen, setBillingEditModalOpen] = useState(false);
+  const [billingEditInvoiceId, setBillingEditInvoiceId] = useState<string | null>(null);
+  const [billingEditPlanCode, setBillingEditPlanCode] = useState<'esquadro' | 'compasso' | 'acacia'>('esquadro');
+  const [billingEditSubStatus, setBillingEditSubStatus] = useState<'pending' | 'active' | 'past_due' | 'canceled'>('pending');
+  const [billingEditInvoiceStatus, setBillingEditInvoiceStatus] = useState<'open' | 'paid' | 'overdue' | 'void'>('open');
+  const [billingEditAmountBrl, setBillingEditAmountBrl] = useState<string>('0.00');
+  const [billingEditModality, setBillingEditModality] = useState<'padrao' | 'permuta_100' | 'permuta_50' | 'parceria'>('padrao');
+  const [billingEditInstallments, setBillingEditInstallments] = useState<number>(1);
+  const [billingEditSyncCommercial, setBillingEditSyncCommercial] = useState<boolean>(true);
+  const [billingEditJustification, setBillingEditJustification] = useState<string>('');
+  const [savingBillingCorrection, setSavingBillingCorrection] = useState(false);
+  const [billingCorrectionError, setBillingCorrectionError] = useState<string | null>(null);
+
+  const normalizePlanToCanonicalUi = (code?: string | null): 'esquadro' | 'compasso' | 'acacia' => {
+    const c = (code || '').toLowerCase();
+    if (c === 'acacia' || c === 'ouro') return 'acacia';
+    if (c === 'compasso' || c === 'prata') return 'compasso';
+    return 'esquadro';
+  };
+
+  const openBillingCorrectionModal = (invoice?: AdminBusiness360DTO['payments_history'][number]) => {
+    const canonPlan = normalizePlanToCanonicalUi(data.business.plan_code || data.subscription.plan_code);
+    setBillingEditPlanCode(canonPlan);
+    setBillingEditInvoiceId(invoice?.id || data.payments_history?.[0]?.id || null);
+    const currentSubStatus = data.subscription.status;
+    setBillingEditSubStatus(
+      currentSubStatus === 'active' || currentSubStatus === 'past_due' || currentSubStatus === 'canceled'
+        ? currentSubStatus
+        : 'pending'
+    );
+    const rawInvStatus = invoice?.status || data.payments_history?.[0]?.status || 'open';
+    setBillingEditInvoiceStatus(
+      rawInvStatus === 'paid' || rawInvStatus === 'overdue' || rawInvStatus === 'void'
+        ? rawInvStatus
+        : 'open'
+    );
+    const baseAmount =
+      invoice?.amount_brl ??
+      data.commercial_terms?.amount_cents != null
+        ? (data.commercial_terms ? data.commercial_terms.amount_cents / 100 : 0)
+        : (data.subscription.amount_brl ?? 0);
+    setBillingEditAmountBrl(Number(invoice?.amount_brl ?? baseAmount).toFixed(2));
+    const rawModality = ((data.commercial_terms as any)?.commercial_modality || data.commercial_terms?.payment_method || 'padrao') as string;
+    setBillingEditModality(
+      rawModality === 'permuta_100' || rawModality === 'permuta_50' || rawModality === 'parceria'
+        ? rawModality
+        : 'padrao'
+    );
+    setBillingEditInstallments(data.commercial_terms?.installments_count || 1);
+    setBillingEditSyncCommercial(true);
+    setBillingEditJustification('');
+    setBillingCorrectionError(null);
+    setBillingEditModalOpen(true);
+  };
+
+  const handleSaveBillingCorrection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!billingEditJustification.trim()) {
+      setBillingCorrectionError('Informe o motivo/justificativa para a correção.');
+      return;
+    }
+    setSavingBillingCorrection(true);
+    setBillingCorrectionError(null);
+    try {
+      const parsedAmount = parseFloat(billingEditAmountBrl.replace(',', '.'));
+      const amountCents = Number.isNaN(parsedAmount) ? 0 : Math.max(0, Math.round(parsedAmount * 100));
+      const res = await adminCorrectBusinessBillingAction({
+        business_id: data.business.id,
+        invoice_id: billingEditInvoiceId,
+        plan_code: billingEditPlanCode,
+        subscription_status: billingEditSubStatus,
+        invoice_status: billingEditInvoiceStatus,
+        amount_cents: amountCents,
+        commercial_modality: billingEditModality,
+        installments_count: billingEditInstallments,
+        justification: billingEditJustification.trim(),
+        sync_commercial_status: billingEditSyncCommercial,
+      });
+
+      if (!res.success || !res.data) {
+        setBillingCorrectionError(res.error || 'Falha ao corrigir dados financeiros.');
+        return;
+      }
+
+      setMessage({
+        type: 'success',
+        text: `Dados financeiros atualizados: ${res.data.plan_name} · Assinatura ${res.data.subscription_status} · Fatura ${res.data.invoice_status}.`,
+      });
+      setBillingEditModalOpen(false);
+      router.refresh();
+    } catch (err: any) {
+      setBillingCorrectionError(err?.message || 'Erro inesperado ao salvar correção.');
+    } finally {
+      setSavingBillingCorrection(false);
+    }
+  };
+
   const handleUpdatePlan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!planJustification.trim()) {
@@ -537,18 +642,17 @@ export default function Company360Client({ initialData }: Props) {
       if (!res.success || !res.data) throw new Error(res.error);
       const updatedPlan = res.data;
 
-      // Atualização otimista parcial — cotas reais vêm do plan_entitlements
-      // via revalidatePath no server action. Forçar reload para dados frescos.
       setData((prev) => ({
         ...prev,
         business: {
           ...prev.business,
-          plan_code: selectedPlanCode,
+          plan_code: updatedPlan.plan_code as any,
         },
         subscription: {
           ...prev.subscription,
-          plan_code: selectedPlanCode,
+          plan_code: updatedPlan.plan_code,
           plan_name: updatedPlan.plan_name,
+          status: (updatedPlan.subscription_status as any) || prev.subscription.status,
           entitlements: {
             services_limit: updatedPlan.entitlements.services_limit ?? 0,
             benefits_limit: updatedPlan.entitlements.benefits_limit ?? 0,
@@ -570,9 +674,10 @@ export default function Company360Client({ initialData }: Props) {
       const selectedPlanName = getCommercialPlanName(updatedPlan.plan_name);
       setPlanMessage({
         type: 'success',
-        text: `Plano comercial alterado para ${selectedPlanName} com sucesso. As cotas já foram atualizadas.`,
+        text: `Plano comercial alterado para ${selectedPlanName} com sucesso em todas as telas.`,
       });
       setPlanJustification('');
+      router.refresh();
     } catch (err: any) {
       setPlanMessage({ type: 'error', text: err.message || 'Erro ao alterar plano comercial.' });
     } finally {
@@ -4251,10 +4356,20 @@ export default function Company360Client({ initialData }: Props) {
               </p>
             </div>
 
-            <span className={`px-3 py-1 font-bold text-xs rounded-full flex items-center gap-1.5 border shadow-xs ${data.subscription.status === 'active' ? 'bg-emerald-100 text-emerald-900 border-emerald-300' : 'bg-amber-100 text-amber-900 border-amber-300'}`}>
-              {data.subscription.status === 'active' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <History className="w-4 h-4 text-amber-700" />}
-              <span>{{ active: 'Assinatura ativa', pending: 'Assinatura pendente', past_due: 'Assinatura em atraso', canceled: 'Assinatura cancelada', expired: 'Assinatura expirada', not_found: 'Sem assinatura registrada' }[data.subscription.status]} ({getCommercialPlanName(data.subscription.plan_name)})</span>
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`px-3 py-1 font-bold text-xs rounded-full flex items-center gap-1.5 border shadow-xs ${data.subscription.status === 'active' ? 'bg-emerald-100 text-emerald-900 border-emerald-300' : 'bg-amber-100 text-amber-900 border-amber-300'}`}>
+                {data.subscription.status === 'active' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <History className="w-4 h-4 text-amber-700" />}
+                <span>{{ active: 'Assinatura ativa', pending: 'Assinatura pendente', past_due: 'Assinatura em atraso', canceled: 'Assinatura cancelada', expired: 'Assinatura expirada', not_found: 'Sem assinatura registrada' }[data.subscription.status]} ({getCommercialPlanName(data.subscription.plan_name)})</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => openBillingCorrectionModal()}
+                className="px-3 py-1.5 rounded-xl bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs flex items-center gap-1.5 border border-[#C9A227]/40 cursor-pointer shadow-xs"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Corrigir Plano / Cobrança</span>
+              </button>
+            </div>
           </div>
 
           {/* Cards de Resumo da Assinatura Atual */}
@@ -4266,9 +4381,18 @@ export default function Company360Client({ initialData }: Props) {
               </strong>
               <span className="text-stone-500 block">
                 {data.subscription.amount_brl !== null
-                  ? `R$ ${data.subscription.amount_brl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / ano`
+                  ? `R$ ${data.subscription.amount_brl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / ${data.commercial_terms?.billing_cycle === 'biennial' ? '2 anos' : 'ano'}`
                   : 'Valor contratado não disponível'}
               </span>
+              {data.commercial_terms?.payment_method && ['permuta_100', 'parceria', 'permuta_50'].includes(data.commercial_terms.payment_method) && (
+                <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-300 font-bold text-[10px]">
+                  {data.commercial_terms.payment_method === 'permuta_100'
+                    ? 'Permuta 100%'
+                    : data.commercial_terms.payment_method === 'parceria'
+                      ? 'Parceria 100%'
+                      : 'Permuta 50%'}
+                </span>
+              )}
             </div>
 
             <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl space-y-1">
@@ -4305,6 +4429,7 @@ export default function Company360Client({ initialData }: Props) {
                       <th className="py-3 px-4">Forma de Pagamento</th>
                       <th className="py-3 px-4">Valor</th>
                       <th className="py-3 px-4 text-right">Status da Fatura</th>
+                      <th className="py-3 px-4 text-right">Ação</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-200 bg-white font-serif">
@@ -4334,6 +4459,16 @@ export default function Company360Client({ initialData }: Props) {
                             {pay.status_label}
                           </span>
                         </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => openBillingCorrectionModal(pay)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 text-[11px] font-bold cursor-pointer"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            Editar
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -4344,6 +4479,170 @@ export default function Company360Client({ initialData }: Props) {
                 Nenhuma fatura ou transação financeira registrada para esta empresa.
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Correção Unificada de Plano, Assinatura e Fatura */}
+      {billingEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/70 p-4 backdrop-blur-xs">
+          <div role="dialog" aria-modal="true" className="w-full max-w-lg rounded-2xl border border-stone-300 bg-white p-6 shadow-2xl text-left space-y-4">
+            <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full bg-[#3B0B14] text-[#C9A227] font-bold text-[10px] uppercase">
+                  Sincronização Financeira 360º
+                </span>
+                <h3 className="font-serif font-bold text-lg text-stone-900 mt-1">
+                  Corrigir Plano, Assinatura &amp; Pagamento
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBillingEditModalOpen(false)}
+                className="text-stone-400 hover:text-stone-700 font-bold text-lg cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBillingCorrection} className="space-y-4 text-xs">
+              {billingCorrectionError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 font-semibold">
+                  {billingCorrectionError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Plano Comercial</label>
+                  <select
+                    value={billingEditPlanCode}
+                    onChange={(e) => setBillingEditPlanCode(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 font-semibold"
+                  >
+                    <option value="esquadro">Plano Esquadro</option>
+                    <option value="compasso">Plano Compasso</option>
+                    <option value="acacia">Plano Acácia</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Condição / Modalidade</label>
+                  <select
+                    value={billingEditModality}
+                    onChange={(e) => {
+                      const val = e.target.value as any;
+                      setBillingEditModality(val);
+                      if (val === 'permuta_100' || val === 'parceria') {
+                        setBillingEditAmountBrl('0.00');
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 font-semibold"
+                  >
+                    <option value="padrao">Cobrança Padrão / Com Desconto</option>
+                    <option value="permuta_100">Permuta 100% (Sem Cobrança)</option>
+                    <option value="parceria">Parceria 100% / Cortesia</option>
+                    <option value="permuta_50">Permuta 50% + Saldo</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Status da Assinatura</label>
+                  <select
+                    value={billingEditSubStatus}
+                    onChange={(e) => setBillingEditSubStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 font-semibold"
+                  >
+                    <option value="pending">Pendente (Não pago)</option>
+                    <option value="active">Assinatura Ativa</option>
+                    <option value="past_due">Em Atraso</option>
+                    <option value="canceled">Cancelada</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Status da Fatura</label>
+                  <select
+                    value={billingEditInvoiceStatus}
+                    onChange={(e) => setBillingEditInvoiceStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 font-semibold"
+                  >
+                    <option value="open">Em aberto (Não paga)</option>
+                    <option value="paid">Paga / Confirmada</option>
+                    <option value="overdue">Vencida / Em atraso</option>
+                    <option value="void">Cancelada / Anulada</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Valor Negociado (R$)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    disabled={billingEditModality === 'permuta_100' || billingEditModality === 'parceria'}
+                    value={billingEditAmountBrl}
+                    onChange={(e) => setBillingEditAmountBrl(e.target.value)}
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 font-mono font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Parcelas</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    disabled={billingEditModality === 'permuta_100' || billingEditModality === 'parceria'}
+                    value={billingEditInstallments}
+                    onChange={(e) => setBillingEditInstallments(Math.max(1, Number(e.target.value) || 1))}
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 font-bold"
+                  />
+                </div>
+              </div>
+
+              <label className="flex items-start gap-2 rounded-xl border border-stone-200 bg-stone-50 p-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={billingEditSyncCommercial}
+                  onChange={(e) => setBillingEditSyncCommercial(e.target.checked)}
+                  className="mt-0.5 rounded border-stone-300 text-[#3B0B14]"
+                />
+                <span className="text-[11px] text-stone-700">
+                  Sincronizar etapa comercial automaticamente (ex: voltar de <strong>Pagamento confirmado</strong> para <strong>Aguardando pagamento</strong> se marcado como não pago).
+                </span>
+              </label>
+
+              <div>
+                <label className="block font-bold text-stone-700 mb-1">Justificativa de Auditoria *</label>
+                <input
+                  type="text"
+                  required
+                  value={billingEditJustification}
+                  onChange={(e) => setBillingEditJustification(e.target.value)}
+                  placeholder="Ex: Correção de plano após upgrade para Acácia; cobrança marcada incorretamente no início."
+                  className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-stone-200">
+                <button
+                  type="button"
+                  onClick={() => setBillingEditModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingBillingCorrection}
+                  className="px-4 py-2 rounded-xl bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                >
+                  {savingBillingCorrection ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  <span>Salvar & Sincronizar nas 3 Telas</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

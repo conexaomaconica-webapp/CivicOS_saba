@@ -19,6 +19,8 @@ import {
   Calendar,
   Tag,
   RotateCcw,
+  Edit3,
+  Save,
 } from 'lucide-react';
 import {
   getAdminPaymentsDashboardAction,
@@ -27,6 +29,7 @@ import {
   AdminPaymentsDashboardDTO,
   AdminPaymentListItem,
 } from '@/lib/admin/admin-payments-service';
+import { adminCorrectBusinessBillingAction } from '@/lib/admin/admin-businesses-service';
 import { getCommercialPlanName } from '@/lib/admin/approval-display';
 import { systemConfirm } from '@/components/system/SystemFeedback';
 import { formatDateBR } from '@/lib/format/datetime-br';
@@ -107,9 +110,90 @@ export default function PaymentManagementClient({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [_activeMainTab, _setActiveMainTab] = useState<'visao_geral' | 'transacoes' | 'conciliacao' | 'assinaturas' | 'gateway'>('visao_geral');
   const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<AdminPaymentListItem | null>(null);
+  const [editingBillingItem, setEditingBillingItem] = useState<AdminPaymentListItem | null>(null);
+  const [editPlanCode, setEditPlanCode] = useState<'esquadro' | 'compasso' | 'acacia'>('esquadro');
+  const [editSubStatus, setEditSubStatus] = useState<'pending' | 'active' | 'past_due' | 'canceled'>('pending');
+  const [editInvoiceStatus, setEditInvoiceStatus] = useState<'open' | 'paid' | 'overdue' | 'void'>('open');
+  const [editAmountBrl, setEditAmountBrl] = useState<string>('0.00');
+  const [editModality, setEditModality] = useState<'padrao' | 'permuta_100' | 'permuta_50' | 'parceria'>('padrao');
+  const [editInstallments, setEditInstallments] = useState<number>(1);
+  const [editSyncCommercial, setEditSyncCommercial] = useState<boolean>(true);
+  const [editJustification, setEditJustification] = useState<string>('');
+  const [savingBillingEdit, setSavingBillingEdit] = useState<boolean>(false);
+  const [editBillingError, setEditBillingError] = useState<string | null>(null);
   const [reprocessingId, setReprocessingId] = useState<string | null>(null);
   const [manualConfirmingId, setManualConfirmingId] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const openEditBillingModal = (item: AdminPaymentListItem) => {
+    const rawCode = (item.plan_code || '').toLowerCase();
+    const canonicalPlan =
+      rawCode === 'acacia' || rawCode === 'ouro'
+        ? 'acacia'
+        : rawCode === 'compasso' || rawCode === 'prata'
+          ? 'compasso'
+          : 'esquadro';
+    setEditingBillingItem(item);
+    setEditPlanCode(canonicalPlan);
+    const plat = (item.platform_status || 'pending').toLowerCase();
+    setEditSubStatus(
+      plat === 'active' || plat === 'past_due' || plat === 'canceled' ? (plat as any) : 'pending'
+    );
+    const invSt = (item.raw_invoice_status || (item.status === 'paid' ? 'paid' : item.status === 'overdue' ? 'overdue' : 'open')).toLowerCase();
+    setEditInvoiceStatus(
+      invSt === 'paid' || invSt === 'overdue' || invSt === 'void' ? (invSt as any) : 'open'
+    );
+    setEditAmountBrl((item.amount_cents / 100).toFixed(2));
+    setEditModality(item.commercial_modality || 'padrao');
+    setEditInstallments(item.installments || 1);
+    setEditSyncCommercial(true);
+    setEditJustification('');
+    setEditBillingError(null);
+  };
+
+  const handleSaveBillingEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBillingItem) return;
+    if (!editJustification.trim()) {
+      setEditBillingError('Informe a justificativa de auditoria para salvar a correção.');
+      return;
+    }
+    setSavingBillingEdit(true);
+    setEditBillingError(null);
+    try {
+      const parsedAmount = parseFloat(editAmountBrl.replace(',', '.'));
+      const amountCents = Number.isNaN(parsedAmount) ? 0 : Math.max(0, Math.round(parsedAmount * 100));
+      const res = await adminCorrectBusinessBillingAction({
+        business_id: editingBillingItem.business_id,
+        invoice_id: editingBillingItem.is_virtual_terms_record ? null : editingBillingItem.id,
+        plan_code: editPlanCode,
+        subscription_status: editSubStatus,
+        invoice_status: editInvoiceStatus,
+        amount_cents: amountCents,
+        commercial_modality: editModality,
+        installments_count: editInstallments,
+        justification: editJustification.trim(),
+        sync_commercial_status: editSyncCommercial,
+      });
+
+      if (!res.success || !res.data) {
+        setEditBillingError(res.error || 'Falha ao salvar correção financeira.');
+        return;
+      }
+
+      setActionMsg({
+        type: 'success',
+        text: `Cadastro financeiro de "${editingBillingItem.business_name}" corrigido: ${res.data.plan_name} · Assinatura ${res.data.subscription_status} · Fatura ${res.data.invoice_status}.`,
+      });
+      setEditingBillingItem(null);
+      setSelectedPaymentDetail(null);
+      await loadDashboard();
+    } catch (err: any) {
+      setEditBillingError(err?.message || 'Erro inesperado ao salvar correção.');
+    } finally {
+      setSavingBillingEdit(false);
+    }
+  };
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -578,16 +662,27 @@ export default function PaymentManagementClient({
                         )}
                       </td>
 
-                      {/* AÇÃO: VER DETALHES */}
+                      {/* AÇÃO: EDITAR / VER DETALHES */}
                       <td className="py-3.5 px-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedPaymentDetail(item)}
-                          className="px-3.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-900 font-bold text-xs rounded-xl border border-stone-300 transition-all inline-flex items-center gap-1 cursor-pointer"
-                        >
-                          <span>Ver Detalhes</span>
-                          <ArrowRight className="w-3.5 h-3.5 text-stone-600" />
-                        </button>
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openEditBillingModal(item)}
+                            className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-[#3B0B14] font-bold text-xs rounded-xl border border-amber-300 transition-all inline-flex items-center gap-1 cursor-pointer"
+                            title="Corrigir plano, status ou valor"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>Editar</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPaymentDetail(item)}
+                            className="px-3.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-900 font-bold text-xs rounded-xl border border-stone-300 transition-all inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>Ver Detalhes</span>
+                            <ArrowRight className="w-3.5 h-3.5 text-stone-600" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -680,49 +775,224 @@ export default function PaymentManagementClient({
                 <span>Abrir Prontuário da Empresa →</span>
               </Link>
 
-              {!selectedPaymentDetail.is_virtual_terms_record && (
-                <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                  {selectedPaymentDetail.status !== 'paid' && (
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center flex-wrap justify-end">
+                <button
+                  type="button"
+                  onClick={() => openEditBillingModal(selectedPaymentDetail)}
+                  className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-[#3B0B14] font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs border border-amber-300"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Corrigir Plano / Cobrança</span>
+                </button>
+
+                {!selectedPaymentDetail.is_virtual_terms_record && (
+                  <>
+                    {selectedPaymentDetail.status !== 'paid' && (
+                      <button
+                        type="button"
+                        onClick={() => handleManualConfirmPayment(selectedPaymentDetail.id)}
+                        disabled={manualConfirmingId === selectedPaymentDetail.id}
+                        className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs border border-emerald-900/20 disabled:opacity-60"
+                      >
+                        {manualConfirmingId === selectedPaymentDetail.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <ShieldCheck className="w-3.5 h-3.5 text-white" />
+                        )}
+                        <span>Confirmar pagamento manualmente</span>
+                      </button>
+                    )}
+
                     <button
                       type="button"
-                      onClick={() => handleManualConfirmPayment(selectedPaymentDetail.id)}
-                      disabled={manualConfirmingId === selectedPaymentDetail.id}
-                      className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs border border-emerald-900/20 disabled:opacity-60"
+                      onClick={() => {
+                        if (!selectedPaymentDetail.webhook_event_id) {
+                          setActionMsg({
+                            type: 'error',
+                            text: 'Esta cobrança ainda não possui evento do Asaas registrado. Reenvie o webhook no painel do Asaas depois de corrigir URL e token.',
+                          });
+                          return;
+                        }
+                        handleReprocessWebhook(selectedPaymentDetail.webhook_event_id);
+                      }}
+                      disabled={!selectedPaymentDetail.webhook_event_id || (Boolean(selectedPaymentDetail.webhook_event_id) && reprocessingId === selectedPaymentDetail.webhook_event_id)}
+                      className="px-4 py-2 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs border border-[#C9A227]/40 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {manualConfirmingId === selectedPaymentDetail.id ? (
+                      {Boolean(selectedPaymentDetail.webhook_event_id) && reprocessingId === selectedPaymentDetail.webhook_event_id ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : (
-                        <ShieldCheck className="w-3.5 h-3.5 text-white" />
+                        <RefreshCw className="w-3.5 h-3.5 text-[#C9A227]" />
                       )}
-                      <span>Confirmar pagamento manualmente</span>
+                      <span>Reprocessar Evento Asaas</span>
                     </button>
-                  )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!selectedPaymentDetail.webhook_event_id) {
-                        setActionMsg({
-                          type: 'error',
-                          text: 'Esta cobrança ainda não possui evento do Asaas registrado. Reenvie o webhook no painel do Asaas depois de corrigir URL e token.',
-                        });
-                        return;
-                      }
-                      handleReprocessWebhook(selectedPaymentDetail.webhook_event_id);
-                    }}
-                    disabled={!selectedPaymentDetail.webhook_event_id || (Boolean(selectedPaymentDetail.webhook_event_id) && reprocessingId === selectedPaymentDetail.webhook_event_id)}
-                    className="px-4 py-2 bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs border border-[#C9A227]/40 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {Boolean(selectedPaymentDetail.webhook_event_id) && reprocessingId === selectedPaymentDetail.webhook_event_id ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-3.5 h-3.5 text-[#C9A227]" />
-                    )}
-                    <span>Reprocessar Evento Asaas</span>
-                  </button>
+      {/* 6. MODAL DE CORREÇÃO UNIFICADA DE PLANO, ASSINATURA & FATURA */}
+      {editingBillingItem && (
+        <div className="fixed inset-0 bg-stone-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div role="dialog" aria-modal="true" className="bg-white border border-stone-300 rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-2xl text-left">
+            <div className="flex justify-between items-center border-b border-stone-200 pb-3">
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full bg-[#3B0B14] text-[#C9A227] font-bold text-[10px] uppercase">
+                  Sincronização Financeira 360º
+                </span>
+                <h3 className="font-serif font-bold text-lg text-stone-900 mt-1">
+                  Editar Cobrança · {editingBillingItem.business_name}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingBillingItem(null)}
+                className="text-stone-400 hover:text-stone-600 font-bold text-lg cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBillingEdit} className="space-y-4 text-xs">
+              {editBillingError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 font-semibold">
+                  {editBillingError}
                 </div>
               )}
-            </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Plano Comercial</label>
+                  <select
+                    value={editPlanCode}
+                    onChange={(e) => setEditPlanCode(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 font-semibold"
+                  >
+                    <option value="esquadro">Plano Esquadro</option>
+                    <option value="compasso">Plano Compasso</option>
+                    <option value="acacia">Plano Acácia</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Condição / Modalidade</label>
+                  <select
+                    value={editModality}
+                    onChange={(e) => {
+                      const val = e.target.value as any;
+                      setEditModality(val);
+                      if (val === 'permuta_100' || val === 'parceria') {
+                        setEditAmountBrl('0.00');
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 font-semibold"
+                  >
+                    <option value="padrao">Cobrança Padrão / Com Desconto</option>
+                    <option value="permuta_100">Permuta 100% (Sem Cobrança)</option>
+                    <option value="parceria">Parceria 100% / Cortesia</option>
+                    <option value="permuta_50">Permuta 50% + Saldo</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Status da Assinatura</label>
+                  <select
+                    value={editSubStatus}
+                    onChange={(e) => setEditSubStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 font-semibold"
+                  >
+                    <option value="pending">Pendente (Não pago)</option>
+                    <option value="active">Assinatura Ativa</option>
+                    <option value="past_due">Em Atraso</option>
+                    <option value="canceled">Cancelada</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Status da Fatura</label>
+                  <select
+                    value={editInvoiceStatus}
+                    onChange={(e) => setEditInvoiceStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 font-semibold"
+                  >
+                    <option value="open">Em aberto (Não paga)</option>
+                    <option value="paid">Paga / Confirmada</option>
+                    <option value="overdue">Vencida / Em atraso</option>
+                    <option value="void">Cancelada / Anulada</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Valor Negociado (R$)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    disabled={editModality === 'permuta_100' || editModality === 'parceria'}
+                    value={editAmountBrl}
+                    onChange={(e) => setEditAmountBrl(e.target.value)}
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 font-mono font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Parcelas</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    disabled={editModality === 'permuta_100' || editModality === 'parceria'}
+                    value={editInstallments}
+                    onChange={(e) => setEditInstallments(Math.max(1, Number(e.target.value) || 1))}
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 font-bold"
+                  />
+                </div>
+              </div>
+
+              <label className="flex items-start gap-2 rounded-xl border border-stone-200 bg-stone-50 p-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editSyncCommercial}
+                  onChange={(e) => setEditSyncCommercial(e.target.checked)}
+                  className="mt-0.5 rounded border-stone-300 text-[#3B0B14]"
+                />
+                <span className="text-[11px] text-stone-700">
+                  Sincronizar etapa comercial automaticamente (ex: reverter para <strong>Aguardando pagamento</strong> se marcado como não pago).
+                </span>
+              </label>
+
+              <div>
+                <label className="block font-bold text-stone-700 mb-1">Justificativa de Auditoria *</label>
+                <input
+                  type="text"
+                  required
+                  value={editJustification}
+                  onChange={(e) => setEditJustification(e.target.value)}
+                  placeholder="Ex: Empresa fez upgrade para Acácia e ainda não realizou o pagamento."
+                  className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-stone-200">
+                <button
+                  type="button"
+                  onClick={() => setEditingBillingItem(null)}
+                  className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingBillingEdit}
+                  className="px-4 py-2 rounded-xl bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                >
+                  {savingBillingEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  <span>Salvar & Sincronizar nas 3 Telas</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
