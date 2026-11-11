@@ -25,7 +25,7 @@ import {
 } from './guide-data';
 import { visibleHomeSections, type HomeSectionId } from './home-sections';
 import { claimColdLaunch } from './launch-session';
-import { trackMobileEvent, resetMobileCycleId } from './mobile-analytics';
+import { trackMobileEvent, resetMobileCycleId, createFreshMobileCycleId } from './mobile-analytics';
 import { routeFromHash, routeHref, routeLabels, routes, type Route } from './navigation';
 import { setupPushNotifications, sendTokenToSupabase } from './push-service';
 import { executeAccountDeletion, purgeLocalAccountState } from './account-lifecycle';
@@ -2668,6 +2668,7 @@ function BusinessDetailModal({
   onOpenMemberLogin,
   onOpenVoucherModal,
   onRequestRedeemWithLogin,
+  onBusinessViewsUpdated,
 }: {
   slug: string | null;
   onClose: () => void;
@@ -2687,9 +2688,12 @@ function BusinessDetailModal({
     businessId?: string,
     businessWhatsapp?: string | null
   ) => void;
+  onBusinessViewsUpdated?: (businessId: string, viewsCount: number) => void;
 }) {
   const [detail, setDetail] = useState<MobileBusinessDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isAnuncioOpen, setIsAnuncioOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'sobre' | 'selos' | 'servicos' | 'fotos' | 'beneficio' | 'comentarios' | 'localizacao'>(
@@ -2700,6 +2704,9 @@ function BusinessDetailModal({
   const [zoomedPerson, setZoomedPerson] = useState<{ url: string; name: string; subtitle?: string | null } | null>(null);
 
   const guideServiceRef = useRef(createMobileGuideService());
+  const detailScrollRef = useRef<HTMLDivElement | null>(null);
+  const touchPullRef = useRef<{ x: number; y: number } | null>(null);
+  const loadRequestIdRef = useRef(0);
 
   useEffect(() => {
     if (initialTab) {
@@ -2707,51 +2714,137 @@ function BusinessDetailModal({
     }
   }, [initialTab]);
 
+  const loadDetailAndTrack = async (targetSlug: string, forceNewViewCycle = false) => {
+    const requestId = ++loadRequestIdRef.current;
+    if (forceNewViewCycle) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+      setError(null);
+    }
+
+    try {
+      let currentBusinessId = detail?.business_id;
+      if (forceNewViewCycle && currentBusinessId) {
+        resetMobileCycleId(currentBusinessId);
+      }
+
+      const data = await guideServiceRef.current.loadBusinessDetail(targetSlug);
+      if (loadRequestIdRef.current !== requestId) return;
+
+      if (!data) {
+        if (!forceNewViewCycle) {
+          setError('Empresa não encontrada ou temporariamente indisponível.');
+        }
+        return;
+      }
+
+      setDetail(data);
+      currentBusinessId = data.business_id;
+
+      if (data.business_id) {
+        const trackRes = await trackMobileEvent({
+          businessId: data.business_id,
+          eventType: 'view',
+          city: data.city,
+          state: data.state,
+          cycleId: forceNewViewCycle ? createFreshMobileCycleId() : undefined,
+        });
+        if (loadRequestIdRef.current !== requestId) return;
+
+        if (trackRes.ok && !trackRes.deduplicated && !trackRes.skipped) {
+          const optimisticViews = Math.max(1, (typeof data.views_count === 'number' ? data.views_count : 0) + 1);
+          setDetail((prev) =>
+            prev && prev.business_id === data.business_id
+              ? { ...prev, views_count: Math.max(optimisticViews, prev.views_count ?? 0) }
+              : prev
+          );
+          onBusinessViewsUpdated?.(data.business_id, optimisticViews);
+        } else if (typeof data.views_count === 'number') {
+          onBusinessViewsUpdated?.(data.business_id, data.views_count);
+        }
+      }
+
+      if (!forceNewViewCycle && initialTab === 'beneficio') {
+        setTimeout(() => {
+          document.getElementById('section-beneficio')?.scrollIntoView({ behavior: 'smooth' });
+        }, 300);
+      }
+    } catch {
+      if (loadRequestIdRef.current === requestId && !forceNewViewCycle) {
+        setError('Não foi possível carregar os dados desta empresa.');
+      }
+    } finally {
+      if (loadRequestIdRef.current === requestId) {
+        setLoading(false);
+        setIsRefreshing(false);
+        setPullDistance(0);
+      }
+    }
+  };
+
   useEffect(() => {
     if (!slug) {
+      loadRequestIdRef.current++;
       if (detail?.business_id) {
         resetMobileCycleId(detail.business_id);
       }
       setDetail(null);
       setError(null);
       setIsAnuncioOpen(false);
+      setIsRefreshing(false);
+      setPullDistance(0);
       setActiveTab('sobre');
       setActivePhotoIndex(null);
       setZoomedSeal(null);
       setZoomedPerson(null);
       return;
     }
-    setLoading(true);
-    setError(null);
-    guideServiceRef.current
-      .loadBusinessDetail(slug)
-      .then((data) => {
-        if (!data) {
-          setError('Empresa não encontrada ou temporariamente indisponível.');
-        } else {
-          setDetail(data);
-          if (data.business_id) {
-            trackMobileEvent({
-              businessId: data.business_id,
-              eventType: 'view',
-              city: data.city,
-              state: data.state,
-            });
-          }
-          if (initialTab === 'beneficio') {
-            setTimeout(() => {
-              document.getElementById('section-beneficio')?.scrollIntoView({ behavior: 'smooth' });
-            }, 300);
-          }
-        }
-      })
-      .catch(() => {
-        setError('Não foi possível carregar os dados desta empresa.');
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    void loadDetailAndTrack(slug, false);
   }, [slug]);
+
+  const onDetailTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+    const scrollEl = detailScrollRef.current;
+    if (!scrollEl || scrollEl.scrollTop <= 5) {
+      touchPullRef.current = {
+        x: e.touches[0]?.clientX ?? 0,
+        y: e.touches[0]?.clientY ?? 0,
+      };
+    } else {
+      touchPullRef.current = null;
+    }
+  };
+
+  const onDetailTouchMove = (e: TouchEvent<HTMLDivElement>) => {
+    const start = touchPullRef.current;
+    const scrollEl = detailScrollRef.current;
+    if (!start || isRefreshing || loading || !scrollEl || scrollEl.scrollTop > 5) return;
+    const dy = (e.touches[0]?.clientY ?? 0) - start.y;
+    const dx = Math.abs((e.touches[0]?.clientX ?? 0) - start.x);
+    if (dy > 12 && dy > dx) {
+      setPullDistance(Math.min(72, Math.round(dy * 0.45)));
+    } else if (dy <= 0) {
+      setPullDistance(0);
+    }
+  };
+
+  const onDetailTouchEnd = (e: TouchEvent<HTMLDivElement>) => {
+    const start = touchPullRef.current;
+    touchPullRef.current = null;
+    const scrollEl = detailScrollRef.current;
+    if (!start || isRefreshing || loading || !slug) {
+      setPullDistance(0);
+      return;
+    }
+    const endTouch = e.changedTouches[0];
+    const dy = (endTouch?.clientY ?? 0) - start.y;
+    const dx = Math.abs((endTouch?.clientX ?? 0) - start.x);
+    if ((!scrollEl || scrollEl.scrollTop <= 5) && dy > 55 && dx < 80) {
+      void loadDetailAndTrack(slug, true);
+    } else {
+      setPullDistance(0);
+    }
+  };
 
   if (!slug) return null;
 
@@ -2878,7 +2971,27 @@ function BusinessDetailModal({
             )}
           </div>
 
-          <div className="detail-scroll-container">
+          <div
+            ref={detailScrollRef}
+            className="detail-scroll-container"
+            onTouchStart={onDetailTouchStart}
+            onTouchMove={onDetailTouchMove}
+            onTouchEnd={onDetailTouchEnd}
+          >
+            {(pullDistance > 16 || isRefreshing) && (
+              <div className="detail-pull-refresh-banner" role="status" aria-live="polite">
+                {isRefreshing ? (
+                  <>
+                    <span className="detail-pull-spinner" aria-hidden="true" />
+                    <span>Atualizando empresa...</span>
+                  </>
+                ) : (
+                  <span>
+                    {pullDistance >= 25 ? '↓ Solte para atualizar a empresa' : '↓ Puxe para atualizar'}
+                  </span>
+                )}
+              </div>
+            )}
             {loading && (
               <div style={{ padding: 48, textAlign: 'center', color: '#7a6e67' }}>
                 <span className="pull-refresh-spinner" style={{ margin: '0 auto 16px' }} />
@@ -3033,6 +3146,31 @@ function BusinessDetailModal({
                             }}
                           />
                         </button>
+
+                        {detail.is_verified && (
+                          <span
+                            className="header-verified-badge"
+                            title="Empresa Verificada pela curadoria Conexão Maçônica"
+                          >
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.2"
+                              width="12"
+                              height="12"
+                              aria-hidden="true"
+                            >
+                              <path
+                                d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+                                fill="currentColor"
+                                fillOpacity="0.2"
+                              />
+                              <path d="m9 12 2 2 4-4" />
+                            </svg>
+                            <span>VERIFICADA</span>
+                          </span>
+                        )}
                       </div>
                     );
                   })()}
@@ -3478,32 +3616,6 @@ function BusinessDetailModal({
                             <span className="seal-clean-caption">{planTitle}</span>
                             <span className="seal-clean-zoom-hint">Toque para ampliar</span>
                           </button>
-
-                          {/* Selo Empresa Verificada (se ativa) */}
-                          {detail.is_verified && (
-                            <button
-                              type="button"
-                              className="seal-clean-card-btn seal-clean-verified"
-                              title="Empresa Verificada — Toque para ampliar"
-                              onClick={() =>
-                                setZoomedSeal({
-                                  badgeLabel: 'Auditoria Institucional',
-                                  title: 'Empresa Verificada',
-                                  description:
-                                    'Identidade corporativa e vínculo fraterno auditados pela curadoria Conexão Maçônica.',
-                                  imageUrl: './selos/verificada.svg',
-                                })
-                              }
-                            >
-                              <img
-                                src="./selos/verificada.svg"
-                                alt="Empresa Verificada"
-                                className="seal-clean-img seal-clean-img-wide"
-                              />
-                              <span className="seal-clean-caption">Empresa Verificada</span>
-                              <span className="seal-clean-zoom-hint">Toque para ampliar</span>
-                            </button>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -3973,6 +4085,7 @@ function BeneficiosScreen({
   favoritesCount,
   onLoadedData,
   onOpenVoucherModal,
+  viewsOverrides,
 }: {
   search: string;
   city: string;
@@ -3988,18 +4101,22 @@ function BeneficiosScreen({
   favoritesCount?: number;
   onLoadedData?: (data: MobileGuideHomeData) => void;
   onOpenVoucherModal?: (voucher: MobileBenefitRedemption) => void;
+  viewsOverrides?: Record<string, number>;
 }) {
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [guideData, setGuideData] = useState<MobileGuideHomeData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
   const [redeemedList, setRedeemedList] = useState<MobileBenefitRedemption[]>(() => loadRedeemedBenefits());
   const guideServiceRef = useRef(createMobileGuideService());
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     setRedeemedList(loadRedeemedBenefits());
   }, []);
 
-  const fetchBenefitBusinesses = (q = search, c = city, cat = selectedCategory) => {
+  const fetchBenefitBusinesses = (q = search, c = city, cat = selectedCategory, manualPull = false) => {
+    if (manualPull) setIsPullRefreshing(true);
     setLoading(true);
     guideServiceRef.current
       .loadHome({ query: q, city: c, category: cat, hasBenefits: true })
@@ -4026,6 +4143,7 @@ function BeneficiosScreen({
       })
       .finally(() => {
         setLoading(false);
+        setIsPullRefreshing(false);
       });
   };
 
@@ -4034,14 +4152,37 @@ function BeneficiosScreen({
   }, [search, city, selectedCategory]);
 
   const rawList = guideData?.businesses ?? [];
-  const sorted = sortBusinessesByTier(rawList);
+  const sorted = sortBusinessesByTier(rawList).map((b) =>
+    viewsOverrides?.[b.id] !== undefined ? { ...b, views_count: viewsOverrides[b.id] } : b
+  );
   const displayedBusinesses = onlyFavorites
     ? sorted.filter((b) => isFavorite?.(b.slug))
     : sorted;
   const hasActiveFilter = Boolean(search || city || selectedCategory || onlyFavorites);
 
   return (
-    <div className="directory-screen">
+    <div
+      className="directory-screen"
+      onTouchStart={(e) => {
+        if (window.scrollY <= 5) {
+          touchStartRef.current = { x: e.touches[0]?.clientX ?? 0, y: e.touches[0]?.clientY ?? 0 };
+        }
+      }}
+      onTouchEnd={(e) => {
+        const start = touchStartRef.current;
+        touchStartRef.current = null;
+        if (!start || isPullRefreshing || window.scrollY > 10) return;
+        const touch = e.changedTouches[0];
+        if (touch && touch.clientY - start.y > 60 && Math.abs(touch.clientX - start.x) < 80) {
+          fetchBenefitBusinesses(search, city, selectedCategory, true);
+        }
+      }}
+    >
+      {isPullRefreshing && (
+        <div className="pull-refresh-overlay" role="status" aria-live="polite">
+          <span className="pull-refresh-spinner" aria-hidden="true" />
+        </div>
+      )}
       <div className="directory-header">
         <p className="eyebrow">Clube de Vantagens da Rede</p>
         <h1>Benefícios Exclusivos</h1>
@@ -6941,6 +7082,7 @@ function EmpresasScreen({
   onRefer,
   favoritesCount,
   onLoadedData,
+  viewsOverrides,
 }: {
   search: string;
   city: string;
@@ -6955,14 +7097,18 @@ function EmpresasScreen({
   onRefer?: (name: string, slug: string) => void;
   favoritesCount?: number;
   onLoadedData?: (data: MobileGuideHomeData) => void;
+  viewsOverrides?: Record<string, number>;
 }) {
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [guideData, setGuideData] = useState<MobileGuideHomeData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const guideServiceRef = useRef(createMobileGuideService());
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  const fetchBusinesses = (q = search, c = city, cat = selectedCategory) => {
+  const fetchBusinesses = (q = search, c = city, cat = selectedCategory, manualPull = false) => {
+    if (manualPull) setIsPullRefreshing(true);
     setLoading(true);
     setErrorMessage(null);
     guideServiceRef.current
@@ -6980,6 +7126,7 @@ function EmpresasScreen({
       })
       .finally(() => {
         setLoading(false);
+        setIsPullRefreshing(false);
       });
   };
 
@@ -6988,13 +7135,36 @@ function EmpresasScreen({
   }, [search, city, selectedCategory]);
 
   const businesses = guideData?.businesses ?? [];
-  const sorted = sortBusinessesByTier(businesses);
+  const sorted = sortBusinessesByTier(businesses).map((b) =>
+    viewsOverrides?.[b.id] !== undefined ? { ...b, views_count: viewsOverrides[b.id] } : b
+  );
   const displayedBusinesses = onlyFavorites
     ? sorted.filter((b) => isFavorite?.(b.slug))
     : sorted;
 
   return (
-    <div className="directory-screen">
+    <div
+      className="directory-screen"
+      onTouchStart={(e) => {
+        if (window.scrollY <= 5) {
+          touchStartRef.current = { x: e.touches[0]?.clientX ?? 0, y: e.touches[0]?.clientY ?? 0 };
+        }
+      }}
+      onTouchEnd={(e) => {
+        const start = touchStartRef.current;
+        touchStartRef.current = null;
+        if (!start || isPullRefreshing || window.scrollY > 10) return;
+        const touch = e.changedTouches[0];
+        if (touch && touch.clientY - start.y > 60 && Math.abs(touch.clientX - start.x) < 80) {
+          fetchBusinesses(search, city, selectedCategory, true);
+        }
+      }}
+    >
+      {isPullRefreshing && (
+        <div className="pull-refresh-overlay" role="status" aria-live="polite">
+          <span className="pull-refresh-spinner" aria-hidden="true" />
+        </div>
+      )}
       <div className="directory-header">
         <p className="eyebrow">Guia Comercial da Rede</p>
         <h1>Empresas</h1>
@@ -7734,6 +7904,7 @@ function Home({
   onToggleFavorite,
   onRefer,
   onStartShareExperience,
+  viewsOverrides,
 }: {
   city: string;
   selectedCategory: string;
@@ -7746,6 +7917,7 @@ function Home({
   onToggleFavorite?: (slug: string, name?: string) => void;
   onRefer?: (name: string, slug: string) => void;
   onStartShareExperience?: (slug?: string) => void;
+  viewsOverrides?: Record<string, number>;
 }) {
   const [guideData, setGuideData] = useState<MobileGuideHomeData | null>(null);
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
@@ -8023,7 +8195,9 @@ function Home({
       />
     ),
     all_businesses: guideData ? (() => {
-      const sorted = sortBusinessesByTier(guideData.businesses);
+      const sorted = sortBusinessesByTier(guideData.businesses).map((b) =>
+        viewsOverrides?.[b.id] !== undefined ? { ...b, views_count: viewsOverrides[b.id] } : b
+      );
       return (
         <section className="guide-section" aria-labelledby="all-businesses-title">
           <div className="section-heading">
@@ -8278,6 +8452,7 @@ export function App() {
     }
   });
   const [serverBusinesses, setServerBusinesses] = useState<MobileGuideSponsoredBusiness[]>([]);
+  const [viewsOverrides, setViewsOverrides] = useState<Record<string, number>>({});
   const [isMemberLoginModalOpen, setIsMemberLoginModalOpen] = useState(false);
   const [isShareExperienceModalOpen, setIsShareExperienceModalOpen] = useState(false);
   const [openShareAfterLogin, setOpenShareAfterLogin] = useState(false);
@@ -8685,6 +8860,7 @@ export function App() {
             onToggleFavorite={handleToggleFavorite}
             onRefer={handleOpenRefer}
             onStartShareExperience={handleStartShareExperience}
+            viewsOverrides={viewsOverrides}
             onLoadedData={(data) => {
               if (data.available_cities?.length) {
                 setAvailableCities(data.available_cities);
@@ -8713,6 +8889,7 @@ export function App() {
             onToggleFavorite={handleToggleFavorite}
             onRefer={handleOpenRefer}
             favoritesCount={favorites.length}
+            viewsOverrides={viewsOverrides}
             onLoadedData={(data) => {
               if (data.available_cities?.length) {
                 setAvailableCities(data.available_cities);
@@ -8744,6 +8921,7 @@ export function App() {
             onToggleFavorite={handleToggleFavorite}
             onRefer={handleOpenRefer}
             favoritesCount={favorites.length}
+            viewsOverrides={viewsOverrides}
             onOpenVoucherModal={(v) => setActiveVoucherModal(v)}
             onLoadedData={(data) => {
               if (data.available_cities?.length) {
@@ -8832,6 +9010,12 @@ export function App() {
           setIsMemberLoginModalOpen(true);
         }}
         onOpenVoucherModal={(v) => setActiveVoucherModal(v)}
+        onBusinessViewsUpdated={(businessId, viewsCount) => {
+          setViewsOverrides((prev) => ({ ...prev, [businessId]: viewsCount }));
+          setServerBusinesses((prev) =>
+            prev.map((b) => (b.id === businessId ? { ...b, views_count: viewsCount } : b))
+          );
+        }}
         onRequestRedeemWithLogin={(benefit, bizName, bizSlug, bizId, bizWa) => {
           setPendingBenefitToRedeem({
             benefit,

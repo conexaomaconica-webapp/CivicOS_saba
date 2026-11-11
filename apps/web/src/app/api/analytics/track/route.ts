@@ -215,5 +215,13 @@ export async function POST(request: Request) {
   });
 
   // Telemetria nunca devolve erro detalhado ao navegador.
-  return NextResponse.json({ ok: Boolean((result as { ok?: boolean }).ok) }, { status: 200, headers: corsHeaders });
+  const typedResult = result as { ok?: boolean; deduplicated?: boolean; skipped?: boolean };
+  return NextResponse.json(
+    {
+      ok: Boolean(typedResult?.ok),
+      ...(typedResult?.deduplicated ? { deduplicated: true } : {}),
+      ...(typedResult?.skipped ? { skipped: true } : {}),
+    },
+    { status: 200, headers: corsHeaders }
+  );
 }

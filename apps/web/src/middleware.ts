@@ -27,9 +27,11 @@ export async function middleware(request: NextRequest) {
   // Public resolution never trusts x-tenant-id or tenant_id cookies. Server
   // components pass this original Host to the verified-domain RPC.
 
-  // O BFF do Guia é público e usa um cliente Supabase sem sessão. Não tente
-  // renovar cookies do navegador nesta rota, evitando refresh_token_not_found.
-  if (request.nextUrl.pathname === '/api/mobile/guide') {
+  // Endpoints públicos de telemetria/BFF que não dependem de sessão de cookie no navegador.
+  if (
+    request.nextUrl.pathname === '/api/mobile/guide' ||
+    request.nextUrl.pathname === '/api/analytics/track'
+  ) {
     return response;
   }
 

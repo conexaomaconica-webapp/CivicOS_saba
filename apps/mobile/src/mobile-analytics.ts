@@ -30,12 +30,16 @@ const activeCycleIds = new Map<string, string>();
  * Retorna ou cria um ID de ciclo efêmero para visualizações do anunciante no app.
  * Garante que a abertura do modal registre apenas 1 view mesmo com re-renderizações do React.
  */
+export function createFreshMobileCycleId(): string {
+  return `mob_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
 export function getOrCreateMobileCycleId(businessId: string): string {
   if (!businessId) return '';
   const existing = activeCycleIds.get(businessId);
   if (existing) return existing;
 
-  const newId = `mob_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  const newId = createFreshMobileCycleId();
   activeCycleIds.set(businessId, newId);
   return newId;
 }
@@ -62,7 +66,7 @@ function resolveAnalyticsEndpoint(): string {
 export async function trackMobileEvent(
   options: MobileTrackOptions,
   fetchImpl: typeof fetch = fetch
-): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+): Promise<{ ok: boolean; deduplicated?: boolean; skipped?: boolean; error?: string }> {
   if (!options.businessId || !options.eventType) {
     return { ok: false, error: 'MISSING_PARAMS' };
   }
@@ -88,6 +92,7 @@ export async function trackMobileEvent(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-Client-Platform': 'mobile_app',
       },
       body: JSON.stringify(payload),
     });

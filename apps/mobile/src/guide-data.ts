@@ -237,6 +237,7 @@ async function loadFromDirectSupabase(
   if (categoryParam) bffUrl.searchParams.set('category', categoryParam);
   if (hasBenefitsParam) bffUrl.searchParams.set('has_benefits', 'true');
   bffUrl.searchParams.set('page_size', '100');
+  bffUrl.searchParams.set('_t', String(Date.now()));
 
   const [homeRes, searchRes, categoriesRes, bffRes] = await Promise.all([
     fetchImpl(`${supabaseUrl}/rest/v1/rpc/public_directory_home_data`, {
@@ -264,7 +265,12 @@ async function loadFromDirectSupabase(
       headers,
       body: JSON.stringify({ p_host: host }),
     }).catch(() => null),
-    fetchWithTimeout(fetchImpl, bffUrl.toString(), { headers: { Accept: 'application/json' } }, 4500).catch(() => null),
+    fetchWithTimeout(
+      fetchImpl,
+      bffUrl.toString(),
+      { headers: { Accept: 'application/json' }, cache: 'no-store' },
+      4500,
+    ).catch(() => null),
   ]);
 
   if (!homeRes.ok) throw new MobileGuideServiceError(`Guia indisponível (${homeRes.status})`);
@@ -503,6 +509,7 @@ async function fetchWithTimeout(
 export async function loadBusinessDetailFromDirectSupabase(
   fetchImpl: typeof fetch,
   slug: string,
+  bustCache = true,
 ): Promise<MobileBusinessDetail | null> {
   const supabaseUrl = 'https://rwvztwsjcjljphqttiws.supabase.co';
   const anonKey =
@@ -510,7 +517,7 @@ export async function loadBusinessDetailFromDirectSupabase(
   const host = 'localhost:3000';
 
   try {
-    const bffDetailUrl = `https://conexaomaconica.com.br/api/mobile/guide?slug=${encodeURIComponent(slug)}`;
+    const bffDetailUrl = `https://conexaomaconica.com.br/api/mobile/guide?slug=${encodeURIComponent(slug)}${bustCache ? `&_t=${Date.now()}` : ''}`;
     const [res, bffRes, recsRes] = await Promise.all([
       fetchImpl(`${supabaseUrl}/rest/v1/rpc/public_business_detail`, {
         method: 'POST',
@@ -521,7 +528,12 @@ export async function loadBusinessDetailFromDirectSupabase(
         },
         body: JSON.stringify({ p_host: host, p_business_slug: slug }),
       }),
-      fetchWithTimeout(fetchImpl, bffDetailUrl, { headers: { Accept: 'application/json' } }, 4500).catch(() => null),
+      fetchWithTimeout(
+        fetchImpl,
+        bffDetailUrl,
+        { headers: { Accept: 'application/json' }, cache: 'no-store' },
+        4500,
+      ).catch(() => null),
       fetchWithTimeout(
         fetchImpl,
         `${supabaseUrl}/rest/v1/institutional_recognitions?select=key,title,description,seal_url,compact_seal_url,header_display,header_scale,card_display,is_active,priority_order&is_active=eq.true&order=priority_order.asc`,
