@@ -269,7 +269,7 @@ async function loadFromDirectSupabase(
       fetchImpl,
       bffUrl.toString(),
       { headers: { Accept: 'application/json' }, cache: 'no-store' },
-      4500,
+      8000,
     ).catch(() => null),
   ]);
 
@@ -532,7 +532,7 @@ export async function loadBusinessDetailFromDirectSupabase(
         fetchImpl,
         bffDetailUrl,
         { headers: { Accept: 'application/json' }, cache: 'no-store' },
-        4500,
+        8000,
       ).catch(() => null),
       fetchWithTimeout(
         fetchImpl,

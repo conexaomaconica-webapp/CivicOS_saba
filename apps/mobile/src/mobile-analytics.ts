@@ -66,7 +66,7 @@ function resolveAnalyticsEndpoint(): string {
 export async function trackMobileEvent(
   options: MobileTrackOptions,
   fetchImpl: typeof fetch = fetch
-): Promise<{ ok: boolean; deduplicated?: boolean; skipped?: boolean; error?: string }> {
+): Promise<{ ok: boolean; deduplicated?: boolean; skipped?: boolean; viewsCount?: number; error?: string }> {
   if (!options.businessId || !options.eventType) {
     return { ok: false, error: 'MISSING_PARAMS' };
   }
@@ -86,25 +86,35 @@ export async function trackMobileEvent(
     device: 'mobile_app',
   };
 
-  try {
-    const endpoint = resolveAnalyticsEndpoint();
-    const res = await fetchImpl(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Client-Platform': 'mobile_app',
-      },
-      body: JSON.stringify(payload),
-    });
+  const endpoint = resolveAnalyticsEndpoint();
+  const maxAttempts = 2;
+  let lastError = 'NETWORK_ERROR';
 
-    if (!res.ok) {
-      return { ok: false, error: `HTTP_${res.status}` };
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetchImpl(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-Platform': 'mobile_app',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        lastError = `HTTP_${res.status}`;
+        if (res.status >= 400 && res.status < 500) {
+          return { ok: false, error: lastError };
+        }
+        continue;
+      }
+
+      const data = await res.json().catch(() => ({ ok: true }));
+      return { ok: true, ...data };
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : 'NETWORK_ERROR';
     }
-
-    const data = await res.json().catch(() => ({ ok: true }));
-    return { ok: true, ...data };
-  } catch (err) {
-    // Falha silenciosa para nunca quebrar a interface em caso de oscilação de rede móvel
-    return { ok: false, error: err instanceof Error ? err.message : 'NETWORK_ERROR' };
   }
+
+  return { ok: false, error: lastError };
 }

@@ -2706,7 +2706,9 @@ function BusinessDetailModal({
   const guideServiceRef = useRef(createMobileGuideService());
   const detailScrollRef = useRef<HTMLDivElement | null>(null);
   const touchPullRef = useRef<{ x: number; y: number } | null>(null);
+  const pullDistanceRef = useRef(0);
   const loadRequestIdRef = useRef(0);
+  const activeOpenCycleRef = useRef<{ slug: string; cycleId: string } | null>(null);
 
   useEffect(() => {
     if (initialTab) {
@@ -2724,9 +2726,24 @@ function BusinessDetailModal({
     }
 
     try {
-      let currentBusinessId = detail?.business_id;
-      if (forceNewViewCycle && currentBusinessId) {
-        resetMobileCycleId(currentBusinessId);
+      const cycleForRequest =
+        forceNewViewCycle || activeOpenCycleRef.current?.slug !== targetSlug
+          ? createFreshMobileCycleId()
+          : activeOpenCycleRef.current.cycleId;
+      activeOpenCycleRef.current = { slug: targetSlug, cycleId: cycleForRequest };
+
+      // Ao atualizar manualmente com a empresa já carregada, registra +1 visualização antes de buscar os dados frescos
+      let preTrackRes: Awaited<ReturnType<typeof trackMobileEvent>> | null = null;
+      if (forceNewViewCycle && detail?.business_id) {
+        resetMobileCycleId(detail.business_id);
+        preTrackRes = await trackMobileEvent({
+          businessId: detail.business_id,
+          eventType: 'view',
+          city: detail.city,
+          state: detail.state,
+          cycleId: cycleForRequest,
+        });
+        if (loadRequestIdRef.current !== requestId) return;
       }
 
       const data = await guideServiceRef.current.loadBusinessDetail(targetSlug);
@@ -2740,28 +2757,34 @@ function BusinessDetailModal({
       }
 
       setDetail(data);
-      currentBusinessId = data.business_id;
 
       if (data.business_id) {
-        const trackRes = await trackMobileEvent({
-          businessId: data.business_id,
-          eventType: 'view',
-          city: data.city,
-          state: data.state,
-          cycleId: forceNewViewCycle ? createFreshMobileCycleId() : undefined,
-        });
+        const trackRes =
+          preTrackRes ??
+          (await trackMobileEvent({
+            businessId: data.business_id,
+            eventType: 'view',
+            city: data.city,
+            state: data.state,
+            cycleId: cycleForRequest,
+          }));
         if (loadRequestIdRef.current !== requestId) return;
 
-        if (trackRes.ok && !trackRes.deduplicated && !trackRes.skipped) {
-          const optimisticViews = Math.max(1, (typeof data.views_count === 'number' ? data.views_count : 0) + 1);
+        const baseViews = typeof data.views_count === 'number' ? data.views_count : 0;
+        const nextViews =
+          typeof trackRes.viewsCount === 'number'
+            ? Math.max(trackRes.viewsCount, baseViews)
+            : trackRes.ok && !trackRes.deduplicated && !trackRes.skipped
+              ? Math.max(1, baseViews + (preTrackRes ? 0 : 1))
+              : data.views_count;
+
+        if (typeof nextViews === 'number') {
           setDetail((prev) =>
             prev && prev.business_id === data.business_id
-              ? { ...prev, views_count: Math.max(optimisticViews, prev.views_count ?? 0) }
+              ? { ...prev, views_count: Math.max(nextViews, prev.views_count ?? 0) }
               : prev
           );
-          onBusinessViewsUpdated?.(data.business_id, optimisticViews);
-        } else if (typeof data.views_count === 'number') {
-          onBusinessViewsUpdated?.(data.business_id, data.views_count);
+          onBusinessViewsUpdated?.(data.business_id, nextViews);
         }
       }
 
@@ -2778,6 +2801,7 @@ function BusinessDetailModal({
       if (loadRequestIdRef.current === requestId) {
         setLoading(false);
         setIsRefreshing(false);
+        pullDistanceRef.current = 0;
         setPullDistance(0);
       }
     }
@@ -2786,6 +2810,7 @@ function BusinessDetailModal({
   useEffect(() => {
     if (!slug) {
       loadRequestIdRef.current++;
+      activeOpenCycleRef.current = null;
       if (detail?.business_id) {
         resetMobileCycleId(detail.business_id);
       }
@@ -2793,6 +2818,7 @@ function BusinessDetailModal({
       setError(null);
       setIsAnuncioOpen(false);
       setIsRefreshing(false);
+      pullDistanceRef.current = 0;
       setPullDistance(0);
       setActiveTab('sobre');
       setActivePhotoIndex(null);
@@ -2801,6 +2827,9 @@ function BusinessDetailModal({
       return;
     }
     void loadDetailAndTrack(slug, false);
+    return () => {
+      activeOpenCycleRef.current = null;
+    };
   }, [slug]);
 
   const onDetailTouchStart = (e: TouchEvent<HTMLDivElement>) => {
@@ -2818,12 +2847,26 @@ function BusinessDetailModal({
   const onDetailTouchMove = (e: TouchEvent<HTMLDivElement>) => {
     const start = touchPullRef.current;
     const scrollEl = detailScrollRef.current;
-    if (!start || isRefreshing || loading || !scrollEl || scrollEl.scrollTop > 5) return;
+    if (!start || isRefreshing || loading || (scrollEl && scrollEl.scrollTop > 5)) return;
     const dy = (e.touches[0]?.clientY ?? 0) - start.y;
     const dx = Math.abs((e.touches[0]?.clientX ?? 0) - start.x);
-    if (dy > 12 && dy > dx) {
-      setPullDistance(Math.min(72, Math.round(dy * 0.45)));
+    if (dy > 10 && dy > dx) {
+      const dist = Math.min(72, Math.round(dy * 0.48));
+      pullDistanceRef.current = dist;
+      setPullDistance(dist);
     } else if (dy <= 0) {
+      pullDistanceRef.current = 0;
+      setPullDistance(0);
+    }
+  };
+
+  const finishDetailPull = (dy: number, dx: number) => {
+    const scrollEl = detailScrollRef.current;
+    const pulledEnough = pullDistanceRef.current >= 22 || (dy > 45 && dx < 90);
+    pullDistanceRef.current = 0;
+    if (!isRefreshing && !loading && slug && (!scrollEl || scrollEl.scrollTop <= 5) && pulledEnough) {
+      void loadDetailAndTrack(slug, true);
+    } else {
       setPullDistance(0);
     }
   };
@@ -2831,17 +2874,24 @@ function BusinessDetailModal({
   const onDetailTouchEnd = (e: TouchEvent<HTMLDivElement>) => {
     const start = touchPullRef.current;
     touchPullRef.current = null;
-    const scrollEl = detailScrollRef.current;
-    if (!start || isRefreshing || loading || !slug) {
+    if (!start) {
+      pullDistanceRef.current = 0;
       setPullDistance(0);
       return;
     }
     const endTouch = e.changedTouches[0];
     const dy = (endTouch?.clientY ?? 0) - start.y;
     const dx = Math.abs((endTouch?.clientX ?? 0) - start.x);
-    if ((!scrollEl || scrollEl.scrollTop <= 5) && dy > 55 && dx < 80) {
-      void loadDetailAndTrack(slug, true);
+    finishDetailPull(dy, dx);
+  };
+
+  const onDetailTouchCancel = () => {
+    const hadPull = Boolean(touchPullRef.current) && pullDistanceRef.current >= 22;
+    touchPullRef.current = null;
+    if (hadPull) {
+      finishDetailPull(50, 0);
     } else {
+      pullDistanceRef.current = 0;
       setPullDistance(0);
     }
   };
@@ -2910,7 +2960,13 @@ function BusinessDetailModal({
           if (e.target === e.currentTarget) onClose();
         }}
       >
-        <div className="business-detail-sheet">
+        <div
+          className="business-detail-sheet"
+          onTouchStart={onDetailTouchStart}
+          onTouchMove={onDetailTouchMove}
+          onTouchEnd={onDetailTouchEnd}
+          onTouchCancel={onDetailTouchCancel}
+        >
           <div className="detail-top-nav">
             <button
               type="button"
@@ -2974,9 +3030,6 @@ function BusinessDetailModal({
           <div
             ref={detailScrollRef}
             className="detail-scroll-container"
-            onTouchStart={onDetailTouchStart}
-            onTouchMove={onDetailTouchMove}
-            onTouchEnd={onDetailTouchEnd}
           >
             {(pullDistance > 16 || isRefreshing) && (
               <div className="detail-pull-refresh-banner" role="status" aria-live="polite">
@@ -3196,7 +3249,18 @@ function BusinessDetailModal({
                     <p className="header-location-line">{locationText}</p>
                   )}
 
-                  <div className="detail-views-badge" title="Total de visualizações da página">
+                  <button
+                    type="button"
+                    className="detail-views-badge"
+                    onClick={() => {
+                      if (!isRefreshing && !loading && slug) {
+                        void loadDetailAndTrack(slug, true);
+                      }
+                    }}
+                    disabled={isRefreshing || loading}
+                    title="Total de visualizações da página (toque para atualizar)"
+                    style={{ cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
                       <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
                       <circle cx="12" cy="12" r="3" />
@@ -3205,7 +3269,10 @@ function BusinessDetailModal({
                       {typeof detail.views_count === 'number' && detail.views_count > 0 ? detail.views_count : 1}{' '}
                       {(detail.views_count ?? 1) === 1 ? 'visualização' : 'visualizações'}
                     </span>
-                  </div>
+                    <span style={{ marginLeft: 4, fontSize: '.78rem', opacity: 0.85 }} aria-hidden="true">
+                      {isRefreshing ? '⏳' : '↻'}
+                    </span>
+                  </button>
                 </div>
 
                 {/* Ações de Contato Direto */}

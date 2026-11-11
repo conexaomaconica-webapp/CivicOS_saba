@@ -1,5 +1,8 @@
 import React from 'react';
 import type { Metadata } from 'next';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 import { appUrl } from '@/lib/seo/app-url';
 import Link from 'next/link';
 import { cookies, headers } from 'next/headers';

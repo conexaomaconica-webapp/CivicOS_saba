@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { isVisitOrigin } from '@/lib/analytics/visit-origin';
 import {
   normalizeAcquisitionSource,
@@ -20,7 +21,7 @@ const CYCLE_REGEX = /^[a-zA-Z0-9_-]{10,120}$/;
 
 function isAllowedOrigin(request: Request): boolean {
   const origin = request.headers.get('origin');
-  if (!origin) return true; // sendBeacon ou requisições mobile nativas sem Origin
+  if (!origin || origin === 'null') return true; // sendBeacon, mobile nativo ou WebView sem Origin HTTP
   try {
     const originUrl = new URL(origin);
     const host = request.headers.get('host');
@@ -216,11 +217,34 @@ export async function POST(request: Request) {
 
   // Telemetria nunca devolve erro detalhado ao navegador.
   const typedResult = result as { ok?: boolean; deduplicated?: boolean; skipped?: boolean };
+  let viewsCount: number | undefined;
+  if (normalizedType === 'view' && typedResult?.ok && !typedResult?.skipped) {
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (supabaseUrl && serviceRoleKey) {
+        const adminDb = createClient(supabaseUrl, serviceRoleKey, {
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+        });
+        const { count } = await (adminDb as any)
+          .from('analytics_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('business_id', businessId)
+          .eq('event_name', 'view');
+        if (typeof count === 'number') {
+          viewsCount = count;
+        }
+      }
+    } catch {
+      // Silencioso para nunca atrasar ou falhar a telemetria
+    }
+  }
   return NextResponse.json(
     {
       ok: Boolean(typedResult?.ok),
       ...(typedResult?.deduplicated ? { deduplicated: true } : {}),
       ...(typedResult?.skipped ? { skipped: true } : {}),
+      ...(typeof viewsCount === 'number' ? { viewsCount } : {}),
     },
     { status: 200, headers: corsHeaders }
   );

@@ -22,10 +22,10 @@ describe('mobile-analytics', () => {
     expect(cycle3).not.toBe(cycle1);
   });
 
-  it('envia evento com payload canônico e device=mobile_app', async () => {
+  it('envia evento com payload canônico e device=mobile_app e retorna viewsCount quando fornecido', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ ok: true }),
+      json: async () => ({ ok: true, viewsCount: 42 }),
     });
 
     const result = await trackMobileEvent(
@@ -39,6 +39,7 @@ describe('mobile-analytics', () => {
     );
 
     expect(result.ok).toBe(true);
+    expect(result.viewsCount).toBe(42);
     expect(mockFetch).toHaveBeenCalledTimes(1);
 
     const callArgs = mockFetch.mock.calls[0]!;

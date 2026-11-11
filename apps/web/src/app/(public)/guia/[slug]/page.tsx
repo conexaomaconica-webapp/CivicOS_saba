@@ -1,5 +1,8 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { BusinessProfileRenderer } from '@/components/public/business/BusinessProfileRenderer';
