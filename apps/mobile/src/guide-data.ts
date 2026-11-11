@@ -231,7 +231,7 @@ async function loadFromDirectSupabase(
     'Content-Type': 'application/json',
   };
 
-  const bffUrl = new URL('https://conexaomaconica.com.br/api/mobile/guide');
+  const bffUrl = new URL('https://www.conexaomaconica.com.br/api/mobile/guide');
   if (cityParam) bffUrl.searchParams.set('city', cityParam);
   if (queryParam) bffUrl.searchParams.set('q', queryParam);
   if (categoryParam) bffUrl.searchParams.set('category', categoryParam);
@@ -552,7 +552,7 @@ export async function loadBusinessDetailFromDirectSupabase(
   const host = 'localhost:3000';
 
   try {
-    const bffDetailUrl = `https://conexaomaconica.com.br/api/mobile/guide?slug=${encodeURIComponent(slug)}${bustCache ? `&_t=${Date.now()}` : ''}`;
+    const bffDetailUrl = `https://www.conexaomaconica.com.br/api/mobile/guide?slug=${encodeURIComponent(slug)}${bustCache ? `&_t=${Date.now()}` : ''}`;
     const [res, bffRes, recsRes] = await Promise.all([
       fetchImpl(`${supabaseUrl}/rest/v1/rpc/public_business_detail`, {
         method: 'POST',
@@ -934,7 +934,7 @@ export async function loadEventsFromDirectSupabase(
   fetchImpl: typeof fetch,
 ): Promise<MobileEventItem[]> {
   try {
-    const bffUrl = `https://conexaomaconica.com.br/api/mobile/events?_t=${Date.now()}`;
+    const bffUrl = `https://www.conexaomaconica.com.br/api/mobile/events?_t=${Date.now()}`;
     const res = await fetchWithTimeout(
       fetchImpl,
       bffUrl,
@@ -966,7 +966,7 @@ export async function submitMobileEventRSVP(
   try {
     const res = await fetchWithTimeout(
       fetchImpl,
-      'https://conexaomaconica.com.br/api/mobile/events/rsvp',
+      'https://www.conexaomaconica.com.br/api/mobile/events/rsvp',
       {
         method: 'POST',
         headers: {
@@ -1056,7 +1056,7 @@ export function createMobileGuideService(
       const cleanSlugs = Array.from(new Set(slugs.map((s) => s.trim()).filter(Boolean)));
       if (cleanSlugs.length === 0) return [];
       try {
-        const bffUrl = `https://conexaomaconica.com.br/api/mobile/guide?slugs=${encodeURIComponent(cleanSlugs.join(','))}&_t=${Date.now()}`;
+        const bffUrl = `https://www.conexaomaconica.com.br/api/mobile/guide?slugs=${encodeURIComponent(cleanSlugs.join(','))}&_t=${Date.now()}`;
         const res = await fetchWithTimeout(
           fetchImpl,
           bffUrl,

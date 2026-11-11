@@ -57,7 +57,7 @@ function resolveAnalyticsEndpoint(): string {
   if (customUrl) {
     return `${customUrl.replace(/\/+$/, '')}/api/analytics/track`;
   }
-  return 'https://conexaomaconica.com.br/api/analytics/track';
+  return 'https://www.conexaomaconica.com.br/api/analytics/track';
 }
 
 /**
@@ -80,6 +80,8 @@ export async function trackMobileEvent(
     businessId: options.businessId,
     eventType: options.eventType,
     source: options.source || 'app_mobile',
+    discoverySource: 'direct_link',
+    acquisitionSource: 'direct',
     cycleId,
     city: options.city || undefined,
     state: options.state || undefined,

@@ -67,7 +67,7 @@ export type MobileRegisterPayload = {
   acceptedPrivacy: boolean;
 };
 
-const API_BASE = 'https://conexaomaconica.com.br/api/mobile/member';
+const API_BASE = 'https://www.conexaomaconica.com.br/api/mobile/member';
 export const MOBILE_SESSION_STORAGE_KEY = 'cm_mobile_auth_session';
 export const MOBILE_USER_STORAGE_KEY = 'cm_mobile_member_user';
 

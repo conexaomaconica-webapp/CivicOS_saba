@@ -46,7 +46,7 @@ describe('mobile-analytics', () => {
     const url = callArgs[0] as string;
     const init = callArgs[1] as RequestInit;
 
-    expect(url).toContain('/api/analytics/track');
+    expect(url).toBe('https://www.conexaomaconica.com.br/api/analytics/track');
     expect(init.method).toBe('POST');
 
     const body = JSON.parse(init.body as string);

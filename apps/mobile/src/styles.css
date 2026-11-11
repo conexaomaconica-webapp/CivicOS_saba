@@ -637,6 +637,7 @@ button, input { font: inherit; }
 .detail-scroll-container {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 40px;
