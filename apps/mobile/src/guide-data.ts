@@ -268,7 +268,14 @@ async function loadFromDirectSupabase(
     fetchWithTimeout(
       fetchImpl,
       bffUrl.toString(),
-      { headers: { Accept: 'application/json' }, cache: 'no-store' },
+      {
+        headers: {
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+        cache: 'no-store',
+      },
       8000,
     ).catch(() => null),
   ]);
@@ -531,7 +538,14 @@ export async function loadBusinessDetailFromDirectSupabase(
       fetchWithTimeout(
         fetchImpl,
         bffDetailUrl,
-        { headers: { Accept: 'application/json' }, cache: 'no-store' },
+        {
+          headers: {
+            Accept: 'application/json',
+            'Cache-Control': 'no-cache',
+            Pragma: 'no-cache',
+          },
+          cache: 'no-store',
+        },
         8000,
       ).catch(() => null),
       fetchWithTimeout(

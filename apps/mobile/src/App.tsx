@@ -1,3 +1,5 @@
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { Button } from '@saas/ui';
 import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type ReactNode, type TouchEvent } from 'react';
 import 'leaflet/dist/leaflet.css';
@@ -250,6 +252,49 @@ function useOnlineStatus() {
     return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); };
   }, []);
   return online;
+}
+
+/**
+ * Executa revalidação silenciosa ao retornar o aplicativo para o primeiro plano (WebView Android/iOS ou aba visível),
+ * com janela de deduplicação para evitar disparos duplicados entre visibilitychange e appStateChange.
+ */
+function useForegroundResume(onResume: () => void, enabled = true) {
+  const callbackRef = useRef(onResume);
+  callbackRef.current = onResume;
+
+  useEffect(() => {
+    if (!enabled) return;
+    let lastTriggerAt = 0;
+    const trigger = () => {
+      const now = Date.now();
+      if (now - lastTriggerAt < 1500) return;
+      lastTriggerAt = now;
+      callbackRef.current();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') trigger();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    let handle: { remove: () => Promise<void> } | null = null;
+    if (Capacitor.isNativePlatform()) {
+      void CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) trigger();
+      })
+        .then((listener) => {
+          handle = listener;
+        })
+        .catch(() => {});
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (handle) {
+        void handle.remove().catch(() => {});
+      }
+    };
+  }, [enabled]);
 }
 
 function normalizePlanCode(raw?: string | null): 'acacia' | 'compasso' | 'esquadro' {
@@ -2693,7 +2738,7 @@ function BusinessDetailModal({
   const [detail, setDetail] = useState<MobileBusinessDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [pullDistance, setPullDistance] = useState(0);
+  const [pullState, setPullState] = useState<'idle' | 'pulling' | 'ready'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [isAnuncioOpen, setIsAnuncioOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'sobre' | 'selos' | 'servicos' | 'fotos' | 'beneficio' | 'comentarios' | 'localizacao'>(
@@ -2802,7 +2847,7 @@ function BusinessDetailModal({
         setLoading(false);
         setIsRefreshing(false);
         pullDistanceRef.current = 0;
-        setPullDistance(0);
+        setPullState('idle');
       }
     }
   };
@@ -2819,7 +2864,7 @@ function BusinessDetailModal({
       setIsAnuncioOpen(false);
       setIsRefreshing(false);
       pullDistanceRef.current = 0;
-      setPullDistance(0);
+      setPullState('idle');
       setActiveTab('sobre');
       setActivePhotoIndex(null);
       setZoomedSeal(null);
@@ -2832,9 +2877,36 @@ function BusinessDetailModal({
     };
   }, [slug]);
 
+  // Revalidação passiva (somente leitura) quando o usuário retorna ao app com a empresa aberta
+  const refreshDetailCountsOnly = async (targetSlug: string) => {
+    try {
+      const fresh = await guideServiceRef.current.loadBusinessDetail(targetSlug);
+      if (!fresh || slug !== targetSlug) return;
+      setDetail((prev) => {
+        if (!prev || prev.business_slug !== fresh.business_slug) return prev;
+        const freshViews = typeof fresh.views_count === 'number' ? fresh.views_count : prev.views_count;
+        return {
+          ...prev,
+          views_count: typeof freshViews === 'number' ? Math.max(freshViews, prev.views_count ?? 0) : prev.views_count,
+        };
+      });
+      if (fresh.business_id && typeof fresh.views_count === 'number') {
+        onBusinessViewsUpdated?.(fresh.business_id, fresh.views_count);
+      }
+    } catch {
+      // Silencioso ao voltar para o app
+    }
+  };
+
+  useForegroundResume(() => {
+    if (slug && !loading && !isRefreshing) {
+      void refreshDetailCountsOnly(slug);
+    }
+  }, Boolean(slug));
+
   const onDetailTouchStart = (e: TouchEvent<HTMLDivElement>) => {
     const scrollEl = detailScrollRef.current;
-    if (!scrollEl || scrollEl.scrollTop <= 5) {
+    if (!scrollEl || scrollEl.scrollTop <= 8) {
       touchPullRef.current = {
         x: e.touches[0]?.clientX ?? 0,
         y: e.touches[0]?.clientY ?? 0,
@@ -2847,27 +2919,27 @@ function BusinessDetailModal({
   const onDetailTouchMove = (e: TouchEvent<HTMLDivElement>) => {
     const start = touchPullRef.current;
     const scrollEl = detailScrollRef.current;
-    if (!start || isRefreshing || loading || (scrollEl && scrollEl.scrollTop > 5)) return;
+    if (!start || isRefreshing || loading || (scrollEl && scrollEl.scrollTop > 8)) return;
     const dy = (e.touches[0]?.clientY ?? 0) - start.y;
     const dx = Math.abs((e.touches[0]?.clientX ?? 0) - start.x);
-    if (dy > 10 && dy > dx) {
-      const dist = Math.min(72, Math.round(dy * 0.48));
-      pullDistanceRef.current = dist;
-      setPullDistance(dist);
-    } else if (dy <= 0) {
+    if (dy > 14 && dy > dx * 1.1) {
+      pullDistanceRef.current = dy;
+      const nextState = dy >= 34 ? 'ready' : 'pulling';
+      setPullState((prev) => (prev === nextState ? prev : nextState));
+    } else if (dy <= 4 && pullDistanceRef.current > 0) {
       pullDistanceRef.current = 0;
-      setPullDistance(0);
+      setPullState((prev) => (prev === 'idle' ? prev : 'idle'));
     }
   };
 
   const finishDetailPull = (dy: number, dx: number) => {
     const scrollEl = detailScrollRef.current;
-    const pulledEnough = pullDistanceRef.current >= 22 || (dy > 45 && dx < 90);
+    const maxDy = Math.max(dy, pullDistanceRef.current);
+    const pulledEnough = maxDy >= 34 && dx < 100;
     pullDistanceRef.current = 0;
-    if (!isRefreshing && !loading && slug && (!scrollEl || scrollEl.scrollTop <= 5) && pulledEnough) {
+    setPullState('idle');
+    if (!isRefreshing && !loading && slug && (!scrollEl || scrollEl.scrollTop <= 8) && pulledEnough) {
       void loadDetailAndTrack(slug, true);
-    } else {
-      setPullDistance(0);
     }
   };
 
@@ -2876,7 +2948,7 @@ function BusinessDetailModal({
     touchPullRef.current = null;
     if (!start) {
       pullDistanceRef.current = 0;
-      setPullDistance(0);
+      setPullState('idle');
       return;
     }
     const endTouch = e.changedTouches[0];
@@ -2886,13 +2958,13 @@ function BusinessDetailModal({
   };
 
   const onDetailTouchCancel = () => {
-    const hadPull = Boolean(touchPullRef.current) && pullDistanceRef.current >= 22;
+    const hadPull = Boolean(touchPullRef.current) && pullDistanceRef.current >= 34;
     touchPullRef.current = null;
     if (hadPull) {
       finishDetailPull(50, 0);
     } else {
       pullDistanceRef.current = 0;
-      setPullDistance(0);
+      setPullState('idle');
     }
   };
 
@@ -3027,24 +3099,25 @@ function BusinessDetailModal({
             )}
           </div>
 
+          {(pullState !== 'idle' || isRefreshing) && (
+            <div className="detail-pull-refresh-banner" role="status" aria-live="polite">
+              {isRefreshing ? (
+                <>
+                  <span className="detail-pull-spinner" aria-hidden="true" />
+                  <span>Atualizando empresa...</span>
+                </>
+              ) : (
+                <span>
+                  {pullState === 'ready' ? '↓ Solte para atualizar a empresa' : '↓ Puxe para atualizar'}
+                </span>
+              )}
+            </div>
+          )}
+
           <div
             ref={detailScrollRef}
             className="detail-scroll-container"
           >
-            {(pullDistance > 16 || isRefreshing) && (
-              <div className="detail-pull-refresh-banner" role="status" aria-live="polite">
-                {isRefreshing ? (
-                  <>
-                    <span className="detail-pull-spinner" aria-hidden="true" />
-                    <span>Atualizando empresa...</span>
-                  </>
-                ) : (
-                  <span>
-                    {pullDistance >= 25 ? '↓ Solte para atualizar a empresa' : '↓ Puxe para atualizar'}
-                  </span>
-                )}
-              </div>
-            )}
             {loading && (
               <div style={{ padding: 48, textAlign: 'center', color: '#7a6e67' }}>
                 <span className="pull-refresh-spinner" style={{ margin: '0 auto 16px' }} />
@@ -3249,18 +3322,7 @@ function BusinessDetailModal({
                     <p className="header-location-line">{locationText}</p>
                   )}
 
-                  <button
-                    type="button"
-                    className="detail-views-badge"
-                    onClick={() => {
-                      if (!isRefreshing && !loading && slug) {
-                        void loadDetailAndTrack(slug, true);
-                      }
-                    }}
-                    disabled={isRefreshing || loading}
-                    title="Total de visualizações da página (toque para atualizar)"
-                    style={{ cursor: 'pointer', fontFamily: 'inherit' }}
-                  >
+                  <div className="detail-views-badge" title="Total de visualizações da página">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
                       <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
                       <circle cx="12" cy="12" r="3" />
@@ -3269,10 +3331,7 @@ function BusinessDetailModal({
                       {typeof detail.views_count === 'number' && detail.views_count > 0 ? detail.views_count : 1}{' '}
                       {(detail.views_count ?? 1) === 1 ? 'visualização' : 'visualizações'}
                     </span>
-                    <span style={{ marginLeft: 4, fontSize: '.78rem', opacity: 0.85 }} aria-hidden="true">
-                      {isRefreshing ? '⏳' : '↻'}
-                    </span>
-                  </button>
+                  </div>
                 </div>
 
                 {/* Ações de Contato Direto */}
@@ -4218,9 +4277,15 @@ function BeneficiosScreen({
     fetchBenefitBusinesses(search, city, selectedCategory);
   }, [search, city, selectedCategory]);
 
+  useForegroundResume(() => {
+    fetchBenefitBusinesses(search, city, selectedCategory, false);
+  });
+
   const rawList = guideData?.businesses ?? [];
   const sorted = sortBusinessesByTier(rawList).map((b) =>
-    viewsOverrides?.[b.id] !== undefined ? { ...b, views_count: viewsOverrides[b.id] } : b
+    viewsOverrides?.[b.id] !== undefined
+      ? { ...b, views_count: Math.max(viewsOverrides[b.id]!, b.views_count ?? 0) }
+      : b
   );
   const displayedBusinesses = onlyFavorites
     ? sorted.filter((b) => isFavorite?.(b.slug))
@@ -7201,9 +7266,15 @@ function EmpresasScreen({
     fetchBusinesses(search, city, selectedCategory);
   }, [search, city, selectedCategory]);
 
+  useForegroundResume(() => {
+    fetchBusinesses(search, city, selectedCategory, false);
+  });
+
   const businesses = guideData?.businesses ?? [];
   const sorted = sortBusinessesByTier(businesses).map((b) =>
-    viewsOverrides?.[b.id] !== undefined ? { ...b, views_count: viewsOverrides[b.id] } : b
+    viewsOverrides?.[b.id] !== undefined
+      ? { ...b, views_count: Math.max(viewsOverrides[b.id]!, b.views_count ?? 0) }
+      : b
   );
   const displayedBusinesses = onlyFavorites
     ? sorted.filter((b) => isFavorite?.(b.slug))
@@ -8014,15 +8085,12 @@ function Home({
   };
 
   useEffect(() => {
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') reload(false);
-    };
     reload(false);
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-    };
   }, [city, selectedCategory]);
+
+  useForegroundResume(() => {
+    reload(false);
+  });
 
   const onTouchStart = (event: TouchEvent<HTMLDivElement>) => {
     if (window.scrollY <= 5) {
@@ -8263,7 +8331,9 @@ function Home({
     ),
     all_businesses: guideData ? (() => {
       const sorted = sortBusinessesByTier(guideData.businesses).map((b) =>
-        viewsOverrides?.[b.id] !== undefined ? { ...b, views_count: viewsOverrides[b.id] } : b
+        viewsOverrides?.[b.id] !== undefined
+          ? { ...b, views_count: Math.max(viewsOverrides[b.id]!, b.views_count ?? 0) }
+          : b
       );
       return (
         <section className="guide-section" aria-labelledby="all-businesses-title">
