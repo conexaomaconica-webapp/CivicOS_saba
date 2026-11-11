@@ -19,6 +19,7 @@ import {
   type MobileGuideBanner,
   type MobileGuideHomeData,
   type MobileGuideSponsoredBusiness,
+  type MobileInstitutionalRecognition,
   type MobileLodgeCardData,
   type MobileLodgeDetail,
 } from './guide-data';
@@ -269,13 +270,142 @@ function getPlanDisplayName(plan: 'acacia' | 'compasso' | 'esquadro'): string {
   }
 }
 
+function getCustomLogoBackground(bg?: string | null): string | undefined {
+  const customBg = bg?.trim();
+  if (!customBg) return undefined;
+  const lower = customBg.toLowerCase();
+  if (lower === '#ffffff' || lower === '#fff' || lower === 'white' || lower === 'rgb(255, 255, 255)') {
+    return undefined;
+  }
+  return customBg;
+}
+
+function sanitizeRichTextHtml(html: string): string {
+  if (!html) return '';
+  let clean = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  clean = clean.replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
+  clean = clean.replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '');
+  clean = clean.replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '');
+  clean = clean.replace(/<applet\b[^<]*(?:(?!<\/applet>)<[^<]*)*<\/applet>/gi, '');
+  clean = clean.replace(/\son\w+\s*=\s*(['"]).*?\1/gi, '');
+  clean = clean.replace(/\son\w+\s*=\s*[^>\s]+/gi, '');
+  clean = clean.replace(/href\s*=\s*(['"])\s*javascript:[^'"]*\1/gi, '');
+  clean = clean.replace(/\s+data-(?:spread|pm-slice)\s*=\s*(['"]).*?\1/gi, '');
+  clean = clean.replace(/style\s*=\s*(['"])(.*?)\1/gi, (_match, quote, styleContent) => {
+    const alignMatch = String(styleContent).match(/text-align\s*:\s*(left|center|right|justify)/i);
+    if (alignMatch?.[1]) {
+      return `style=${quote}text-align: ${alignMatch[1].toLowerCase()};${quote}`;
+    }
+    return '';
+  });
+  return clean;
+}
+
+function formatPlainTopicsToHtml(text: string): string {
+  if (!text) return '';
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  const lines = text.split('\n');
+  let inList = false;
+  let html = '';
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const bulletMatch = trimmed.match(/^[-*•]\s+(.*)$/);
+    if (bulletMatch && bulletMatch[1] !== undefined) {
+      if (!inList) {
+        html += '<ul>';
+        inList = true;
+      }
+      html += `<li>${escapeHtml(bulletMatch[1])}</li>`;
+    } else {
+      if (inList) {
+        html += '</ul>';
+        inList = false;
+      }
+      if (trimmed) {
+        html += `<p>${escapeHtml(trimmed)}</p>`;
+      }
+    }
+  }
+  if (inList) html += '</ul>';
+  return html || `<p>${escapeHtml(text)}</p>`;
+}
+
+function MobileFormattedText({
+  content,
+  className = '',
+}: {
+  content?: string | null;
+  className?: string;
+}) {
+  if (!content || !content.trim()) return null;
+  const raw = content.trim();
+  const isHtml = /<[a-z][\s\S]*>/i.test(raw);
+  const processedHtml = isHtml ? sanitizeRichTextHtml(raw) : formatPlainTopicsToHtml(raw);
+  return (
+    <div
+      className={`mobile-formatted-text ${className}`}
+      dangerouslySetInnerHTML={{ __html: processedHtml }}
+    />
+  );
+}
+
 const PLAN_HORIZONTAL_SEALS: Record<'acacia' | 'compasso' | 'esquadro', string> = {
+  acacia: 'https://rwvztwsjcjljphqttiws.supabase.co/storage/v1/object/public/business-assets/recognitions/seal-selo_ouro-horizontal-1793987260534.webp',
+  compasso: 'https://rwvztwsjcjljphqttiws.supabase.co/storage/v1/object/public/business-assets/recognitions/seal-selo_prata-horizontal-1793987384874.webp',
+  esquadro: 'https://rwvztwsjcjljphqttiws.supabase.co/storage/v1/object/public/business-assets/recognitions/seal-selo_bronze-horizontal-1793987326510.webp',
+};
+
+const PLAN_HORIZONTAL_FALLBACKS: Record<'acacia' | 'compasso' | 'esquadro', string> = {
+  acacia: './selos/plano-ouro.svg',
+  compasso: './selos/plano-prata.svg',
+  esquadro: './selos/plano-bronze.svg',
+};
+
+const PLAN_FULL_SEALS: Record<'acacia' | 'compasso' | 'esquadro', string> = {
+  acacia: 'https://rwvztwsjcjljphqttiws.supabase.co/storage/v1/object/public/business-assets/recognitions/seal-selo_ouro-seal-1790036030874.png',
+  compasso: 'https://rwvztwsjcjljphqttiws.supabase.co/storage/v1/object/public/business-assets/recognitions/seal-selo_prata-seal-1790169619900.webp',
+  esquadro: 'https://rwvztwsjcjljphqttiws.supabase.co/storage/v1/object/public/business-assets/recognitions/seal-selo_bronze-seal-1790169675772.webp',
+};
+
+const PLAN_FULL_FALLBACKS: Record<'acacia' | 'compasso' | 'esquadro', string> = {
   acacia: './selos/plano-acacia.webp',
   compasso: './selos/plano-compasso.webp',
   esquadro: './selos/plano-esquadro.webp',
 };
 
-const PEDRA_FUNDAMENTAL_SEAL = './selos/selo-pedrafundamental.webp';
+const PEDRA_FUNDAMENTAL_HORIZONTAL_SEAL =
+  'https://rwvztwsjcjljphqttiws.supabase.co/storage/v1/object/public/business-assets/recognitions/seal-pedra_fundamental-horizontal-1793987225095.webp';
+const PEDRA_FUNDAMENTAL_HORIZONTAL_FALLBACK = './selos/pedra-fundamental.svg';
+
+const PEDRA_FUNDAMENTAL_SEAL =
+  'https://rwvztwsjcjljphqttiws.supabase.co/storage/v1/object/public/business-assets/recognitions/seal-pedra_fundamental-seal-1790036016665.png';
+const PEDRA_FUNDAMENTAL_FULL_FALLBACK = './selos/selo-pedrafundamental.webp';
+
+type MobileSealDialogInfo = {
+  badgeLabel: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  fallbackUrl?: string;
+};
+
+function resolveRecognitionEntry(
+  recognitions: MobileInstitutionalRecognition[] | undefined,
+  key: 'pedra_fundamental' | 'selo_ouro' | 'selo_prata' | 'selo_bronze',
+): MobileInstitutionalRecognition | undefined {
+  return recognitions?.find((r) => r.key === key && r.is_active !== false);
+}
+
+function getPlanCatalogKey(plan: 'acacia' | 'compasso' | 'esquadro'): 'selo_ouro' | 'selo_prata' | 'selo_bronze' {
+  if (plan === 'acacia') return 'selo_ouro';
+  if (plan === 'compasso') return 'selo_prata';
+  return 'selo_bronze';
+}
 
 function PlanSealBadge({
   plan,
@@ -286,6 +416,7 @@ function PlanSealBadge({
 }) {
   const [imgError, setImgError] = useState(false);
   const sealSrc = PLAN_HORIZONTAL_SEALS[plan];
+  const fallbackSrc = PLAN_HORIZONTAL_FALLBACKS[plan];
   const name = getPlanDisplayName(plan);
 
   if (!imgError && sealSrc) {
@@ -295,7 +426,15 @@ function PlanSealBadge({
         alt={`Plano ${name}`}
         className={large ? 'plan-seal-img-lg' : 'plan-seal-img'}
         loading="lazy"
-        onError={() => setImgError(true)}
+        onError={(e) => {
+          const img = e.currentTarget;
+          if (fallbackSrc && img.getAttribute('data-fb') !== '1') {
+            img.setAttribute('data-fb', '1');
+            img.src = fallbackSrc;
+          } else {
+            setImgError(true);
+          }
+        }}
       />
     );
   }
@@ -901,117 +1040,6 @@ function ReferBusinessModal({
     </div>
   );
 }
-
-const DEFAULT_BUSINESSES: MobileGuideSponsoredBusiness[] = [
-  {
-    id: 'biz-1',
-    name: 'Óptica e Relojoaria Aliança',
-    slug: 'optica-alianca',
-    city: 'Feira de Santana',
-    state: 'BA',
-    latitude: -12.2572,
-    longitude: -38.9605,
-    address: 'Av. Getúlio Vargas, 1020 - Centro',
-    category_name: 'Óticas e Relojoarias',
-    category_slug: 'oticas-e-relojoarias',
-    plan_tier: 'acacia',
-    is_featured: true,
-    is_pedra_fundamental: true,
-    logo_url: null,
-    cover_url: null,
-    description: 'Armações nacionais e importadas, lentes de alta tecnologia e atendimento exclusivo para a família maçônica.',
-  },
-  {
-    id: 'biz-2',
-    name: 'Oficina & Centro Automotivo Fraternidade',
-    slug: 'oficina-fraternidade',
-    city: 'Feira de Santana',
-    state: 'BA',
-    latitude: -12.2635,
-    longitude: -38.9542,
-    address: 'Av. Presidente Dutra, 450 - Capuchinhos',
-    category_name: 'Automotivo & Manutenção',
-    category_slug: 'automotivo-e-manutencao',
-    plan_tier: 'compasso',
-    is_featured: true,
-    is_pedra_fundamental: true,
-    logo_url: null,
-    cover_url: null,
-    description: 'Mecânica geral, suspensão, injeção eletrônica e alinhamento 3D com transparência e laudos detalhados.',
-  },
-  {
-    id: 'biz-3',
-    name: 'Construtora & Engenharia Acácia',
-    slug: 'construtora-acacia',
-    city: 'Feira de Santana',
-    state: 'BA',
-    latitude: -12.2514,
-    longitude: -38.9648,
-    address: 'Rua São Domingos, 310 - Santa Mônica',
-    category_name: 'Construção & Reformas',
-    category_slug: 'construcao-e-reformas',
-    plan_tier: 'acacia',
-    is_featured: true,
-    is_pedra_fundamental: false,
-    logo_url: null,
-    cover_url: null,
-    description: 'Obras civis, reformas corporativas e laudos técnicos de engenharia civil com pontualidade e rigor.',
-  },
-  {
-    id: 'biz-4',
-    name: 'Restaurante & Parrilla O Esquadro',
-    slug: 'restaurante-o-esquadro',
-    city: 'Salvador',
-    state: 'BA',
-    latitude: -12.9777,
-    longitude: -38.5016,
-    address: 'Rua das Acácias, 88 - Pituba, Salvador',
-    category_name: 'Alimentos & Bebidas',
-    category_slug: 'alimentos-e-bebidas',
-    plan_tier: 'esquadro',
-    is_featured: false,
-    is_pedra_fundamental: false,
-    logo_url: null,
-    cover_url: null,
-    description: 'Gastronomia de primeira qualidade, cortes nobres na brasa e ambiente acolhedor para a família.',
-  },
-  {
-    id: 'biz-5',
-    name: 'Clínica Médica e Diagnóstico Harmonia',
-    slug: 'clinica-harmonia',
-    city: 'Feira de Santana',
-    state: 'BA',
-    latitude: -12.2591,
-    longitude: -38.9682,
-    address: 'Av. Maria Quitéria, 1500 - Kalilândia',
-    category_name: 'Saúde & Psicologia',
-    category_slug: 'saude-e-psicologia',
-    plan_tier: 'compasso',
-    is_featured: true,
-    is_pedra_fundamental: true,
-    logo_url: null,
-    cover_url: null,
-    description: 'Consultas multidisciplinares, exames preventivos e telemedicina com médicos renomados e idôneos.',
-  },
-  {
-    id: 'biz-6',
-    name: 'Advocacia & Consultoria Jurídica Hiram',
-    slug: 'advocacia-hiram',
-    city: 'Salvador',
-    state: 'BA',
-    latitude: -12.9850,
-    longitude: -38.5120,
-    address: 'Av. Tancredo Neves, 620 - Caminho das Árvores, Salvador',
-    category_name: 'Direito & Advocacia',
-    category_slug: 'direito-e-advocacia',
-    plan_tier: 'acacia',
-    is_featured: true,
-    is_pedra_fundamental: true,
-    logo_url: null,
-    cover_url: null,
-    description: 'Assessoria em direito empresarial, sucessório e contratual com máxima discrição e segurança jurídica.',
-  },
-];
 
 function MuralDeConexoesSection({
   onOpenShareExperience,
@@ -1951,31 +1979,40 @@ function BusinessCard({
       {/* 2. Transição da Capa para o Conteúdo: [ LOGO ] ... [ SELO PEDRA FUNDAMENTAL ] */}
       <div className="card-overlap-row">
         {/* Logo da Empresa */}
-        <div
-          className="card-logo-box"
-          style={business.logo_background_color ? { background: business.logo_background_color } : undefined}
-          onClick={(e) => {
-            if (business.logo_url) {
-              e.stopPropagation();
-              onZoomLogo?.(business.logo_url, business.name, business.logo_background_color);
-            }
-          }}
-          title="Toque para ampliar a logomarca"
-        >
-          {business.logo_url && !imgError ? (
-            <img
-              src={business.logo_url}
-              alt={business.name}
-              className="card-logo-img"
-              loading="lazy"
-              onError={() => setImgError(true)}
-            />
-          ) : (
-            <div className="card-logo-placeholder">
-              {business.name.charAt(0).toUpperCase()}
+        {(() => {
+          const customBg = getCustomLogoBackground(business.logo_background_color);
+          return (
+            <div
+              className="card-logo-box"
+              style={
+                customBg
+                  ? { backgroundColor: customBg, borderColor: customBg }
+                  : undefined
+              }
+              onClick={(e) => {
+                if (business.logo_url) {
+                  e.stopPropagation();
+                  onZoomLogo?.(business.logo_url, business.name, customBg ?? business.logo_background_color);
+                }
+              }}
+              title="Toque para ampliar a logomarca"
+            >
+              {business.logo_url && !imgError ? (
+                <img
+                  src={business.logo_url}
+                  alt={business.name}
+                  className="card-logo-img"
+                  loading="lazy"
+                  onError={() => setImgError(true)}
+                />
+              ) : (
+                <div className="card-logo-placeholder">
+                  {business.name.charAt(0).toUpperCase()}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          );
+        })()}
 
         {/* Selo Pedra Fundamental (Apenas se for Pedra Fundamental) */}
         {business.is_pedra_fundamental && (
@@ -2215,11 +2252,17 @@ function AnuncioModal({
           {/* Dados Rápidos da Empresa */}
           <div className="anuncio-business-info">
             {detail.logo_url ? (
-              <img
-                src={detail.logo_url}
-                alt={detail.business_name}
-                className="anuncio-logo-thumb"
-              />
+              (() => {
+                const customBg = getCustomLogoBackground(detail.logo_background_color);
+                return (
+                  <img
+                    src={detail.logo_url}
+                    alt={detail.business_name}
+                    className="anuncio-logo-thumb"
+                    style={customBg ? { backgroundColor: customBg, borderColor: customBg } : undefined}
+                  />
+                );
+              })()
             ) : (
               <div
                 className="anuncio-logo-thumb"
@@ -2653,6 +2696,8 @@ function BusinessDetailModal({
     initialTab || 'sobre'
   );
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
+  const [zoomedSeal, setZoomedSeal] = useState<MobileSealDialogInfo | null>(null);
+  const [zoomedPerson, setZoomedPerson] = useState<{ url: string; name: string; subtitle?: string | null } | null>(null);
 
   const guideServiceRef = useRef(createMobileGuideService());
 
@@ -2672,6 +2717,8 @@ function BusinessDetailModal({
       setIsAnuncioOpen(false);
       setActiveTab('sobre');
       setActivePhotoIndex(null);
+      setZoomedSeal(null);
+      setZoomedPerson(null);
       return;
     }
     setLoading(true);
@@ -2911,32 +2958,84 @@ function BusinessDetailModal({
                     <p className="detail-company-category">{detail.primary_category_name}</p>
                   )}
 
-                  {/* Linha de Selos Horizontais Oficiais no Cabeçalho (Pedra Fundamental e Plano na mesma altura e proporção, estáticos) */}
-                  <div className="detail-seals-header-row">
-                    {detail.is_pedra_fundamental && (
-                      <div
-                        className="header-horizontal-seal-badge"
-                        title="Condecoração Especial Pedra Fundamental"
-                      >
-                        <img
-                          src={PEDRA_FUNDAMENTAL_SEAL}
-                          alt="Pedra Fundamental"
-                          className="header-seal-img"
-                        />
-                      </div>
-                    )}
+                  {/* Linha de Selos Horizontais Oficiais no Cabeçalho (igual ao Web: clicáveis para ampliar) */}
+                  {(() => {
+                    const pedraCatalog = resolveRecognitionEntry(detail.recognitions, 'pedra_fundamental');
+                    const planCatalog = resolveRecognitionEntry(detail.recognitions, getPlanCatalogKey(plan));
+                    const pedraHorizontalUrl = pedraCatalog?.compact_seal_url || PEDRA_FUNDAMENTAL_HORIZONTAL_SEAL;
+                    const pedraFullUrl = pedraCatalog?.seal_url || PEDRA_FUNDAMENTAL_SEAL;
+                    const planHorizontalUrl = planCatalog?.compact_seal_url || PLAN_HORIZONTAL_SEALS[plan];
+                    const planFullUrl = planCatalog?.seal_url || PLAN_FULL_SEALS[plan];
+                    const pedraDesc =
+                      pedraCatalog?.description ||
+                      'Condecoração histórica destinada às empresas fundadoras da Conexão Maçônica.';
+                    const planTitle = planCatalog?.title || `Plano ${getPlanDisplayName(plan)}`;
+                    const planDesc =
+                      planCatalog?.description ||
+                      `Identificação comercial das empresas ativas no Plano ${getPlanDisplayName(plan)}.`;
 
-                    <div
-                      className="header-horizontal-seal-badge"
-                      title={`Plano ${getPlanDisplayName(plan)}`}
-                    >
-                      <img
-                        src={PLAN_HORIZONTAL_SEALS[plan]}
-                        alt={`Plano ${getPlanDisplayName(plan)}`}
-                        className="header-seal-img"
-                      />
-                    </div>
-                  </div>
+                    return (
+                      <div className="detail-seals-header-row">
+                        {detail.is_pedra_fundamental && (
+                          <button
+                            type="button"
+                            className="header-horizontal-seal-btn"
+                            title="Condecoração Especial Pedra Fundamental (Toque para ampliar)"
+                            onClick={() =>
+                              setZoomedSeal({
+                                badgeLabel: 'Condecoração Histórica',
+                                title: pedraCatalog?.title || 'Pedra Fundamental',
+                                description: pedraDesc,
+                                imageUrl: pedraFullUrl,
+                                fallbackUrl: PEDRA_FUNDAMENTAL_FULL_FALLBACK,
+                              })
+                            }
+                          >
+                            <img
+                              src={pedraHorizontalUrl}
+                              alt="Pedra Fundamental"
+                              className="header-seal-img"
+                              onError={(e) => {
+                                const img = e.currentTarget;
+                                if (img.getAttribute('data-fb') !== '1') {
+                                  img.setAttribute('data-fb', '1');
+                                  img.src = PEDRA_FUNDAMENTAL_HORIZONTAL_FALLBACK;
+                                }
+                              }}
+                            />
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          className="header-horizontal-seal-btn"
+                          title={`${planTitle} (Toque para ampliar)`}
+                          onClick={() =>
+                            setZoomedSeal({
+                              badgeLabel: 'Plano Comercial',
+                              title: planTitle,
+                              description: planDesc,
+                              imageUrl: planFullUrl,
+                              fallbackUrl: PLAN_FULL_FALLBACKS[plan],
+                            })
+                          }
+                        >
+                          <img
+                            src={planHorizontalUrl}
+                            alt={planTitle}
+                            className="header-seal-img"
+                            onError={(e) => {
+                              const img = e.currentTarget;
+                              if (img.getAttribute('data-fb') !== '1') {
+                                img.setAttribute('data-fb', '1');
+                                img.src = PLAN_HORIZONTAL_FALLBACKS[plan];
+                              }
+                            }}
+                          />
+                        </button>
+                      </div>
+                    );
+                  })()}
 
                   {/* Responsável + Loja Maçônica no Cabeçalho (igual ao web/mobile) */}
                   {(detail.responsible?.name || detail.lodge_name) && (
@@ -3287,62 +3386,167 @@ function BusinessDetailModal({
                 {/* 1. SOBRE A EMPRESA (Vem logo após os contatos e abas) */}
                 <div id="section-sobre" className="detail-section-block">
                   <h3 className="detail-section-title">Sobre a Empresa</h3>
-                  <p style={{ margin: 0, fontSize: '.86rem', color: '#524843', lineHeight: 1.6 }}>
-                    {detail.description || 'Empresa participante da rede Conexão Maçônica, comprometida com a ética, qualidade no atendimento e pontualidade em seus serviços.'}
-                  </p>
+                  <MobileFormattedText
+                    content={
+                      detail.description ||
+                      'Empresa participante da rede Conexão Maçônica, comprometida com a ética, qualidade no atendimento e pontualidade em seus serviços.'
+                    }
+                    className="detail-about-formatted"
+                  />
                 </div>
 
-                {/* 2. CARD COM OS SELOS OFICIAIS (Apenas Plano e Pedra Fundamental, sem títulos nem toque para explicar) */}
-                <div id="section-selos" className="detail-section-block">
-                  <h3 className="detail-section-title">Selos & Reconhecimentos</h3>
-                  <div className="seals-catalog-card">
-                    <div className="seals-grid-clean">
-                      {/* Selo Pedra Fundamental (se for) */}
-                      {detail.is_pedra_fundamental && (
-                        <div
-                          className="seal-clean-card"
-                          title="Pedra Fundamental"
-                        >
-                          <img
-                            src={PEDRA_FUNDAMENTAL_SEAL}
-                            alt="Pedra Fundamental"
-                            className="seal-clean-img"
-                          />
-                        </div>
-                      )}
+                {/* 2. CARD COM OS SELOS OFICIAIS (Grandes e Clicáveis para Ampliar, igual ao Web) */}
+                {(() => {
+                  const pedraCatalog = resolveRecognitionEntry(detail.recognitions, 'pedra_fundamental');
+                  const planCatalog = resolveRecognitionEntry(detail.recognitions, getPlanCatalogKey(plan));
+                  const pedraSealUrl = pedraCatalog?.seal_url || PEDRA_FUNDAMENTAL_SEAL;
+                  const planSealUrl = planCatalog?.seal_url || PLAN_FULL_SEALS[plan];
+                  const pedraTitle = pedraCatalog?.title || 'Pedra Fundamental';
+                  const pedraDesc =
+                    pedraCatalog?.description ||
+                    'Reconhecimento para as empresas que participam do início do projeto. Identificação e reconhecimento especial dentro da plataforma.';
+                  const planTitle = planCatalog?.title || `Plano ${getPlanDisplayName(plan)}`;
+                  const planDesc =
+                    planCatalog?.description ||
+                    `Identificação comercial das empresas ativas no Plano ${getPlanDisplayName(plan)}.`;
 
-                      {/* Selo do Plano */}
-                      <div
-                        className="seal-clean-card"
-                        title={`Plano ${getPlanDisplayName(plan)}`}
-                      >
-                        <img
-                          src={PLAN_HORIZONTAL_SEALS[plan]}
-                          alt={getPlanDisplayName(plan)}
-                          className="seal-clean-img"
-                        />
+                  return (
+                    <div id="section-selos" className="detail-section-block">
+                      <h3 className="detail-section-title">Selos & Reconhecimentos</h3>
+                      <div className="seals-catalog-card">
+                        <div className="seals-grid-clean">
+                          {/* Selo Pedra Fundamental (se for) */}
+                          {detail.is_pedra_fundamental && (
+                            <button
+                              type="button"
+                              className="seal-clean-card-btn"
+                              title={`${pedraTitle} — Toque para ampliar`}
+                              onClick={() =>
+                                setZoomedSeal({
+                                  badgeLabel: 'Condecoração Histórica',
+                                  title: pedraTitle,
+                                  description: pedraDesc,
+                                  imageUrl: pedraSealUrl,
+                                  fallbackUrl: PEDRA_FUNDAMENTAL_FULL_FALLBACK,
+                                })
+                              }
+                            >
+                              <img
+                                src={pedraSealUrl}
+                                alt={pedraTitle}
+                                className="seal-clean-img"
+                                onError={(e) => {
+                                  const img = e.currentTarget;
+                                  if (img.getAttribute('data-fb') !== '1') {
+                                    img.setAttribute('data-fb', '1');
+                                    img.src = PEDRA_FUNDAMENTAL_FULL_FALLBACK;
+                                  }
+                                }}
+                              />
+                              <span className="seal-clean-caption">{pedraTitle}</span>
+                              <span className="seal-clean-zoom-hint">Toque para ampliar</span>
+                            </button>
+                          )}
+
+                          {/* Selo do Plano */}
+                          <button
+                            type="button"
+                            className="seal-clean-card-btn"
+                            title={`${planTitle} — Toque para ampliar`}
+                            onClick={() =>
+                              setZoomedSeal({
+                                badgeLabel: 'Plano Comercial',
+                                title: planTitle,
+                                description: planDesc,
+                                imageUrl: planSealUrl,
+                                fallbackUrl: PLAN_FULL_FALLBACKS[plan],
+                              })
+                            }
+                          >
+                            <img
+                              src={planSealUrl}
+                              alt={planTitle}
+                              className="seal-clean-img"
+                              onError={(e) => {
+                                const img = e.currentTarget;
+                                if (img.getAttribute('data-fb') !== '1') {
+                                  img.setAttribute('data-fb', '1');
+                                  img.src = PLAN_FULL_FALLBACKS[plan];
+                                }
+                              }}
+                            />
+                            <span className="seal-clean-caption">{planTitle}</span>
+                            <span className="seal-clean-zoom-hint">Toque para ampliar</span>
+                          </button>
+
+                          {/* Selo Empresa Verificada (se ativa) */}
+                          {detail.is_verified && (
+                            <button
+                              type="button"
+                              className="seal-clean-card-btn seal-clean-verified"
+                              title="Empresa Verificada — Toque para ampliar"
+                              onClick={() =>
+                                setZoomedSeal({
+                                  badgeLabel: 'Auditoria Institucional',
+                                  title: 'Empresa Verificada',
+                                  description:
+                                    'Identidade corporativa e vínculo fraterno auditados pela curadoria Conexão Maçônica.',
+                                  imageUrl: './selos/verificada.svg',
+                                })
+                              }
+                            >
+                              <img
+                                src="./selos/verificada.svg"
+                                alt="Empresa Verificada"
+                                className="seal-clean-img seal-clean-img-wide"
+                              />
+                              <span className="seal-clean-caption">Empresa Verificada</span>
+                              <span className="seal-clean-zoom-hint">Toque para ampliar</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
-                {/* 3. CARD DO RESPONSÁVEL (Título "Responsável", foto, título Ir./Cunhada/Sobrinho, loja e telefone) */}
+                {/* 3. CARD DO RESPONSÁVEL (Título "Responsável", foto ampliável ao clicar, título Ir./Cunhada/Sobrinho, loja e telefone) */}
                 {(detail.responsible || detail.lodge_name) && (
                   <div id="section-responsavel" className="detail-section-block">
                     <h3 className="detail-section-title">Responsável</h3>
                     <div className="responsible-card-enhanced">
                       <div className="responsible-header-flex">
-                        <div className="responsible-avatar-wrapper">
-                          {detail.responsible?.avatar_url ? (
+                        {detail.responsible?.avatar_url ? (
+                          <button
+                            type="button"
+                            className="responsible-avatar-wrapper responsible-avatar-clickable"
+                            title="Toque para ampliar a foto do responsável"
+                            aria-label="Ampliar foto do responsável"
+                            onClick={() =>
+                              setZoomedPerson({
+                                url: detail.responsible!.avatar_url!,
+                                name: `${detail.responsible?.community_label ? `${detail.responsible.community_label} ` : 'Ir∴ '}${detail.responsible?.name || 'Responsável'}`,
+                                subtitle: [
+                                  detail.responsible?.business_role,
+                                  detail.lodge_name ? `Loja: ${detail.lodge_name}` : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' • '),
+                              })
+                            }
+                          >
                             <img
                               src={detail.responsible.avatar_url}
                               alt={detail.responsible.name || 'Responsável'}
                               className="responsible-avatar-img"
                             />
-                          ) : (
+                            <span className="responsible-zoom-pill" aria-hidden="true">🔍</span>
+                          </button>
+                        ) : (
+                          <div className="responsible-avatar-wrapper">
                             <span>{detail.responsible?.name ? detail.responsible.name.charAt(0).toUpperCase() : '🏛️'}</span>
-                          )}
-                        </div>
+                          </div>
+                        )}
                         <div className="responsible-meta-box">
                           <h4 className="responsible-title-name">
                             {detail.responsible?.community_label ? `${detail.responsible.community_label} ` : 'Ir∴ '}
@@ -3384,44 +3588,54 @@ function BusinessDetailModal({
                   <div id="section-servicos" className="detail-section-block">
                     <h3 className="detail-section-title">Serviços & Soluções</h3>
                     <div className="services-grid-enhanced">
-                      {detail.services.map((svc) => (
-                        <div className="service-card-enhanced" key={svc.id || svc.title}>
-                          <div className="service-header-row">
-                            <h4 className="service-card-title">{svc.title}</h4>
-                            {svc.price !== undefined && svc.price > 0 ? (
-                              <span className="service-card-price">
-                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(svc.price)}
+                      {detail.services.map((svc, idx) => {
+                        const serviceTitle = svc.title || svc.name || `Serviço ${idx + 1}`;
+                        const priceLabel =
+                          svc.price !== undefined && svc.price > 0
+                            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(svc.price)
+                            : svc.price_info || 'Sob Consulta';
+                        return (
+                          <div className="service-card-enhanced" key={svc.id || `${serviceTitle}-${idx}`}>
+                            <div className="service-header-row">
+                              <h4 className="service-card-title">{serviceTitle}</h4>
+                              <span
+                                className="service-card-price"
+                                style={
+                                  svc.price !== undefined && svc.price > 0
+                                    ? undefined
+                                    : { background: '#f5f0e6', borderColor: '#e1d5c5', color: '#685950' }
+                                }
+                              >
+                                {priceLabel}
                               </span>
-                            ) : (
-                              <span className="service-card-price" style={{ background: '#f5f0e6', borderColor: '#e1d5c5', color: '#685950' }}>
-                                Sob Consulta
-                              </span>
+                            </div>
+                            {svc.description && (
+                              <MobileFormattedText content={svc.description} className="service-card-desc" />
+                            )}
+                            {waUrl && (
+                              <a
+                                href={`${waUrl}&text=${encodeURIComponent(`Olá! Gostaria de um orçamento para o serviço "${serviceTitle}".`)}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="service-quote-btn"
+                                onClick={() => {
+                                  if (detail.business_id) {
+                                    trackMobileEvent({
+                                      businessId: detail.business_id,
+                                      eventType: 'whatsapp',
+                                      city: detail.city,
+                                      state: detail.state,
+                                    });
+                                  }
+                                }}
+                              >
+                                <span>💬</span>
+                                <span>Solicitar Orçamento no WhatsApp</span>
+                              </a>
                             )}
                           </div>
-                          {svc.description && <p className="service-card-desc">{svc.description}</p>}
-                          {waUrl && (
-                            <a
-                              href={`${waUrl}&text=${encodeURIComponent(`Olá! Gostaria de um orçamento para o serviço "${svc.title}".`)}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="service-quote-btn"
-                              onClick={() => {
-                                if (detail.business_id) {
-                                  trackMobileEvent({
-                                    businessId: detail.business_id,
-                                    eventType: 'whatsapp',
-                                    city: detail.city,
-                                    state: detail.state,
-                                  });
-                                }
-                              }}
-                            >
-                              <span>💬</span>
-                              <span>Solicitar Orçamento no WhatsApp</span>
-                            </a>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -3655,6 +3869,89 @@ function BusinessDetailModal({
         onClose={() => setActivePhotoIndex(null)}
         onChangeIndex={(newIndex) => setActivePhotoIndex(newIndex)}
       />
+
+      {zoomedSeal && (
+        <div
+          className="seal-dialog-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={zoomedSeal.title}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setZoomedSeal(null);
+          }}
+        >
+          <div className="seal-dialog-card" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close-btn"
+              style={{ position: 'absolute', top: 12, right: 12 }}
+              onClick={() => setZoomedSeal(null)}
+              aria-label="Fechar visualização do selo"
+            >
+              ✕
+            </button>
+            <img
+              src={zoomedSeal.imageUrl}
+              alt={zoomedSeal.title}
+              className="seal-dialog-img"
+              onError={(e) => {
+                const img = e.currentTarget;
+                if (zoomedSeal.fallbackUrl && img.getAttribute('data-fb') !== '1') {
+                  img.setAttribute('data-fb', '1');
+                  img.src = zoomedSeal.fallbackUrl;
+                }
+              }}
+            />
+            <span className="seal-dialog-badge">{zoomedSeal.badgeLabel}</span>
+            <h4 className="seal-dialog-title">{zoomedSeal.title}</h4>
+            <p className="seal-dialog-desc">{zoomedSeal.description}</p>
+            <button
+              type="button"
+              className="seal-dialog-close"
+              onClick={() => setZoomedSeal(null)}
+            >
+              Fechar Visualização
+            </button>
+          </div>
+        </div>
+      )}
+
+      {zoomedPerson && (
+        <div
+          className="logo-zoom-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={zoomedPerson.name}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setZoomedPerson(null);
+          }}
+        >
+          <div className="logo-zoom-card owner-zoom-card" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close-btn"
+              style={{ position: 'absolute', top: 12, right: 12 }}
+              onClick={() => setZoomedPerson(null)}
+              aria-label="Fechar foto"
+            >
+              ✕
+            </button>
+            <img
+              src={zoomedPerson.url}
+              alt={zoomedPerson.name}
+              className="owner-zoom-img"
+            />
+            <h4 style={{ margin: '14px 0 4px', font: '750 1.08rem/1.25 Georgia, serif', color: '#4b161b', textAlign: 'center' }}>
+              {zoomedPerson.name}
+            </h4>
+            {zoomedPerson.subtitle && (
+              <span style={{ fontSize: '.78rem', color: '#8c671d', fontWeight: 700, textAlign: 'center' }}>
+                {zoomedPerson.subtitle}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -3706,18 +4003,26 @@ function BeneficiosScreen({
     setLoading(true);
     guideServiceRef.current
       .loadHome({ query: q, city: c, category: cat, hasBenefits: true })
-      .then(async (data) => {
-        if (data.businesses.length > 0) {
-          setGuideData(data);
-          onLoadedData?.(data);
-        } else {
-          const allData = await guideServiceRef.current.loadHome({ query: q, city: c, category: cat });
-          setGuideData(allData);
-          onLoadedData?.(allData);
-        }
+      .then((data) => {
+        setGuideData(data);
+        onLoadedData?.(data);
       })
       .catch(() => {
-        //Mantém fallback local se offline
+        setGuideData((prev) =>
+          prev ?? {
+            settings: {
+              hero_title: null,
+              hero_subtitle: null,
+              hero_search_placeholder: null,
+              sections_config: [],
+            },
+            banners: [],
+            categories: [],
+            sponsored: [],
+            businesses: [],
+            available_cities: [],
+          }
+        );
       })
       .finally(() => {
         setLoading(false);
@@ -3728,11 +4033,12 @@ function BeneficiosScreen({
     fetchBenefitBusinesses(search, city, selectedCategory);
   }, [search, city, selectedCategory]);
 
-  const rawList = guideData?.businesses?.length ? guideData.businesses : DEFAULT_BUSINESSES;
+  const rawList = guideData?.businesses ?? [];
   const sorted = sortBusinessesByTier(rawList);
   const displayedBusinesses = onlyFavorites
     ? sorted.filter((b) => isFavorite?.(b.slug))
     : sorted;
+  const hasActiveFilter = Boolean(search || city || selectedCategory || onlyFavorites);
 
   return (
     <div className="directory-screen">
@@ -3871,22 +4177,38 @@ function BeneficiosScreen({
         </div>
       )}
 
-      {!loading && displayedBusinesses.length === 0 ? (
+      {loading && displayedBusinesses.length === 0 ? (
         <div className="empty-results">
-          <b>Nenhum benefício encontrado para este filtro</b>
-          <p>Tente alterar o termo de busca ou limpar os filtros selecionados.</p>
-          <button
-            type="button"
-            className="action-button"
-            style={{ marginTop: 12 }}
-            onClick={() => {
-              onSelectCategory('');
-              onSelectCity('');
-              setOnlyFavorites(false);
-            }}
-          >
-            Ver todos os benefícios
-          </button>
+          <span className="pull-refresh-spinner" style={{ margin: '0 auto 12px' }} />
+          <b>Carregando benefícios...</b>
+          <p>Buscando empresas cadastradas com vantagens ativas.</p>
+        </div>
+      ) : !loading && displayedBusinesses.length === 0 ? (
+        <div className="empty-results">
+          <b>
+            {hasActiveFilter
+              ? 'Nenhum benefício encontrado para este filtro'
+              : 'Nenhum benefício ativo publicado no momento'}
+          </b>
+          <p>
+            {hasActiveFilter
+              ? 'Tente alterar o termo de busca ou limpar os filtros selecionados.'
+              : 'Novas ofertas aparecem aqui assim que as empresas cadastradas as publicarem.'}
+          </p>
+          {hasActiveFilter && (
+            <button
+              type="button"
+              className="action-button"
+              style={{ marginTop: 12 }}
+              onClick={() => {
+                onSelectCategory('');
+                onSelectCity('');
+                setOnlyFavorites(false);
+              }}
+            >
+              Ver todos os benefícios
+            </button>
+          )}
         </div>
       ) : (
         <div className="business-list">
@@ -7575,7 +7897,7 @@ function Home({
     ),
     map: (
       <ExploreNoMapaSection
-        businesses={guideData?.businesses?.length ? guideData.businesses : DEFAULT_BUSINESSES}
+        businesses={guideData?.businesses ?? []}
         categories={guideData?.categories || []}
         selectedCity={city}
         onSelectBusiness={onSelectBusiness}
@@ -7661,27 +7983,34 @@ function Home({
           </div>
           <div className="pedra-marquee-container" aria-label="Marcas Pedra Fundamental">
             <div className={`pedra-marquee-track ${displayBizs.length < 4 ? 'no-animation' : ''}`}>
-              {(displayBizs.length >= 4 ? [...displayBizs, ...displayBizs] : displayBizs).map((biz, idx) => (
-                <button
-                  type="button"
-                  key={`${biz.id}-${idx}`}
-                  className="pedra-brand-item-btn"
-                  onClick={() => onSelectBusiness(biz.slug)}
-                  title={`${biz.name} — Pedra Fundamental`}
-                >
-                  <div
-                    className="pedra-brand-circle"
-                    style={biz.logo_background_color ? { backgroundColor: biz.logo_background_color } : undefined}
+              {(displayBizs.length >= 4 ? [...displayBizs, ...displayBizs] : displayBizs).map((biz, idx) => {
+                const customBg = getCustomLogoBackground(biz.logo_background_color);
+                return (
+                  <button
+                    type="button"
+                    key={`${biz.id}-${idx}`}
+                    className="pedra-brand-item-btn"
+                    onClick={() => onSelectBusiness(biz.slug)}
+                    title={`${biz.name} — Pedra Fundamental`}
                   >
-                    {biz.logo_url ? (
-                      <img src={biz.logo_url} alt={biz.name} className="pedra-brand-logo-img" />
-                    ) : (
-                      <span className="pedra-brand-initial">{biz.name.charAt(0).toUpperCase()}</span>
-                    )}
-                  </div>
-                  <span className="pedra-brand-label">{biz.name}</span>
-                </button>
-              ))}
+                    <div
+                      className="pedra-brand-circle"
+                      style={
+                        customBg
+                          ? { backgroundColor: customBg, borderColor: customBg }
+                          : undefined
+                      }
+                    >
+                      {biz.logo_url ? (
+                        <img src={biz.logo_url} alt={biz.name} className="pedra-brand-logo-img" />
+                      ) : (
+                        <span className="pedra-brand-initial">{biz.name.charAt(0).toUpperCase()}</span>
+                      )}
+                    </div>
+                    <span className="pedra-brand-label">{biz.name}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </section>
@@ -7726,7 +8055,7 @@ function Home({
     })() : undefined,
     map: (
       <ExploreNoMapaSection
-        businesses={guideData?.businesses?.length ? guideData.businesses : DEFAULT_BUSINESSES}
+        businesses={guideData?.businesses ?? []}
         categories={guideData?.categories || []}
         selectedCity={city}
         onSelectBusiness={onSelectBusiness}
@@ -8566,7 +8895,7 @@ export function App() {
           setPendingExperienceCompanySlug(null);
         }}
         initialCompanySlug={pendingExperienceCompanySlug}
-        businesses={serverBusinesses.length ? serverBusinesses : DEFAULT_BUSINESSES}
+        businesses={serverBusinesses}
         memberUser={memberUser}
       />
 

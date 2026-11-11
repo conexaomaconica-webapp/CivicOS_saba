@@ -50,6 +50,29 @@ describe('mobile guide data', () => {
     expect(data.businesses[0]?.address).toBe('Av. Maria Quitéria, 1200');
   });
 
+  it('preserva logo_background_color para carrossel e cards na home', async () => {
+    const service = createMobileGuideService(async () => new Response(JSON.stringify({
+      settings: {
+        hero_title: 'Título',
+        sections_config: [{ id: 'sponsored', enabled: true, order: 1 }],
+      },
+      businesses: [
+        {
+          id: 'b2',
+          name: 'Marca Escura',
+          slug: 'marca-escura',
+          is_pedra_fundamental: true,
+          logo_background_color: '#1b263b',
+        },
+      ],
+      available_cities: [],
+    }), { status: 200 }), 'https://isolated.test/api/mobile/guide');
+
+    const data = await service.loadHome();
+    expect(data.businesses[0]?.logo_background_color).toBe('#1b263b');
+    expect(data.businesses[0]?.is_pedra_fundamental).toBe(true);
+  });
+
   it('falha fechado quando o BFF não está disponível', async () => {
     const service = createMobileGuideService(async () => new Response(null, { status: 503 }), 'https://isolated.test/api/mobile/guide');
     await expect(service.loadHome()).rejects.toThrow('Guia indisponível');

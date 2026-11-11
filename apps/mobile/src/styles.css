@@ -845,16 +845,21 @@ button, input { font: inherit; }
   background: transparent;
   border: 0;
   padding: 0;
-  cursor: default;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
+  transition: transform 140ms ease;
+}
+.header-horizontal-seal-btn:active {
+  transform: scale(0.95);
 }
 .header-seal-img {
-  height: 38px;
-  max-height: 38px;
+  height: 44px;
+  max-height: 46px;
   width: auto;
+  max-width: 185px;
   object-fit: contain;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.15));
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.18));
 }
 
 /* Subtítulo: Responsável + Loja Maçônica no Padrão Branco */
@@ -1539,29 +1544,34 @@ button, input { font: inherit; }
 }
 .seals-grid-clean {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
   width: 100%;
+  align-items: stretch;
 }
 .seal-clean-card,
 .seal-clean-card-btn {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 16px 12px;
-  background: #fffdfa;
+  gap: 8px;
+  padding: 16px 12px 14px;
+  background: linear-gradient(180deg, #fffcf5 0%, #fdf8ee 100%);
   border: 1.5px solid #d4af37;
-  border-radius: 16px;
-  box-shadow: 0 4px 14px rgb(43 6 13 / .06);
-  cursor: default;
+  border-radius: 18px;
+  width: 100%;
+  box-shadow: 0 4px 16px rgb(43 6 13 / .08);
+  cursor: pointer;
+  transition: transform 150ms ease, border-color 150ms ease;
 }
 .seal-clean-img {
-  height: 52px;
-  max-height: 52px;
-  width: auto;
+  height: 108px;
+  max-height: 112px;
+  width: 108px;
   max-width: 100%;
   object-fit: contain;
-  filter: drop-shadow(0 3px 8px rgb(201 162 39 / .3));
+  filter: drop-shadow(0 4px 10px rgb(0 0 0 / .2));
 }
 
 /* Modal Popup Explicativo do Selo */
@@ -1679,6 +1689,46 @@ button, input { font: inherit; }
   height: 100%;
   object-fit: cover;
 }
+.responsible-avatar-clickable {
+  padding: 0;
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+.responsible-avatar-clickable:active {
+  transform: scale(0.95);
+}
+.responsible-zoom-pill {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(59, 11, 20, 0.85);
+  border: 1px solid #c9a227;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  line-height: 1;
+}
+.owner-zoom-card {
+  background: #fffdfa !important;
+  max-width: 340px;
+  padding: 24px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.owner-zoom-img {
+  width: 240px;
+  max-width: 100%;
+  height: 240px;
+  border-radius: 20px;
+  object-fit: cover;
+  border: 2px solid #c9a227;
+  box-shadow: 0 8px 24px rgba(43, 6, 13, 0.18);
+}
 .responsible-meta-box {
   display: flex;
   flex-direction: column;
@@ -1772,6 +1822,34 @@ button, input { font: inherit; }
   font-size: .8rem;
   color: #635750;
   line-height: 1.45;
+}
+.detail-about-formatted {
+  font-size: .86rem;
+  color: #524843;
+  line-height: 1.6;
+}
+.mobile-formatted-text p {
+  margin: 0 0 6px;
+}
+.mobile-formatted-text p:last-child {
+  margin-bottom: 0;
+}
+.mobile-formatted-text ul,
+.mobile-formatted-text ol {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+.mobile-formatted-text ul {
+  list-style: disc;
+}
+.mobile-formatted-text ol {
+  list-style: decimal;
+}
+.mobile-formatted-text li {
+  margin: 3px 0;
+}
+.mobile-formatted-text li p {
+  margin: 0;
 }
 .service-quote-btn {
   align-self: flex-start;
@@ -1909,35 +1987,58 @@ button, input { font: inherit; }
   font-size: 1.1rem;
 }
 
-/* Card de Selos Limpo (Apenas Plano e Pedra Fundamental, estático e sem toque de explicação) */
+/* Card de Selos & Reconhecimentos (Grandes e Clicáveis para Ampliar, igual ao Web) */
 .seals-grid-clean {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  align-items: center;
-  padding: 8px 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  align-items: stretch;
+  padding: 6px 0;
 }
 .seal-clean-card,
 .seal-clean-card-btn {
   background: linear-gradient(180deg, #fffcf5 0%, #fdf8ee 100%);
-  border: 1.5px solid #e8d9be;
-  border-radius: 16px;
-  padding: 16px 20px;
+  border: 1.5px solid #d4af37;
+  border-radius: 18px;
+  padding: 16px 12px 14px;
   width: 100%;
-  max-width: 320px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  cursor: default;
-  box-shadow: 0 4px 14px rgb(0 0 0 / .06);
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgb(43 6 13 / .08);
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+}
+.seal-clean-card-btn:active {
+  transform: scale(0.96);
+  border-color: #4b161b;
 }
 .seal-clean-img {
-  height: 48px;
-  max-height: 48px;
-  width: auto;
-  max-width: 220px;
+  height: 108px;
+  max-height: 112px;
+  width: 108px;
+  max-width: 100%;
   object-fit: contain;
-  filter: drop-shadow(0 2px 6px rgb(0 0 0 / .15));
+  filter: drop-shadow(0 4px 10px rgb(0 0 0 / .2));
+}
+.seal-clean-img-wide {
+  width: auto;
+  max-width: 160px;
+  height: 46px;
+}
+.seal-clean-caption {
+  font: 700 0.84rem/1.25 Georgia, serif;
+  color: #4b161b;
+  text-align: center;
+}
+.seal-clean-zoom-hint {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #8c671d;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 /* Modal Explicativo dos Selos (Significado) */
@@ -1970,12 +2071,12 @@ button, input { font: inherit; }
   animation: slideUp 220ms ease;
 }
 .seal-dialog-img {
-  height: 60px !important;
-  max-height: 60px !important;
+  height: 156px !important;
+  max-height: 180px !important;
   width: auto !important;
-  max-width: 240px !important;
+  max-width: 260px !important;
   object-fit: contain !important;
-  filter: drop-shadow(0 4px 10px rgb(0 0 0 / .2)) !important;
+  filter: drop-shadow(0 6px 14px rgb(0 0 0 / .24)) !important;
   margin-bottom: 12px !important;
 }
 .seal-dialog-badge {

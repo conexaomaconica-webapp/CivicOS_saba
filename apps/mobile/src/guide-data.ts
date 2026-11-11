@@ -264,7 +264,7 @@ async function loadFromDirectSupabase(
       headers,
       body: JSON.stringify({ p_host: host }),
     }).catch(() => null),
-    fetchWithTimeout(fetchImpl, bffUrl.toString(), { headers: { Accept: 'application/json' } }, 1800).catch(() => null),
+    fetchWithTimeout(fetchImpl, bffUrl.toString(), { headers: { Accept: 'application/json' } }, 4500).catch(() => null),
   ]);
 
   if (!homeRes.ok) throw new MobileGuideServiceError(`Guia indisponível (${homeRes.status})`);
@@ -325,6 +325,19 @@ export type MobileBusinessBenefit = {
   rules?: string | null;
 };
 
+export type MobileInstitutionalRecognition = {
+  key: string;
+  title: string;
+  description: string;
+  seal_url: string;
+  compact_seal_url: string;
+  header_display?: 'badge' | 'horizontal_seal';
+  header_scale?: number;
+  card_display?: 'circular_seal' | 'horizontal_seal' | 'badge_text';
+  is_active?: boolean;
+  priority_order?: number;
+};
+
 export type MobileBusinessDetail = {
   business_id: string;
   business_name: string;
@@ -368,10 +381,13 @@ export type MobileBusinessDetail = {
   services: Array<{
     id: string;
     title: string;
+    name?: string;
     description?: string;
     price?: number;
+    price_info?: string | null;
   }>;
   benefits: MobileBusinessBenefit[];
+  recognitions?: MobileInstitutionalRecognition[];
 };
 
 export type MobileLodgeMeetingData = {
@@ -495,7 +511,7 @@ export async function loadBusinessDetailFromDirectSupabase(
 
   try {
     const bffDetailUrl = `https://conexaomaconica.com.br/api/mobile/guide?slug=${encodeURIComponent(slug)}`;
-    const [res, bffRes] = await Promise.all([
+    const [res, bffRes, recsRes] = await Promise.all([
       fetchImpl(`${supabaseUrl}/rest/v1/rpc/public_business_detail`, {
         method: 'POST',
         headers: {
@@ -505,17 +521,33 @@ export async function loadBusinessDetailFromDirectSupabase(
         },
         body: JSON.stringify({ p_host: host, p_business_slug: slug }),
       }),
-      fetchWithTimeout(fetchImpl, bffDetailUrl, { headers: { Accept: 'application/json' } }, 1800).catch(() => null),
+      fetchWithTimeout(fetchImpl, bffDetailUrl, { headers: { Accept: 'application/json' } }, 4500).catch(() => null),
+      fetchWithTimeout(
+        fetchImpl,
+        `${supabaseUrl}/rest/v1/institutional_recognitions?select=key,title,description,seal_url,compact_seal_url,header_display,header_scale,card_display,is_active,priority_order&is_active=eq.true&order=priority_order.asc`,
+        { headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` } },
+        3500,
+      ).catch(() => null),
     ]);
 
     if (!res.ok) return null;
     const list = await res.json();
     if (!Array.isArray(list) || !list[0]) return null;
     const bffJson = bffRes && bffRes.ok ? await bffRes.json().catch(() => null) : null;
+    const recsJson = recsRes && recsRes.ok ? await recsRes.json().catch(() => null) : null;
     const b = {
       ...list[0],
       ...(bffJson?.detail && typeof bffJson.detail === 'object' ? bffJson.detail : {}),
     };
+    const rawServices = Array.isArray(b.services) ? b.services : [];
+    const normalizedServices = rawServices.map((s: Record<string, unknown>) => ({
+      id: String(s?.id || ''),
+      title: String(s?.title || s?.name || ''),
+      name: String(s?.name || s?.title || ''),
+      description: typeof s?.description === 'string' ? s.description : undefined,
+      price: typeof s?.price === 'number' ? s.price : undefined,
+      price_info: typeof s?.price_info === 'string' ? s.price_info : null,
+    }));
 
     return {
       business_id: String(b.business_id || ''),
@@ -558,8 +590,13 @@ export async function loadBusinessDetailFromDirectSupabase(
       responsible: b.responsible && typeof b.responsible === 'object' ? b.responsible : null,
       contacts: Array.isArray(b.contacts) ? b.contacts : [],
       media: Array.isArray(b.media) ? b.media : [],
-      services: Array.isArray(b.services) ? b.services : [],
+      services: normalizedServices,
       benefits: Array.isArray(b.benefits) ? b.benefits : [],
+      recognitions: Array.isArray(b.recognitions)
+        ? b.recognitions
+        : Array.isArray(recsJson)
+          ? recsJson
+          : undefined,
     };
   } catch {
     return null;

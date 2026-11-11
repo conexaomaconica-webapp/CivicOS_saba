@@ -60,7 +60,7 @@ export async function GET(request: Request) {
       }
       const bizId = detail.business_id || detail.id;
       if (bizId) {
-        const [{ count: vCount }, { data: attrRows }] = await Promise.all([
+        const [{ count: vCount }, { data: attrRows }, { data: recRows }] = await Promise.all([
           adminDb
             .from('analytics_events')
             .select('id', { count: 'exact', head: true })
@@ -72,8 +72,17 @@ export async function GET(request: Request) {
             .select('attribute_key, attribute_value')
             .eq('business_id', bizId)
             .then((r: any) => r, () => ({ data: [] })),
+          db
+            .from('institutional_recognitions')
+            .select('key, title, description, seal_url, compact_seal_url, header_display, header_scale, card_display, is_active, priority_order')
+            .in('key', ['pedra_fundamental', 'selo_ouro', 'selo_prata', 'selo_bronze', 'coluna_de_honra'])
+            .order('priority_order', { ascending: true })
+            .then((r: any) => r, () => ({ data: [] })),
         ]);
         detail.views_count = typeof vCount === 'number' ? vCount : 0;
+        if (Array.isArray(recRows) && recRows.length > 0) {
+          detail.recognitions = recRows;
+        }
         if (Array.isArray(attrRows)) {
           for (const attr of attrRows) {
             if (attr.attribute_key === 'cover_offset_y') detail.cover_offset_y = Number(attr.attribute_value);
@@ -87,19 +96,25 @@ export async function GET(request: Request) {
       return NextResponse.json({ detail }, { headers: { 'Cache-Control': 'no-store', ...corsHeaders } });
     }
 
-    const [{ data: settings, error: settingsError }, { data: homeData, error: homeError }, { data: activeCategories }] = await Promise.all([
+    const [{ data: settings, error: settingsError }, { data: homeData, error: homeError }, { data: activeCategories }, { data: recognitions }] = await Promise.all([
       db
         .rpc('_resolve_public_tenant_id', { p_host: host })
         .then(async ({ data: tenantId, error }: { data: string | null; error: Error | null }) => {
           if (error || !tenantId) return { data: null, error: error ?? new Error('Tenant não resolvido') };
-          return db
+          return adminDb
             .from('directory_home_settings')
             .select('hero_title, hero_subtitle, hero_search_placeholder, sections_config')
             .eq('tenant_id', tenantId)
             .maybeSingle();
         }),
       db.rpc('public_directory_home_data', { p_host: host, p_city: city }),
-      db.rpc('public_directory_categories', { p_host: host }).catch(() => ({ data: null })),
+      db.rpc('public_directory_categories', { p_host: host }).then((r: any) => r, () => ({ data: null })),
+      db
+        .from('institutional_recognitions')
+        .select('key, title, description, seal_url, compact_seal_url, header_display, header_scale, card_display, is_active, priority_order')
+        .in('key', ['pedra_fundamental', 'selo_ouro', 'selo_prata', 'selo_bronze', 'coluna_de_honra'])
+        .order('priority_order', { ascending: true })
+        .then((r: any) => r, () => ({ data: [] })),
     ]);
 
     if (settingsError || homeError) {
@@ -212,6 +227,7 @@ export async function GET(request: Request) {
       categories: mergedCats,
       sponsored: rawSponsored.map(enrichBiz),
       businesses: rawBusinesses.map(enrichBiz),
+      recognitions: Array.isArray(recognitions) ? recognitions : [],
       pagination: { page, page_size: pageSize, total: Number(searchData?.total || 0), total_pages: Number(searchData?.total_pages || 0) },
       available_cities: Array.isArray(payload.available_cities) ? payload.available_cities : [],
     }, { headers: { 'Cache-Control': 'no-store', Vary: 'Accept, X-Client-Version', ...corsHeaders } });
