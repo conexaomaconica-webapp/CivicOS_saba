@@ -27,7 +27,6 @@ import { DirectoryConnectionsMural } from '@/components/public/directory/Directo
 import { DirectoryConnectionsCta } from '@/components/public/directory/DirectoryConnectionsCta';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
-import { DirectoryFavoritesModal } from '@/components/public/directory/DirectoryFavoritesModal';
 import { resolveSearchQuery } from '@/lib/directory/normalize-search';
 
 export const dynamic = 'force-dynamic';
@@ -818,9 +817,6 @@ export default async function GuiaPage({ searchParams }: Props) {
 
         {/* Footer */}
         <DirectoryFooter />
-
-        {/* Favoritos Drawer/Modal */}
-        <DirectoryFavoritesModal />
       </div>
     </FavoritesProvider>
   );

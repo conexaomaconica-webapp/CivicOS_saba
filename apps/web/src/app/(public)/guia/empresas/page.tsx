@@ -13,7 +13,6 @@ import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
-import { DirectoryFavoritesModal } from '@/components/public/directory/DirectoryFavoritesModal';
 import { BusinessDirectoryClient } from '@/components/public/directory/BusinessDirectoryClient';
 import type { FilterState } from '@/components/public/directory/BusinessFilters';
 import type { ViewMode } from '@/components/public/directory/BusinessResultsToolbar';
@@ -485,9 +484,6 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
 
         {/* Footer */}
         <DirectoryFooter />
-
-        {/* Modal de Favoritos */}
-        <DirectoryFavoritesModal />
       </div>
     </FavoritesProvider>
   );

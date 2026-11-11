@@ -4,6 +4,22 @@ import { Button } from '@saas/ui';
 import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type ReactNode, type TouchEvent } from 'react';
 import 'leaflet/dist/leaflet.css';
 import { LaunchExperience } from './LaunchExperience';
+import { MobileEventDetailScreen } from './MobileEventDetailScreen';
+import { MobileMemberPortalScreen, type MemberPortalTab } from './MobileMemberPortalScreen';
+import {
+  clearMobileFavoritesRemote,
+  deleteMobileMemberAccountRemote,
+  loginMobileMember,
+  readStoredMobileSession,
+  registerMobileMember,
+  requestMobilePasswordReset,
+  syncMobileFavoritesRemote,
+  toggleMobileFavoriteRemote,
+  writeStoredMobileSession,
+  writeStoredMobileUser,
+  type MobileAuthSessionTokens,
+  type MobileMemberUser,
+} from './mobile-member-client';
 import {
   type MobileBenefitItem,
   type MobileBenefitRedemption,
@@ -867,7 +883,22 @@ function useMobileFavorites() {
     });
   };
 
-  return { favorites, isFavorite, toggleFavorite };
+  const setFavoritesList = (slugs: string[]) => {
+    const clean = Array.from(new Set(slugs.filter((s) => typeof s === 'string' && s.trim().length > 0)));
+    setFavorites(clean);
+    try {
+      localStorage.setItem('cm_mobile_favorites', JSON.stringify(clean));
+    } catch { }
+  };
+
+  const clearFavorites = () => {
+    setFavorites([]);
+    try {
+      localStorage.setItem('cm_mobile_favorites', JSON.stringify([]));
+    } catch { }
+  };
+
+  return { favorites, isFavorite, toggleFavorite, setFavoritesList, clearFavorites };
 }
 
 function ReferBusinessModal({
@@ -1274,6 +1305,12 @@ function MuralDeConexoesSection({
   );
 }
 
+const MEMBER_BR_STATES = [
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
+  'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
+  'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
+];
+
 function MemberLoginModal({
   isOpen,
   onClose,
@@ -1281,59 +1318,122 @@ function MemberLoginModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onLoginSuccess: (user: { id: string; name: string; email: string }) => void;
+  onLoginSuccess: (user: MobileMemberUser, session: MobileAuthSessionTokens) => void;
 }) {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [city, setCity] = useState('');
+  const [stateUf, setStateUf] = useState('BA');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const deriveMemberName = (rawEmail: string) => {
-    const localPart = rawEmail.split('@')[0] || 'Membro';
-    const cleaned = localPart.replace(/[._-]+/g, ' ').trim();
-    if (!cleaned) return 'Membro';
-    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-  };
-
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setError(null);
+    setInfoMessage(null);
     const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes('@')) {
+
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       setError('Por favor, informe um e-mail válido.');
       return;
     }
-    if (!password || password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres.');
+
+    if (mode === 'forgot') {
+      setLoading(true);
+      const res = await requestMobilePasswordReset(cleanEmail);
+      setLoading(false);
+      if (res.success) {
+        setInfoMessage(res.message || 'Se o e-mail estiver cadastrado, enviamos um link de redefinição.');
+      } else {
+        setError(res.error || 'Não foi possível enviar o link de recuperação.');
+      }
       return;
     }
-    if (mode === 'register' && password !== confirmPassword) {
-      setError('As senhas informadas não conferem.');
+
+    if (mode === 'register') {
+      if (name.trim().length < 3) {
+        setError('Informe seu nome completo (mínimo 3 caracteres).');
+        return;
+      }
+      if (city.trim().length < 2) {
+        setError('Informe sua cidade.');
+        return;
+      }
+      if (!/^[A-Za-z]{2}$/.test(stateUf.trim())) {
+        setError('Selecione sua UF (estado).');
+        return;
+      }
+      if (!password || password.length < 8) {
+        setError('A senha deve ter pelo menos 8 caracteres.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('As senhas informadas não conferem.');
+        return;
+      }
+      if (!acceptedTerms) {
+        setError('Aceite os Termos de Uso para criar sua conta.');
+        return;
+      }
+      if (!acceptedPrivacy) {
+        setError('Aceite a Política de Privacidade para criar sua conta.');
+        return;
+      }
+
+      setLoading(true);
+      const regRes = await registerMobileMember({
+        name: name.trim(),
+        email: cleanEmail,
+        city: city.trim(),
+        state: stateUf.trim().toUpperCase(),
+        password,
+        confirmPassword,
+        acceptedTerms,
+        acceptedPrivacy,
+      });
+      setLoading(false);
+
+      if (!regRes.success) {
+        setError(regRes.error || 'Não foi possível criar sua conta.');
+        return;
+      }
+
+      if (regRes.needsEmailConfirmation || !regRes.session || !regRes.user) {
+        setMode('login');
+        setInfoMessage(
+          regRes.message ||
+            'Cadastro realizado! Confirme o e-mail enviado para você e depois faça login abaixo.',
+        );
+        return;
+      }
+
+      onLoginSuccess(regRes.user, regRes.session);
+      return;
+    }
+
+    if (!password) {
+      setError('Informe sua senha.');
       return;
     }
 
     setLoading(true);
-    setError(null);
+    const loginRes = await loginMobileMember(cleanEmail, password);
+    setLoading(false);
 
-    setTimeout(() => {
-      setLoading(false);
-      const user = {
-        id: 'member-' + Date.now(),
-        name: deriveMemberName(cleanEmail),
-        email: cleanEmail,
-      };
-      try {
-        const rawList = localStorage.getItem('cm_mobile_registered_members');
-        const list: Array<{ id: string; name: string; email: string }> = rawList ? JSON.parse(rawList) : [];
-        const filtered = list.filter((u) => u.email !== cleanEmail);
-        filtered.push(user);
-        localStorage.setItem('cm_mobile_registered_members', JSON.stringify(filtered));
-      } catch { }
-      onLoginSuccess(user);
-    }, 350);
+    if (!loginRes.success || !loginRes.session || !loginRes.user) {
+      setError(loginRes.error || 'E-mail ou senha incorretos.');
+      return;
+    }
+
+    onLoginSuccess(loginRes.user, loginRes.session);
   };
 
   return (
@@ -1346,7 +1446,7 @@ function MemberLoginModal({
         if (e.target === e.currentTarget && !loading) onClose();
       }}
     >
-      <div className="member-login-card">
+      <div className="member-login-card" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
         <button
           type="button"
           className="modal-close-btn"
@@ -1381,6 +1481,7 @@ function MemberLoginModal({
             onClick={() => {
               setMode('login');
               setError(null);
+              setInfoMessage(null);
             }}
             style={{
               padding: '8px 10px',
@@ -1402,6 +1503,7 @@ function MemberLoginModal({
             onClick={() => {
               setMode('register');
               setError(null);
+              setInfoMessage(null);
             }}
             style={{
               padding: '8px 10px',
@@ -1419,60 +1521,181 @@ function MemberLoginModal({
         </div>
 
         <h3 className="refer-title" style={{ fontSize: '1.2rem', marginBottom: 4 }}>
-          {mode === 'login' ? 'Acesse sua conta' : 'Criar conta de membro'}
+          {mode === 'login'
+            ? 'Acesse sua conta'
+            : mode === 'register'
+              ? 'Criar nova conta de membro'
+              : 'Recuperar senha'}
         </h3>
         <p className="refer-subtitle" style={{ maxWidth: '100%', marginBottom: 14 }}>
           {mode === 'login'
-            ? 'Informe seu e-mail e senha para acessar a área de membros.'
-            : 'Cadastre seu e-mail e crie uma senha para acessar e registrar experiências na rede.'}
+            ? 'Entre com seu e-mail e senha para acessar sua conta, favoritos e indicações.'
+            : mode === 'register'
+              ? 'Preencha os mesmos dados oficiais da plataforma Web para criar sua conta.'
+              : 'Informe o e-mail da sua conta para receber o link de redefinição de senha.'}
         </p>
 
-        <form onSubmit={handleSubmit}>
-          <label className="experience-field-label">
-            E-mail:
-          </label>
-          <input
-            type="email"
-            className="member-login-input"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="seu.email@dominio.com"
-            autoComplete="email"
-            required
-          />
+        {infoMessage && (
+          <div
+            style={{
+              padding: '10px 12px',
+              borderRadius: 10,
+              background: '#ecfdf5',
+              border: '1px solid #a7f3d0',
+              color: '#065f46',
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              marginBottom: 12,
+            }}
+          >
+            {infoMessage}
+          </div>
+        )}
 
-          <label className="experience-field-label">
-            Senha:
-          </label>
-          <input
-            type="password"
-            className="member-login-input"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            required
-          />
-
+        <form onSubmit={(e) => { void handleSubmit(e); }}>
           {mode === 'register' && (
             <>
-              <label className="experience-field-label">
-                Confirmar Senha:
-              </label>
+              <label className="experience-field-label">Nome Completo *</label>
               <input
-                type="password"
+                type="text"
                 className="member-login-input"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="new-password"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ex: João Silva"
+                autoComplete="name"
+                disabled={loading}
                 required
               />
             </>
           )}
 
+          <label className="experience-field-label">Endereço de E-mail *</label>
+          <input
+            type="email"
+            className="member-login-input"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="exemplo@email.com"
+            autoComplete="email"
+            disabled={loading}
+            required
+          />
+
+          {mode === 'register' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 86px', gap: 8 }}>
+              <div>
+                <label className="experience-field-label">Cidade *</label>
+                <input
+                  type="text"
+                  className="member-login-input"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Sua cidade"
+                  disabled={loading}
+                  required
+                />
+              </div>
+              <div>
+                <label className="experience-field-label">UF *</label>
+                <select
+                  className="member-login-input"
+                  value={stateUf}
+                  onChange={(e) => setStateUf(e.target.value)}
+                  disabled={loading}
+                  style={{ paddingLeft: 8, paddingRight: 6 }}
+                >
+                  {MEMBER_BR_STATES.map((uf) => (
+                    <option key={uf} value={uf}>
+                      {uf}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {mode !== 'forgot' && (
+            <>
+              <label className="experience-field-label">
+                Senha {mode === 'register' ? '(mínimo 8 caracteres) *' : '*'}
+              </label>
+              <input
+                type="password"
+                className="member-login-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={mode === 'register' ? 'Mínimo 8 caracteres' : '••••••••'}
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                disabled={loading}
+                required
+              />
+            </>
+          )}
+
+          {mode === 'register' && (
+            <>
+              <label className="experience-field-label">Confirmar Senha *</label>
+              <input
+                type="password"
+                className="member-login-input"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repita a sua senha"
+                autoComplete="new-password"
+                disabled={loading}
+                required
+              />
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '4px 0 12px', fontSize: '0.74rem', color: '#44403c' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    disabled={loading}
+                    style={{ marginTop: 2 }}
+                  />
+                  <span>
+                    Li e aceito os{' '}
+                    <a
+                      href="https://conexaomaconica.com.br/termos"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#4b161b', fontWeight: 700, textDecoration: 'underline' }}
+                    >
+                      Termos de Uso
+                    </a>
+                    .
+                  </span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={acceptedPrivacy}
+                    onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+                    disabled={loading}
+                    style={{ marginTop: 2 }}
+                  />
+                  <span>
+                    Li e aceito a{' '}
+                    <a
+                      href="https://conexaomaconica.com.br/privacidade"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#4b161b', fontWeight: 700, textDecoration: 'underline' }}
+                    >
+                      Política de Privacidade
+                    </a>
+                    .
+                  </span>
+                </label>
+              </div>
+            </>
+          )}
+
           {error && (
-            <p style={{ color: '#be123c', fontSize: '0.78rem', margin: '4px 0 10px' }}>
+            <p style={{ color: '#be123c', fontSize: '0.78rem', fontWeight: 600, margin: '4px 0 10px' }}>
               {error}
             </p>
           )}
@@ -1486,15 +1709,40 @@ function MemberLoginModal({
               ? 'Processando...'
               : mode === 'login'
                 ? 'Entrar'
-                : 'Criar conta e acessar'}
+                : mode === 'register'
+                  ? 'Criar Conta'
+                  : 'Enviar link de recuperação'}
           </button>
 
-          <div style={{ textAlign: 'center', marginTop: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginTop: 12 }}>
+            {mode === 'login' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('forgot');
+                  setError(null);
+                  setInfoMessage(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#57534e',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                }}
+              >
+                Esqueci minha senha
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => {
                 setMode(mode === 'login' ? 'register' : 'login');
                 setError(null);
+                setInfoMessage(null);
               }}
               style={{
                 background: 'none',
@@ -1507,13 +1755,13 @@ function MemberLoginModal({
               }}
             >
               {mode === 'login'
-                ? 'Ainda não tem conta? Cadastre-se para acessar'
-                : 'Já possui cadastro? Entrar com e-mail e senha'}
+                ? 'Ainda não tem conta? Cadastre-se grátis'
+                : 'Já possui cadastro? Fazer Login'}
             </button>
           </div>
 
           <p className="member-login-note">
-            Ambiente protegido e confidencial. Dados preservados conforme regras fraternais e LGPD.
+            Conta única sincronizada com a plataforma Web e proteção LGPD.
           </p>
         </form>
       </div>
@@ -2206,7 +2454,7 @@ function AnuncioModal({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      style={{ zIndex: 1200 }}
+      style={{ zIndex: 2400 }}
     >
       <div className="anuncio-modal-sheet">
         <div className="anuncio-header">
@@ -4505,32 +4753,54 @@ function BeneficiosScreen({
 
 function EmptyScreen({
   route,
+  favorites = [],
   favoritesCount = 0,
   onGoToFavorites,
   memberUser,
+  memberSession,
   onOpenMemberLogin,
   onLogoutMember,
   onDeleteMemberAccount,
+  onUpdateMemberUser,
+  onSyncFavoritesFromAccount,
+  onToggleFavorite,
+  onClearFavorites,
+  onOpenVoucherModal,
   onStartShareExperience,
+  onToast,
   maisSubView = 'menu',
   onChangeMaisSubView,
+  memberPortalInitialTab = 'visao-geral',
+  onOpenMemberPortal,
   eventTypeFilter = 'all',
   onChangeEventTypeFilter,
   searchQuery = '',
+  onSelectBusiness,
 }: {
   route: Exclude<Route, 'inicio' | 'empresas'>;
+  favorites?: string[];
   favoritesCount?: number;
   onGoToFavorites?: () => void;
-  memberUser?: { id: string; name: string; email: string } | null;
+  memberUser?: MobileMemberUser | null;
+  memberSession?: MobileAuthSessionTokens | null;
   onOpenMemberLogin?: () => void;
   onLogoutMember?: () => void;
-  onDeleteMemberAccount?: () => void;
+  onDeleteMemberAccount?: () => Promise<boolean>;
+  onUpdateMemberUser?: (user: MobileMemberUser) => void;
+  onSyncFavoritesFromAccount?: (slugs: string[]) => void;
+  onToggleFavorite?: (slug: string, name?: string) => void;
+  onClearFavorites?: () => void;
+  onOpenVoucherModal?: (voucher: MobileBenefitRedemption) => void;
   onStartShareExperience?: () => void;
-  maisSubView?: 'menu' | 'eventos';
-  onChangeMaisSubView?: (view: 'menu' | 'eventos') => void;
+  onToast?: (msg: string) => void;
+  maisSubView?: 'menu' | 'eventos' | 'minha-conta';
+  onChangeMaisSubView?: (view: 'menu' | 'eventos' | 'minha-conta') => void;
+  memberPortalInitialTab?: MemberPortalTab;
+  onOpenMemberPortal?: (tab: MemberPortalTab) => void;
   eventTypeFilter?: 'all' | 'empresas' | 'lojas';
   onChangeEventTypeFilter?: (filter: 'all' | 'empresas' | 'lojas') => void;
   searchQuery?: string;
+  onSelectBusiness?: (slug: string) => void;
 }) {
   const [eventsList, setEventsList] = useState<MobileEventItem[]>(DEFAULT_COMMUNITY_EVENTS);
   const [loadingEvents, setLoadingEvents] = useState(false);
@@ -4546,10 +4816,70 @@ function EmptyScreen({
         .then((items) => setEventsList(items || []))
         .catch(() => setEventsList([]))
         .finally(() => setLoadingEvents(false));
+    } else {
+      setSelectedEvent(null);
     }
   }, [route, maisSubView]);
 
   if (route === 'mais') {
+    if (maisSubView === 'minha-conta') {
+      if (!memberUser) {
+        return (
+          <div className="home-content" style={{ padding: '24px 16px' }}>
+            <div className="refer-explanation-box" style={{ background: '#ffffff', border: '1.5px solid #ebd9c8', textAlign: 'center', padding: 24 }}>
+              <span style={{ fontSize: '2rem', display: 'block', marginBottom: 8 }}>🔒</span>
+              <h3 style={{ margin: '0 0 6px', fontFamily: 'Georgia, serif', color: '#4b161b' }}>Área do Membro</h3>
+              <p style={{ margin: '0 0 14px', fontSize: '0.84rem', color: '#57534e' }}>
+                Entre ou cadastre-se para acessar seus favoritos sincronizados, benefícios, indicações e segurança da conta.
+              </p>
+              <Button
+                className="action-button"
+                onClick={onOpenMemberLogin}
+                style={{ width: '100%', minHeight: 42 }}
+              >
+                Entrar ou Cadastrar Membro
+              </Button>
+              <button
+                type="button"
+                onClick={() => onChangeMaisSubView?.('menu')}
+                style={{ marginTop: 12, background: 'none', border: 'none', color: '#78716c', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                ← Voltar ao Menu
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <MobileMemberPortalScreen
+          memberUser={memberUser}
+          session={memberSession ?? null}
+          favorites={favorites}
+          initialTab={memberPortalInitialTab}
+          onBack={() => {
+            onChangeMaisSubView?.('menu');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onLogout={() => {
+            onLogoutMember?.();
+            onChangeMaisSubView?.('menu');
+          }}
+          onUpdateMemberUser={(updated) => onUpdateMemberUser?.(updated)}
+          onSyncFavoritesFromAccount={(slugs) => onSyncFavoritesFromAccount?.(slugs)}
+          onToggleFavorite={(slug, name) => onToggleFavorite?.(slug, name)}
+          onClearFavorites={() => onClearFavorites?.()}
+          onSelectBusiness={(slug) => onSelectBusiness?.(slug)}
+          onOpenVoucherModal={(v) => onOpenVoucherModal?.(v)}
+          onDeleteAccount={() => (onDeleteMemberAccount ? onDeleteMemberAccount() : Promise.resolve(false))}
+          onToast={(msg) => onToast?.(msg)}
+          onExploreCatalog={() => {
+            window.location.hash = routeHref('empresas');
+          }}
+        />
+      );
+    }
+
     if (maisSubView === 'eventos') {
       const qClean = searchQuery.trim().toLowerCase();
       const filteredEvents = eventsList.filter((ev) => {
@@ -4607,6 +4937,22 @@ function EmptyScreen({
           window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
         }
       };
+
+      if (selectedEvent) {
+        return (
+          <MobileEventDetailScreen
+            event={selectedEvent}
+            onBack={() => {
+              setSelectedEvent(null);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onSelectBusiness={(slug) => {
+              onSelectBusiness?.(slug);
+            }}
+            onShare={handleShareEvent}
+          />
+        );
+      }
 
       return (
         <div className="directory-screen">
@@ -4695,7 +5041,10 @@ function EmptyScreen({
                         key={ev.id}
                         type="button"
                         className="event-flyer-card"
-                        onClick={() => setSelectedEvent(ev)}
+                        onClick={() => {
+                      setSelectedEvent(ev);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
                       >
                         {/* Imagem / Flyer com Proporção Ampla e Cantos Arredondados */}
                         <div className="event-flyer-media-wrap">
@@ -4752,7 +5101,10 @@ function EmptyScreen({
                   key={ev.id}
                   type="button"
                   className="event-card-mobile"
-                  onClick={() => setSelectedEvent(ev)}
+                  onClick={() => {
+                    setSelectedEvent(ev);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                   style={{ cursor: 'pointer', textAlign: 'left', border: '1.5px solid #ebd9c8', background: '#ffffff', padding: 12, borderRadius: 18 }}
                 >
                   <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', borderRadius: 14, overflow: 'hidden', background: '#3b0b14', marginBottom: 8 }}>
@@ -4797,200 +5149,6 @@ function EmptyScreen({
                   <p>Não há eventos futuros para o filtro selecionado. Tente alterar sua busca ou conferir outras categorias.</p>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* TELA DEDICADA DE DETALHES DO EVENTO (ESTILO PLANO ESQUADRO) */}
-          {selectedEvent && (
-            <div
-              className="mobile-event-detail-screen"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Página do Evento"
-            >
-              {/* Barra Superior com Voltar e Compartilhar */}
-              <div className="mobile-event-topbar">
-                <button
-                  type="button"
-                  className="mobile-event-back-btn"
-                  onClick={() => setSelectedEvent(null)}
-                >
-                  <span>←</span>
-                  <span>Voltar</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="mobile-event-share-btn"
-                  onClick={() => handleShareEvent(selectedEvent)}
-                >
-                  <span>🔗</span>
-                  <span>Compartilhar</span>
-                </button>
-              </div>
-
-              {/* Bloco Hero do Evento (Estilo Plano Esquadro) */}
-              <header className="mobile-event-hero-card">
-                <div className="mobile-event-cover-wrap">
-                  {selectedEvent.cover_url ? (
-                    <img
-                      src={selectedEvent.cover_url}
-                      alt={selectedEvent.title}
-                    />
-                  ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#f3eedd', padding: 20, textAlign: 'center' }}>
-                      <span style={{ fontSize: '2rem', marginBottom: 6 }}>📅</span>
-                      <strong style={{ fontSize: '1rem', font: '700 1.1rem/1.3 Georgia, serif' }}>{selectedEvent.title}</strong>
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <span
-                    className={`event-origin-badge ${selectedEvent.organizer_type}`}
-                    style={{ alignSelf: 'flex-start' }}
-                  >
-                    {selectedEvent.organizer_type === 'lodge' ? '🏛️ Loja Maçônica' : '🏢 Empresa Parceira'}
-                  </span>
-
-                  <h1 style={{ margin: 0, font: '750 1.35rem/1.25 Georgia, serif', color: '#4b161b' }}>
-                    {selectedEvent.title}
-                  </h1>
-
-                  {selectedEvent.subtitle && (
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#661a22', fontWeight: 600 }}>
-                      {selectedEvent.subtitle}
-                    </p>
-                  )}
-
-                  {/* Informações Básicas com Ícones */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4, fontSize: '0.8rem', color: '#44403c', fontWeight: 650 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span>🗓️</span>
-                      <span><b>Data:</b> {selectedEvent.event_date || 'A definir'}</span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                      <span>📍</span>
-                      <div>
-                        <span><b>Local:</b> {selectedEvent.location_label || 'Local do Evento'}</span>
-                        {selectedEvent.address && (
-                          <div style={{ fontSize: '0.74rem', color: '#78716c', fontWeight: 500 }}>
-                            {selectedEvent.address}
-                          </div>
-                        )}
-                        <div style={{ fontSize: '0.74rem', color: '#78716c', fontWeight: 500 }}>
-                          {[selectedEvent.city, selectedEvent.state].filter(Boolean).join(' - ')}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span>👤</span>
-                      <span><b>Realização:</b> {selectedEvent.organizer_name || 'Conexão Maçônica'}</span>
-                    </div>
-                  </div>
-
-                  {/* Destaque de Valores / Ingressos (Estilo Plano Esquadro) */}
-                  <div className="mobile-event-price-highlight" style={{ marginTop: 8 }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#78350f', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      🎟️ Ingressos &amp; Valores
-                    </span>
-                    <strong style={{ fontSize: '1.15rem', color: '#4b161b' }}>
-                      {selectedEvent.price_info || 'Entrada Franca'}
-                    </strong>
-                    <span style={{ fontSize: '0.72rem', color: '#78716c', fontWeight: 500 }}>
-                      {selectedEvent.registration_enabled
-                        ? 'Confirmação antecipada recomendada pela organização.'
-                        : 'Livre participação de membros e convidados.'}
-                    </span>
-                  </div>
-                </div>
-              </header>
-
-              {/* Seção Sobre o Evento */}
-              <section className="mobile-event-content-section">
-                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#4b161b', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #f0ece1', paddingBottom: 6 }}>
-                  ℹ️ Sobre o Evento
-                </span>
-
-                {selectedEvent.description || selectedEvent.summary ? (
-                  <div style={{ fontSize: '0.86rem', color: '#332f2b', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
-                    {selectedEvent.description || selectedEvent.summary}
-                  </div>
-                ) : (
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#78716c', fontStyle: 'italic' }}>
-                    Evento oficial divulgado na rede integrada Conexão Maçônica.
-                  </p>
-                )}
-
-                {selectedEvent.footer_information && (
-                  <div style={{ marginTop: 8, padding: 10, background: '#fef7e6', borderRadius: 10, border: '1px solid #f5d76e', fontSize: '0.76rem', color: '#78350f' }}>
-                    <b>Informações Adicionais:</b>
-                    <p style={{ margin: '4px 0 0' }}>{selectedEvent.footer_information}</p>
-                  </div>
-                )}
-              </section>
-
-              {/* Seção Organização */}
-              <section className="mobile-event-content-section" style={{ marginBottom: 90 }}>
-                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#4b161b', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #f0ece1', paddingBottom: 6 }}>
-                  🏛️ Organização &amp; Contato
-                </span>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.82rem' }}>
-                  <strong style={{ color: '#4b161b', fontSize: '0.92rem' }}>
-                    {selectedEvent.organizer_name || 'Conexão Maçônica'}
-                  </strong>
-                  <span style={{ fontSize: '0.76rem', color: '#78716c' }}>
-                    {selectedEvent.organizer_type === 'lodge'
-                      ? 'Loja Maçônica atuante na comunidade e cadastrada na plataforma.'
-                      : 'Empresa participante da vitrine de negócios Conexão Maçônica.'}
-                  </span>
-                </div>
-              </section>
-
-              {/* Barra Inferior Fixa com Botões de Ação */}
-              <footer className="mobile-event-bottom-bar">
-                {selectedEvent.cta_url ? (
-                  <a
-                    href={selectedEvent.cta_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ flex: 1, padding: '12px 16px', background: '#4b161b', color: '#c9a227', borderRadius: 12, fontWeight: 800, fontSize: '0.82rem', textAlign: 'center', textDecoration: 'none', border: '1px solid #c9a227', boxShadow: '0 2px 8px rgba(75,22,27,0.2)' }}
-                  >
-                    <span>🎟️ Mais Informações / Ingressos</span>
-                  </a>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleShareEvent(selectedEvent)}
-                    style={{ flex: 1, padding: '12px 16px', background: '#4b161b', color: '#ffffff', borderRadius: 12, fontWeight: 800, fontSize: '0.82rem', textAlign: 'center', border: 'none', cursor: 'pointer', boxShadow: '0 2px 8px rgba(75,22,27,0.2)' }}
-                  >
-                    <span>🔗 Compartilhar Evento</span>
-                  </button>
-                )}
-
-                {selectedEvent.organizer_whatsapp ? (
-                  <a
-                    href={`https://wa.me/55${selectedEvent.organizer_whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá! Vi o evento "${selectedEvent.title}" no App Conexão Maçônica e gostaria de mais informações.`)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ padding: '12px 14px', background: '#15803d', color: '#ffffff', borderRadius: 12, fontWeight: 800, fontSize: '0.82rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                  >
-                    <span>💬 WhatsApp</span>
-                  </a>
-                ) : null}
-
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([selectedEvent.location_label, selectedEvent.address, selectedEvent.city, selectedEvent.state].filter(Boolean).join(', '))}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ padding: '12px 14px', background: '#f5ebe6', color: '#4b161b', borderRadius: 12, fontWeight: 800, fontSize: '0.82rem', textDecoration: 'none', border: '1px solid #d6b8ac', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                >
-                  <span>📍 Rota</span>
-                </a>
-              </footer>
             </div>
           )}
         </div>
@@ -5107,14 +5265,82 @@ function EmptyScreen({
             </p>
             {memberUser ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <Button
                     className="action-button"
+                    onClick={() => onOpenMemberPortal?.('visao-geral')}
+                    style={{ marginTop: 0, minHeight: 40, fontSize: '0.8rem' }}
+                  >
+                    Minha Conta
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => onOpenMemberPortal?.('favoritos')}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 12,
+                      border: '1px solid #d6b8ac',
+                      background: '#fffaf5',
+                      color: '#4b161b',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ❤️ Favoritos ({favoritesCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onOpenMemberPortal?.('indicacoes')}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 12,
+                      border: '1px solid #d6b8ac',
+                      background: '#fffaf5',
+                      color: '#4b161b',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    🤝 Indicações
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onOpenMemberPortal?.('senha')}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 12,
+                      border: '1px solid #d6b8ac',
+                      background: '#fffaf5',
+                      color: '#4b161b',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    🔑 Trocar Senha
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
                     onClick={() => onStartShareExperience?.()}
-                    style={{ flex: 1, marginTop: 0, minHeight: 40, fontSize: '0.82rem' }}
+                    style={{
+                      flex: 1,
+                      padding: '9px 12px',
+                      borderRadius: 12,
+                      border: '1px solid #c9a227',
+                      background: '#fffdf7',
+                      color: '#4b161b',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
                   >
                     Compartilhar Experiência
-                  </Button>
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -5152,7 +5378,7 @@ function EmptyScreen({
                       textDecoration: 'underline',
                     }}
                   >
-                    Excluir minha conta
+                    Excluir minha conta definitivamente
                   </button>
                 ) : (
                   <div
@@ -5167,14 +5393,14 @@ function EmptyScreen({
                     }}
                   >
                     <p style={{ margin: 0, fontSize: '0.78rem', color: '#7f1d1d', lineHeight: 1.4, fontWeight: 600 }}>
-                      Tem certeza que deseja excluir sua conta? Seus dados de acesso salvos neste aplicativo serão removidos permanentemente.
+                      Tem certeza que deseja excluir sua conta permanentemente? Suas credenciais de acesso serão removidas e não será possível entrar novamente com este login.
                     </p>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button
                         type="button"
                         onClick={() => {
                           setConfirmingDeleteAccount(false);
-                          onDeleteMemberAccount?.();
+                          void onDeleteMemberAccount?.();
                         }}
                         style={{
                           flex: 1,
@@ -5291,8 +5517,15 @@ function MobileFavoritesModal({
 
     async function loadFavoritesData() {
       try {
-        const homeData = await guideServiceRef.current.loadHome({});
-        const pool = [...(homeData.businesses || []), ...(homeData.sponsored || [])];
+        const [bySlugs, homeData] = await Promise.all([
+          guideServiceRef.current.loadBusinessesBySlugs(favorites).catch(() => []),
+          guideServiceRef.current.loadHome({}).catch(() => null),
+        ]);
+        const pool = [
+          ...bySlugs,
+          ...(homeData?.businesses || []),
+          ...(homeData?.sponsored || []),
+        ];
         const map = new Map<string, MobileGuideSponsoredBusiness>();
         pool.forEach((b) => {
           if (b.slug) map.set(b.slug.toLowerCase(), b);
@@ -5314,6 +5547,7 @@ function MobileFavoritesModal({
                 city: d.city,
                 state: d.state,
                 logo_url: d.logo_url,
+                logo_background_color: d.logo_background_color ?? null,
                 cover_url: d.cover_url ?? null,
                 description: d.description,
                 category_name: d.primary_category_name,
@@ -5361,9 +5595,9 @@ function MobileFavoritesModal({
   });
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label="Janela de Empresas Favoritas">
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Janela de Empresas Favoritas" style={{ zIndex: 2200 }}>
       <div
-        className="location-modal-card"
+        className="location-modal-sheet"
         style={{ maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -8570,7 +8804,8 @@ export function App() {
   const [city, setCity] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedPotency, setSelectedPotency] = useState('');
-  const [maisSubView, setMaisSubView] = useState<'menu' | 'eventos'>('menu');
+  const [maisSubView, setMaisSubView] = useState<'menu' | 'eventos' | 'minha-conta'>('menu');
+  const [memberPortalInitialTab, setMemberPortalInitialTab] = useState<MemberPortalTab>('visao-geral');
   const [eventTypeFilter, setEventTypeFilter] = useState<'all' | 'empresas' | 'lojas'>('all');
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isFavoritesModalOpen, setIsFavoritesModalOpen] = useState(false);
@@ -8580,8 +8815,14 @@ export function App() {
   const [selectedLodgeSlug, setSelectedLodgeSlug] = useState<string | null>(null);
   const [zoomLogo, setZoomLogo] = useState<{ url: string; name: string; backgroundColor?: string | null } | null>(null);
   const [referModal, setReferModal] = useState<{ businessName: string; businessSlug: string } | null>(null);
-  const [memberUser, setMemberUser] = useState<{ id: string; name: string; email: string } | null>(() => {
+  const [memberSession, setMemberSession] = useState<MobileAuthSessionTokens | null>(() => readStoredMobileSession());
+  const [memberUser, setMemberUser] = useState<MobileMemberUser | null>(() => {
     try {
+      const sess = readStoredMobileSession();
+      if (!sess) {
+        localStorage.removeItem('cm_mobile_member_user');
+        return null;
+      }
       const saved = localStorage.getItem('cm_mobile_member_user');
       return saved ? JSON.parse(saved) : null;
     } catch {
@@ -8606,12 +8847,16 @@ export function App() {
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { favorites, isFavorite, toggleFavorite } = useMobileFavorites();
+  const { favorites, isFavorite, toggleFavorite, setFavoritesList, clearFavorites } = useMobileFavorites();
   const online = useOnlineStatus();
 
   const handleToggleFavorite = (slug: string, name?: string) => {
-    toggleFavorite(slug);
     const willBeFavorited = !isFavorite(slug);
+    toggleFavorite(slug);
+    const activeSession = memberSession || readStoredMobileSession();
+    if (activeSession) {
+      void toggleMobileFavoriteRemote(activeSession, slug, willBeFavorited);
+    }
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setToastMsg(
       willBeFavorited
@@ -8637,17 +8882,24 @@ export function App() {
     }
   };
 
-  const handleMemberLoginSuccess = (user: { id: string; name: string; email: string }) => {
+  const handleMemberLoginSuccess = (user: MobileMemberUser, session: MobileAuthSessionTokens) => {
     setMemberUser(user);
+    setMemberSession(session);
+    writeStoredMobileSession(session);
+    writeStoredMobileUser(user);
     try {
-      localStorage.setItem('cm_mobile_member_user', JSON.stringify(user));
-      localStorage.setItem('cm_mobile_referrer_name', user.name);
       const cachedToken = localStorage.getItem('cm_fcm_device_token');
       if (cachedToken) {
         sendTokenToSupabase({ token: cachedToken, memberEmail: user.email, memberId: user.id });
       }
     } catch { }
     setIsMemberLoginModalOpen(false);
+
+    void syncMobileFavoritesRemote(session, favorites).then((mergedSlugs) => {
+      if (Array.isArray(mergedSlugs)) {
+        setFavoritesList(mergedSlugs);
+      }
+    });
 
     if (pendingBenefitToRedeem) {
       const voucher = redeemBenefit({
@@ -8671,17 +8923,38 @@ export function App() {
       setIsShareExperienceModalOpen(true);
     } else {
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-      setToastMsg('✓ Acesso de membro confirmado com sucesso!');
+      setToastMsg(`✓ Bem-vindo(a), ${user.name.split(' ')[0]}!`);
       toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 2500);
     }
   };
 
-  const handleDeleteMemberAccount = async () => {
+  const handleDeleteMemberAccount = async (): Promise<boolean> => {
     const emailToDelete = memberUser?.email;
-    const userId = memberUser?.id;
+    const activeSession = memberSession || readStoredMobileSession();
+
+    if (activeSession?.accessToken) {
+      const res = await deleteMobileMemberAccountRemote(activeSession);
+      if (!res.success) {
+        if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+        setToastMsg(`⚠️ ${res.message}`);
+        toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 4500);
+        return false;
+      }
+
+      purgeLocalAccountState({ userEmail: emailToDelete });
+      writeStoredMobileSession(null);
+      writeStoredMobileUser(null);
+      clearFavorites();
+      setMemberSession(null);
+      setMemberUser(null);
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+      setToastMsg(`✓ ${res.message}`);
+      toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 3500);
+      return true;
+    }
 
     const res = await executeAccountDeletion(null, {
-      userId,
+      userId: memberUser?.id,
       userEmail: emailToDelete,
       deviceToken: localStorage.getItem('cm_fcm_device_token'),
       isAuthenticatedSupabase: false,
@@ -8689,15 +8962,18 @@ export function App() {
 
     if (res.success) {
       purgeLocalAccountState({ userEmail: emailToDelete });
+      writeStoredMobileSession(null);
+      writeStoredMobileUser(null);
+      clearFavorites();
+      setMemberSession(null);
       setMemberUser(null);
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
       setToastMsg(`✓ ${res.message}`);
       toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 3000);
-    } else {
-      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-      setToastMsg(`⚠️ ${res.message}`);
-      toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 4500);
+      return true;
     }
+
+    return false;
   };
 
   useEffect(() => {
@@ -8760,7 +9036,7 @@ export function App() {
 
   const isDetailOpen = Boolean(selectedBusinessSlug || selectedLodgeSlug);
   const isEventosView = route === 'mais' && maisSubView === 'eventos';
-  const isMaisMenuOnly = route === 'mais' && maisSubView === 'menu';
+  const isMaisMenuOnly = route === 'mais' && (maisSubView === 'menu' || maisSubView === 'minha-conta');
 
   const searchPlaceholder =
     route === 'lojas'
@@ -9082,28 +9358,60 @@ export function App() {
         ) : (
           <EmptyScreen
             route={route}
+            favorites={favorites}
             favoritesCount={favorites.length}
             onGoToFavorites={() => {
               setIsFavoritesModalOpen(true);
             }}
             memberUser={memberUser}
+            memberSession={memberSession}
             onOpenMemberLogin={() => {
               setOpenShareAfterLogin(false);
               setIsMemberLoginModalOpen(true);
             }}
             onLogoutMember={() => {
               setMemberUser(null);
-              try {
-                localStorage.removeItem('cm_mobile_member_user');
-              } catch { }
+              setMemberSession(null);
+              writeStoredMobileSession(null);
+              writeStoredMobileUser(null);
+              clearFavorites();
+              setMaisSubView('menu');
             }}
             onDeleteMemberAccount={handleDeleteMemberAccount}
+            onUpdateMemberUser={(updated) => {
+              setMemberUser(updated);
+              writeStoredMobileUser(updated);
+            }}
+            onSyncFavoritesFromAccount={(slugs) => {
+              setFavoritesList(slugs);
+            }}
+            onToggleFavorite={handleToggleFavorite}
+            onClearFavorites={() => {
+              clearFavorites();
+              const activeSession = memberSession || readStoredMobileSession();
+              if (activeSession) {
+                void clearMobileFavoritesRemote(activeSession);
+              }
+            }}
+            onOpenVoucherModal={(v) => setActiveVoucherModal(v)}
+            onToast={(msg) => {
+              if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+              setToastMsg(msg);
+              toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 3000);
+            }}
             onStartShareExperience={() => handleStartShareExperience()}
             maisSubView={maisSubView}
             onChangeMaisSubView={(view) => setMaisSubView(view)}
+            memberPortalInitialTab={memberPortalInitialTab}
+            onOpenMemberPortal={(tab) => {
+              setMemberPortalInitialTab(tab);
+              setMaisSubView('minha-conta');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             eventTypeFilter={eventTypeFilter}
             onChangeEventTypeFilter={(f) => setEventTypeFilter(f)}
             searchQuery={search}
+            onSelectBusiness={(slug) => setSelectedBusinessSlug(slug)}
           />
         )}
       </main>

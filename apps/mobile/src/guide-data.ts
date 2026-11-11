@@ -480,11 +480,14 @@ export type MobileEventItem = {
   city: string | null;
   state: string | null;
   organizer_name: string | null;
-  organizer_type: 'business' | 'lodge' | 'social_action';
+  organizer_type: 'business' | 'lodge' | 'social_action' | 'platform';
   organizer_slug?: string | null;
   organizer_whatsapp?: string | null;
   cover_url: string | null;
   cta_url: string | null;
+  external_ticket_url?: string | null;
+  capacity?: number | null;
+  is_past?: boolean;
   category_id?: string;
   category_label?: string;
   category_short_label?: string;
@@ -493,6 +496,31 @@ export type MobileEventItem = {
   price_info?: string;
   registration_enabled?: boolean;
   footer_information?: string | null;
+};
+
+export type MobileEventRSVPAttendeeType = 'macom' | 'cunhada' | 'familiar' | 'convidado';
+export type MobileEventRSVPAttendanceStatus = 'confirmed' | 'declined';
+
+export type MobileEventRSVPPayload = {
+  eventId: string;
+  fullName: string;
+  whatsapp: string;
+  email?: string;
+  attendeeType: MobileEventRSVPAttendeeType;
+  masonicOrganization?: string;
+  companyName?: string;
+  city?: string;
+  attendanceStatus: MobileEventRSVPAttendanceStatus;
+  source?: string;
+};
+
+export type MobileEventRSVPResult = {
+  registrationId: string;
+  confirmationCode: string;
+  isNew: boolean;
+  fullName: string;
+  attendanceStatus: MobileEventRSVPAttendanceStatus;
+  checkinToken?: string;
 };
 
 async function fetchWithTimeout(
@@ -906,12 +934,19 @@ export async function loadEventsFromDirectSupabase(
   fetchImpl: typeof fetch,
 ): Promise<MobileEventItem[]> {
   try {
-    const bffUrl = 'https://conexaomaconica.com.br/api/mobile/events';
+    const bffUrl = `https://conexaomaconica.com.br/api/mobile/events?_t=${Date.now()}`;
     const res = await fetchWithTimeout(
       fetchImpl,
       bffUrl,
-      { headers: { Accept: 'application/json' } },
-      2500,
+      {
+        headers: {
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+        cache: 'no-store',
+      },
+      8000,
     );
     if (res.ok) {
       const data = await res.json();
@@ -922,6 +957,48 @@ export async function loadEventsFromDirectSupabase(
   } catch {}
 
   return [];
+}
+
+export async function submitMobileEventRSVP(
+  payload: MobileEventRSVPPayload,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ success: boolean; data?: MobileEventRSVPResult; error?: string }> {
+  try {
+    const res = await fetchWithTimeout(
+      fetchImpl,
+      'https://conexaomaconica.com.br/api/mobile/events/rsvp',
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-Client-Platform': 'mobile',
+        },
+        cache: 'no-store',
+        body: JSON.stringify({
+          ...payload,
+          source: payload.source || 'app_mobile',
+        }),
+      },
+      10000,
+    );
+
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.success && data?.data) {
+      return { success: true, data: data.data as MobileEventRSVPResult };
+    }
+    return {
+      success: false,
+      error:
+        (data && typeof data.error === 'string' && data.error) ||
+        'Não foi possível registrar sua presença. Tente novamente.',
+    };
+  } catch {
+    return {
+      success: false,
+      error: 'Sem conexão com o servidor. Verifique sua internet e tente novamente.',
+    };
+  }
 }
 
 export function createMobileGuideService(
@@ -973,6 +1050,34 @@ export function createMobileGuideService(
 
     async loadBusinessDetail(slug: string): Promise<MobileBusinessDetail | null> {
       return await loadBusinessDetailFromDirectSupabase(fetchImpl, slug);
+    },
+
+    async loadBusinessesBySlugs(slugs: string[]): Promise<MobileGuideSponsoredBusiness[]> {
+      const cleanSlugs = Array.from(new Set(slugs.map((s) => s.trim()).filter(Boolean)));
+      if (cleanSlugs.length === 0) return [];
+      try {
+        const bffUrl = `https://conexaomaconica.com.br/api/mobile/guide?slugs=${encodeURIComponent(cleanSlugs.join(','))}&_t=${Date.now()}`;
+        const res = await fetchWithTimeout(
+          fetchImpl,
+          bffUrl,
+          {
+            headers: {
+              Accept: 'application/json',
+              'Cache-Control': 'no-cache',
+              Pragma: 'no-cache',
+            },
+            cache: 'no-store',
+          },
+          8000,
+        );
+        if (res.ok) {
+          const data = parseHomeData(await res.json());
+          return data.businesses || [];
+        }
+      } catch {
+        // Fallback below if direct endpoint fails
+      }
+      return [];
     },
 
     async searchLodges(filters?: MobileLodgeFilterState, page = 1, pageSize = 12): Promise<{ items: MobileLodgeCardData[]; total: number }> {

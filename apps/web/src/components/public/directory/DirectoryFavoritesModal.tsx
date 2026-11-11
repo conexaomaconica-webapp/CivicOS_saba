@@ -106,7 +106,7 @@ export function DirectoryFavoritesModal() {
   if (!isModalOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-xs flex justify-end transition-opacity">
+    <div className="fixed inset-0 z-[1300] overflow-hidden bg-black/60 backdrop-blur-xs flex justify-end transition-opacity">
       {/* Overlay Backdrop Click */}
       <div className="absolute inset-0" onClick={() => setIsModalOpen(false)} />
 

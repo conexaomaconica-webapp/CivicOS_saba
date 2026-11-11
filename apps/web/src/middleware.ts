@@ -29,7 +29,7 @@ export async function middleware(request: NextRequest) {
 
   // Endpoints públicos de telemetria/BFF que não dependem de sessão de cookie no navegador.
   if (
-    request.nextUrl.pathname === '/api/mobile/guide' ||
+    request.nextUrl.pathname.startsWith('/api/mobile/') ||
     request.nextUrl.pathname === '/api/analytics/track'
   ) {
     return response;

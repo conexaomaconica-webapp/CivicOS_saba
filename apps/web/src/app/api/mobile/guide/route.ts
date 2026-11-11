@@ -32,6 +32,10 @@ export async function GET(request: Request) {
 
   const params = new URL(request.url).searchParams;
   const slugParam = params.get('slug')?.trim() || null;
+  const slugsRaw = params.get('slugs')?.trim() || '';
+  const slugsFilter = slugsRaw
+    ? Array.from(new Set(slugsRaw.split(',').map((s) => s.trim()).filter(Boolean))).slice(0, 100)
+    : null;
   const hasBenefitsParam = params.get('has_benefits') === 'true' ? true : null;
   const city = params.get('city')?.trim() || null;
   const query = params.get('q')?.trim() || null;
@@ -124,7 +128,7 @@ export async function GET(request: Request) {
       );
     }
     const payload = (homeData && typeof homeData === 'object' ? homeData : {}) as Record<string, unknown>;
-    const { data: searchData, error: searchError } = await db.rpc('public_businesses_search', {
+    const searchRpcParams: Record<string, unknown> = {
       p_host: host,
       p_query: query,
       p_city: city,
@@ -132,9 +136,13 @@ export async function GET(request: Request) {
       p_verified: null,
       p_has_benefits: hasBenefitsParam,
       p_sort: 'relevance',
-      p_page: page,
-      p_page_size: pageSize,
-    });
+      p_page: slugsFilter && slugsFilter.length > 0 ? 1 : page,
+      p_page_size: slugsFilter && slugsFilter.length > 0 ? Math.max(slugsFilter.length, 50) : pageSize,
+    };
+    if (slugsFilter && slugsFilter.length > 0) {
+      searchRpcParams.p_slugs = slugsFilter;
+    }
+    const { data: searchData, error: searchError } = await db.rpc('public_businesses_search', searchRpcParams);
     if (searchError) {
       return NextResponse.json(
         { error: 'Empresas indisponíveis' },

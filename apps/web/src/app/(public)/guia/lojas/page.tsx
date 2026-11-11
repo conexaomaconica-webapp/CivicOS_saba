@@ -11,7 +11,6 @@ import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
-import { DirectoryFavoritesModal } from '@/components/public/directory/DirectoryFavoritesModal';
 import { LodgeDirectoryClient } from '@/components/public/directory/LodgeDirectoryClient';
 import type { LodgeFilterState } from '@/components/public/directory/LodgeFilters';
 import type { ViewMode } from '@/components/public/directory/BusinessResultsToolbar';
@@ -347,9 +346,6 @@ export default async function MasonicLodgesDirectoryPage({ searchParams }: Props
 
         {/* Footer */}
         <DirectoryFooter />
-
-        {/* Modal de Favoritos */}
-        <DirectoryFavoritesModal />
       </div>
     </FavoritesProvider>
   );

@@ -21,7 +21,6 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database.types';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
-import { DirectoryFavoritesModal } from '@/components/public/directory/DirectoryFavoritesModal';
 import { StructuredData } from '@/components/seo/StructuredData';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
 import {
@@ -699,7 +698,6 @@ export default async function PublicEventsDirectoryPage({ searchParams }: Props)
         </main>
 
         <DirectoryFooter />
-        <DirectoryFavoritesModal />
       </div>
     </FavoritesProvider>
   );

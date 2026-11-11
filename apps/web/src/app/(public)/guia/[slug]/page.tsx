@@ -634,7 +634,6 @@ import MasonicLodgesDirectoryPage from '../lojas/page';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
-import { DirectoryFavoritesModal } from '@/components/public/directory/DirectoryFavoritesModal';
 import '@/styles/directory-home.css';
 
 export default async function CompanyDetailsPage(props: Props & { searchParams?: any }) {
@@ -745,7 +744,6 @@ export default async function CompanyDetailsPage(props: Props & { searchParams?:
       >
         <BusinessProfileRenderer business={business} />
       </BusinessContactTracker>
-      <DirectoryFavoritesModal />
       <DirectoryFooter />
     </FavoritesProvider>
   );

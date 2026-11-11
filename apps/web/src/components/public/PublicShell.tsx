@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { PublicFooter } from './PublicFooter';
 import { PublicHeader } from './PublicHeader';
 import { PublicMobileBottomNav } from './PublicMobileBottomNav';
+import { DirectoryFavoritesModal } from './directory/DirectoryFavoritesModal';
 import { LandingMobileBottomNav } from '@/components/landing/LandingMobileBottomNav';
 import { LaunchExperience } from './LaunchExperience';
 import type { PublicMediaAsset } from '@/lib/business/public-business-presentation';
@@ -40,6 +41,7 @@ export function PublicShell({
       {renderHeader ? <PublicHeader productName={productName || 'Conexão Maçônica'} logoUrl={logoUrl} viewer={viewer} /> : null}
       <main className="cm-public-main pb-20 md:pb-0">{children}</main>
       {renderFooter ? <PublicFooter /> : null}
+      {!isLandingPage ? <DirectoryFavoritesModal /> : null}
       {isLandingPage ? <LandingMobileBottomNav /> : <PublicMobileBottomNav />}
     </div>
   );

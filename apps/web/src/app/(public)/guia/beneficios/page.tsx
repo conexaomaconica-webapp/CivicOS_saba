@@ -6,7 +6,6 @@ import { ChevronRight, Award, Tag, Sparkles, ArrowRight, Store, Search } from 'l
 import { createServerSideClient } from '@/lib/supabase/server';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
-import { DirectoryFavoritesModal } from '@/components/public/directory/DirectoryFavoritesModal';
 import { StructuredData } from '@/components/seo/StructuredData';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
 import '@/styles/directory-home.css';
@@ -206,7 +205,6 @@ export default async function PublicBenefitsDirectoryPage({ searchParams }: Prop
         </main>
 
         <DirectoryFooter />
-        <DirectoryFavoritesModal />
       </div>
     </FavoritesProvider>
   );

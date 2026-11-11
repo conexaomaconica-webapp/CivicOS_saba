@@ -12,7 +12,7 @@ export const revalidate = 0;
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Version',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Version, X-Client-Platform',
 };
 
 export async function OPTIONS() {
@@ -181,19 +181,21 @@ export async function GET() {
           location_label: p.venue_name || null,
           address: p.venue_address || null,
           city: p.city || 'Feira de Santana',
-          state: 'BA',
+          state: p.state || 'BA',
           organizer_name: resolvedOrganizerName,
           organizer_type: orgType,
           organizer_slug: null,
-          organizer_whatsapp: null,
+          organizer_whatsapp: p.organizer_whatsapp || null,
           cover_url: p.cover_image_url || null,
-          cta_url: null,
+          cta_url: p.external_ticket_url || null,
+          external_ticket_url: p.external_ticket_url || null,
+          capacity: typeof p.capacity === 'number' ? p.capacity : null,
           category_id: cat.id,
           category_label: cat.label,
           category_short_label: cat.shortLabel,
           category_icon: cat.icon,
           badge_text: p.badge_text || (orgType === 'lodge' ? 'Loja Maçônica' : 'Evento Especial'),
-          price_info: price,
+          price_info: p.price_info || price,
           registration_enabled: Boolean(p.registration_enabled),
           footer_information: p.footer_information || null,
         };
@@ -231,6 +233,8 @@ export async function GET() {
           organizer_whatsapp: biz?.whatsapp || biz?.phone || null,
           cover_url: b.cover_image_url || null,
           cta_url: b.external_ticket_url || null,
+          external_ticket_url: b.external_ticket_url || null,
+          capacity: null,
           category_id: cat.id,
           category_label: cat.label,
           category_short_label: cat.shortLabel,

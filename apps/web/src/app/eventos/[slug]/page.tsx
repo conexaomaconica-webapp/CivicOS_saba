@@ -24,6 +24,7 @@ import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { appUrl } from '@/lib/seo/app-url';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
+import { DirectoryFavoritesModal } from '@/components/public/directory/DirectoryFavoritesModal';
 import { EventActionsClient } from '@/components/public/events/EventActionsClient';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
 
@@ -654,6 +655,7 @@ export default async function EventPage({ params }: PageProps) {
         </main>
 
         <DirectoryFooter />
+        <DirectoryFavoritesModal />
       </div>
     </FavoritesProvider>
   );

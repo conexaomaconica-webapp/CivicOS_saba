@@ -18,7 +18,7 @@ const LOCAL_STORAGE_KEY = 'cm_directory_favorites';
 
 const FavoritesContext = createContext<FavoritesContextType | undefined>(undefined);
 
-export function FavoritesProvider({ children }: { children: React.ReactNode }) {
+function FavoritesProviderRoot({ children }: { children: React.ReactNode }) {
   const [favoriteSlugs, setFavoriteSlugs] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -125,6 +125,14 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
       {children}
     </FavoritesContext.Provider>
   );
+}
+
+export function FavoritesProvider({ children }: { children: React.ReactNode }) {
+  const parentContext = useContext(FavoritesContext);
+  if (parentContext) {
+    return <>{children}</>;
+  }
+  return <FavoritesProviderRoot>{children}</FavoritesProviderRoot>;
 }
 
 export function useFavorites() {
