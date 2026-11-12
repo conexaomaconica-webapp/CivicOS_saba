@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { MAX_BUSINESS_CERTIFICATIONS, planAllowsCertifications } from '@/lib/business/certifications';
+import { MAX_BUSINESS_CERTIFICATIONS, normalizeCertificationZoom, planAllowsCertifications } from '@/lib/business/certifications';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -85,7 +85,7 @@ export async function GET(request: Request) {
             .then((r: any) => r, () => ({ data: [] })),
           adminDb
             .from('business_certifications')
-            .select('id, image_url, display_order')
+            .select('id, image_url, display_order, zoom_percent')
             .eq('business_id', bizId)
             .order('display_order', { ascending: true })
             .order('created_at', { ascending: true })
@@ -97,7 +97,7 @@ export async function GET(request: Request) {
           ? (Array.isArray(certRows) ? certRows : [])
               .filter((c: any) => c?.image_url)
               .slice(0, MAX_BUSINESS_CERTIFICATIONS)
-              .map((c: any) => ({ id: String(c.id), url: String(c.image_url) }))
+              .map((c: any) => ({ id: String(c.id), url: String(c.image_url), zoom_percent: normalizeCertificationZoom(c.zoom_percent) }))
           : [];
         if (Array.isArray(recRows) && recRows.length > 0) {
           detail.recognitions = recRows;

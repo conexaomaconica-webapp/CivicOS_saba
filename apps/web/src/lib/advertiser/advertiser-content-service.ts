@@ -6,6 +6,7 @@ import { findOwnBusinessById } from '@/lib/advertiser/advertiser-access';
 import { submitBusinessChangeRequest } from '@/lib/advertiser/change-requests';
 import { findAdvertiserBusiness } from '@/lib/advertiser/advertiser-access';
 import { getNextServiceOrder, moveBusinessService } from '@/lib/business/service-order';
+import { cleanRichTextHtml } from '@/lib/text/rich-text-clean';
 import { checkAdvertiserQuotaAction } from '@/lib/advertiser/advertiser-entitlements';
 
 export type ContentStatus = 'published' | 'under_review' | 'draft' | 'inactive' | 'expired';
@@ -357,7 +358,7 @@ export async function saveAdvertiserServiceAction(
           business_id: service.business_id,
           tenant_id: biz.tenant_id,
           name: (service.title || '').trim(),
-          description: service.description?.trim() || null,
+          description: cleanRichTextHtml(service.description) || null,
           icon_name: service.icon_name || null,
           price_info: service.price_info || null,
           is_active: true,
@@ -380,7 +381,7 @@ export async function saveAdvertiserServiceAction(
       .from('business_services')
       .update({
         name: (service.title || '').trim(),
-        description: service.description?.trim() || null,
+        description: cleanRichTextHtml(service.description) || null,
         icon_name: service.icon_name || null,
         price_info: service.price_info || null,
         updated_at: new Date().toISOString(),

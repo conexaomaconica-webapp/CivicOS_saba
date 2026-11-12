@@ -401,7 +401,7 @@ export type MobileBusinessDetail = {
   }>;
   benefits: MobileBusinessBenefit[];
   recognitions?: MobileInstitutionalRecognition[];
-  certifications?: Array<{ id: string; url: string }>;
+  certifications?: Array<{ id: string; url: string; zoom_percent?: number }>;
 };
 
 export type MobileLodgeMeetingData = {

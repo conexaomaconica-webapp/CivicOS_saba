@@ -7320,40 +7320,37 @@ button, input { font: inherit; }
 }
 
 
-/* Certificações de mercado (ISO etc.) — Plano Acácia */
+/* Certificações de mercado (ISO etc.) — Plano Acácia. Quadro fixo; o zoom amplia a arte dentro dele. */
 .header-certification-btn {
   background: #fff;
-  border: 1px solid rgba(201, 162, 39, 0.5);
-  border-radius: 10px;
-  padding: 3px;
-  width: 36px;
-  height: 36px;
+  border: 1px solid rgba(201, 162, 39, 0.6);
+  border-radius: 12px;
+  padding: 0;
+  width: 56px;
+  height: 56px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   cursor: zoom-in;
+  flex-shrink: 0;
 }
 .header-certification-img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
 }
-.certification-card-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.certification-card-btn {
+.certification-card-tile {
+  width: 108px;
+  height: 108px;
+  max-width: 100%;
   background: #fff;
-  border: 1px solid #e8e5df;
   border-radius: 14px;
-  padding: 6px;
-  width: 72px;
-  height: 72px;
-  display: inline-flex;
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  display: flex;
   align-items: center;
   justify-content: center;
-  cursor: zoom-in;
+  overflow: hidden;
 }
 .certification-card-img {
   max-width: 100%;

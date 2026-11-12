@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
+import { CertificationLogo } from '@/components/public/business/shared/CertificationBadges';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -68,6 +69,7 @@ import {
   uploadAdminResponsibleAvatarAction,
   uploadAdminBusinessAssetAction,
   uploadAdminBusinessCertificationAction,
+  updateAdminBusinessCertificationZoomAction,
   deleteAdminBusinessCertificationAction,
   listAdminBusinessCategoriesAction,
   createAdminBusinessCategoryAction,
@@ -1242,16 +1244,51 @@ export default function Company360Client({ initialData }: Props) {
     setLoading(false);
   };
 
-  const handleUploadCertification = async (file: File | null | undefined) => {
+  const [certDraftFile, setCertDraftFile] = useState<File | null>(null);
+  const [certDraftPreview, setCertDraftPreview] = useState<string | null>(null);
+  const [certDraftZoom, setCertDraftZoom] = useState(100);
+
+  useEffect(() => {
+    if (!certDraftFile) {
+      setCertDraftPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(certDraftFile);
+    setCertDraftPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [certDraftFile]);
+
+  const handleSaveCertificationZoom = async (certificationId: string, zoom: number) => {
+    setMessage(null);
+    const res = await updateAdminBusinessCertificationZoomAction(data.business.id, certificationId, zoom);
+    if (res.success) {
+      setData((prev) => ({
+        ...prev,
+        certifications_items: (prev.certifications_items || []).map((c) =>
+          c.id === certificationId ? { ...c, zoom_percent: res.zoom_percent ?? zoom } : c
+        ),
+      }));
+      setMessage({ type: 'success', text: 'Zoom da certificação atualizado.' });
+    } else {
+      setMessage({ type: 'error', text: res.error || 'Erro ao ajustar o zoom.' });
+    }
+  };
+
+  const handleUploadCertification = async (file: File | null | undefined, zoom = 100) => {
     if (!file) return;
     setLoading(true);
     setMessage(null);
     const formData = new FormData();
     formData.append('businessId', data.business.id);
     formData.append('file', file);
+    formData.append('zoom', String(zoom));
     const res = await uploadAdminBusinessCertificationAction(formData);
     if (res.success && res.item) {
       setData((prev) => ({ ...prev, certifications_items: [...(prev.certifications_items || []), res.item!] }));
+      setCertDraftFile(null);
+      setCertDraftZoom(100);
+      setCertDraftFile(null);
+      setCertDraftZoom(100);
       setMessage({ type: 'success', text: 'Certificação adicionada ao cabeçalho e ao card de selos da empresa.' });
     } else {
       setMessage({ type: 'error', text: res.error || 'Erro ao enviar certificação.' });
@@ -3161,8 +3198,11 @@ export default function Company360Client({ initialData }: Props) {
                                 setRespCommunityLabel(lbl);
                                 const fem = lbl === 'Cunhada' || lbl === 'Sobrinha';
                                 const prof = resolveProfessionFromCategory(category, fem ? 'feminino' : 'masculino');
-                                if (!respRole || /^propriet[aá]ri[oa]$/i.test(respRole)) {
+                                if (!respRole) {
                                   setRespRole(prof || (fem ? 'Proprietária' : 'Proprietário'));
+                                } else if (/^propriet[aá]ri[oa]$/i.test(respRole)) {
+                                  // Mantém a escolha "Proprietário(a)", só ajusta o gênero
+                                  setRespRole(fem ? 'Proprietária' : 'Proprietário');
                                 } else {
                                   const adjusted = resolveResponsibleRole({
                                     businessRole: respRole,
@@ -3739,47 +3779,120 @@ export default function Company360Client({ initialData }: Props) {
                     <span>Certificações de Mercado ({(data.certifications_items || []).length}/3)</span>
                   </h3>
                   <p className="text-xs text-stone-500 mt-0.5">
-                    Logos como ISO 9001 aparecem no cabeçalho e no card de selos da página da empresa (Web e App). Distintas dos selos institucionais.
+                    Logos como ISO 9001 aparecem no cabeçalho (ao lado dos selos) e em um card de certificações na página da empresa (Web e App). Distintas dos selos institucionais.
                   </p>
                 </div>
                 <label
                   className={`px-3.5 py-1.5 bg-[#3B0B14] hover:bg-[#5d1523] text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer ${
-                    loading || (data.certifications_items || []).length >= 3 ? 'opacity-50 pointer-events-none' : ''
+                    loading || certDraftFile || (data.certifications_items || []).length >= 3 ? 'opacity-50 pointer-events-none' : ''
                   }`}
                 >
-                  <Upload className="w-4 h-4 text-[#C9A227]" /> Enviar logo
+                  <Upload className="w-4 h-4 text-[#C9A227]" /> Escolher logo
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
                     className="hidden"
                     onChange={(e) => {
-                      void handleUploadCertification(e.target.files?.[0]);
+                      setCertDraftFile(e.target.files?.[0] ?? null);
+                      setCertDraftZoom(100);
                       e.target.value = '';
                     }}
                   />
                 </label>
               </div>
 
-              {(data.certifications_items || []).length === 0 ? (
-                <div className="p-6 text-center bg-stone-50 border border-dashed border-stone-300 rounded-2xl text-xs text-stone-500">
-                  Nenhuma certificação cadastrada. Envie a logo (PNG, JPG ou WebP, até 2 MB; fundo transparente recomendado).
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-4">
-                  {(data.certifications_items || []).map((cert) => (
-                    <div key={cert.id} className="relative w-28 h-28 rounded-2xl border border-stone-300 bg-stone-50 flex items-center justify-center p-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={cert.url} alt="Certificação da empresa" className="max-w-full max-h-full object-contain" />
+              {certDraftFile && certDraftPreview && (
+                <div className="p-4 rounded-2xl border border-[#C9A227]/50 bg-[#3B0B14]/5 flex flex-wrap items-center gap-5">
+                  <CertificationLogo
+                    url={certDraftPreview}
+                    zoom={certDraftZoom}
+                    alt="Pré-visualização da certificação"
+                    className="h-32 w-32 rounded-2xl border border-[#C9A227]/40 shrink-0"
+                  />
+                  <div className="flex-1 min-w-[220px] space-y-2">
+                    <p className="text-xs font-bold text-stone-800">Ajuste o zoom antes de salvar ({certDraftZoom}%)</p>
+                    <input
+                      type="range"
+                      min={100}
+                      max={300}
+                      step={5}
+                      value={certDraftZoom}
+                      onChange={(e) => setCertDraftZoom(Number(e.target.value))}
+                      className="w-full"
+                      aria-label="Zoom da certificação"
+                    />
+                    <p className="text-[11px] text-stone-500">Aumente se a logo tem muita margem em volta. No cabeçalho o quadro é menor, com o mesmo enquadramento.</p>
+                    <div className="flex gap-2 pt-1">
                       <button
                         type="button"
-                        onClick={() => handleDeleteCertification(cert.id)}
                         disabled={loading}
-                        title="Remover certificação"
-                        aria-label="Remover certificação"
-                        className="absolute -top-2 -right-2 p-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow cursor-pointer"
+                        onClick={() => void handleUploadCertification(certDraftFile, certDraftZoom)}
+                        className="px-3.5 py-1.5 bg-[#3B0B14] hover:bg-[#5d1523] text-white font-bold text-xs rounded-xl cursor-pointer disabled:opacity-50"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        Salvar certificação
                       </button>
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={() => setCertDraftFile(null)}
+                        className="px-3.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(data.certifications_items || []).length === 0 && !certDraftFile ? (
+                <div className="p-6 text-center bg-stone-50 border border-dashed border-stone-300 rounded-2xl text-xs text-stone-500">
+                  Nenhuma certificação cadastrada. Escolha a logo (PNG, JPG ou WebP, até 2 MB; fundo transparente recomendado).
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-5">
+                  {(data.certifications_items || []).map((cert) => (
+                    <div key={cert.id} className="w-36 space-y-2">
+                      <div className="relative">
+                        <CertificationLogo
+                          url={cert.url}
+                          zoom={cert.zoom_percent}
+                          alt="Certificação da empresa"
+                          className="h-32 w-32 rounded-2xl border border-stone-300 mx-auto"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCertification(cert.id)}
+                          disabled={loading}
+                          title="Remover certificação"
+                          aria-label="Remover certificação"
+                          className="absolute -top-2 right-0 p-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <label className="block text-[11px] font-semibold text-stone-600">
+                        Zoom {cert.zoom_percent ?? 100}%
+                        <input
+                          type="range"
+                          min={100}
+                          max={300}
+                          step={5}
+                          defaultValue={cert.zoom_percent ?? 100}
+                          onChange={(e) => {
+                            const zoom = Number(e.target.value);
+                            setData((prev) => ({
+                              ...prev,
+                              certifications_items: (prev.certifications_items || []).map((c) =>
+                                c.id === cert.id ? { ...c, zoom_percent: zoom } : c
+                              ),
+                            }));
+                          }}
+                          onPointerUp={(e) => void handleSaveCertificationZoom(cert.id, Number((e.target as HTMLInputElement).value))}
+                          onKeyUp={(e) => void handleSaveCertificationZoom(cert.id, Number((e.target as HTMLInputElement).value))}
+                          className="w-full"
+                          aria-label="Zoom da certificação"
+                        />
+                      </label>
                     </div>
                   ))}
                 </div>

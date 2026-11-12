@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { cleanRichTextHtml, visibleTextLength } from '@/lib/text/rich-text-clean';
 import {
   Bold,
   Italic,
@@ -109,6 +110,24 @@ export function RichTextEditor({
       updateActiveStates();
     }
   };
+
+  // Ao colar, descarta estilos/spans/classes de Word, Google Docs e sites (HTML escondido que incha o texto)
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const html = e.clipboardData.getData('text/html');
+    const plain = e.clipboardData.getData('text/plain');
+    e.preventDefault();
+    const cleaned = html ? cleanRichTextHtml(html) : '';
+    if (cleaned && visibleTextLength(cleaned) > 0) {
+      document.execCommand('insertHTML', false, cleaned);
+    } else {
+      document.execCommand('insertText', false, plain);
+    }
+    handleInput();
+  };
+
+  const visibleChars = visibleTextLength(value);
+  const htmlChars = (value || '').length;
+  const hasHiddenFormatting = htmlChars > 1500 && htmlChars > visibleChars * 3;
 
   const executeCommand = (command: string, arg?: string) => {
     if (showCode) return;
@@ -364,6 +383,7 @@ export function RichTextEditor({
             onKeyUp={updateActiveStates}
             onMouseUp={updateActiveStates}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             onWheel={handleEditorWheel}
             style={{ minHeight, overscrollBehavior: 'contain' }}
             data-placeholder={placeholder}
@@ -379,6 +399,26 @@ export function RichTextEditor({
           )}
         </div>
       )}
+
+      {/* CONTADOR DE CARACTERES + AVISO DE FORMATAÇÃO OCULTA */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 border-t border-stone-200 text-[10px] text-stone-500">
+        <span>
+          {visibleChars.toLocaleString('pt-BR')} caractere(s) de texto
+          {htmlChars > 0 && ` • ${htmlChars.toLocaleString('pt-BR')} com formatação`}
+        </span>
+        {hasHiddenFormatting && (
+          <span className="flex items-center gap-2 text-amber-800 font-semibold">
+            Há formatação oculta (colada de outro lugar).
+            <button
+              type="button"
+              onClick={() => onChange(cleanRichTextHtml(value))}
+              className="px-2 py-0.5 rounded-md bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 font-bold cursor-pointer"
+            >
+              Limpar formatação
+            </button>
+          </span>
+        )}
+      </div>
     </div>
   );
 }

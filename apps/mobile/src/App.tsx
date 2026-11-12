@@ -3562,7 +3562,12 @@ function BusinessDetailModal({
                                 })
                               }
                             >
-                              <img src={cert.url} alt={`Certificação de ${detail.business_name}`} className="header-certification-img" />
+                              <img
+                                src={cert.url}
+                                alt={`Certificação de ${detail.business_name}`}
+                                className="header-certification-img"
+                                style={{ transform: `scale(${Math.min(3, Math.max(1, (cert.zoom_percent || 100) / 100))})` }}
+                              />
                             </button>
                           ))}
                       </div>
@@ -4020,26 +4025,36 @@ function BusinessDetailModal({
                 {plan === 'acacia' && (detail.certifications || []).length > 0 && (
                   <div id="section-certificacoes" className="detail-section-block">
                     <h3 className="detail-section-title">Certificações</h3>
-                    <div className="certification-card-row">
-                      {(detail.certifications || []).map((cert) => (
-                        <button
-                          key={cert.id}
-                          type="button"
-                          className="certification-card-btn"
-                          title="Toque para ampliar"
-                          aria-label="Ampliar certificação da empresa"
-                          onClick={() =>
-                            setZoomedSeal({
-                              badgeLabel: 'Certificação de mercado',
-                              title: `Certificação de ${detail.business_name}`,
-                              description: 'Certificação de mercado conquistada pela empresa.',
-                              imageUrl: cert.url,
-                            })
-                          }
-                        >
-                          <img src={cert.url} alt={`Certificação de ${detail.business_name}`} className="certification-card-img" />
-                        </button>
-                      ))}
+                    <div className="seals-catalog-card">
+                      <div className="seals-grid-clean">
+                        {(detail.certifications || []).map((cert) => (
+                          <button
+                            key={cert.id}
+                            type="button"
+                            className="seal-clean-card-btn"
+                            title="Toque para ampliar"
+                            aria-label="Ampliar certificação da empresa"
+                            onClick={() =>
+                              setZoomedSeal({
+                                badgeLabel: 'Certificação de mercado',
+                                title: `Certificação de ${detail.business_name}`,
+                                description: 'Certificação de mercado conquistada pela empresa.',
+                                imageUrl: cert.url,
+                              })
+                            }
+                          >
+                            <span className="certification-card-tile">
+                              <img
+                                src={cert.url}
+                                alt={`Certificação de ${detail.business_name}`}
+                                className="certification-card-img"
+                                style={{ transform: `scale(${Math.min(3, Math.max(1, (cert.zoom_percent || 100) / 100))})` }}
+                              />
+                            </span>
+                            <span className="seal-clean-zoom-hint">Toque para ampliar</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}

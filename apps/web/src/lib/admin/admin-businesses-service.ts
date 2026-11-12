@@ -32,7 +32,8 @@ import {
 } from '@/lib/commercial-onboarding-status';
 import { evaluateBusinessProfileReadiness } from './admin-commercial-dossier-readiness';
 import { getNextServiceOrder, moveBusinessService } from '@/lib/business/service-order';
-import { MAX_BUSINESS_CERTIFICATIONS, planAllowsCertifications } from '@/lib/business/certifications';
+import { MAX_BUSINESS_CERTIFICATIONS, normalizeCertificationZoom, planAllowsCertifications } from '@/lib/business/certifications';
+import { cleanRichTextHtml } from '@/lib/text/rich-text-clean';
 import { getInternalProfileDTO } from '@/lib/member/profile-access-service';
 
 function normalizeMasonicStatus(status: string | null | undefined): 'pending' | 'verified' | 'rejected' {
@@ -370,7 +371,7 @@ export async function uploadAdminBusinessAssetAction(formData: FormData): Promis
 
 export async function uploadAdminBusinessCertificationAction(formData: FormData): Promise<{
   success: boolean;
-  item?: { id: string; url: string; display_order: number };
+  item?: { id: string; url: string; display_order: number; zoom_percent: number };
   error?: string;
 }> {
   try {
@@ -420,8 +421,9 @@ export async function uploadAdminBusinessCertificationAction(formData: FormData)
       business_id: businessId,
       image_url: url,
       storage_path: storagePath,
+      zoom_percent: normalizeCertificationZoom(formData.get('zoom')),
       display_order: (count || 0) + 1,
-    }).select('id, image_url, display_order').single();
+    }).select('id, image_url, display_order, zoom_percent').single();
     if (insertError) {
       await adminClient.storage.from('business-assets').remove([storagePath]);
       return { success: false, error: `Falha ao salvar certificação: ${insertError.message}` };
@@ -429,9 +431,34 @@ export async function uploadAdminBusinessCertificationAction(formData: FormData)
 
     revalidatePath(`/admin/empresas/${businessId}`);
     revalidatePath('/guia', 'layout');
-    return { success: true, item: { id: inserted.id, url: inserted.image_url, display_order: inserted.display_order } };
+    return { success: true, item: { id: inserted.id, url: inserted.image_url, display_order: inserted.display_order, zoom_percent: inserted.zoom_percent ?? 100 } };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Erro inesperado no upload.' };
+  }
+}
+
+export async function updateAdminBusinessCertificationZoomAction(
+  businessId: string,
+  certificationId: string,
+  zoomPercent: number
+): Promise<{ success: boolean; zoom_percent?: number; error?: string }> {
+  try {
+    await assertPlatformAdminAccess();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) return { success: false, error: 'Configuração segura do servidor indisponível.' };
+    const adminClient: any = createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+
+    const zoom = normalizeCertificationZoom(zoomPercent);
+    const { error } = await adminClient.from('business_certifications')
+      .update({ zoom_percent: zoom }).eq('id', certificationId).eq('business_id', businessId);
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath(`/admin/empresas/${businessId}`);
+    revalidatePath('/guia', 'layout');
+    return { success: true, zoom_percent: zoom };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Erro ao ajustar o zoom.' };
   }
 }
 
@@ -664,7 +691,7 @@ export interface AdminBusiness360DTO {
     display_order: number;
     created_at: string;
   }>;
-  certifications_items?: Array<{ id: string; url: string; display_order: number }>;
+  certifications_items?: Array<{ id: string; url: string; display_order: number; zoom_percent: number }>;
   certifications_enabled?: boolean;
   business_video?: { id: string; url: string; title: string | null };
   cover_item?: {
@@ -1253,11 +1280,11 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       ? { id: coverRaw.id, url: coverRaw.url, title: coverRaw.title || null }
       : undefined;
 
-    let certifications_items: Array<{ id: string; url: string; display_order: number }> = [];
+    let certifications_items: Array<{ id: string; url: string; display_order: number; zoom_percent: number }> = [];
     try {
       const certRes = await (supabase as any)
         .from('business_certifications')
-        .select('id, image_url, display_order')
+        .select('id, image_url, display_order, zoom_percent')
         .eq('business_id', businessId)
         .order('display_order', { ascending: true })
         .order('created_at', { ascending: true });
@@ -1265,6 +1292,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
         id: c.id,
         url: c.image_url,
         display_order: c.display_order || 1,
+        zoom_percent: c.zoom_percent || 100,
       }));
     } catch (_e) {
       certifications_items = [];
@@ -3942,7 +3970,7 @@ export async function manageAdminServiceAction(
           tenant_id: biz.tenant_id,
           business_id: businessId,
           name: (payload.name || 'Novo Serviço').trim(),
-          description: payload.description ? payload.description.trim() : null,
+          description: payload.description ? cleanRichTextHtml(payload.description) || null : null,
           price_info: payload.price_info ? payload.price_info.trim() : null,
           is_active: true,
           display_order: await getNextServiceOrder(supabase, businessId),
@@ -3973,7 +4001,7 @@ export async function manageAdminServiceAction(
         .from('business_services')
         .update({
           name: payload.name !== undefined ? payload.name.trim() : existing?.name,
-          description: payload.description !== undefined ? payload.description.trim() : existing?.description,
+          description: payload.description !== undefined ? cleanRichTextHtml(payload.description) : existing?.description,
           price_info: payload.price_info !== undefined ? payload.price_info.trim() : existing?.price_info,
           updated_at: new Date().toISOString(),
         })

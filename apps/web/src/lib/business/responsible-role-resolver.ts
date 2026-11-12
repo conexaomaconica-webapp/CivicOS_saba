@@ -106,8 +106,14 @@ export function resolveResponsibleRole(options: {
   // - Sobrinho: "Proprietário" ou Profissão conforme categoria (gênero masculino)
   // - Sobrinha: "Proprietária" ou Profissão conforme categoria (gênero feminino)
   // Se não houver cargo preenchido ou for o padrão "Proprietário(a)", utiliza a Profissão da categoria ou Proprietário(a)
-  if (!rawRole || /^propriet[aá]ri[oa]$/i.test(rawRole)) {
+  // Cargo vazio: usa a profissão da categoria (ou Proprietário(a)).
+  // Cargo "Proprietário(a)" escolhido explicitamente é RESPEITADO (apenas ajusta o gênero),
+  // para o admin poder escolher entre Proprietário e a profissão sugerida.
+  if (!rawRole) {
     return profession || defaultProp;
+  }
+  if (/^propriet[aá]ri[oa]$/i.test(rawRole)) {
+    return defaultProp;
   }
 
   // 2. Se o cargo for customizado (ex: "Diretor", "Sócio", "Advogado", etc.), ajustar a concordância de gênero:

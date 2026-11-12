@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { HelpCircle, X } from 'lucide-react';
 import type { PublicBusinessPresentation, PublicCommercialPlan } from '@/lib/business/public-business-presentation';
 import type { InstitutionalRecognitionDTO } from '@/app/actions/institutional-recognitions';
+import { CertificationBadges } from './CertificationBadges';
 
 type InstitutionalBadgesProps = {
   recognition: PublicBusinessPresentation['recognition'];
@@ -10,6 +11,9 @@ type InstitutionalBadgesProps = {
   commercialPlan?: PublicCommercialPlan;
   variant?: 'full' | 'compact' | 'gold-card';
   className?: string;
+  /** Certificações de mercado (Plano Acácia): exibidas na MESMA linha dos selos do cabeçalho. */
+  certifications?: Array<{ id: string; url: string; zoom_percent?: number }>;
+  businessName?: string;
 };
 
 type BadgeItemData = {
@@ -190,6 +194,8 @@ export function InstitutionalBadges({
   commercialPlan,
   variant = 'compact',
   className = '',
+  certifications,
+  businessName,
 }: InstitutionalBadgesProps) {
   const [zoomedBadge, setZoomedBadge] = useState<BadgeItemData | null>(null);
 
@@ -349,6 +355,7 @@ export function InstitutionalBadges({
             </span>
           );
         })}
+        <CertificationBadges certifications={certifications} businessName={businessName} variant="inline" />
       </div>
     );
   }

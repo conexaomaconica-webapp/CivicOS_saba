@@ -1,5 +1,6 @@
 import type { Database, Json } from '@/types/database.types';
-import { MAX_BUSINESS_CERTIFICATIONS, planAllowsCertifications } from '@/lib/business/certifications';
+import { MAX_BUSINESS_CERTIFICATIONS, normalizeCertificationZoom, planAllowsCertifications } from '@/lib/business/certifications';
+import { cleanRichTextHtml } from '@/lib/text/rich-text-clean';
 import { getCanonicalDefaultLimit } from '@/lib/billing/plans-service';
 import { resolveResponsibleRole, resolveTreatmentLabel } from '@/lib/business/responsible-role-resolver';
 
@@ -208,7 +209,7 @@ export type PublicBusinessPresentation = {
     isClosed: boolean;
   }>;
   services: PublicBusinessService[];
-  certifications?: Array<{ id: string; url: string }>;
+  certifications?: Array<{ id: string; url: string; zoom_percent?: number }>;
   benefit: PublicBusinessBenefit | null;
   benefits: PublicBusinessBenefit[];
   events: PublicBusinessEvent[];
@@ -462,7 +463,8 @@ export function toPublicBusinessPresentation(
       return {
         id: text(item.id, 64) ?? undefined,
         name,
-        description: text(item.description, 5000),
+        // Descrições longas (HTML colado de editores) são truncadas, nunca descartadas por inteiro.
+        description: typeof item.description === 'string' && item.description.trim() ? cleanRichTextHtml(item.description).slice(0, 30000) || null : null,
         iconName: text(item.icon_name, 50),
         priceInfo: text(item.price_info, 80),
       };
@@ -471,14 +473,14 @@ export function toPublicBusinessPresentation(
     .slice(0, maxServices);
 
   // Certificações de mercado (ISO etc.): exclusivas do Plano Acácia, no máximo MAX_BUSINESS_CERTIFICATIONS.
-  const certificationsList: Array<{ id: string; url: string }> =
+  const certificationsList: Array<{ id: string; url: string; zoom_percent?: number }> =
     hasEffectiveAccess && planAllowsCertifications(row.effective_plan_code || (row as any).plan_code)
       ? records(row.certifications)
           .map((item) => {
             const url = text(item.image_url ?? item.url, 1000);
-            return url ? { id: text(item.id, 64) || url, url } : null;
+            return url ? { id: text(item.id, 64) || url, url, zoom_percent: normalizeCertificationZoom(item.zoom_percent) } : null;
           })
-          .filter((item): item is { id: string; url: string } => item !== null)
+          .filter((item): item is { id: string; url: string; zoom_percent: number } => item !== null)
           .slice(0, MAX_BUSINESS_CERTIFICATIONS)
       : [];
 

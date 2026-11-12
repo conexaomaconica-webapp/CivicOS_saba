@@ -150,6 +150,17 @@ describe('responsible-role-resolver canonical rules', () => {
       expect(roleComercio).toBe('Proprietária');
     });
 
+    it('respeita "Proprietário(a)" escolhido explicitamente, mesmo com categoria de profissão', () => {
+      expect(
+        resolveResponsibleRole({ communityLabel: 'Ir∴', businessRole: 'Proprietário', category: 'Engenharia Civil' })
+      ).toBe('Proprietário');
+      expect(
+        resolveResponsibleRole({ communityLabel: 'Cunhada', businessRole: 'Proprietário', category: 'Engenharia Civil' })
+      ).toBe('Proprietária');
+      // Cargo vazio continua usando a profissão da categoria
+      expect(resolveResponsibleRole({ communityLabel: 'Ir∴', category: 'Engenharia Civil' })).toBe('Engenheiro');
+    });
+
     it('ajusta concordância de gênero para papéis personalizados', () => {
       expect(
         resolveResponsibleRole({

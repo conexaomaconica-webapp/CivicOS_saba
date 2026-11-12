@@ -166,6 +166,12 @@ export const adminNavSections: NavSection[] = [
         icon: Bell,
       },
       {
+        id: 'notificacoes-push',
+        label: 'Notificações Push (App)',
+        path: '/admin/notificacoes/push',
+        icon: Bell,
+      },
+      {
         id: 'eventos',
         label: 'Eventos & RSVP',
         path: '/admin/eventos',
@@ -275,7 +281,7 @@ export function AdminSidebar({ isMobileOpen = false, onMobileClose, userRole = '
   }, []);
 
   const isLinkActive = (path: string) => {
-    if (path === '/admin') return pathname === '/admin';
+    if (path === '/admin' || path === '/admin/notificacoes') return pathname === path;
     return pathname?.startsWith(path);
   };
 

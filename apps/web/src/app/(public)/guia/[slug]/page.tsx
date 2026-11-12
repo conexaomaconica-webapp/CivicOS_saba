@@ -369,7 +369,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
       (dbReader as any).from('business_locations').select('city, state, address, street, number, postal_code, neighborhood, latitude, longitude').eq('business_id', bizId).maybeSingle(),
       (dbReader as any).from('business_hours').select('*').eq('business_id', bizId),
       (dbReader as any).from('business_attributes').select('attribute_key, attribute_value').eq('business_id', bizId),
-      (dbReader as any).from('business_certifications').select('id, image_url, display_order').eq('business_id', bizId).order('display_order', { ascending: true }).order('created_at', { ascending: true }),
+      (dbReader as any).from('business_certifications').select('id, image_url, display_order, zoom_percent').eq('business_id', bizId).order('display_order', { ascending: true }).order('created_at', { ascending: true }),
     ]);
 
     let shortDescription: string | null = null;
