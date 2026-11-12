@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { assertPlatformAdminAccess } from '@/lib/admin/admin-auth-helper';
-import { getFirebaseServiceAccount, sendPushToToken } from './fcm';
+import { getFirebaseConfigStatus, getFirebaseServiceAccount, sendPushToToken } from './fcm';
 
 type ContentMode = 'text' | 'image' | 'image_text';
 type AudienceType = 'all' | 'emails';
@@ -67,6 +67,21 @@ async function loadTokens(db: any, audience: AudienceType, emails: string[]): Pr
   return Array.from(new Set(((data || []) as Array<{ token: string }>).map((row) => row.token).filter(Boolean)));
 }
 
+/** Diagnóstico seguro da configuração do Firebase (não expõe segredo; só projeto e e-mail da conta de serviço). */
+export async function getPushConfigStatusAction(): Promise<{
+  configured: boolean;
+  reason?: string;
+  projectId?: string;
+  clientEmail?: string;
+}> {
+  try {
+    await assertPlatformAdminAccess();
+    return getFirebaseConfigStatus();
+  } catch {
+    return { configured: false, reason: 'Sem permissão para consultar a configuração.' };
+  }
+}
+
 export async function countPushAudienceAction(
   audience: AudienceType,
   emailsRaw: string,
@@ -95,7 +110,8 @@ export async function sendPushCampaignAction(formData: FormData): Promise<{
     const db = getServiceClient();
     if (!db) return { success: false, error: 'Configuração segura do servidor indisponível.' };
     if (!getFirebaseServiceAccount()) {
-      return { success: false, error: 'Envio indisponível: configure FIREBASE_SERVICE_ACCOUNT_JSON no servidor.' };
+      const status = getFirebaseConfigStatus();
+      return { success: false, error: `Envio indisponível. ${status.reason ?? 'Configure FIREBASE_SERVICE_ACCOUNT_JSON no servidor.'}` };
     }
 
     const contentMode = String(formData.get('contentMode') ?? 'text') as ContentMode;

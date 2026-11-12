@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Send, ImageIcon, Type, Users, Clock, Loader2 } from 'lucide-react';
 import {
+  getPushConfigStatusAction,
   countPushAudienceAction,
   listPushCampaignsAction,
   sendPushCampaignAction,
@@ -48,6 +49,11 @@ export default function PushCampaignsClient() {
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [history, setHistory] = useState<PushCampaignListItem[]>([]);
+  const [fcmStatus, setFcmStatus] = useState<{ configured: boolean; reason?: string; projectId?: string; clientEmail?: string } | null>(null);
+
+  useEffect(() => {
+    void getPushConfigStatusAction().then(setFcmStatus);
+  }, []);
 
   const loadHistory = useCallback(async () => {
     const res = await listPushCampaignsAction();
@@ -121,6 +127,20 @@ export default function PushCampaignsClient() {
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      {fcmStatus && (
+        <div
+          role="status"
+          className={`xl:col-span-3 p-3 rounded-xl text-xs font-semibold border ${
+            fcmStatus.configured
+              ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+              : 'bg-amber-50 text-amber-900 border-amber-300'
+          }`}
+        >
+          {fcmStatus.configured
+            ? `Firebase configurado no servidor — projeto: ${fcmStatus.projectId} (conta de serviço: ${fcmStatus.clientEmail}).`
+            : `Firebase NÃO configurado neste ambiente. ${fcmStatus.reason ?? ''}`}
+        </div>
+      )}
       <div className="xl:col-span-2 bg-white border border-stone-300 rounded-2xl p-6 shadow-xs space-y-5">
         <div>
           <p className="text-xs font-bold text-stone-700 mb-2">Formato da notificação</p>

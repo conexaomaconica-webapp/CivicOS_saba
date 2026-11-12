@@ -10,22 +10,86 @@ type ServiceAccount = { project_id: string; client_email: string; private_key: s
 let cachedAccount: ServiceAccount | null = null;
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
-export function getFirebaseServiceAccount(): ServiceAccount | null {
-  if (cachedAccount) return cachedAccount;
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw.trim().startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8'));
-    if (!parsed.project_id || !parsed.client_email || !parsed.private_key) return null;
-    cachedAccount = {
+export type ServiceAccountParseResult =
+  | { ok: true; account: ServiceAccount }
+  | { ok: false; reason: 'missing' | 'invalid_json' | 'missing_fields'; detail?: string };
+
+/**
+ * Interpreta FIREBASE_SERVICE_ACCOUNT_JSON (JSON puro ou base64). Tolerante a erros comuns de colagem:
+ * BOM, aspas envolvendo o valor e quebras de linha reais dentro da private_key. Nunca devolve nem registra
+ * o conteúdo da chave: o diagnóstico informa apenas a CATEGORIA do problema.
+ */
+export function parseServiceAccount(rawValue: string | undefined | null): ServiceAccountParseResult {
+  let raw = (rawValue ?? '').replace(/^﻿/, '').trim();
+  if (!raw) return { ok: false, reason: 'missing' };
+
+  // Aspas envolvendo o valor inteiro (ex.: "{...}" ou '{...}').
+  if (raw.length > 1 && ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'")))) {
+    raw = raw.slice(1, -1).trim();
+  }
+
+  const candidates: string[] = [];
+  if (raw.startsWith('{')) {
+    candidates.push(raw);
+    // Quebras de linha REAIS dentro da private_key invalidam o JSON: escapa só dentro desse campo.
+    candidates.push(
+      raw.replace(/("private_key"\s*:\s*")([\s\S]*?)(")/, (_m, a: string, key: string, b: string) => `${a}${key.replace(/\r?\n/g, '\\n')}${b}`),
+    );
+    // JSON "escapado" (aspas escapadas, como quando colado de um string literal).
+    candidates.push(raw.replace(/\\"/g, '"'));
+  } else {
+    try {
+      candidates.push(Buffer.from(raw, 'base64').toString('utf8').replace(/^﻿/, '').trim());
+    } catch {
+      /* segue para o erro abaixo */
+    }
+  }
+
+  let parsed: Record<string, unknown> | null = null;
+  for (const candidate of candidates) {
+    try {
+      const value = JSON.parse(candidate);
+      if (value && typeof value === 'object') {
+        parsed = value as Record<string, unknown>;
+        break;
+      }
+    } catch {
+      /* tenta o próximo candidato */
+    }
+  }
+  if (!parsed) return { ok: false, reason: 'invalid_json' };
+
+  const missing = ['project_id', 'client_email', 'private_key'].filter((k) => typeof parsed![k] !== 'string' || !(parsed![k] as string).trim());
+  if (missing.length > 0) return { ok: false, reason: 'missing_fields', detail: missing.join(', ') };
+
+  return {
+    ok: true,
+    account: {
       project_id: String(parsed.project_id),
       client_email: String(parsed.client_email),
       private_key: String(parsed.private_key).replace(/\\n/g, '\n'),
-    };
-    return cachedAccount;
-  } catch {
-    return null;
-  }
+    },
+  };
+}
+
+/** Diagnóstico seguro (sem segredos) para o admin: situação da configuração do Firebase no servidor. */
+export function getFirebaseConfigStatus(): { configured: boolean; reason?: string; projectId?: string; clientEmail?: string } {
+  const result = parseServiceAccount(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  if (result.ok) return { configured: true, projectId: result.account.project_id, clientEmail: result.account.client_email };
+  const messages: Record<string, string> = {
+    missing: 'A variável FIREBASE_SERVICE_ACCOUNT_JSON não está definida neste ambiente (confira o nome, o ambiente Production/Preview e faça um novo deploy depois de salvar).',
+    invalid_json: 'A variável existe, mas o conteúdo não é um JSON válido (nem base64 de um JSON). Cole o arquivo inteiro sem aspas ou use o valor em base64.',
+    missing_fields: `O JSON foi lido, mas faltam campos obrigatórios (${result.detail}). Use o arquivo completo da conta de serviço.`,
+  };
+  return { configured: false, reason: messages[result.reason] };
+}
+
+export function getFirebaseServiceAccount(): ServiceAccount | null {
+  if (cachedAccount) return cachedAccount;
+  const result = parseServiceAccount(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  if (!result.ok) return null;
+  cachedAccount = result.account;
+  return cachedAccount;
 }
 
 function base64Url(input: Buffer | string): string {
