@@ -2133,6 +2133,8 @@ export async function updateAdminBusinessDetailsAction(
           .select('id')
           .eq('tenant_id', existing.tenant_id)
           .ilike('name', newResp.organization)
+          .order('created_at', { ascending: true })
+          .limit(1)
           .maybeSingle();
 
         if (orgLookupError) {
