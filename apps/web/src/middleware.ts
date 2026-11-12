@@ -10,6 +10,7 @@ import { createMiddlewareSideClient } from '@/lib/supabase/middleware';
 import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
 import { isNoIndexFollowPath } from '@/lib/seo/noindex-paths';
 import { getProfileAuthorization } from '@/lib/member/profile-access-service';
+import { isCommercialModuleEnvEnabled, isRepresentativePath } from '@/lib/commercial/feature-flag';
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
@@ -33,6 +34,11 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname === '/api/analytics/track'
   ) {
     return response;
+  }
+
+  // Módulo comercial desativado: a área do representante não existe (404), sem revelar redirecionamentos.
+  if (isRepresentativePath(request.nextUrl.pathname) && !isCommercialModuleEnvEnabled()) {
+    return NextResponse.rewrite(new URL('/__comercial-desativado__', request.url));
   }
 
   // ---------------------------------------------------------------------------
@@ -76,10 +82,12 @@ export async function middleware(request: NextRequest) {
   const isProfileRoute = path.startsWith('/perfil') || path.startsWith('/profile');
   const isUserAreaRoute = path.startsWith('/usuario');
   const isMemberAreaRoute = path.startsWith('/minha-conta');
+  // Área do representante: login obrigatório; o vínculo comercial é verificado no layout e na RLS.
+  const isRepresentativeRoute = isRepresentativePath(path);
   const isAuthRoute = path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/forgot-password');
 
   // If trying to access protected routes
-  if (isAdminRoute || isDashboardRoute || isProfileRoute || isUserAreaRoute || isMemberAreaRoute) {
+  if (isAdminRoute || isDashboardRoute || isProfileRoute || isUserAreaRoute || isMemberAreaRoute || isRepresentativeRoute) {
     const mockRole = process.env.NODE_ENV !== 'production' ? request.cookies.get('e2e-mock-role')?.value : null;
 
     if (mockRole === 'master' || mockRole === 'socio_admin') {

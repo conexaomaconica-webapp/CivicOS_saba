@@ -22,6 +22,7 @@
     "db:migrate:test": "node scripts/db-migrate-test.cjs",
     "test:rls": "node scripts/run-rls-tests.cjs",
     "test:commercial-db": "node scripts/test-migration-228-233-commercial.mjs",
+    "test:commercial-authz": "node scripts/test-migration-234-237-commercial-authz.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "verify": "pnpm clean && pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm build && pnpm test"
   },
