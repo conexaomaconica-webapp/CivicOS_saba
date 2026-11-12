@@ -67,6 +67,8 @@ import {
   adminCorrectBusinessBillingAction,
   uploadAdminResponsibleAvatarAction,
   uploadAdminBusinessAssetAction,
+  uploadAdminBusinessCertificationAction,
+  deleteAdminBusinessCertificationAction,
   listAdminBusinessCategoriesAction,
   createAdminBusinessCategoryAction,
   listAdminCanonicalLocationsAction,
@@ -1216,6 +1218,60 @@ export default function Company360Client({ initialData }: Props) {
       setMessage({ type: 'success', text: `Visibilidade operacional do serviço alterada para ${!currentActive ? 'Ativo' : 'Inativo'}.` });
     } else {
       setMessage({ type: 'error', text: res.error || 'Erro ao alterar visibilidade.' });
+    }
+    setLoading(false);
+  };
+
+  const handleMoveService = async (serviceId: string, direction: 'up' | 'down') => {
+    setLoading(true);
+    setMessage(null);
+    const res = await manageAdminServiceAction(data.business.id, direction === 'up' ? 'move_up' : 'move_down', { service_id: serviceId });
+    if (res.success) {
+      setData((prev) => {
+        const items = [...prev.services_items];
+        const index = items.findIndex((s) => s.id === serviceId);
+        const target = direction === 'up' ? index - 1 : index + 1;
+        if (index >= 0 && target >= 0 && target < items.length) {
+          [items[index], items[target]] = [items[target]!, items[index]!];
+        }
+        return { ...prev, services_items: items.map((s, i) => ({ ...s, display_order: i + 1 })) };
+      });
+    } else {
+      setMessage({ type: 'error', text: res.error || 'Erro ao reordenar serviço.' });
+    }
+    setLoading(false);
+  };
+
+  const handleUploadCertification = async (file: File | null | undefined) => {
+    if (!file) return;
+    setLoading(true);
+    setMessage(null);
+    const formData = new FormData();
+    formData.append('businessId', data.business.id);
+    formData.append('file', file);
+    const res = await uploadAdminBusinessCertificationAction(formData);
+    if (res.success && res.item) {
+      setData((prev) => ({ ...prev, certifications_items: [...(prev.certifications_items || []), res.item!] }));
+      setMessage({ type: 'success', text: 'Certificação adicionada ao cabeçalho e ao card de selos da empresa.' });
+    } else {
+      setMessage({ type: 'error', text: res.error || 'Erro ao enviar certificação.' });
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteCertification = async (certificationId: string) => {
+    if (!window.confirm('Remover esta certificação da página da empresa?')) return;
+    setLoading(true);
+    setMessage(null);
+    const res = await deleteAdminBusinessCertificationAction(data.business.id, certificationId);
+    if (res.success) {
+      setData((prev) => ({
+        ...prev,
+        certifications_items: (prev.certifications_items || []).filter((c) => c.id !== certificationId),
+      }));
+      setMessage({ type: 'success', text: 'Certificação removida.' });
+    } else {
+      setMessage({ type: 'error', text: res.error || 'Erro ao remover certificação.' });
     }
     setLoading(false);
   };
@@ -3673,6 +3729,64 @@ export default function Company360Client({ initialData }: Props) {
             )}
           </div>
 
+          {/* SEÇÃO 2B: CERTIFICAÇÕES DE MERCADO (ISO etc.) — exclusivo Plano Acácia */}
+          {data.certifications_enabled && (
+            <div className="bg-white border border-stone-300 rounded-2xl p-6 shadow-xs space-y-4">
+              <div className="flex justify-between items-center border-b border-stone-200 pb-3 gap-3">
+                <div>
+                  <h3 className="font-serif font-bold text-base text-stone-900 flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-[#3B0B14]" />
+                    <span>Certificações de Mercado ({(data.certifications_items || []).length}/3)</span>
+                  </h3>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Logos como ISO 9001 aparecem no cabeçalho e no card de selos da página da empresa (Web e App). Distintas dos selos institucionais.
+                  </p>
+                </div>
+                <label
+                  className={`px-3.5 py-1.5 bg-[#3B0B14] hover:bg-[#5d1523] text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer ${
+                    loading || (data.certifications_items || []).length >= 3 ? 'opacity-50 pointer-events-none' : ''
+                  }`}
+                >
+                  <Upload className="w-4 h-4 text-[#C9A227]" /> Enviar logo
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      void handleUploadCertification(e.target.files?.[0]);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              </div>
+
+              {(data.certifications_items || []).length === 0 ? (
+                <div className="p-6 text-center bg-stone-50 border border-dashed border-stone-300 rounded-2xl text-xs text-stone-500">
+                  Nenhuma certificação cadastrada. Envie a logo (PNG, JPG ou WebP, até 2 MB; fundo transparente recomendado).
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-4">
+                  {(data.certifications_items || []).map((cert) => (
+                    <div key={cert.id} className="relative w-28 h-28 rounded-2xl border border-stone-300 bg-stone-50 flex items-center justify-center p-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={cert.url} alt="Certificação da empresa" className="max-w-full max-h-full object-contain" />
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCertification(cert.id)}
+                        disabled={loading}
+                        title="Remover certificação"
+                        aria-label="Remover certificação"
+                        className="absolute -top-2 -right-2 p-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* SEÇÃO 3: SERVIÇOS OFERECIDOS (business_services) */}
           <div className="bg-white border border-stone-300 rounded-2xl p-6 shadow-xs space-y-4">
             <div className="flex justify-between items-center border-b border-stone-200 pb-3">
@@ -3708,7 +3822,7 @@ export default function Company360Client({ initialData }: Props) {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {data.services_items.map((svc) => (
+                {data.services_items.map((svc, svcIndex) => (
                   <div
                     key={svc.id}
                     className={`p-4 rounded-2xl border text-xs space-y-2 shadow-xs transition-colors ${svc.is_active ? 'bg-white border-stone-300' : 'bg-stone-100 border-stone-300 opacity-75'
@@ -3741,6 +3855,26 @@ export default function Company360Client({ initialData }: Props) {
 
                     <div className="flex items-center justify-between pt-2 border-t border-stone-200">
                       <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          title="Mover para cima"
+                          aria-label="Mover serviço para cima"
+                          disabled={loading || svcIndex === 0}
+                          onClick={() => handleMoveService(svc.id, 'up')}
+                          className="px-1.5 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg disabled:opacity-40 cursor-pointer"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Mover para baixo"
+                          aria-label="Mover serviço para baixo"
+                          disabled={loading || svcIndex === data.services_items.length - 1}
+                          onClick={() => handleMoveService(svc.id, 'down')}
+                          className="px-1.5 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg disabled:opacity-40 cursor-pointer"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleToggleServiceActive(svc.id, svc.is_active)}

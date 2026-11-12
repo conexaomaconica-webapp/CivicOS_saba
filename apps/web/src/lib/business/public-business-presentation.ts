@@ -1,4 +1,5 @@
 import type { Database, Json } from '@/types/database.types';
+import { MAX_BUSINESS_CERTIFICATIONS, planAllowsCertifications } from '@/lib/business/certifications';
 import { getCanonicalDefaultLimit } from '@/lib/billing/plans-service';
 import { resolveResponsibleRole, resolveTreatmentLabel } from '@/lib/business/responsible-role-resolver';
 
@@ -207,6 +208,7 @@ export type PublicBusinessPresentation = {
     isClosed: boolean;
   }>;
   services: PublicBusinessService[];
+  certifications?: Array<{ id: string; url: string }>;
   benefit: PublicBusinessBenefit | null;
   benefits: PublicBusinessBenefit[];
   events: PublicBusinessEvent[];
@@ -250,6 +252,7 @@ export function resolveBusinessProfileTemplate(
 type DetailRow = Database['public']['Functions']['public_business_detail']['Returns'][number] & {
   benefits?: Json;
   services?: Json;
+  certifications?: Json;
   events?: Json;
   posts?: Json;
   is_pedra_fundamental?: boolean;
@@ -467,6 +470,18 @@ export function toPublicBusinessPresentation(
     .filter((item): item is PublicBusinessService => item !== null)
     .slice(0, maxServices);
 
+  // Certificações de mercado (ISO etc.): exclusivas do Plano Acácia, no máximo MAX_BUSINESS_CERTIFICATIONS.
+  const certificationsList: Array<{ id: string; url: string }> =
+    hasEffectiveAccess && planAllowsCertifications(row.effective_plan_code || (row as any).plan_code)
+      ? records(row.certifications)
+          .map((item) => {
+            const url = text(item.image_url ?? item.url, 1000);
+            return url ? { id: text(item.id, 64) || url, url } : null;
+          })
+          .filter((item): item is { id: string; url: string } => item !== null)
+          .slice(0, MAX_BUSINESS_CERTIFICATIONS)
+      : [];
+
   // Events (sliced by entitlement)
   const eventsList = canShowEvents
     ? records(row.events)
@@ -615,6 +630,7 @@ export function toPublicBusinessPresentation(
       isClosed: item.is_closed === true,
     })),
     services: servicesList,
+    certifications: certificationsList,
     benefit: benefitsList[0] ?? null,
     benefits: benefitsList,
     events: eventsList,

@@ -3545,6 +3545,26 @@ function BusinessDetailModal({
                             <span>VERIFICADA</span>
                           </span>
                         )}
+                        {plan === 'acacia' &&
+                          (detail.certifications || []).map((cert) => (
+                            <button
+                              key={cert.id}
+                              type="button"
+                              className="header-certification-btn"
+                              title="Certificação (Toque para ampliar)"
+                              aria-label="Ampliar certificação da empresa"
+                              onClick={() =>
+                                setZoomedSeal({
+                                  badgeLabel: 'Certificação de mercado',
+                                  title: `Certificação de ${detail.business_name}`,
+                                  description: 'Certificação de mercado conquistada pela empresa.',
+                                  imageUrl: cert.url,
+                                })
+                              }
+                            >
+                              <img src={cert.url} alt={`Certificação de ${detail.business_name}`} className="header-certification-img" />
+                            </button>
+                          ))}
                       </div>
                     );
                   })()}
@@ -3995,6 +4015,34 @@ function BusinessDetailModal({
                     </div>
                   );
                 })()}
+
+                {/* 2B. CERTIFICAÇÕES DE MERCADO (ISO etc.) — exclusivo Plano Acácia, ampliáveis ao toque */}
+                {plan === 'acacia' && (detail.certifications || []).length > 0 && (
+                  <div id="section-certificacoes" className="detail-section-block">
+                    <h3 className="detail-section-title">Certificações</h3>
+                    <div className="certification-card-row">
+                      {(detail.certifications || []).map((cert) => (
+                        <button
+                          key={cert.id}
+                          type="button"
+                          className="certification-card-btn"
+                          title="Toque para ampliar"
+                          aria-label="Ampliar certificação da empresa"
+                          onClick={() =>
+                            setZoomedSeal({
+                              badgeLabel: 'Certificação de mercado',
+                              title: `Certificação de ${detail.business_name}`,
+                              description: 'Certificação de mercado conquistada pela empresa.',
+                              imageUrl: cert.url,
+                            })
+                          }
+                        >
+                          <img src={cert.url} alt={`Certificação de ${detail.business_name}`} className="certification-card-img" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* 3. CARD DO RESPONSÁVEL (Título "Responsável", foto ampliável ao clicar, título Ir./Cunhada/Sobrinho, loja e telefone) */}
                 {(detail.responsible || detail.lodge_name) && (

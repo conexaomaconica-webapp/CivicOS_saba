@@ -203,6 +203,14 @@ export function normalizeCanonicalPlanCode(planCode: string | null | undefined):
   return 'esquadro';
 }
 
+/** Chave usada em plan_entitlements / plan_payment_rules (bronze | prata | ouro). */
+export function toEntitlementPlanCode(planCode: string | null | undefined): 'bronze' | 'prata' | 'ouro' {
+  const code = normalizeCanonicalPlanCode(planCode);
+  if (code === 'acacia') return 'ouro';
+  if (code === 'compasso') return 'prata';
+  return 'bronze';
+}
+
 export function getCanonicalPlanByCode(planCode: string | null | undefined): Omit<CommercialPlan, 'id'> {
   const code = normalizeCanonicalPlanCode(planCode);
   if (code === 'acacia') return CANONICAL_PLANS.ouro;

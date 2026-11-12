@@ -356,9 +356,10 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
       { data: locationRow },
       { data: hoursRows },
       { data: attrRows },
+      { data: certRows },
     ] = await Promise.all([
       (dbReader as any).from('business_media').select('*').eq('business_id', bizId).order('display_order', { ascending: true }),
-      (dbReader as any).from('business_services').select('*').eq('business_id', bizId).eq('is_active', true).order('display_order', { ascending: true }),
+      (dbReader as any).from('business_services').select('*').eq('business_id', bizId).eq('is_active', true).order('display_order', { ascending: true }).order('created_at', { ascending: true }).order('id', { ascending: true }),
       (dbReader as any).from('business_benefits').select('*').eq('business_id', bizId).eq('is_active', true).order('display_order', { ascending: true }),
       (dbReader as any).from('business_contacts').select('*').eq('business_id', bizId),
       (dbReader as any).from('business_responsibles').select('name, business_role, community_label, organization, whatsapp, avatar_url').eq('business_id', bizId).maybeSingle(),
@@ -368,6 +369,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
       (dbReader as any).from('business_locations').select('city, state, address, street, number, postal_code, neighborhood, latitude, longitude').eq('business_id', bizId).maybeSingle(),
       (dbReader as any).from('business_hours').select('*').eq('business_id', bizId),
       (dbReader as any).from('business_attributes').select('attribute_key, attribute_value').eq('business_id', bizId),
+      (dbReader as any).from('business_certifications').select('id, image_url, display_order').eq('business_id', bizId).order('display_order', { ascending: true }).order('created_at', { ascending: true }),
     ]);
 
     let shortDescription: string | null = null;
@@ -466,6 +468,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
       address: locationRow?.address || (locationRow?.street ? `${locationRow.street}${locationRow.number ? ', ' + locationRow.number : ''}` : null) || bObj.address || null,
       locations: locationRow ? [locationRow] : [] as any,
       media: (mediaRows || []) as any,
+      certifications: (certRows || []) as any,
       services: (servicesRows || []).map((s: any) => ({
         id: s.id,
         name: s.name,

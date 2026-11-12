@@ -1,5 +1,6 @@
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
 import { InstitutionalBadges } from '../shared/InstitutionalBadges';
+import { CertificationBadges } from '../shared/CertificationBadges';
 import { BusinessOwnerCard } from './BusinessOwnerCard';
 import { BusinessHours } from './BusinessHours';
 import { BusinessLocationCard } from './BusinessLocationCard';
@@ -21,7 +22,10 @@ export function ProfileContentGrid({ profile }: { profile: PublicBusinessPresent
   const { identity, recognition, authority, owner } = profile;
 
   const planCard = (
-    <InstitutionalBadges recognition={recognition} catalog={recognition.catalog} commercialPlan={profile.plan.commercialPlan} variant="gold-card" />
+    <div className="space-y-4">
+      <InstitutionalBadges recognition={recognition} catalog={recognition.catalog} commercialPlan={profile.plan.commercialPlan} variant="gold-card" />
+      <CertificationBadges certifications={profile.certifications} businessName={identity.name} variant="card" />
+    </div>
   );
   const ownerCard = (
     <BusinessOwnerCard owner={owner} logo={identity.logo} businessName={identity.name} isVerified={authority?.isVerified || recognition?.verified} />

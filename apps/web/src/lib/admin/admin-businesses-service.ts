@@ -15,6 +15,7 @@ import {
   getCanonicalDefaultLimit,
   getCommercialPlanName,
   normalizeCanonicalPlanCode,
+  toEntitlementPlanCode,
 } from '@/lib/billing/plans-service';
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database.types';
@@ -30,6 +31,8 @@ import {
   type CommercialStatus,
 } from '@/lib/commercial-onboarding-status';
 import { evaluateBusinessProfileReadiness } from './admin-commercial-dossier-readiness';
+import { getNextServiceOrder, moveBusinessService } from '@/lib/business/service-order';
+import { MAX_BUSINESS_CERTIFICATIONS, planAllowsCertifications } from '@/lib/business/certifications';
 import { getInternalProfileDTO } from '@/lib/member/profile-access-service';
 
 function normalizeMasonicStatus(status: string | null | undefined): 'pending' | 'verified' | 'rejected' {
@@ -330,7 +333,7 @@ export async function uploadAdminBusinessAssetAction(formData: FormData): Promis
         .order('created_at', { ascending: false }).limit(1).maybeSingle();
       const planCode = activeSubscription?.plan_versions?.plans?.code || business.plan_tier || 'bronze';
       const { data: entitlement } = await (adminClient as any).from('plan_entitlements').select('max_limit')
-        .eq('tenant_id', business.tenant_id).eq('plan_code', planCode).eq('feature_code', 'gallery_photos_limit').maybeSingle();
+        .eq('tenant_id', business.tenant_id).eq('plan_code', toEntitlementPlanCode(planCode)).eq('feature_code', 'gallery_photos_limit').maybeSingle();
       const limit = entitlement?.max_limit ?? getCanonicalDefaultLimit(planCode, 'gallery_photos_limit');
       const { count } = await (adminClient as any).from('business_media').select('*', { count: 'exact', head: true })
         .eq('business_id', businessId).eq('media_type', 'image').gt('display_order', 0);
@@ -362,6 +365,100 @@ export async function uploadAdminBusinessAssetAction(formData: FormData): Promis
     return { success: true, url, media: createdMedia };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Erro inesperado no upload.' };
+  }
+}
+
+export async function uploadAdminBusinessCertificationAction(formData: FormData): Promise<{
+  success: boolean;
+  item?: { id: string; url: string; display_order: number };
+  error?: string;
+}> {
+  try {
+    await assertPlatformAdminAccess();
+    const businessId = String(formData.get('businessId') ?? '').trim();
+    const file = formData.get('file');
+    if (!businessId || !(file instanceof File)) return { success: false, error: 'Empresa e imagem são obrigatórias.' };
+    if (file.size <= 0 || file.size > 2 * 1024 * 1024) return { success: false, error: 'A logo deve possuir no máximo 2 MB.' };
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (!isSupportedImage(bytes)) return { success: false, error: 'Envie uma imagem JPG, PNG ou WebP válida.' };
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) return { success: false, error: 'Configuração segura do Storage indisponível.' };
+    const adminClient: any = createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+
+    const { data: business, error: businessError } = await adminClient.from('businesses')
+      .select('id, tenant_id, plan_tier').eq('id', businessId).maybeSingle();
+    if (businessError) return { success: false, error: `Falha ao consultar empresa: ${businessError.message}` };
+    if (!business) return { success: false, error: 'Empresa não localizada.' };
+
+    const { data: activeSubscription } = await adminClient.from('subscriptions')
+      .select('plan_versions!inner(plans!inner(code))')
+      .eq('tenant_id', business.tenant_id).eq('business_id', businessId)
+      .in('status', ['active', 'trialing', 'past_due', 'canceled'])
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const planCode = business.plan_tier || activeSubscription?.plan_versions?.plans?.code || 'bronze';
+    if (!planAllowsCertifications(planCode)) {
+      return { success: false, error: 'Certificações de mercado estão disponíveis apenas no Plano Acácia.' };
+    }
+
+    const { count } = await adminClient.from('business_certifications')
+      .select('*', { count: 'exact', head: true }).eq('business_id', businessId);
+    if ((count || 0) >= MAX_BUSINESS_CERTIFICATIONS) {
+      return { success: false, error: `Limite de ${MAX_BUSINESS_CERTIFICATIONS} certificações atingido.` };
+    }
+
+    const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+    const storagePath = `${business.tenant_id}/${businessId}/certification/${crypto.randomUUID()}.${extension}`;
+    const { error: uploadError } = await adminClient.storage.from('business-assets')
+      .upload(storagePath, bytes, { contentType: file.type || `image/${extension}`, upsert: false });
+    if (uploadError) return { success: false, error: `Falha no upload: ${uploadError.message}` };
+    const url = adminClient.storage.from('business-assets').getPublicUrl(storagePath).data.publicUrl;
+
+    const { data: inserted, error: insertError } = await adminClient.from('business_certifications').insert({
+      tenant_id: business.tenant_id,
+      business_id: businessId,
+      image_url: url,
+      storage_path: storagePath,
+      display_order: (count || 0) + 1,
+    }).select('id, image_url, display_order').single();
+    if (insertError) {
+      await adminClient.storage.from('business-assets').remove([storagePath]);
+      return { success: false, error: `Falha ao salvar certificação: ${insertError.message}` };
+    }
+
+    revalidatePath(`/admin/empresas/${businessId}`);
+    revalidatePath('/guia', 'layout');
+    return { success: true, item: { id: inserted.id, url: inserted.image_url, display_order: inserted.display_order } };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Erro inesperado no upload.' };
+  }
+}
+
+export async function deleteAdminBusinessCertificationAction(
+  businessId: string,
+  certificationId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await assertPlatformAdminAccess();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) return { success: false, error: 'Configuração segura do Storage indisponível.' };
+    const adminClient: any = createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+
+    const { data: row } = await adminClient.from('business_certifications')
+      .select('id, storage_path').eq('id', certificationId).eq('business_id', businessId).maybeSingle();
+    if (!row) return { success: false, error: 'Certificação não encontrada.' };
+
+    const { error } = await adminClient.from('business_certifications').delete().eq('id', certificationId).eq('business_id', businessId);
+    if (error) return { success: false, error: error.message };
+    if (row.storage_path) await adminClient.storage.from('business-assets').remove([row.storage_path]);
+
+    revalidatePath(`/admin/empresas/${businessId}`);
+    revalidatePath('/guia', 'layout');
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Erro ao excluir certificação.' };
   }
 }
 
@@ -567,6 +664,8 @@ export interface AdminBusiness360DTO {
     display_order: number;
     created_at: string;
   }>;
+  certifications_items?: Array<{ id: string; url: string; display_order: number }>;
+  certifications_enabled?: boolean;
   business_video?: { id: string; url: string; title: string | null };
   cover_item?: {
     id: string;
@@ -961,7 +1060,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       .from('plan_entitlements')
       .select('feature_code, max_limit')
       .eq('tenant_id', b.tenant_id)
-      .eq('plan_code', planCode);
+      .eq('plan_code', toEntitlementPlanCode(planCode));
     const entMap360: Record<string, number> = {};
     (entRows360 || []).forEach((e: any) => { entMap360[e.feature_code] = e.max_limit; });
     const galleryLimit = entMap360['gallery_photos_limit'] ?? getCanonicalDefaultLimit(planCode, 'gallery_photos_limit');
@@ -1154,6 +1253,23 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       ? { id: coverRaw.id, url: coverRaw.url, title: coverRaw.title || null }
       : undefined;
 
+    let certifications_items: Array<{ id: string; url: string; display_order: number }> = [];
+    try {
+      const certRes = await (supabase as any)
+        .from('business_certifications')
+        .select('id, image_url, display_order')
+        .eq('business_id', businessId)
+        .order('display_order', { ascending: true })
+        .order('created_at', { ascending: true });
+      certifications_items = ((certRes?.data || []) as any[]).map((c) => ({
+        id: c.id,
+        url: c.image_url,
+        display_order: c.display_order || 1,
+      }));
+    } catch (_e) {
+      certifications_items = [];
+    }
+
     const gallery_items = galleryList.map((m) => ({
       id: m.id,
       url: m.url,
@@ -1171,7 +1287,9 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
         .from('business_services')
         .select('id, name, description, price_info, is_active, display_order, created_at')
         .eq('business_id', businessId)
-        .order('display_order', { ascending: true });
+        .order('display_order', { ascending: true })
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true });
       servicesRaw = (res?.data || []) as any[];
     } catch (_e) {
       servicesRaw = [];
@@ -1704,6 +1822,8 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
         events_limit: 10,
       },
       gallery_items,
+      certifications_items,
+      certifications_enabled: planAllowsCertifications(planCode),
       business_video,
       cover_item,
       services_items,
@@ -3763,7 +3883,7 @@ async function ensureAdminActiveSubscription(
 
 export async function manageAdminServiceAction(
   businessId: string,
-  action: 'create' | 'update' | 'toggle_active' | 'delete',
+  action: 'create' | 'update' | 'toggle_active' | 'delete' | 'move_up' | 'move_down',
   payload: {
     service_id?: string;
     name?: string;
@@ -3803,7 +3923,7 @@ export async function manageAdminServiceAction(
         .from('plan_entitlements')
         .select('max_limit')
         .eq('tenant_id', biz.tenant_id)
-        .eq('plan_code', planCode)
+        .eq('plan_code', toEntitlementPlanCode(planCode))
         .eq('feature_code', 'services_limit')
         .maybeSingle();
       const servicesLimit = svcEntRows?.max_limit ?? getCanonicalDefaultLimit(planCode, 'services_limit');
@@ -3825,6 +3945,7 @@ export async function manageAdminServiceAction(
           description: payload.description ? payload.description.trim() : null,
           price_info: payload.price_info ? payload.price_info.trim() : null,
           is_active: true,
+          display_order: await getNextServiceOrder(supabase, businessId),
         })
         .select()
         .single();
@@ -3873,6 +3994,9 @@ export async function manageAdminServiceAction(
         after_value: updated,
         reason: 'Edição de serviço via Admin 360º',
       });
+    } else if ((action === 'move_up' || action === 'move_down') && payload.service_id) {
+      const moved = await moveBusinessService(supabase, businessId, payload.service_id, action === 'move_up' ? 'up' : 'down');
+      if (!moved.success) return { success: false, error: moved.error || 'Erro ao reordenar serviço.' };
     } else if (action === 'toggle_active' && payload.service_id) {
       const { data: existing } = await (supabase as any)
         .from('business_services')
@@ -4179,7 +4303,7 @@ export async function manageAdminMediaAction(
         return { success: false, error: 'Informe um link público válido iniciado por https://.' };
       }
       const { data: entitlement } = await (supabase as any).from('plan_entitlements').select('max_limit')
-        .eq('tenant_id', biz.tenant_id).eq('plan_code', planCode).eq('feature_code', 'business_video_limit').maybeSingle();
+        .eq('tenant_id', biz.tenant_id).eq('plan_code', toEntitlementPlanCode(planCode)).eq('feature_code', 'business_video_limit').maybeSingle();
       const limit = entitlement?.max_limit ?? getCanonicalDefaultLimit(planCode, 'business_video_limit');
       if (limit < 1) return { success: false, error: 'O plano desta empresa não permite vídeo institucional.' };
       const { data: existing } = await (supabase as any).from('business_media').select('id, url, title')
@@ -4357,7 +4481,7 @@ export async function manageAdminMediaAction(
         .from('plan_entitlements')
         .select('max_limit')
         .eq('tenant_id', biz.tenant_id)
-        .eq('plan_code', planCode)
+        .eq('plan_code', toEntitlementPlanCode(planCode))
         .eq('feature_code', 'gallery_photos_limit')
         .maybeSingle();
       const galleryLimit = galEntRow?.max_limit ?? 0;

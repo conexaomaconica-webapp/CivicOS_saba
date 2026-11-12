@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { MAX_BUSINESS_CERTIFICATIONS, planAllowsCertifications } from '@/lib/business/certifications';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -64,7 +65,7 @@ export async function GET(request: Request) {
       }
       const bizId = detail.business_id || detail.id;
       if (bizId) {
-        const [{ count: vCount }, { data: attrRows }, { data: recRows }] = await Promise.all([
+        const [{ count: vCount }, { data: attrRows }, { data: recRows }, { data: certRows }] = await Promise.all([
           adminDb
             .from('analytics_events')
             .select('id', { count: 'exact', head: true })
@@ -82,8 +83,22 @@ export async function GET(request: Request) {
             .in('key', ['pedra_fundamental', 'selo_ouro', 'selo_prata', 'selo_bronze', 'coluna_de_honra'])
             .order('priority_order', { ascending: true })
             .then((r: any) => r, () => ({ data: [] })),
+          adminDb
+            .from('business_certifications')
+            .select('id, image_url, display_order')
+            .eq('business_id', bizId)
+            .order('display_order', { ascending: true })
+            .order('created_at', { ascending: true })
+            .then((r: any) => r, () => ({ data: [] })),
         ]);
         detail.views_count = typeof vCount === 'number' ? vCount : 0;
+        // Certificações de mercado (ISO etc.): exclusivas do Plano Acácia.
+        detail.certifications = planAllowsCertifications(detail.effective_plan_code || detail.plan_code || detail.plan_tier)
+          ? (Array.isArray(certRows) ? certRows : [])
+              .filter((c: any) => c?.image_url)
+              .slice(0, MAX_BUSINESS_CERTIFICATIONS)
+              .map((c: any) => ({ id: String(c.id), url: String(c.image_url) }))
+          : [];
         if (Array.isArray(recRows) && recRows.length > 0) {
           detail.recognitions = recRows;
         }

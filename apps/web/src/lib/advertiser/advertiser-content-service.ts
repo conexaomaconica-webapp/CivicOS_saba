@@ -5,6 +5,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { findOwnBusinessById } from '@/lib/advertiser/advertiser-access';
 import { submitBusinessChangeRequest } from '@/lib/advertiser/change-requests';
 import { findAdvertiserBusiness } from '@/lib/advertiser/advertiser-access';
+import { getNextServiceOrder, moveBusinessService } from '@/lib/business/service-order';
 import { checkAdvertiserQuotaAction } from '@/lib/advertiser/advertiser-entitlements';
 
 export type ContentStatus = 'published' | 'under_review' | 'draft' | 'inactive' | 'expired';
@@ -181,7 +182,9 @@ export async function getAdvertiserContentDataAction(): Promise<AdvertiserConten
     .select('id, name, description, icon_name, price_info, is_active')
     .eq('tenant_id', tenantId)
     .eq('business_id', businessId)
-    .order('created_at', { ascending: false });
+    .order('display_order', { ascending: true })
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true });
 
   if (errServices) {
     throw new Error(`Erro ao carregar serviços do banco: ${errServices.message}`);
@@ -358,6 +361,7 @@ export async function saveAdvertiserServiceAction(
           icon_name: service.icon_name || null,
           price_info: service.price_info || null,
           is_active: true,
+          display_order: await getNextServiceOrder(writer, service.business_id),
         })
         .select()
         .single();
@@ -397,6 +401,25 @@ export async function saveAdvertiserServiceAction(
       success: false,
       message: err instanceof Error ? err.message : 'Erro interno ao salvar serviço.',
     };
+  }
+}
+
+export async function moveServiceAction(
+  serviceId: string,
+  direction: 'up' | 'down'
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const supabase = await createServerSideClient();
+    const { data: userRes } = await supabase.auth.getUser();
+    const own = userRes?.user ? await findAdvertiserBusiness(supabase, userRes.user.id) : null;
+    if (!own) return { success: false, message: 'Empresa do anunciante não localizada.' };
+    const writer: any = createServiceRoleClient() ?? supabase;
+
+    const res = await moveBusinessService(writer, own.id, serviceId, direction);
+    if (!res.success) return { success: false, message: friendlyDbError(res.error || 'Erro ao reordenar serviço.') };
+    return { success: true, message: 'Ordem dos serviços atualizada.' };
+  } catch (err: unknown) {
+    return { success: false, message: err instanceof Error ? err.message : 'Erro interno ao reordenar serviço.' };
   }
 }
 

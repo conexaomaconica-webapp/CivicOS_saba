@@ -401,6 +401,7 @@ export type MobileBusinessDetail = {
   }>;
   benefits: MobileBusinessBenefit[];
   recognitions?: MobileInstitutionalRecognition[];
+  certifications?: Array<{ id: string; url: string }>;
 };
 
 export type MobileLodgeMeetingData = {
@@ -646,6 +647,9 @@ export async function loadBusinessDetailFromDirectSupabase(
       media: Array.isArray(b.media) ? b.media : [],
       services: normalizedServices,
       benefits: Array.isArray(b.benefits) ? b.benefits : [],
+      certifications: Array.isArray(b.certifications)
+        ? b.certifications.filter((c: Record<string, unknown>) => typeof c?.url === 'string' && c.url)
+        : [],
       recognitions: Array.isArray(b.recognitions)
         ? b.recognitions
         : Array.isArray(recsJson)

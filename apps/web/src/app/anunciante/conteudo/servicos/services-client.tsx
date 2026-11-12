@@ -15,12 +15,15 @@ import {
   ToggleRight,
   Clock,
   X,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import {
   AdvertiserContentDTO,
   AdvertiserServiceItem,
   saveAdvertiserServiceAction,
   toggleServiceActiveAction,
+  moveServiceAction,
 } from '@/lib/advertiser/advertiser-content-service';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { FormattedText } from '@/components/ui/formatted-text';
@@ -127,6 +130,24 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
     setFeedback({ type: 'success', message: res.message });
   };
 
+  const handleMove = async (srv: AdvertiserServiceItem, direction: 'up' | 'down') => {
+    const index = services.findIndex((s) => s.id === srv.id);
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (index < 0 || target < 0 || target >= services.length) return;
+    const previous = services;
+    const next = [...services];
+    [next[index], next[target]] = [next[target]!, next[index]!];
+    setServices(next);
+
+    const res = await moveServiceAction(srv.id, direction);
+    if (!res.success) {
+      setServices(previous);
+      setFeedback({ type: 'error', message: res.message });
+      return;
+    }
+    router.refresh();
+  };
+
   return (
     <div className="space-y-6 text-left">
       {/* HEADER DA TELA & BOTÃO ADICIONAR */}
@@ -226,7 +247,7 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
       ) : (
         /* LISTA DE SERVIÇOS EM CARDS */
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {services.map((srv) => (
+          {services.map((srv, srvIndex) => (
             <div
               key={srv.id}
               className="bg-white border border-stone-200 rounded-3xl p-5 shadow-xs space-y-3 relative flex flex-col justify-between"
@@ -278,6 +299,26 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleMove(srv, 'up')}
+                    disabled={srvIndex === 0}
+                    className="p-2 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg disabled:opacity-30"
+                    title="Mover para cima"
+                    aria-label="Mover serviço para cima"
+                  >
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMove(srv, 'down')}
+                    disabled={srvIndex === services.length - 1}
+                    className="p-2 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg disabled:opacity-30"
+                    title="Mover para baixo"
+                    aria-label="Mover serviço para baixo"
+                  >
+                    <ArrowDown className="w-3.5 h-3.5" />
+                  </button>
                   <Link
                     href={`/guia/${business.slug || '#'}?preview=true`}
                     target="_blank"

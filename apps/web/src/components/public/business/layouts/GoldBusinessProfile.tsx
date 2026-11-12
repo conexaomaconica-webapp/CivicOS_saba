@@ -8,6 +8,7 @@ import { getMediaFramingStyle } from '@/lib/business/public-business-presentatio
 import { ReferBusinessModal } from '../sections/ReferBusinessModal';
 import { BusinessAdModal } from '../sections/BusinessAdModal';
 import { InstitutionalBadges } from '../shared/InstitutionalBadges';
+import { CertificationBadges } from '../shared/CertificationBadges';
 import { QuickActionBar } from '../shared/BusinessActionButtons';
 import { CompanyLogoWithZoom } from '../shared/CompanyLogoWithZoom';
 import { ProfileContentGrid } from '../sections/ProfileContentGrid';
@@ -152,6 +153,7 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
                 <div className="pt-1">
                   <InstitutionalBadges recognition={recognition} catalog={recognition.catalog} commercialPlan={profile.plan.commercialPlan} variant="compact" />
                 </div>
+                <CertificationBadges certifications={profile.certifications} businessName={identity.name} variant="header" className="pt-1" />
 
                 {/* Responsável + Loja Maçônica no Subtítulo */}
                 {owner && (

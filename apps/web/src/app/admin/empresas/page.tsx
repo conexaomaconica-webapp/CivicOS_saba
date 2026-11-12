@@ -623,11 +623,11 @@ export default function AdminBusinessesDirectoryPage() {
         ) : viewMode === 'cards' ? (
           <div className="p-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {items.map((item) => (
-              <Link
+              <div
                 key={item.id}
-                href={`/admin/empresas/${item.id}`}
-                className="block rounded-2xl border border-stone-200 bg-white p-4 hover:border-[#C9A227] hover:shadow-md transition-all min-w-0"
+                className="flex flex-col rounded-2xl border border-stone-200 bg-white p-4 hover:border-[#C9A227] hover:shadow-md transition-all min-w-0"
               >
+              <Link href={`/admin/empresas/${item.id}`} className="block flex-1 min-w-0">
                 <div className="flex items-start gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-xl bg-stone-100 border border-stone-200 flex items-center justify-center text-[#3B0B14] font-serif font-bold shrink-0">
                     {item.name.charAt(0)}
@@ -677,6 +677,31 @@ export default function AdminBusinessesDirectoryPage() {
                   )}
                 </div>
               </Link>
+              <div className="mt-3 pt-3 border-t border-stone-100 flex items-center justify-end gap-2">
+                <Link
+                  href={`/admin/empresas/${item.id}`}
+                  title="Editar Anunciante / Prontuário 360º"
+                  aria-label={`Editar ${item.name}`}
+                  className="p-1.5 rounded-xl bg-[#3B0B14] hover:bg-[#4B161B] text-[#C9A227] border border-[#C9A227]/40 transition-all cursor-pointer shadow-xs inline-flex items-center justify-center"
+                >
+                  <Pencil className="w-4 h-4" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTargetDeleteBiz(item);
+                    setDeleteMode('archive');
+                    setConfirmNameInput('');
+                    setDeleteError(null);
+                  }}
+                  title="Excluir ou Inativar Anunciante"
+                  aria-label={`Excluir ou inativar ${item.name}`}
+                  className="p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-all cursor-pointer shadow-xs"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+              </div>
             ))}
           </div>
         ) : (
