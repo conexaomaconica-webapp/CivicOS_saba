@@ -2,6 +2,7 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { getAsaasDynamicConfig } from '@/lib/payment/asaas-config-service';
+import { isCommercialModuleEnvEnabled } from '@/lib/commercial/feature-flag';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,5 +24,9 @@ export default async function AdminLayout({
     isSandbox = false;
   }
 
-  return <AdminShell isSandbox={isSandbox}>{children}</AdminShell>;
+  return (
+    <AdminShell isSandbox={isSandbox} showCommercial={isCommercialModuleEnvEnabled()}>
+      {children}
+    </AdminShell>
+  );
 }

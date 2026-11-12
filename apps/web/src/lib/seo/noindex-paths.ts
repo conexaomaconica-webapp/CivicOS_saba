@@ -12,6 +12,9 @@ export function isNoIndexFollowPath(pathname: string): boolean {
     pathname === '/pesquisas' ||
     pathname.startsWith('/pesquisas/') ||
     pathname === '/representante' ||
-    pathname.startsWith('/representante/')
+    pathname.startsWith('/representante/') ||
+    pathname === '/comercial' ||
+    pathname.startsWith('/comercial/') ||
+    pathname.startsWith('/r/')
   );
 }

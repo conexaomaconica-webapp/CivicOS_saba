@@ -260,10 +260,26 @@ type AdminSidebarProps = {
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
   userRole?: string;
+  /** Módulo Comercial ativado na aplicação: exibe o atalho para /comercial (acesso por permissão comercial). */
+  showCommercial?: boolean;
 };
 
-export function AdminSidebar({ isMobileOpen = false, onMobileClose, userRole = 'master' }: AdminSidebarProps) {
+/** Atalho condicional: a área /comercial exige permissão comercial própria; ser admin NÃO basta (exceto master). */
+const commercialNavSection: NavSection = {
+  sectionTitle: '7. COMERCIAL',
+  items: [
+    {
+      id: 'comercial',
+      label: 'Representantes e Comissões',
+      path: '/comercial',
+      icon: Users,
+    },
+  ],
+};
+
+export function AdminSidebar({ isMobileOpen = false, onMobileClose, userRole = 'master', showCommercial = false }: AdminSidebarProps) {
   const pathname = usePathname();
+  const navSections = showCommercial ? [...adminNavSections, commercialNavSection] : adminNavSections;
   const [pendingCount, setPendingCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -305,7 +321,7 @@ export function AdminSidebar({ isMobileOpen = false, onMobileClose, userRole = '
 
       {/* Lista de Navegação por 6 Seções Domínio */}
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5 scrollbar-thin scrollbar-thumb-amber-900">
-        {adminNavSections.map((section) => (
+        {navSections.map((section) => (
           <div key={section.sectionTitle} className="space-y-1">
             <h4 className="px-3 text-[10px] font-bold text-[#C9A227] uppercase tracking-widest mb-1.5">
               {section.sectionTitle}

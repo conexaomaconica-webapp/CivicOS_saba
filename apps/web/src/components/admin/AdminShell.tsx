@@ -9,11 +9,12 @@ import Link from 'next/link';
 interface AdminShellProps {
   children: React.ReactNode;
   isSandbox?: boolean;
+  showCommercial?: boolean;
 }
 
 import { usePathname } from 'next/navigation';
 
-export function AdminShell({ children, isSandbox }: AdminShellProps) {
+export function AdminShell({ children, isSandbox, showCommercial = false }: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
 
@@ -44,7 +45,7 @@ export function AdminShell({ children, isSandbox }: AdminShellProps) {
 
       <div className="flex-1 flex w-full max-w-[1400px] mx-auto">
         {/* Sidebar Administrativa */}
-        <AdminSidebar isMobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
+        <AdminSidebar isMobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} showCommercial={showCommercial} />
 
         {/* Conteúdo Principal da Rota Administrativa */}
         <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-x-hidden min-w-0">

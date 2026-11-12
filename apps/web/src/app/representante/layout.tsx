@@ -37,6 +37,11 @@ export default async function RepresentativeLayout({ children }: { children: Rea
           <Link href="/representante" className="px-3 py-1.5 rounded-lg hover:bg-white/10 font-semibold">
             Resumo
           </Link>
+          {!readOnly && (
+            <Link href="/representante/leads" className="px-3 py-1.5 rounded-lg hover:bg-white/10 font-semibold">
+              Indicações
+            </Link>
+          )}
           <Link href="/representante/comissoes" className="px-3 py-1.5 rounded-lg hover:bg-white/10 font-semibold">
             Comissões
           </Link>

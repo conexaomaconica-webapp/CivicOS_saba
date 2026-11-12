@@ -64,3 +64,14 @@ export function formatCentsBRL(cents: number | string | bigint | null | undefine
   const centavos = (abs % BigInt(100)).toString().padStart(2, '0');
   return `${negative ? '-' : ''}R$ ${reais},${centavos}`;
 }
+
+/** Permissões "virtuais" de leitura, atendidas por permissões de gestão (espelha has_commercial_permission, migration 234). */
+export type CommercialPermissionNeed = CommercialPermission | 'rules.read';
+
+export function permissionSatisfies(granted: readonly string[], needed: CommercialPermissionNeed): boolean {
+  if (granted.includes(needed)) return true;
+  if (needed === 'representatives.read') return granted.includes('representatives.manage');
+  if (needed === 'commissions.read') return granted.includes('commissions.approve') || granted.includes('payouts.manage');
+  if (needed === 'rules.read') return granted.includes('rules.manage') || granted.includes('rules.approve');
+  return false;
+}

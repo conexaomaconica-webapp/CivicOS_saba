@@ -11,3 +11,13 @@ export function isCommercialModuleEnvEnabled(): boolean {
 export function isRepresentativePath(pathname: string): boolean {
   return pathname === '/representante' || pathname.startsWith('/representante/');
 }
+
+/** Rotas da equipe comercial (fora de /admin: acesso por permissão comercial, nunca por papel de admin). */
+export function isCommercialStaffPath(pathname: string): boolean {
+  return pathname === '/comercial' || pathname.startsWith('/comercial/');
+}
+
+/** Qualquer rota do módulo comercial protegida por login e pela chave de aplicação. */
+export function isCommercialAreaPath(pathname: string): boolean {
+  return isRepresentativePath(pathname) || isCommercialStaffPath(pathname);
+}

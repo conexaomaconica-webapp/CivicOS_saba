@@ -77,17 +77,21 @@ describe('Módulo comercial · Gate 1B (estático)', () => {
     const layout = app('app/representante/layout.tsx');
     expect(layout).toMatch(/notFound\(\)/);
     expect(layout).toMatch(/robots:\s*\{\s*index:\s*false/);
-    for (const f of ['app/representante/layout.tsx', 'app/representante/page.tsx', 'app/representante/comissoes/page.tsx', 'lib/commercial/commercial-auth.ts']) {
+    for (const f of ['app/representante/layout.tsx', 'app/representante/page.tsx', 'app/representante/comissoes/page.tsx']) {
       const text = app(f);
       expect(text, f).not.toMatch(/service-role|SERVICE_ROLE|createServiceRoleClient/);
     }
-    expect(app('lib/commercial/commercial-auth.ts')).toMatch(/import 'server-only'/);
+    // commercial-auth: a chave de serviço aparece SOMENTE no vínculo do convite (e-mail verificado)
+    const auth = app('lib/commercial/commercial-auth.ts');
+    expect((auth.match(/createServiceRoleClient\(\)/g) ?? []).length).toBe(1);
+    expect(auth).toMatch(/if \(!email \|\| !user\.email_confirmed_at\) return false;/);
+    expect(auth).toMatch(/import 'server-only'/);
     expect(app('lib/commercial/commercial-auth.ts')).not.toMatch(/document_hash|document_encrypted|pix_key_encrypted|tax_profile/);
   });
 
   it('middleware: 404 com módulo desativado (antes de qualquer redirecionamento) e login obrigatório', () => {
     const mw = app('middleware.ts');
-    expect(mw).toMatch(/isRepresentativePath\(request\.nextUrl\.pathname\) && !isCommercialModuleEnvEnabled\(\)/);
+    expect(mw).toMatch(/isCommercialAreaPath\(request\.nextUrl\.pathname\) && !isCommercialModuleEnvEnabled\(\)/);
     expect(mw).toMatch(/NextResponse\.rewrite/);
     expect(mw).toMatch(/isRepresentativeRoute\s*\)\s*\{/);
     // a checagem de módulo vem antes da criação do cliente Supabase/autenticação
