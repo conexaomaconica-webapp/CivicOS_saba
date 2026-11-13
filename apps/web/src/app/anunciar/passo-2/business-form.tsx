@@ -15,6 +15,7 @@ import { upsertMasonicAffiliation } from '@/lib/masonic/masonic-affiliation-serv
 import { MASONIC_STATUS_LABELS } from '@/lib/masonic/masonic-affiliation';
 import { MasonicLinkAuthorizationModal } from '@/components/onboarding/MasonicLinkAuthorizationModal';
 import { trackGa } from '@/lib/analytics/ga';
+import { claimCommercialReferralAction } from '@/lib/commercial/referral-claim-service';
 
 const FIELD_ERROR_STYLE = {
   marginTop: 'var(--space-1)',
@@ -41,9 +42,11 @@ function FieldError({ message }: { message?: string }) {
 export interface BusinessFormProps {
   categories: BusinessCategoryOption[];
   tenantId: string | null;
+  /** Gate 1C.1: só é true quando a chave do módulo comercial está ligada no servidor. */
+  referralClaimEnabled?: boolean;
 }
 
-export default function BusinessForm({ categories, tenantId }: BusinessFormProps) {
+export default function BusinessForm({ categories, tenantId, referralClaimEnabled = false }: BusinessFormProps) {
   const router = useRouter();
   const supabase = createClient();
   const responsibleDraft = loadResponsibleDraft();
@@ -149,6 +152,17 @@ export default function BusinessForm({ categories, tenantId }: BusinessFormProps
           ...responsibleDraft.masonic,
           masonicConsent: isMasonicConnectionPublic,
         });
+      }
+      if (referralClaimEnabled && result.businessId) {
+        // Gate 1C.1: atribuição pendente da indicação por link. Nunca bloqueia o cadastro: falhas e demora são ignoradas.
+        try {
+          await Promise.race([
+            claimCommercialReferralAction(result.businessId),
+            new Promise((resolve) => setTimeout(resolve, 3000)),
+          ]);
+        } catch {
+          // o cadastro segue normalmente
+        }
       }
       clearResponsibleDraft();
       trackGa('complete_advertiser_signup', { source_page: 'anunciar_passo_2' });
