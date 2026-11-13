@@ -5,8 +5,11 @@ import {
   documentLast4,
   friendlyCommercialError,
   generateReferralCode,
+  generateReferralToken,
+  hashReferralToken,
   isValidEmail,
   isValidReferralCode,
+  isValidReferralToken,
   leadDedupeKey,
   normalizeEmail,
   onlyDigits,
@@ -48,6 +51,27 @@ describe('Módulo comercial · utilitários puros (Gate 1C)', () => {
     expect(isValidReferralCode('ABCDEFGHJKMN')).toBe(false); // formato dos convites de cadastro
     expect(isValidReferralCode('REP-abc')).toBe(false);
     expect(generateReferralCode(() => 0)).toBe('REP-AAAAAAAA');
+  });
+
+  it('token do cookie: 128 bits aleatórios, formato validado, sem relação com o código e só o hash é persistido', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 200; i += 1) {
+      const token = generateReferralToken();
+      expect(token).toMatch(/^[A-Za-z0-9_-]{22}$/);
+      expect(isValidReferralToken(token)).toBe(true);
+      expect(token.startsWith('REP-')).toBe(false);
+      seen.add(token);
+    }
+    expect(seen.size).toBe(200);
+    expect(isValidReferralToken('REP-ABCDEFGH')).toBe(false); // cookie antigo (código em texto) não é token
+    expect(isValidReferralToken('curto')).toBe(false);
+    expect(isValidReferralToken(undefined)).toBe(false);
+    const token = generateReferralToken(() => Buffer.alloc(16, 7));
+    const hash = hashReferralToken(token);
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(hash).toBe(hashReferralToken(token));
+    expect(hash).not.toContain(token);
+    expect(hashReferralToken(token + 'x')).not.toBe(hash);
   });
 
   it('validade de indicação em dias', () => {

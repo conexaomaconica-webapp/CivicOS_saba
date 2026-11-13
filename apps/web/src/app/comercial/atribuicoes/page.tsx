@@ -1,7 +1,7 @@
 import React from 'react';
 import { notFound } from 'next/navigation';
 import { getStaffContext, staffCan } from '@/lib/commercial/commercial-auth';
-import { listAttributionsAction } from '@/lib/commercial/attributions-service';
+import { listAttributionIssuesAction, listAttributionsAction } from '@/lib/commercial/attributions-service';
 import { listRepresentativesAction } from '@/lib/commercial/representatives-service';
 import AttributionsClient from './attributions-client';
 
@@ -11,8 +11,9 @@ export default async function CommercialAttributionsPage() {
   const ctx = await getStaffContext();
   if (!ctx || !staffCan(ctx, 'attributions.manage')) notFound();
 
-  const [attributions, representatives] = await Promise.all([
+  const [attributions, issues, representatives] = await Promise.all([
     listAttributionsAction(),
+    listAttributionIssuesAction(),
     staffCan(ctx, 'representatives.read') ? listRepresentativesAction() : Promise.resolve({ success: true as const, data: [] }),
   ]);
 
@@ -20,6 +21,8 @@ export default async function CommercialAttributionsPage() {
     <AttributionsClient
       items={attributions.success ? (attributions.data ?? []) : []}
       loadError={attributions.success ? null : attributions.error}
+      issues={issues.success ? (issues.data ?? []) : []}
+      issueLoadError={issues.success ? null : issues.error}
       representatives={(representatives.success ? (representatives.data ?? []) : [])
         .filter((r) => r.status === 'active')
         .map((r) => ({ id: r.id, name: r.trade_name || r.legal_name }))}

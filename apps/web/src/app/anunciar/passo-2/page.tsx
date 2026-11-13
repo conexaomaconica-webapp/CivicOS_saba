@@ -4,6 +4,7 @@ import { createServerSideClient } from '@/lib/supabase/server';
 import { resolveRequestTenantId } from '@/lib/tenant/tenant-resolver';
 import { listBusinessCategories } from '@/lib/business/business-registration-service';
 import OnboardingHeader from '@/components/onboarding/OnboardingHeader';
+import { isCommercialModuleEnvEnabled } from '@/lib/commercial/feature-flag';
 import BusinessForm from './business-form';
 
 export const metadata = {
@@ -54,7 +55,7 @@ export default async function OnboardingStep2Page() {
             💡 <strong>Dica:</strong> Logo, capa corporativa, galeria de fotos e horários detalhados poderão ser preenchidos depois no seu Portal do Anunciante.
           </p>
 
-          <BusinessForm categories={categories} tenantId={tenantId} />
+          <BusinessForm categories={categories} tenantId={tenantId} referralClaimEnabled={isCommercialModuleEnvEnabled()} />
         </div>
       </div>
     </main>

@@ -5,7 +5,10 @@ import { useRouter } from 'next/navigation';
 import {
   confirmAttributionAction,
   createManualAttributionAction,
+  resolveAttributionIssueAction,
+  retryAttributionIssueAction,
   revokeAttributionAction,
+  type AttributionIssueItem,
   type AttributionItem,
 } from '@/lib/commercial/attributions-service';
 
@@ -16,13 +19,29 @@ const TYPE_LABEL: Record<string, string> = {
   referral_link: 'Link de indicação', lead_registration: 'Lead convertido', admin_assigned: 'Manual (equipe)',
 };
 
+const ISSUE_KIND_LABEL: Record<string, string> = {
+  transient_error: 'Falha técnica ao atribuir',
+  evidence_expired: 'Evidência vencida no cadastro',
+  evidence_used_by_other_business: 'Evidência já usada por outra empresa',
+  rep_inactive: 'Representante inativo',
+  self_referral: 'Autoindicação',
+  conflict_confirmed: 'Conflito com atribuição confirmada',
+  reserved_by_other: 'Lead reservado por outro representante',
+  competing_pending: 'Atribuição pendente de outro representante',
+};
+const ISSUE_STATUS_LABEL: Record<string, string> = { open: 'Aberta', resolved: 'Resolvida', discarded: 'Descartada' };
+
 export default function AttributionsClient({
   items,
   loadError,
+  issues,
+  issueLoadError,
   representatives,
 }: {
   items: AttributionItem[];
   loadError: string | null;
+  issues: AttributionIssueItem[];
+  issueLoadError: string | null;
   representatives: Array<{ id: string; name: string }>;
 }) {
   const router = useRouter();
@@ -117,6 +136,65 @@ export default function AttributionsClient({
                         }} className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-800 text-xs font-bold border border-rose-200 cursor-pointer disabled:opacity-50">Revogar</button>
                       )}
                     </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section aria-labelledby="pend-titulo" className="space-y-3">
+        <h2 id="pend-titulo" className="text-xl font-serif font-bold text-[#3B0B14]">
+          Pendências da atribuição automática ({issues.filter((i) => i.status === 'open').length} abertas)
+        </h2>
+        <p className="text-xs text-stone-500">
+          Indicações por link que não geraram atribuição sozinhas (conflito, reserva de lead, validade ou falha técnica). A evidência
+          original é sempre preservada. Reprocessar nunca confirma nem substitui uma atribuição existente; descartar exige justificativa.
+        </p>
+        {issueLoadError && <p className="text-sm text-rose-700">{issueLoadError}</p>}
+        <div className="overflow-x-auto rounded-2xl border border-[#E8E5DF] bg-white">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-stone-50 text-xs uppercase tracking-wide text-stone-500">
+              <tr>
+                <th className="px-4 py-3">Motivo</th>
+                <th className="px-4 py-3">Empresa</th>
+                <th className="px-4 py-3">Representante da indicação</th>
+                <th className="px-4 py-3">Cadastro em</th>
+                <th className="px-4 py-3">Situação</th>
+                <th className="px-4 py-3">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {issues.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-stone-500">Nenhuma pendência.</td></tr>}
+              {issues.map((i) => (
+                <tr key={i.id} className="border-t border-stone-100 align-top">
+                  <td className="px-4 py-3 font-semibold">{ISSUE_KIND_LABEL[i.kind] ?? i.kind}{i.attempts > 1 && <span className="block text-xs font-normal text-stone-500">{i.attempts} tentativas</span>}</td>
+                  <td className="px-4 py-3 font-mono text-xs">{i.business_id ? `${i.business_id.slice(0, 8)}…` : '—'}</td>
+                  <td className="px-4 py-3">{i.representative_id ? repName(i.representative_id) : '—'}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">{new Date(i.claim_at).toLocaleDateString('pt-BR')}</td>
+                  <td className="px-4 py-3">
+                    <span className="font-bold">{ISSUE_STATUS_LABEL[i.status] ?? i.status}</span>
+                    {i.resolution_note && <span className="block text-xs text-stone-500">{i.resolution_note}</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    {i.status === 'open' && (
+                      <div className="flex flex-wrap gap-1.5">
+                        <button disabled={busy} onClick={async () => { setBusy(true); setMessage(null); finish(await retryAttributionIssueAction(i.id), 'Pendência reprocessada: atribuição pendente criada.'); }} className="px-2.5 py-1 rounded-lg bg-[#3B0B14] text-white text-xs font-bold cursor-pointer disabled:opacity-50">Reprocessar</button>
+                        <button disabled={busy} onClick={async () => {
+                          const note = window.prompt('Resolvida por outro meio (ex.: atribuição manual criada). Justificativa (mín. 10 caracteres):');
+                          if (!note?.trim()) return;
+                          setBusy(true); setMessage(null);
+                          finish(await resolveAttributionIssueAction({ issueId: i.id, decision: 'resolved', note }), 'Pendência encerrada como resolvida.');
+                        }} className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200 cursor-pointer disabled:opacity-50">Resolvida</button>
+                        <button disabled={busy} onClick={async () => {
+                          const note = window.prompt('Motivo do descarte (mín. 10 caracteres). A evidência continua preservada:');
+                          if (!note?.trim()) return;
+                          setBusy(true); setMessage(null);
+                          finish(await resolveAttributionIssueAction({ issueId: i.id, decision: 'discarded', note }), 'Pendência descartada.');
+                        }} className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-800 text-xs font-bold border border-rose-200 cursor-pointer disabled:opacity-50">Descartar</button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

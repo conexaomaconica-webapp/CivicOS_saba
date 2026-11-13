@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { tryCommercialPermission } from './commercial-auth';
 import { auditCommercial, fail, requireWriter, type ActionResult } from './commercial-service-base';
-import { addDays, friendlyCommercialError } from './commercial-utils';
+import { dedupeKeyKey } from './commercial-secrets';
+import { addDays, friendlyCommercialError, leadDedupeKey } from './commercial-utils';
 
 export type AttributionItem = {
   id: string;
@@ -16,6 +17,25 @@ export type AttributionItem = {
   valid_until: string | null;
   confirmed_at: string | null;
   revoke_reason: string | null;
+};
+
+export type AttributionIssueKind =
+  | 'transient_error' | 'evidence_expired' | 'evidence_used_by_other_business' | 'rep_inactive' | 'self_referral'
+  | 'conflict_confirmed' | 'reserved_by_other' | 'competing_pending';
+
+export type AttributionIssueItem = {
+  id: string;
+  business_id: string | null;
+  evidence_id: string | null;
+  representative_id: string | null;
+  kind: AttributionIssueKind;
+  status: 'open' | 'resolved' | 'discarded';
+  claim_at: string;
+  attempts: number;
+  last_attempt_at: string;
+  resolution: string | null;
+  resolution_note: string | null;
+  created_at: string;
 };
 
 export async function listAttributionsAction(): Promise<ActionResult<AttributionItem[]>> {
@@ -163,5 +183,146 @@ export async function revokeAttributionAction(input: { attributionId: string; re
     return { success: true };
   } catch {
     return fail('Erro ao revogar a atribuição.');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Gate 1C.1 · Fila de pendências/conflitos da atribuição automática pelo link
+// ---------------------------------------------------------------------------
+
+export async function listAttributionIssuesAction(): Promise<ActionResult<AttributionIssueItem[]>> {
+  const auth = await tryCommercialPermission('attributions.manage');
+  if (!auth.ok) return fail(auth.error);
+  const { data, error } = await (auth.supabase as any)
+    .from('commercial_attribution_issues')
+    .select('id, business_id, evidence_id, representative_id, kind, status, claim_at, attempts, last_attempt_at, resolution, resolution_note, created_at')
+    .eq('tenant_id', auth.tenantId)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error) return fail('Não foi possível listar as pendências de atribuição.');
+  return { success: true, data: (data ?? []) as AttributionIssueItem[] };
+}
+
+const ISSUE_KIND_MESSAGE: Record<string, string> = {
+  evidence_expired: 'A evidência de indicação já estava vencida quando a empresa foi cadastrada.',
+  evidence_used_by_other_business: 'Esta evidência já foi usada por outra empresa.',
+  rep_inactive: 'O representante da indicação não está ativo.',
+  self_referral: 'A empresa pertence ao próprio representante (autoindicação).',
+  conflict_confirmed: 'A empresa já tem atribuição confirmada para outro representante.',
+  reserved_by_other: 'Existe um lead com reserva vigente de outro representante.',
+  competing_pending: 'Outro representante já tem atribuição pendente para esta empresa.',
+};
+
+/**
+ * Reprocessa uma pendência usando a EVIDÊNCIA guardada (não depende mais do cookie). A validade é avaliada no momento
+ * em que a empresa foi cadastrada. Nunca confirma e nunca substitui atribuição existente.
+ */
+export async function retryAttributionIssueAction(issueId: string): Promise<ActionResult<{ result: string }>> {
+  const auth = await tryCommercialPermission('attributions.manage');
+  if (!auth.ok) return fail(auth.error);
+  try {
+    const writer = requireWriter();
+    const { data: issue } = await writer
+      .from('commercial_attribution_issues')
+      .select('id, business_id, evidence_id, claim_at, claim_user_id, status')
+      .eq('id', issueId)
+      .eq('tenant_id', auth.tenantId)
+      .maybeSingle();
+    if (!issue || issue.status !== 'open') return fail('Pendência não encontrada ou já encerrada.');
+    if (!issue.business_id || !issue.evidence_id) return fail('A empresa ou a evidência desta pendência não existe mais; descarte-a com justificativa.');
+
+    const { data: business } = await writer
+      .from('businesses')
+      .select('id, owner_id, cnpj')
+      .eq('id', issue.business_id)
+      .eq('tenant_id', auth.tenantId)
+      .maybeSingle();
+    if (!business) return fail('Empresa não encontrada.');
+
+    const key = dedupeKeyKey();
+    let ownerEmail: string | null = null;
+    if (business.owner_id) {
+      const { data: owner } = await writer.auth.admin.getUserById(business.owner_id as string);
+      ownerEmail = owner?.user?.email ?? null;
+    }
+    const keys = [
+      leadDedupeKey({ document: business.cnpj as string | null }, key),
+      leadDedupeKey({ email: ownerEmail }, key),
+    ].filter((k): k is string => Boolean(k));
+
+    const { data, error } = await writer.rpc('commercial_claim_referral', {
+      p_tenant_id: auth.tenantId,
+      p_business_id: issue.business_id,
+      p_claim_user: issue.claim_user_id ?? business.owner_id ?? null,
+      p_token_hash: null,
+      p_evidence_id: issue.evidence_id,
+      p_dedupe_keys: keys,
+      p_claim_at: issue.claim_at,
+      p_actor: auth.user.id,
+      p_issue_id: issue.id,
+    });
+    if (error) return fail(friendlyCommercialError(error.message));
+
+    const result = String((data as { result?: string })?.result ?? 'unknown');
+    const kind = (data as { issue_kind?: string })?.issue_kind;
+    await auditCommercial(writer, {
+      tenantId: auth.tenantId,
+      actorId: auth.user.id,
+      entityType: 'commercial_attribution_issue',
+      entityId: issueId,
+      action: 'COMMERCIAL_ISSUE_RETRIED',
+      after: { result, kind: kind ?? null },
+    });
+    revalidatePath('/comercial/atribuicoes');
+    if (result === 'created' || result === 'already_attributed') return { success: true, data: { result } };
+    if (result === 'issue') return fail(ISSUE_KIND_MESSAGE[kind ?? ''] ?? 'A pendência continua aberta.');
+    if (result === 'disabled') return fail('A atribuição automática está desligada neste ambiente.');
+    return fail('Não foi possível reprocessar a pendência.');
+  } catch {
+    return fail('Erro ao reprocessar a pendência.');
+  }
+}
+
+/** Decisão administrativa registrada: encerra a pendência (resolvida por outro meio ou descartada) com justificativa. */
+export async function resolveAttributionIssueAction(input: {
+  issueId: string;
+  decision: 'resolved' | 'discarded';
+  note: string;
+}): Promise<ActionResult> {
+  const auth = await tryCommercialPermission('attributions.manage');
+  if (!auth.ok) return fail(auth.error);
+  const note = input.note?.trim();
+  if (!note || note.length < 10) return fail('Descreva a justificativa (mínimo de 10 caracteres).');
+  if (input.decision !== 'resolved' && input.decision !== 'discarded') return fail('Decisão inválida.');
+
+  try {
+    const writer = requireWriter();
+    const { data, error } = await writer
+      .from('commercial_attribution_issues')
+      .update({
+        status: input.decision,
+        resolution: input.decision === 'resolved' ? 'resolved_by_staff' : 'discarded_by_staff',
+        resolution_note: note,
+        resolved_by: auth.user.id,
+        resolved_at: new Date().toISOString(),
+      })
+      .eq('id', input.issueId)
+      .eq('tenant_id', auth.tenantId)
+      .eq('status', 'open')
+      .select('id')
+      .maybeSingle();
+    if (error || !data) return fail('Pendência não encontrada ou já encerrada.');
+    await auditCommercial(writer, {
+      tenantId: auth.tenantId,
+      actorId: auth.user.id,
+      entityType: 'commercial_attribution_issue',
+      entityId: input.issueId,
+      action: input.decision === 'resolved' ? 'COMMERCIAL_ISSUE_RESOLVED' : 'COMMERCIAL_ISSUE_DISCARDED',
+      reason: note,
+    });
+    revalidatePath('/comercial/atribuicoes');
+    return { success: true };
+  } catch {
+    return fail('Erro ao encerrar a pendência.');
   }
 }

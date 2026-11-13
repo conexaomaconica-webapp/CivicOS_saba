@@ -53,6 +53,20 @@ export function isValidReferralCode(value: string): boolean {
   return /^REP-[A-Z0-9]{6,10}$/.test(value);
 }
 
+/** Token do cookie de indicação: 128 bits aleatórios (base64url). Nunca contém o código do representante. */
+export function generateReferralToken(randomBytes: (size: number) => Buffer = (size) => crypto.randomBytes(size)): string {
+  return randomBytes(16).toString('base64url');
+}
+
+export function isValidReferralToken(value: string | null | undefined): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{22}$/.test(value);
+}
+
+/** SHA-256 hexadecimal do token: é o que o banco guarda (o token claro existe só no cookie do navegador). */
+export function hashReferralToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
 /** Fim da validade (ex.: indicação de 30 dias). */
 export function addDays(from: Date, days: number): Date {
   return new Date(from.getTime() + days * 24 * 60 * 60 * 1000);
