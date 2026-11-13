@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { assertPlatformAdminAccess } from '@/lib/admin/admin-auth-helper';
-import { getFirebaseConfigStatus, getFirebaseServiceAccount, sendPushToToken } from './fcm';
+import { getFirebaseConfigStatus, getFirebaseServiceAccount, sendPushToToken, testFirebaseConnection, type FirebaseConnectionTest } from './fcm';
 
 type ContentMode = 'text' | 'image' | 'image_text';
 type AudienceType = 'all' | 'emails';
@@ -79,6 +79,30 @@ export async function getPushConfigStatusAction(): Promise<{
     return getFirebaseConfigStatus();
   } catch {
     return { configured: false, reason: 'Sem permissão para consultar a configuração.' };
+  }
+}
+
+/**
+ * Teste de conexão (somente admin): valida a configuração do Firebase de ponta a ponta SEM enviar notificação,
+ * e informa quantos aparelhos Android ativos existem. Nenhum segredo é devolvido.
+ */
+export async function testPushConnectionAction(): Promise<{ success: boolean; test?: FirebaseConnectionTest; devices?: number; error?: string }> {
+  try {
+    await assertPlatformAdminAccess();
+    const test = await testFirebaseConnection();
+    let devices: number | undefined;
+    const db = getServiceClient();
+    if (db) {
+      const { count } = await db
+        .from('mobile_device_tokens')
+        .select('token', { count: 'exact', head: true })
+        .eq('is_active', true)
+        .eq('platform', 'android');
+      devices = typeof count === 'number' ? count : undefined;
+    }
+    return { success: true, test, devices };
+  } catch {
+    return { success: false, error: 'Sem permissão para testar a conexão ou erro inesperado.' };
   }
 }
 

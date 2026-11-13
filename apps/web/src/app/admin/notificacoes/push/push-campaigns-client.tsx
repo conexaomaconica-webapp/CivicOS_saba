@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Send, ImageIcon, Type, Users, Clock, Loader2 } from 'lucide-react';
 import {
   getPushConfigStatusAction,
+  testPushConnectionAction,
   countPushAudienceAction,
   listPushCampaignsAction,
   sendPushCampaignAction,
@@ -50,6 +51,20 @@ export default function PushCampaignsClient() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [history, setHistory] = useState<PushCampaignListItem[]>([]);
   const [fcmStatus, setFcmStatus] = useState<{ configured: boolean; reason?: string; projectId?: string; clientEmail?: string } | null>(null);
+
+  const [testing, setTesting] = useState(false);
+  const [connTest, setConnTest] = useState<Awaited<ReturnType<typeof testPushConnectionAction>> | null>(null);
+
+  const runConnectionTest = async () => {
+    setTesting(true);
+    try {
+      setConnTest(await testPushConnectionAction());
+    } catch {
+      setConnTest({ success: false, error: 'Não foi possível executar o teste agora. Tente novamente.' });
+    } finally {
+      setTesting(false);
+    }
+  };
 
   useEffect(() => {
     void getPushConfigStatusAction().then(setFcmStatus);
@@ -127,20 +142,69 @@ export default function PushCampaignsClient() {
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-      {fcmStatus && (
-        <div
-          role="status"
-          className={`xl:col-span-3 p-3 rounded-xl text-xs font-semibold border ${
-            fcmStatus.configured
-              ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
-              : 'bg-amber-50 text-amber-900 border-amber-300'
-          }`}
-        >
-          {fcmStatus.configured
-            ? `Firebase configurado no servidor — projeto: ${fcmStatus.projectId} (conta de serviço: ${fcmStatus.clientEmail}).`
-            : `Firebase NÃO configurado neste ambiente. ${fcmStatus.reason ?? ''}`}
+      <div className="xl:col-span-3 space-y-2">
+        {fcmStatus && (
+          <div
+            role="status"
+            className={`p-3 rounded-xl text-xs font-semibold border ${
+              fcmStatus.configured
+                ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                : 'bg-amber-50 text-amber-900 border-amber-300'
+            }`}
+          >
+            {fcmStatus.configured
+              ? `Firebase configurado no servidor — projeto: ${fcmStatus.projectId} (conta de serviço: ${fcmStatus.clientEmail}).`
+              : `Firebase NÃO configurado neste ambiente. ${fcmStatus.reason ?? ''}`}
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void runConnectionTest()}
+            disabled={testing}
+            className="px-4 py-2 rounded-xl border border-[#3B0B14] text-[#3B0B14] text-xs font-bold hover:bg-[#3B0B14]/5 disabled:opacity-50 cursor-pointer"
+          >
+            {testing ? 'Testando…' : 'Testar conexão com o Firebase'}
+          </button>
+          <span className="text-[11px] text-stone-500">Valida a configuração de ponta a ponta sem enviar nenhuma notificação.</span>
         </div>
-      )}
+        {connTest && (
+          <div
+            role="status"
+            className={`p-4 rounded-xl border text-xs space-y-2 ${
+              connTest.test?.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'
+            }`}
+          >
+            {connTest.error && <p className="font-bold">{connTest.error}</p>}
+            {connTest.test && (
+              <>
+                <p className="font-bold">
+                  {connTest.test.ok ? 'Conexão OK: o envio de notificações está pronto neste ambiente.' : 'A conexão tem problemas. Veja abaixo o que corrigir.'}
+                </p>
+                <ul className="space-y-1.5">
+                  {connTest.test.steps.map((step) => (
+                    <li key={step.id} className="flex gap-2">
+                      <span aria-hidden className="font-bold">{step.skipped ? '–' : step.ok ? '✓' : '✗'}</span>
+                      <span>
+                        <strong>{step.label}:</strong> {step.detail}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-[11px] opacity-80">
+                  Ambiente: {connTest.test.environment}
+                  {typeof connTest.devices === 'number' ? ` · ${connTest.devices} aparelho(s) Android ativo(s) cadastrado(s)` : ''}
+                </p>
+                {connTest.test.ok && connTest.devices === 0 && (
+                  <p className="font-semibold">
+                    A configuração está correta, mas ainda não há aparelhos Android ativos cadastrados: o app precisa estar instalado, com a permissão de notificações aceita e já aberto ao menos uma vez.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
       <div className="xl:col-span-2 bg-white border border-stone-300 rounded-2xl p-6 shadow-xs space-y-5">
         <div>
           <p className="text-xs font-bold text-stone-700 mb-2">Formato da notificação</p>

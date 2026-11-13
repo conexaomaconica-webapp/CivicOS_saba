@@ -96,10 +96,8 @@ function base64Url(input: Buffer | string): string {
   return Buffer.from(input).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
-async function getAccessToken(account: ServiceAccount): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  if (cachedToken && cachedToken.expiresAt - 60 > now) return cachedToken.value;
-
+/** JWT assinado (RS256) que a conta de serviço troca por um token de acesso. */
+function buildAssertion(account: ServiceAccount, now: number = Math.floor(Date.now() / 1000)): string {
   const header = base64Url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
   const claims = base64Url(
     JSON.stringify({
@@ -111,7 +109,14 @@ async function getAccessToken(account: ServiceAccount): Promise<string> {
     }),
   );
   const signature = crypto.createSign('RSA-SHA256').update(`${header}.${claims}`).sign(account.private_key);
-  const assertion = `${header}.${claims}.${base64Url(signature)}`;
+  return `${header}.${claims}.${base64Url(signature)}`;
+}
+
+async function getAccessToken(account: ServiceAccount): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  if (cachedToken && cachedToken.expiresAt - 60 > now) return cachedToken.value;
+
+  const assertion = buildAssertion(account, now);
 
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -163,5 +168,196 @@ export async function sendPushToToken(token: string, payload: PushPayload): Prom
     return { ok: false, invalidToken, error: `FCM ${res.status}: ${text.slice(0, 200)}` };
   } catch (error) {
     return { ok: false, invalidToken: false, error: error instanceof Error ? error.message : 'Erro ao enviar push.' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Teste de conexão (admin): valida a configuração de ponta a ponta SEM enviar notificação a ninguém.
+// Nunca devolve nem registra segredo: só categorias, códigos públicos de erro e o projeto/e-mail da conta.
+// ---------------------------------------------------------------------------
+
+export type ServiceAccountFormat = 'missing' | 'json' | 'json_with_quotes' | 'base64' | 'unknown';
+
+/** Como o valor da variável parece estar colado (sem revelar o conteúdo). */
+export function detectServiceAccountFormat(rawValue: string | undefined | null): ServiceAccountFormat {
+  const raw = (rawValue ?? '').replace(/^﻿/, '').trim();
+  if (!raw) return 'missing';
+  if (raw.length > 1 && ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'")))) return 'json_with_quotes';
+  if (raw.startsWith('{')) return 'json';
+  if (/^[A-Za-z0-9+/=\s]+$/.test(raw)) return 'base64';
+  return 'unknown';
+}
+
+const FORMAT_LABEL: Record<ServiceAccountFormat, string> = {
+  missing: 'ausente',
+  json: 'JSON puro',
+  json_with_quotes: 'JSON entre aspas (tolerado)',
+  base64: 'base64',
+  unknown: 'formato não reconhecido',
+};
+
+export type ConnectionStep = {
+  id: 'config' | 'key' | 'auth' | 'fcm';
+  label: string;
+  ok: boolean;
+  skipped?: boolean;
+  detail: string;
+};
+
+export type FirebaseConnectionTest = {
+  ok: boolean;
+  steps: ConnectionStep[];
+  projectId?: string;
+  clientEmail?: string;
+  /** Ambiente e versão que estão respondendo (ex.: "production · versão 15e7c8f"). */
+  environment: string;
+};
+
+function describeEnvironment(): string {
+  const env = process.env.VERCEL_ENV || process.env.NODE_ENV || 'desconhecido';
+  const sha = (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7);
+  return sha ? `${env} · versão ${sha}` : env;
+}
+
+function publicErrorStatus(text: string): string | null {
+  try {
+    const status = JSON.parse(text)?.error?.status;
+    return typeof status === 'string' ? status : null;
+  } catch {
+    return null;
+  }
+}
+
+const AUTH_ADVICE: Record<string, string> = {
+  invalid_grant:
+    'O Google recusou a conta de serviço (invalid_grant): a chave pode ter sido revogada/excluída, a conta desativada ou o relógio do servidor está fora de hora. Gere uma nova chave no Firebase e atualize a variável.',
+  invalid_client: 'O Google não reconhece esta conta de serviço (invalid_client). Confirme o client_email do arquivo.',
+  unauthorized_client: 'A conta de serviço não está autorizada para este escopo (unauthorized_client).',
+  invalid_scope: 'Escopo recusado pelo Google (invalid_scope).',
+};
+
+/**
+ * Testa, em 4 etapas e sem enviar nenhuma notificação: (1) variável legível, (2) chave privada utilizável,
+ * (3) autenticação no Google, (4) Firebase Cloud Messaging aceita a conta no projeto (envio com validate_only).
+ */
+export async function testFirebaseConnection(): Promise<FirebaseConnectionTest> {
+  const environment = describeEnvironment();
+  const steps: ConnectionStep[] = [];
+  const skip = (id: ConnectionStep['id'], label: string) =>
+    steps.push({ id, label, ok: false, skipped: true, detail: 'Não executado: corrija a etapa anterior.' });
+  const done = (ok: boolean): FirebaseConnectionTest => ({ ok, steps, environment });
+
+  // 1) Variável
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const parsed = parseServiceAccount(raw);
+  if (!parsed.ok) {
+    const status = getFirebaseConfigStatus();
+    steps.push({ id: 'config', label: 'Variável FIREBASE_SERVICE_ACCOUNT_JSON', ok: false, detail: status.reason ?? 'Configuração inválida.' });
+    skip('key', 'Chave privada');
+    skip('auth', 'Autenticação no Google');
+    skip('fcm', 'Firebase Cloud Messaging');
+    return done(false);
+  }
+  const account = parsed.account;
+  const result = (ok: boolean): FirebaseConnectionTest => ({ ...done(ok), projectId: account.project_id, clientEmail: account.client_email });
+  steps.push({
+    id: 'config',
+    label: 'Variável FIREBASE_SERVICE_ACCOUNT_JSON',
+    ok: true,
+    detail: `Lida com sucesso (${FORMAT_LABEL[detectServiceAccountFormat(raw)]}). Projeto: ${account.project_id}.`,
+  });
+
+  // 2) Chave privada
+  let assertion: string;
+  try {
+    if (!/-----BEGIN (RSA )?PRIVATE KEY-----/.test(account.private_key)) throw new Error('cabeçalho');
+    assertion = buildAssertion(account);
+  } catch {
+    steps.push({
+      id: 'key',
+      label: 'Chave privada',
+      ok: false,
+      detail:
+        'A private_key não pôde ser usada para assinar (cabeçalho ausente ou conteúdo corrompido, em geral por quebras de linha ou caracteres alterados na colagem). Use o arquivo original inteiro ou o valor em base64.',
+    });
+    skip('auth', 'Autenticação no Google');
+    skip('fcm', 'Firebase Cloud Messaging');
+    return result(false);
+  }
+  steps.push({ id: 'key', label: 'Chave privada', ok: true, detail: 'A chave assina corretamente.' });
+
+  // 3) Autenticação (sempre uma chamada nova; não usa o token em cache)
+  let accessToken: string;
+  try {
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      let code = 'erro';
+      try {
+        const c = JSON.parse(text)?.error;
+        if (typeof c === 'string') code = c;
+      } catch {
+        /* mantém o código genérico */
+      }
+      steps.push({
+        id: 'auth',
+        label: 'Autenticação no Google',
+        ok: false,
+        detail: AUTH_ADVICE[code] ?? `O Google recusou a autenticação (HTTP ${res.status}, ${code}).`,
+      });
+      skip('fcm', 'Firebase Cloud Messaging');
+      return result(false);
+    }
+    accessToken = ((await res.json()) as { access_token: string }).access_token;
+  } catch {
+    steps.push({ id: 'auth', label: 'Autenticação no Google', ok: false, detail: 'Sem resposta do Google (rede ou tempo esgotado). Tente novamente.' });
+    skip('fcm', 'Firebase Cloud Messaging');
+    return result(false);
+  }
+  steps.push({ id: 'auth', label: 'Autenticação no Google', ok: true, detail: `Conta de serviço aceita (${account.client_email}).` });
+
+  // 4) FCM: validate_only com um token propositalmente inválido. Chegar ao erro de "token inválido" prova que a
+  //    autenticação, a API e o projeto estão corretos, sem entregar nada a nenhum aparelho.
+  try {
+    const res = await fetch(`https://fcm.googleapis.com/v1/projects/${account.project_id}/messages:send`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        validate_only: true,
+        message: { token: 'teste-de-conexao-nao-e-um-aparelho', notification: { title: 'Teste de conexão' } },
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const text = res.ok ? '' : await res.text();
+    const status = publicErrorStatus(text);
+    if (res.ok || (res.status === 400 && (status === 'INVALID_ARGUMENT' || /registration token/i.test(text)))) {
+      steps.push({
+        id: 'fcm',
+        label: 'Firebase Cloud Messaging',
+        ok: true,
+        detail: 'O Firebase aceitou a conta neste projeto (teste sem envio: nenhuma notificação foi enviada).',
+      });
+      return result(true);
+    }
+    const advice: Record<number, string> = {
+      401: 'Autenticação recusada pelo FCM. Gere uma nova chave da conta de serviço.',
+      403: 'Permissão negada. Ative a "Firebase Cloud Messaging API (V1)" no projeto e confirme que a conta de serviço tem o papel "Firebase Cloud Messaging Admin" (ou "Firebase Admin").',
+      404: 'Projeto não encontrado no FCM: o project_id da chave não corresponde a um projeto Firebase com mensagens habilitadas.',
+    };
+    steps.push({
+      id: 'fcm',
+      label: 'Firebase Cloud Messaging',
+      ok: false,
+      detail: advice[res.status] ?? `O FCM respondeu HTTP ${res.status}${status ? ` (${status})` : ''}. ${res.status >= 500 || res.status === 429 ? 'Instabilidade temporária: tente novamente.' : ''}`.trim(),
+    });
+    return result(false);
+  } catch {
+    steps.push({ id: 'fcm', label: 'Firebase Cloud Messaging', ok: false, detail: 'Sem resposta do FCM (rede ou tempo esgotado). Tente novamente.' });
+    return result(false);
   }
 }
