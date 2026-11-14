@@ -11,6 +11,7 @@ import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
 import { isNoIndexFollowPath } from '@/lib/seo/noindex-paths';
 import { getProfileAuthorization } from '@/lib/member/profile-access-service';
 import { isCommercialModuleEnvEnabled, isCommercialAreaPath } from '@/lib/commercial/feature-flag';
+import { evaluateTempPasswordGate, getTempPasswordState, TEMP_PASSWORD_CHANGE_PATH } from '@/lib/commercial/temp-password';
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
@@ -75,6 +76,29 @@ export async function middleware(request: NextRequest) {
   }
 
   const path = request.nextUrl.pathname;
+
+  // Representante com senha temporária (Gate 1C.2): enquanto a troca estiver pendente só a página de troca e o login
+  // funcionam; senha temporária expirada encerra a sessão. Só vale com o módulo comercial ligado; o estado vem do
+  // app_metadata (somente o servidor altera), sem consulta extra ao banco.
+  if (user && isCommercialModuleEnvEnabled()) {
+    const gate = evaluateTempPasswordGate(path, getTempPasswordState(user.app_metadata));
+    if (gate.action === 'sign_out_expired') {
+      await supabase.auth.signOut();
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = '/login';
+      redirectUrl.search = '?senha_temporaria=expirada';
+      return NextResponse.redirect(redirectUrl);
+    }
+    if (gate.action === 'redirect_change') {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = TEMP_PASSWORD_CHANGE_PATH;
+      redirectUrl.search = '';
+      return NextResponse.redirect(redirectUrl);
+    }
+    if (gate.action === 'deny_api') {
+      return NextResponse.json({ error: 'Troca de senha pendente.' }, { status: 403 });
+    }
+  }
 
   // Define route categories
   const isAdminRoute = path.startsWith('/admin');

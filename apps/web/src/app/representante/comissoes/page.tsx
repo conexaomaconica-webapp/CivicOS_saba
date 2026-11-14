@@ -30,6 +30,15 @@ export default async function RepresentativeCommissionsPage() {
     .limit(100);
   const rows = (data ?? []) as LedgerRow[];
 
+  // Situação de cada comissão (carência, liberada, paga, estornada): leitura pelo cliente DO USUÁRIO (RLS).
+  const { data: releaseData } = await (supabase as any)
+    .from('commercial_commission_releases')
+    .select('ledger_entry_id, status, release_at')
+    .eq('representative_id', ctx.representative.id);
+  const releases = new Map<string, { status: string; release_at: string }>(
+    ((releaseData ?? []) as Array<{ ledger_entry_id: string; status: string; release_at: string }>).map((r) => [r.ledger_entry_id, r]),
+  );
+
   return (
     <section aria-labelledby="comissoes-titulo" className="space-y-4">
       <h2 id="comissoes-titulo" className="text-xl font-serif font-bold text-[#3B0B14]">
@@ -59,6 +68,17 @@ export default async function RepresentativeCommissionsPage() {
                   <td className="px-4 py-3">
                     <span className="font-semibold">{LEDGER_ENTRY_LABEL[row.entry_type] ?? row.entry_type}</span>
                     {row.reason && <span className="block text-xs text-stone-500">{row.reason}</span>}
+                    {(() => {
+                      const rel = releases.get(row.id);
+                      if (!rel) return null;
+                      const label =
+                        rel.status === 'hold' ? `Em carência até ${new Date(rel.release_at).toLocaleDateString('pt-BR')}`
+                        : rel.status === 'released' ? 'Liberada para repasse'
+                        : rel.status === 'paid' ? 'Paga'
+                        : rel.status === 'reversed' ? 'Estornada'
+                        : 'Bloqueada';
+                      return <span className="block text-xs font-semibold text-stone-600">{label}</span>;
+                    })()}
                   </td>
                   <td className="px-4 py-3 tabular-nums">{row.base_amount_cents != null ? formatCentsBRL(row.base_amount_cents) : '—'}</td>
                   <td className="px-4 py-3 tabular-nums">{row.rate_bps != null ? `${(row.rate_bps / 100).toFixed(2).replace('.', ',')}%` : '—'}</td>

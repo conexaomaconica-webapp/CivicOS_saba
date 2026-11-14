@@ -74,7 +74,7 @@ export default async function RepresentativeHomePage() {
             Indicações e documentos
           </h2>
           <p className="mt-1 text-sm text-stone-600">
-            O cadastro de indicações (leads) e o envio de documentos serão liberados na próxima etapa do módulo.
+            Cadastre suas indicações em Indicações e consulte planos e seu link em Material de vendas.
           </p>
         </section>
       )}
