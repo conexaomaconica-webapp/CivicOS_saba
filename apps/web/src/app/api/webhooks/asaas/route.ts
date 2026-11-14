@@ -10,6 +10,7 @@ import {
   extractAsaasEventId,
 } from '@/lib/payment/asaas-event-catalog';
 import { logger } from '@/lib/observability/logger';
+import { captureProviderReversal } from '@/lib/commercial/provider-reversal-capture';
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -130,6 +131,10 @@ export async function POST(req: Request) {
         message: 'Evento não catalogado registrado para triagem operacional.',
       });
     }
+
+    // Gate 1D (módulo comercial): estorno/chargeback também vira evento financeiro comercial. Melhor esforço: nunca lança,
+    // não altera a resposta nem o fluxo abaixo e não faz nada com o módulo desligado.
+    await captureProviderReversal(payload as Record<string, unknown>, rawEventType);
 
     // 4. Tenta reconciliar como Onboarding Comercial (Microetapa 6.3)
     const onboardingRes = await reconcileCommercialPaymentWebhook(payload, eventId);
