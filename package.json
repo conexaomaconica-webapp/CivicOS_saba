@@ -28,6 +28,7 @@
     "test:commercial-access": "node scripts/test-migration-240-commercial-representative-access.mjs",
     "test:commercial-contract": "node scripts/test-migration-241-commercial-representative-contract.mjs",
     "test:commercial-reversals": "node scripts/test-migration-242-commercial-provider-reversals.mjs",
+    "test:commercial-engine": "node scripts/test-migration-243-commercial-commission-engine.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "verify": "pnpm clean && pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm build && pnpm test"
   },
