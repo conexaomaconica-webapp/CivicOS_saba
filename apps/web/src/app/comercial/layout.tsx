@@ -22,6 +22,7 @@ export default async function CommercialLayout({ children }: { children: React.R
     { href: '/comercial/leads', label: 'Indicações (leads)', show: staffCan(ctx, 'leads.manage') },
     { href: '/comercial/atribuicoes', label: 'Atribuições', show: staffCan(ctx, 'attributions.manage') },
     { href: '/comercial/acessos', label: 'Acessos', show: staffCan(ctx, 'settings.manage') },
+    { href: '/comercial/configuracoes', label: 'Configurações', show: staffCan(ctx, 'settings.manage') },
   ].filter((l) => l.show);
 
   return (
