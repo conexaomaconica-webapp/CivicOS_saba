@@ -2,7 +2,8 @@ import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getStaffContext, staffCan } from '@/lib/commercial/commercial-auth';
-import { createServerSideClient } from '@/lib/supabase/server';
+import { createServerSideClient, resolveTenantIdServer } from '@/lib/supabase/server';
+import { headers } from 'next/headers';
 import { getProfileAuthorization } from '@/lib/member/profile-access-service';
 import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
 
@@ -24,11 +25,26 @@ export default async function CommercialLayout({ children }: { children: React.R
     const { data: auth } = await supabase.auth.getUser();
     const profile = auth?.user ? await getProfileAuthorization(supabase, auth.user.id) : null;
     if (!profile || !isPlatformAdminRole(profile.role)) notFound();
+
+    // Diagnóstico para quem é administrador: o domínio atual é reconhecido como ambiente verificado?
+    let tenantOk = true;
+    try {
+      await resolveTenantIdServer();
+    } catch {
+      tenantOk = false;
+    }
+    const host = ((await headers()).get('x-forwarded-host') ?? (await headers()).get('host') ?? '').split(',')[0]!.trim();
     return (
       <main className="min-h-screen bg-[#FDFBF7] text-stone-900 flex items-center justify-center px-4 py-10">
         <section className="max-w-xl rounded-2xl border border-[#E8E5DF] bg-white p-6 sm:p-8 space-y-3">
           <p className="text-[11px] font-mono font-bold text-[#C9A227] uppercase tracking-wider">Módulo Comercial Nacional</p>
           <h1 className="text-2xl font-serif font-bold text-[#3B0B14]">Acesso comercial necessário</h1>
+          {!tenantOk && (
+            <p role="alert" className="text-sm font-semibold text-rose-800 bg-rose-50 border border-rose-200 rounded-xl p-3">
+              Este endereço ({host || 'desconhecido'}) não é reconhecido como domínio verificado de nenhum ambiente, por isso a área comercial não consegue
+              identificar o ambiente. Acesse pelo domínio oficial do sistema (o mesmo cadastrado como domínio verificado do tenant).
+            </p>
+          )}
           <p className="text-sm text-stone-700">
             Ser administrador da plataforma não concede acesso à área comercial. Para abrir esta área é preciso ter uma permissão comercial própria
             (concedida em <strong>Comercial → Acessos</strong>) ou o perfil <strong>master</strong>.
