@@ -2,6 +2,9 @@ import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getStaffContext, staffCan } from '@/lib/commercial/commercial-auth';
+import { createServerSideClient } from '@/lib/supabase/server';
+import { getProfileAuthorization } from '@/lib/member/profile-access-service';
+import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +17,31 @@ export const metadata = {
 export default async function CommercialLayout({ children }: { children: React.ReactNode }) {
   // Sem permissão comercial (administrador sem grant inclusive): a área não existe.
   const ctx = await getStaffContext();
-  if (!ctx) notFound();
+  if (!ctx) {
+    // Administrador da plataforma logado que chegou aqui pelo menu: explica em vez de "página não encontrada".
+    // Qualquer outra pessoa continua recebendo 404 (a área não existe para quem não tem permissão comercial).
+    const supabase = await createServerSideClient();
+    const { data: auth } = await supabase.auth.getUser();
+    const profile = auth?.user ? await getProfileAuthorization(supabase, auth.user.id) : null;
+    if (!profile || !isPlatformAdminRole(profile.role)) notFound();
+    return (
+      <main className="min-h-screen bg-[#FDFBF7] text-stone-900 flex items-center justify-center px-4 py-10">
+        <section className="max-w-xl rounded-2xl border border-[#E8E5DF] bg-white p-6 sm:p-8 space-y-3">
+          <p className="text-[11px] font-mono font-bold text-[#C9A227] uppercase tracking-wider">Módulo Comercial Nacional</p>
+          <h1 className="text-2xl font-serif font-bold text-[#3B0B14]">Acesso comercial necessário</h1>
+          <p className="text-sm text-stone-700">
+            Ser administrador da plataforma não concede acesso à área comercial. Para abrir esta área é preciso ter uma permissão comercial própria
+            (concedida em <strong>Comercial → Acessos</strong>) ou o perfil <strong>master</strong>.
+          </p>
+          <p className="text-sm text-stone-700">
+            Se você deveria ter acesso: peça a um usuário master para conceder a permissão ou confirme que o perfil master está ativo.
+            Também confira se o endereço usado é o domínio principal do ambiente.
+          </p>
+          <Link href="/admin" className="inline-block px-4 py-2 rounded-xl bg-[#3B0B14] text-white text-sm font-bold">Voltar ao admin</Link>
+        </section>
+      </main>
+    );
+  }
 
   const links = [
     { href: '/comercial', label: 'Resumo', show: true },
