@@ -12,6 +12,7 @@ Não toca em Asaas, checkout, faturamento, regras financeiras nem nos Gates 1D/1
 | Senha temporária gerada pelo servidor (14 caracteres, `crypto`) | `lib/commercial/temp-password.ts` |
 | Exibição única da senha à equipe, estado e "Nova senha temporária" | tela de representantes |
 | Troca obrigatória no primeiro login | `app/definir-senha-representante/*`, `lib/commercial/temp-password-service.ts` |
+| Contrato com aceite no primeiro acesso | `supabase/migrations/241_commercial_representative_contract.sql`, `lib/commercial/contract-service.ts`, `app/representante/contract-acceptance.tsx`, seção em `/comercial/configuracoes` |
 | Trava no middleware (troca pendente / senha expirada) | `middleware.ts` |
 | Aviso de senha expirada e atalho no login | `app/(auth)/login/page.tsx` |
 
@@ -27,7 +28,7 @@ Não toca em Asaas, checkout, faturamento, regras financeiras nem nos Gates 1D/1
 
 ## Desvios do plano (para ciência)
 
-1. **Contrato/termos no primeiro acesso: não incluído.** Não existe texto de contrato do representante no sistema, e não criei texto jurídico. A equipe continua registrando a versão do contrato ao ativar (fluxo atual). Entra quando houver o documento aprovado.
+1. **Contrato no primeiro acesso: incluído depois (migration 241).** O texto NÃO vem do código: a equipe o publica em `/comercial/configuracoes` (versionado, imutável, com justificativa e auditoria). O aceite acontece na área do representante, antes de qualquer conteúdo, para os dois modos de acesso, e se repete a cada nova versão publicada. Grava versão, instante e SHA-256 do texto exato (calculado no banco). Sem contrato publicado não há o que aceitar; ativar um representante então exige informar a versão manualmente (fluxo anterior, útil para contrato assinado fora do sistema).
 2. **Rota da troca de senha:** `/definir-senha-representante` (fora de `/representante`, para o layout da área do representante não exibir menu durante a troca), e não `/representante/definir-senha`.
 3. **Limite de tentativas de login:** vale o limite do próprio Supabase Auth; não foi criado limite adicional.
 4. **E-mail com a senha:** o sistema não envia e-mail; a equipe repassa a senha por canal próprio.
@@ -37,8 +38,9 @@ Não toca em Asaas, checkout, faturamento, regras financeiras nem nos Gates 1D/1
 | Verificação | Resultado |
 |---|---|
 | Migration 240 em PGlite (`pnpm test:commercial-access`) | 9/9 |
+| Migration 241 em PGlite (`pnpm test:commercial-contract`) | 17/17 |
 | Migration 239 (regressão, `pnpm test:commercial-link`) | 33/33 |
-| Vitest do módulo (10 arquivos) | 80/80 (15 novos) |
+| Vitest do módulo (11 arquivos) | 88/88 (23 novos) |
 | `pnpm --filter web typecheck` | sem erros |
 | Vitest completo | ver nota abaixo |
 
@@ -46,10 +48,12 @@ Limites: PGlite não exercita RLS/JWT reais nem a API `auth.admin` do Supabase; 
 
 ## Roteiro de homologação (Supabase de teste ou o oficial com representante fictício)
 
-1. Aplicar a 240 (conferindo o Project Ref).
+1. Aplicar a 240 e a 241, nesta ordem (conferindo o Project Ref).
+1b. Publicar o contrato em `/comercial/configuracoes` (texto aprovado pelo jurídico).
 2. Cadastrar representante em "Acesso direto" com e-mail novo → copiar a senha.
 3. Login com a senha temporária → deve ir direto para a troca; testar acesso a `/representante` e `/minha-conta` antes de trocar (devem redirecionar).
-4. Trocar a senha (recusar curta, sem número, igual à temporária) → cai em `/representante`.
+4. Trocar a senha (recusar curta, sem número, igual à temporária) → cai em `/representante` já mostrando o contrato; sem aceitar, nada além do contrato aparece; aceitar libera a área.
+4b. Publicar uma versão nova → o representante volta a ver o aceite no próximo acesso.
 5. Repetir com validade de 24 h forçando expiração (ajustar `temp_password_expires_at` no `app_metadata`) → login encerra a sessão com aviso; "Nova senha temporária" restaura o acesso.
 6. Tentar o modo direto com e-mail de conta existente → recusado, senha da conta intacta.
 

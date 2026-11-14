@@ -26,6 +26,7 @@
     "test:commercial-leads": "node scripts/test-migration-238-commercial-leads.mjs",
     "test:commercial-link": "node scripts/test-migration-239-commercial-link-attribution.mjs",
     "test:commercial-access": "node scripts/test-migration-240-commercial-representative-access.mjs",
+    "test:commercial-contract": "node scripts/test-migration-241-commercial-representative-contract.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "verify": "pnpm clean && pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm build && pnpm test"
   },

@@ -2,6 +2,8 @@ import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getRepresentativeContext } from '@/lib/commercial/commercial-auth';
+import { getContractGate } from '@/lib/commercial/contract-queries';
+import ContractAcceptance from './contract-acceptance';
 import { REPRESENTATIVE_STATUS_LABEL, representativeScopeAllows } from '@/lib/commercial/access-rules';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +22,11 @@ export default async function RepresentativeLayout({ children }: { children: Rea
   const { representative } = ctx;
   const readOnly = !representativeScopeAllows(representative.status, 'operational');
   const displayName = representative.trade_name || representative.legal_name;
+  // Contrato vigente ainda não aceito (primeiro acesso ou nova versão): o aceite vem antes de qualquer conteúdo.
+  const contractGate =
+    representative.status === 'suspended' || representative.status === 'terminated'
+      ? ({ required: false } as const)
+      : await getContractGate(ctx.tenantId, ctx.userId);
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-stone-900">
@@ -58,7 +65,13 @@ export default async function RepresentativeLayout({ children }: { children: Rea
         </div>
       )}
 
-      <main className="max-w-5xl mx-auto px-4 py-8">{children}</main>
+      <main className="max-w-5xl mx-auto px-4 py-8">
+        {contractGate.required ? (
+          <ContractAcceptance version={contractGate.contract.version} title={contractGate.contract.title} text={contractGate.contract.content_text} />
+        ) : (
+          children
+        )}
+      </main>
     </div>
   );
 }
