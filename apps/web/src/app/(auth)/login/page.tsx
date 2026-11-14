@@ -111,6 +111,11 @@ export default function LoginPage() {
         setErrorMsg('E-mail ou senha incorretos.');
       } else if (data.user) {
         setActiveUser(data.user);
+        // Representante com senha temporária: vai direto para a troca obrigatória.
+        if (data.user.app_metadata?.must_change_password === true) {
+          router.push('/definir-senha-representante');
+          return;
+        }
         const { role, isOwner } = await checkUserPermissions(data.user.id);
 
         const params = new URLSearchParams(window.location.search);
@@ -140,6 +145,13 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  // Aviso quando a senha temporária de representante expirou (o middleware encerrou a sessão).
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('senha_temporaria') === 'expirada') {
+      setErrorMsg('Sua senha temporária expirou. Solicite uma nova à equipe comercial.');
+    }
+  }, []);
 
   // Mantém o destino (redirect) ao ir para o cadastro de membro.
   const [registerHref, setRegisterHref] = useState('/register');

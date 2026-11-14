@@ -5,11 +5,27 @@ import { useRouter } from 'next/navigation';
 import { REPRESENTATIVE_STATUS_LABEL } from '@/lib/commercial/access-rules';
 import {
   createRepresentativeAction,
+  regenerateTempPasswordAction,
   setRepresentativeStatusAction,
   type RepresentativeListItem,
 } from '@/lib/commercial/representatives-service';
 
 type Message = { type: 'success' | 'error'; text: string } | null;
+
+/** Credencial exibida UMA vez à equipe. Fica só na memória da página: nunca em banco, log ou auditoria. */
+type RevealedCredential = { name: string; email: string; password: string; expiresAt: string };
+
+function tempPasswordLabel(r: RepresentativeListItem): { text: string; tone: string } | null {
+  if (r.access_mode !== 'temp_password') return null;
+  if (r.password_changed_at) return { text: 'Senha definida pelo representante', tone: 'text-emerald-800' };
+  if (r.temp_password_expires_at && new Date(r.temp_password_expires_at).getTime() <= Date.now()) {
+    return { text: 'Senha temporária expirada', tone: 'text-rose-800' };
+  }
+  return {
+    text: `Senha temporária pendente${r.temp_password_expires_at ? ` (expira em ${new Date(r.temp_password_expires_at).toLocaleString('pt-BR')})` : ''}`,
+    tone: 'text-amber-800',
+  };
+}
 
 export default function RepresentativesClient({
   items,
@@ -23,7 +39,9 @@ export default function RepresentativesClient({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message>(null);
-  const [form, setForm] = useState({ personType: 'pf' as 'pf' | 'pj', legalName: '', tradeName: '', email: '', phone: '', document: '', pixKeyType: '', pixKey: '' });
+  const [credential, setCredential] = useState<RevealedCredential | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [form, setForm] = useState({ personType: 'pf' as 'pf' | 'pj', legalName: '', tradeName: '', email: '', phone: '', document: '', pixKeyType: '', pixKey: '', accessMode: 'invite' as 'invite' | 'temp_password', tempHours: '72' });
 
   const set = (key: keyof typeof form, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -31,6 +49,8 @@ export default function RepresentativesClient({
     e.preventDefault();
     setBusy(true);
     setMessage(null);
+    setCredential(null);
+    setCopied(false);
     const res = await createRepresentativeAction({
       personType: form.personType,
       legalName: form.legalName,
@@ -40,20 +60,58 @@ export default function RepresentativesClient({
       document: form.document,
       pixKeyType: form.pixKeyType as 'cpf' | 'cnpj' | 'email' | 'phone' | 'random' | '',
       pixKey: form.pixKey,
+      accessMode: form.accessMode,
+      tempPasswordHours: Number(form.tempHours),
     });
-    if (res.success && res.data) {
+    if (res.success && res.data?.temporaryPassword) {
+      setCredential({
+        name: form.legalName.trim(),
+        email: form.email.trim().toLowerCase(),
+        password: res.data.temporaryPassword,
+        expiresAt: res.data.tempPasswordExpiresAt ?? '',
+      });
+      setMessage({ type: 'success', text: `Representante cadastrado (código ${res.data.referralCode}) com acesso direto. Copie a senha temporária abaixo: ela não será exibida novamente.` });
+      setForm({ personType: 'pf', legalName: '', tradeName: '', email: '', phone: '', document: '', pixKeyType: '', pixKey: '', accessMode: 'temp_password', tempHours: form.tempHours });
+      router.refresh();
+    } else if (res.success && res.data) {
       setMessage({
         type: 'success',
         text: res.data.linkedUser
           ? `Representante cadastrado e vinculado ao usuário existente. Código de indicação: ${res.data.referralCode}.`
           : `Representante cadastrado como convidado (código ${res.data.referralCode}). Peça que ele entre ou crie conta com o e-mail ${form.email.trim().toLowerCase()}: o vínculo é feito automaticamente no primeiro acesso à Área do Representante.`,
       });
-      setForm({ personType: 'pf', legalName: '', tradeName: '', email: '', phone: '', document: '', pixKeyType: '', pixKey: '' });
+      setForm({ personType: 'pf', legalName: '', tradeName: '', email: '', phone: '', document: '', pixKeyType: '', pixKey: '', accessMode: 'invite', tempHours: form.tempHours });
       router.refresh();
     } else if (!res.success) {
       setMessage({ type: 'error', text: res.error });
     }
     setBusy(false);
+  };
+
+  const regenerate = async (item: RepresentativeListItem) => {
+    if (!window.confirm('Gerar uma nova senha temporária? A anterior deixa de funcionar.')) return;
+    setBusy(true);
+    setMessage(null);
+    setCopied(false);
+    const res = await regenerateTempPasswordAction({ representativeId: item.id });
+    if (res.success && res.data) {
+      setCredential({ name: item.trade_name || item.legal_name, email: item.email, password: res.data.temporaryPassword, expiresAt: res.data.tempPasswordExpiresAt });
+      setMessage({ type: 'success', text: 'Nova senha temporária gerada. Copie agora: ela não será exibida novamente.' });
+      router.refresh();
+    } else if (!res.success) {
+      setMessage({ type: 'error', text: res.error });
+    }
+    setBusy(false);
+  };
+
+  const copyCredential = async () => {
+    if (!credential) return;
+    try {
+      await navigator.clipboard.writeText(credential.password);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
   };
 
   const changeStatus = async (item: RepresentativeListItem, status: 'pending_review' | 'active' | 'suspended' | 'terminated') => {
@@ -82,6 +140,22 @@ export default function RepresentativesClient({
       {message && (
         <div role="status" className={`p-3 rounded-xl text-sm font-semibold border ${message.type === 'success' ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-rose-50 text-rose-900 border-rose-200'}`}>
           {message.text}
+        </div>
+      )}
+
+      {credential && (
+        <div role="alert" className="rounded-2xl border-2 border-[#C9A227] bg-amber-50 p-5 space-y-3">
+          <h2 className="text-base font-serif font-bold text-[#3B0B14]">Senha temporária de {credential.name}</h2>
+          <p className="text-xs text-amber-900">Envie ao representante por um canal seguro. <strong>Esta senha não será exibida novamente</strong> e não fica registrada no sistema.</p>
+          <dl className="text-sm grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div><dt className="text-[11px] font-bold uppercase text-stone-500">Login (e-mail)</dt><dd className="break-all">{credential.email}</dd></div>
+            <div><dt className="text-[11px] font-bold uppercase text-stone-500">Senha temporária</dt><dd className="font-mono font-bold text-base select-all">{credential.password}</dd></div>
+            <div><dt className="text-[11px] font-bold uppercase text-stone-500">Válida até</dt><dd>{credential.expiresAt ? new Date(credential.expiresAt).toLocaleString('pt-BR') : '—'}</dd></div>
+          </dl>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={copyCredential} className="px-4 py-2 rounded-xl bg-[#3B0B14] text-white text-xs font-bold cursor-pointer">{copied ? 'Copiada ✓' : 'Copiar senha'}</button>
+            <button type="button" onClick={() => setCredential(null)} className="px-4 py-2 rounded-xl border border-stone-300 text-xs font-bold cursor-pointer">Já copiei, ocultar</button>
+          </div>
         </div>
       )}
 
@@ -124,6 +198,28 @@ export default function RepresentativesClient({
               <input className={input} value={form.pixKey} onChange={(e) => set('pixKey', e.target.value)} disabled={!form.pixKeyType} />
             </label>
           </div>
+          <fieldset className="space-y-2 rounded-xl border border-stone-200 p-4">
+            <legend className="px-1 text-xs font-bold text-stone-700">Como o representante vai acessar</legend>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="radio" name="accessMode" className="mt-1" checked={form.accessMode === 'invite'} onChange={() => set('accessMode', 'invite')} />
+              <span><strong>Convite</strong><span className="block text-xs text-stone-500">Ele entra ou cria conta com o e-mail acima; o vínculo é feito no primeiro acesso.</span></span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="radio" name="accessMode" className="mt-1" checked={form.accessMode === 'temp_password'} onChange={() => set('accessMode', 'temp_password')} />
+              <span><strong>Acesso direto com senha temporária</strong><span className="block text-xs text-stone-500">O sistema cria o acesso e gera uma senha temporária, exibida uma única vez. Ele precisa trocá-la no primeiro login. Não vale para e-mail que já tem conta.</span></span>
+            </label>
+            {form.accessMode === 'temp_password' && (
+              <label className="block text-xs font-bold text-stone-700">Validade da senha temporária
+                <select className={input} value={form.tempHours} onChange={(e) => set('tempHours', e.target.value)}>
+                  <option value="24">24 horas</option>
+                  <option value="48">48 horas</option>
+                  <option value="72">72 horas (padrão)</option>
+                  <option value="120">5 dias</option>
+                  <option value="168">7 dias</option>
+                </select>
+              </label>
+            )}
+          </fieldset>
           <button type="submit" disabled={busy} className="px-5 py-2.5 bg-[#3B0B14] hover:bg-[#5d1523] text-white font-bold text-sm rounded-xl disabled:opacity-50 cursor-pointer">
             {busy ? 'Salvando…' : 'Cadastrar representante'}
           </button>
@@ -160,7 +256,13 @@ export default function RepresentativesClient({
                     <span className="font-bold">{REPRESENTATIVE_STATUS_LABEL[r.status]}</span>
                     {r.termination_reason && <span className="block text-xs text-stone-500">{r.termination_reason}</span>}
                   </td>
-                  <td className="px-4 py-3 text-xs">{r.user_id ? 'Usuário vinculado' : 'Aguardando primeiro acesso'}</td>
+                  <td className="px-4 py-3 text-xs">
+                    {r.user_id ? 'Usuário vinculado' : 'Aguardando primeiro acesso'}
+                    {(() => {
+                      const t = tempPasswordLabel(r);
+                      return t ? <span className={`block font-semibold ${t.tone}`}>{t.text}</span> : null;
+                    })()}
+                  </td>
                   {canManage && (
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1.5">
@@ -171,6 +273,9 @@ export default function RepresentativesClient({
                         )}
                         {r.status === 'active' && (
                           <button disabled={busy} onClick={() => changeStatus(r, 'suspended')} className="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 text-xs font-bold border border-amber-300 cursor-pointer disabled:opacity-50">Suspender</button>
+                        )}
+                        {r.access_mode === 'temp_password' && !r.password_changed_at && r.status !== 'terminated' && (
+                          <button disabled={busy} onClick={() => regenerate(r)} className="px-2.5 py-1 rounded-lg bg-stone-100 text-stone-800 text-xs font-bold border border-stone-300 cursor-pointer disabled:opacity-50">Nova senha temporária</button>
                         )}
                         {r.status !== 'terminated' && (
                           <button disabled={busy} onClick={() => changeStatus(r, 'terminated')} className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-800 text-xs font-bold border border-rose-200 cursor-pointer disabled:opacity-50">Desligar</button>
