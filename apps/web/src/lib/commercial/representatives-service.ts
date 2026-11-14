@@ -17,7 +17,7 @@ import {
 } from './commercial-utils';
 
 const REPRESENTATIVE_LIST_COLUMNS =
-  'id, user_id, person_type, legal_name, trade_name, email, phone, document_last4, referral_code, status, status_changed_at, contract_version, contract_accepted_at, termination_reason, created_at, access_mode, temp_password_expires_at, password_changed_at';
+  'id, user_id, person_type, legal_name, trade_name, email, phone, document_last4, referral_code, status, status_changed_at, contract_version, contract_accepted_at, termination_reason, created_at, access_mode, temp_password_expires_at, password_changed_at, category_id';
 
 export type RepresentativeListItem = {
   id: string;
@@ -38,6 +38,7 @@ export type RepresentativeListItem = {
   access_mode: 'invite' | 'temp_password';
   temp_password_expires_at: string | null;
   password_changed_at: string | null;
+  category_id: string | null;
 };
 
 export type CreateRepresentativeInput = {

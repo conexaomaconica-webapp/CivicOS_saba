@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS public.commercial_representative_categories (
 
 ALTER TABLE public.commercial_representatives ADD COLUMN IF NOT EXISTS category_id UUID;
 ALTER TABLE public.commercial_commission_rules ADD COLUMN IF NOT EXISTS category_id UUID;
+GRANT SELECT (category_id) ON public.commercial_representatives TO authenticated;
 
 DO $$
 BEGIN

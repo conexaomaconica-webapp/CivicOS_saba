@@ -67,13 +67,27 @@ describe('Módulo comercial · Gate 1C.1 (estático)', () => {
     let diff = '';
     try {
       diff = execSync(
-        'git diff --name-only main -- apps/web/src/lib/business apps/web/src/lib/onboarding apps/web/src/lib/payment apps/web/src/lib/contracts apps/web/src/app/actions apps/web/src/app/api',
+        'git diff --name-only main -- apps/web/src/lib/business apps/web/src/lib/onboarding apps/web/src/lib/payment apps/web/src/lib/contracts apps/web/src/app/actions apps/web/src/app/api \':(exclude)apps/web/src/app/api/webhooks/asaas/route.ts\'',
         { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
       );
     } catch {
       return;
     }
     expect(diff.trim()).toBe('');
+
+    // Gate 1D autorizou UMA mudança no webhook do Asaas: a ponte de captura de estornos (import + chamada). Nada além disso.
+    let webhookDiff = '';
+    try {
+      webhookDiff = execSync('git diff -U0 main -- apps/web/src/app/api/webhooks/asaas/route.ts', { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch {
+      return;
+    }
+    const added = webhookDiff.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).map((l) => l.slice(1).replace(/\r$/, '').trim()).filter(Boolean);
+    const removed = webhookDiff.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
+    expect(removed).toEqual([]);
+    for (const line of added) {
+      expect(line).toMatch(/captureProviderReversal|^\/\/ Gate 1D|^\/\/ não altera a resposta/);
+    }
   });
 
   it('migration 239: funções só para service_role, nunca confirma, nada fora do módulo', () => {

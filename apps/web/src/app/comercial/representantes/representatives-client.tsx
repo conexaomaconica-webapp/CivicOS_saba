@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { REPRESENTATIVE_STATUS_LABEL } from '@/lib/commercial/access-rules';
+import { assignRepresentativeCategoryAction } from '@/lib/commercial/rules-service';
 import {
   createRepresentativeAction,
   regenerateTempPasswordAction,
@@ -31,10 +32,12 @@ export default function RepresentativesClient({
   items,
   loadError,
   canManage,
+  categories,
 }: {
   items: RepresentativeListItem[];
   loadError: string | null;
   canManage: boolean;
+  categories: Array<{ id: string; name: string }>;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -85,6 +88,15 @@ export default function RepresentativesClient({
     } else if (!res.success) {
       setMessage({ type: 'error', text: res.error });
     }
+    setBusy(false);
+  };
+
+  const setCategory = async (item: RepresentativeListItem, categoryId: string) => {
+    setBusy(true);
+    setMessage(null);
+    const res = await assignRepresentativeCategoryAction({ representativeId: item.id, categoryId: categoryId || null });
+    setMessage(res.success ? { type: 'success', text: 'Categoria atualizada (vale para comissões de vendas futuras).' } : { type: 'error', text: res.error });
+    if (res.success) router.refresh();
     setBusy(false);
   };
 
@@ -254,6 +266,14 @@ export default function RepresentativesClient({
                   <td className="px-4 py-3 font-mono text-xs">{r.referral_code}</td>
                   <td className="px-4 py-3">
                     <span className="font-bold">{REPRESENTATIVE_STATUS_LABEL[r.status]}</span>
+                    {canManage && categories.length > 0 && (
+                      <label className="mt-1 block text-[11px] font-semibold text-stone-500">Categoria
+                        <select disabled={busy} className="mt-0.5 block w-full border border-stone-300 rounded-lg px-2 py-1 text-xs bg-white" value={r.category_id ?? ''} onChange={(e) => void setCategory(r, e.target.value)}>
+                          <option value="">Sem categoria</option>
+                          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </label>
+                    )}
                     {r.termination_reason && <span className="block text-xs text-stone-500">{r.termination_reason}</span>}
                   </td>
                   <td className="px-4 py-3 text-xs">
