@@ -36,6 +36,7 @@ import {
   type MobileEventItem,
   type MobileGuideBanner,
   type MobileGuideHomeData,
+  pickMainCategories,
   type MobileGuideSponsoredBusiness,
   type MobileInstitutionalRecognition,
   type MobileLodgeCardData,
@@ -4572,6 +4573,7 @@ function BeneficiosScreen({
             },
             banners: [],
             categories: [],
+            main_categories: [],
             sponsored: [],
             businesses: [],
             available_cities: [],
@@ -8549,9 +8551,9 @@ function Home({
           <p className="eyebrow">Descubra</p>
           <h2 id="categories-title">Explore por Categoria</h2>
         </div>
-        <div className="category-scroll-grid" aria-label="Categorias publicadas">
-          {guideData.categories.length ? (
-            guideData.categories.map((category) => {
+        <div className="category-scroll-grid" aria-label="Categorias principais">
+          {pickMainCategories(guideData.categories, guideData.main_categories).length ? (
+            pickMainCategories(guideData.categories, guideData.main_categories).map((category) => {
               const isSelected = selectedCategory === category.slug;
               return (
                 <button
@@ -8874,6 +8876,7 @@ export function App() {
   const [isFavoritesModalOpen, setIsFavoritesModalOpen] = useState(false);
   const [availableCities, setAvailableCities] = useState<string[]>(['Feira de Santana']);
   const [serverCategories, setServerCategories] = useState<Array<{ id?: string; name: string; slug: string; business_count?: number }>>([]);
+  const [serverMainCategories, setServerMainCategories] = useState<Array<{ id?: string; name: string; slug: string; business_count?: number }>>([]);
   const [selectedBusinessSlug, setSelectedBusinessSlug] = useState<string | null>(null);
   const [selectedLodgeSlug, setSelectedLodgeSlug] = useState<string | null>(null);
   const [zoomLogo, setZoomLogo] = useState<{ url: string; name: string; backgroundColor?: string | null } | null>(null);
@@ -9118,7 +9121,8 @@ export function App() {
     window.location.hash = routeHref('empresas');
   };
 
-  const displayCategories = getMergedCategories(serverCategories);
+  // Barra de categorias do topo: as principais (destaques do painel ou principais do prontuário 360); nunca a lista inteira.
+  const displayCategories = pickMainCategories(getMergedCategories(serverCategories), serverMainCategories);
 
   const handleCategoryClick = (catSlug: string) => {
     const next = selectedCategory === catSlug ? '' : catSlug;
@@ -9344,6 +9348,9 @@ export function App() {
               if (data.categories?.length) {
                 setServerCategories(data.categories);
               }
+              if (data.main_categories?.length) {
+                setServerMainCategories(data.main_categories);
+              }
               if (data.businesses?.length) {
                 setServerBusinesses(data.businesses);
               } else if (data.sponsored?.length) {
@@ -9372,6 +9379,9 @@ export function App() {
               }
               if (data.categories?.length) {
                 setServerCategories(data.categories);
+              }
+              if (data.main_categories?.length) {
+                setServerMainCategories(data.main_categories);
               }
               if (data.businesses?.length) {
                 setServerBusinesses(data.businesses);
@@ -9405,6 +9415,9 @@ export function App() {
               }
               if (data.categories?.length) {
                 setServerCategories(data.categories);
+              }
+              if (data.main_categories?.length) {
+                setServerMainCategories(data.main_categories);
               }
               if (data.businesses?.length) {
                 setServerBusinesses(data.businesses);

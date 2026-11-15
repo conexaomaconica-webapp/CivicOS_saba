@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { MAX_BUSINESS_CERTIFICATIONS, normalizeCertificationZoom, planAllowsCertifications } from '@/lib/business/certifications';
+import { fetchMainHomeCategories } from '@/lib/directory/home-main-categories';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -243,11 +244,23 @@ export async function GET(request: Request) {
       }
     }
 
+    // Categorias principais da home (mesma regra da home web): destaques do painel; sem destaque, as principais do prontuário 360 (máx. 10).
+    let homeCategories: unknown[] = [];
+    try {
+      const { data: tenantIdForHome } = await db.rpc('_resolve_public_tenant_id', { p_host: host });
+      if (typeof tenantIdForHome === 'string' && tenantIdForHome) {
+        homeCategories = await fetchMainHomeCategories(adminDb, tenantIdForHome, activeCatsArray);
+      }
+    } catch {
+      homeCategories = [];
+    }
+
     const rpcSettings = (payload.settings && typeof payload.settings === 'object' ? payload.settings : {}) as Record<string, unknown>;
     return NextResponse.json({
       settings: settings ?? rpcSettings,
       banners: Array.isArray(payload.banners) ? payload.banners : [],
       categories: mergedCats,
+      home_categories: homeCategories,
       sponsored: rawSponsored.map(enrichBiz),
       businesses: rawBusinesses.map(enrichBiz),
       recognitions: Array.isArray(recognitions) ? recognitions : [],

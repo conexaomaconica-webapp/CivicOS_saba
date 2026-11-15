@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   createMobileGuideService,
   loadEventsFromDirectSupabase,
+  pickMainCategories,
+  MOBILE_MAIN_CATEGORIES_MAX,
   submitMobileEventRSVP,
 } from './guide-data';
 
@@ -158,3 +160,50 @@ describe('mobile guide data', () => {
   });
 });
 
+
+describe('categorias principais da home do app', () => {
+  const cat = (n: number, count = 1) => ({ id: `c${n}`, slug: `s${n}`, name: `Cat ${n}`, icon_name: null, business_count: count });
+
+  it('usa a lista principal do servidor (destaques/principais do prontuário 360) quando ela vem', () => {
+    const all = Array.from({ length: 30 }, (_, i) => cat(i));
+    const main = [cat(3), cat(7)];
+    expect(pickMainCategories(all, main)).toEqual(main);
+  });
+
+  it('sem lista do servidor: apenas as 10 primeiras com empresas, nunca todas', () => {
+    const all = [...Array.from({ length: 30 }, (_, i) => cat(i)), cat(99, 0)];
+    const picked = pickMainCategories(all, undefined);
+    expect(picked).toHaveLength(MOBILE_MAIN_CATEGORIES_MAX);
+    expect(MOBILE_MAIN_CATEGORIES_MAX).toBe(10);
+    expect(picked.every((c) => (c.business_count ?? 0) > 0)).toBe(true);
+  });
+
+  it('sem nenhuma categoria com empresas, ainda limita a lista', () => {
+    const all = Array.from({ length: 25 }, (_, i) => cat(i, 0));
+    expect(pickMainCategories(all, [])).toHaveLength(10);
+  });
+
+  it('o Guia entrega main_categories a partir de home_categories do servidor', async () => {
+    const service = createMobileGuideService(async () => new Response(JSON.stringify({
+      settings: {},
+      categories: Array.from({ length: 20 }, (_, i) => ({ id: `c${i}`, slug: `s${i}`, name: `Cat ${i}`, business_count: 2 })),
+      home_categories: [
+        { id: 'c4', slug: 's4', name: 'Cat 4', icon_name: 'x', business_count: 2 },
+        { id: 'c9', slug: 's9', name: 'Cat 9', business_count: 2 },
+        { id: '', slug: 'invalida', name: 'Sem id' },
+      ],
+    }), { status: 200 }), 'https://isolated.test/api/mobile/guide');
+    const data = await service.loadHome();
+    expect(data.categories).toHaveLength(20);
+    expect(data.main_categories.map((c) => c.slug)).toEqual(['s4', 's9']);
+  });
+
+  it('sem home_categories (servidor antigo), o Guia limita as principais a 10', async () => {
+    const service = createMobileGuideService(async () => new Response(JSON.stringify({
+      settings: {},
+      categories: Array.from({ length: 20 }, (_, i) => ({ id: `c${i}`, slug: `s${i}`, name: `Cat ${i}`, business_count: 2 })),
+    }), { status: 200 }), 'https://isolated.test/api/mobile/guide');
+    const data = await service.loadHome();
+    expect(data.main_categories).toHaveLength(10);
+  });
+});

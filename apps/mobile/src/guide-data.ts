@@ -38,10 +38,30 @@ export type MobileGuideSponsoredBusiness = {
   logo_background_color?: string | null;
 };
 
+/** Máximo de categorias exibidas na home do app quando o servidor não informa as principais. */
+export const MOBILE_MAIN_CATEGORIES_MAX = 10;
+
+/**
+ * Categorias principais para a home do app (topo e "Explore por Categoria").
+ * Usa a lista do servidor (destaques do painel ou principais do prontuário 360, mesma regra da home web);
+ * se ela não vier (BFF indisponível/versão antiga), cai nas primeiras com empresas — nunca todas.
+ */
+export function pickMainCategories<T extends { business_count?: number }>(
+  allCategories: T[],
+  serverMain: T[] | undefined,
+  max: number = MOBILE_MAIN_CATEGORIES_MAX,
+): T[] {
+  if (serverMain && serverMain.length > 0) return serverMain;
+  const withBusinesses = allCategories.filter((c) => (c.business_count ?? 0) > 0);
+  return (withBusinesses.length > 0 ? withBusinesses : allCategories).slice(0, Math.max(1, max));
+}
+
 export type MobileGuideHomeData = {
   settings: MobileGuideSettings;
   banners: MobileGuideBanner[];
   categories: MobileGuideCategory[];
+  /** Categorias principais da home (regra do servidor, com reserva local). */
+  main_categories: MobileGuideCategory[];
   sponsored: MobileGuideSponsoredBusiness[];
   businesses: MobileGuideSponsoredBusiness[];
   available_cities: string[];
@@ -83,6 +103,19 @@ function parseHomeData(value: unknown, activeCategoriesList?: unknown[]): Mobile
     .filter((item) => item.id && item.name && item.slug);
 
   const rawHomeCats = (Array.isArray(payload.categories) ? payload.categories : [])
+    .map((item) => {
+      const row = asRecord(item);
+      return {
+        id: String(row.id ?? ''),
+        name: String(row.name ?? ''),
+        slug: String(row.slug ?? ''),
+        icon_name: typeof row.icon_name === 'string' ? row.icon_name : null,
+        business_count: Number(row.business_count) || 0,
+      };
+    })
+    .filter((item) => item.id && item.name && item.slug);
+
+  const rawMainCats = (Array.isArray(payload.home_categories) ? payload.home_categories : [])
     .map((item) => {
       const row = asRecord(item);
       return {
@@ -194,6 +227,7 @@ function parseHomeData(value: unknown, activeCategoriesList?: unknown[]): Mobile
     },
     banners,
     categories,
+    main_categories: pickMainCategories(categories, rawMainCats),
     sponsored: parseBusinesses(Array.isArray(payload.sponsored) ? payload.sponsored : []),
     businesses: parseBusinesses(Array.isArray(payload.businesses) ? payload.businesses : []),
     available_cities: Array.isArray(payload.available_cities)
@@ -313,6 +347,7 @@ async function loadFromDirectSupabase(
       ...homePayload,
       sponsored: mergeExtra(Array.isArray(homePayload?.sponsored) ? homePayload.sponsored : []),
       businesses: mergeExtra(Array.isArray(searchPayload?.items) ? searchPayload.items : []),
+      home_categories: bffPayload && Array.isArray((bffPayload as Record<string, unknown>).home_categories) ? (bffPayload as Record<string, unknown>).home_categories : [],
     },
     Array.isArray(categoriesPayload) ? categoriesPayload : [],
   );
