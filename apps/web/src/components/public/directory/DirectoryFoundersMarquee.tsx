@@ -6,12 +6,16 @@ import type { DirectorySponsoredItem } from './DirectorySponsored';
 
 type DirectoryFoundersMarqueeProps = {
   items?: DirectorySponsoredItem[];
+  /** Velocidade da esteira em pixels por segundo (menor = mais calma). */
   speed?: number;
 };
 
+/** Largura de cada espaço no desktop: 200px de card + 40px de respiro (cerca de 5 empresas visíveis em 1200px). */
+const DESKTOP_SLOT_PX = 240;
+
 export function DirectoryFoundersMarquee({
   items = [],
-  speed = 40,
+  speed = 45,
 }: DirectoryFoundersMarqueeProps) {
   if (!items.length) return null;
 
@@ -21,6 +25,8 @@ export function DirectoryFoundersMarquee({
     marqueeItems = [...marqueeItems, ...items];
   }
   const loopedItems = [...marqueeItems, ...marqueeItems];
+  // A esteira percorre metade da trilha por ciclo: a duração acompanha o tamanho para o giro manter a mesma velocidade.
+  const cycleSeconds = Math.max(20, Math.round((marqueeItems.length * DESKTOP_SLOT_PX) / Math.max(10, speed)));
 
   return (
     <section className="dh-container dh-mobile-visible-section py-4" id="pedra-fundamental">
@@ -41,8 +47,8 @@ export function DirectoryFoundersMarquee({
 
         {/* Marquee Track contínuo */}
         <div
-          className="dh-logo-marquee-track items-start gap-4 sm:gap-5"
-          style={{ '--marquee-speed': `${Math.max(10, speed)}s` } as React.CSSProperties}
+          className="dh-logo-marquee-track items-start gap-6 sm:gap-8 lg:gap-10"
+          style={{ '--marquee-speed': `${cycleSeconds}s` } as React.CSSProperties}
         >
           {loopedItems.map((biz, idx) => {
             const businessTitle = `${biz.name}${biz.category_name ? ` • ${biz.category_name}` : ''}`;
@@ -53,12 +59,11 @@ export function DirectoryFoundersMarquee({
                 key={`${biz.id}-${idx}`}
                 href={`/guia/${biz.slug}?src=founders_pedra_fundamental`}
                 title={businessTitle}
-                className="group/item flex flex-col items-center gap-1.5 shrink-0 transition-transform duration-200 hover:-translate-y-0.5 focus:outline-none"
-                style={{ width: '92px' }}
+                className="group/item flex flex-col items-center gap-2 shrink-0 transition-transform duration-200 hover:-translate-y-0.5 focus:outline-none w-[112px] sm:w-[150px] lg:w-[200px]"
               >
                 {/* Container da Logo com Borda Dourada Nobre */}
                 <div
-                  className="relative w-20 h-20 rounded-[22px] border-2 border-[#e7dacd] group-hover/item:border-[#C9A227] shadow-xs group-hover/item:shadow-md flex items-center justify-center p-2 transition-all overflow-hidden"
+                  className="relative w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 rounded-[22px] lg:rounded-[28px] border-2 border-[#e7dacd] group-hover/item:border-[#C9A227] shadow-xs group-hover/item:shadow-md flex items-center justify-center p-2 transition-all overflow-hidden"
                   style={{ backgroundColor: bgColor }}
                 >
                   {biz.logo_url ? (
@@ -77,7 +82,7 @@ export function DirectoryFoundersMarquee({
                 </div>
 
                 {/* Nome da Marca abaixo do ícone */}
-                <span className="text-[11px] font-bold text-[#4b161b] text-center w-full truncate px-0.5 group-hover/item:text-[#C9A227] transition-colors">
+                <span className="text-[11px] sm:text-xs lg:text-sm font-bold text-[#4b161b] text-center w-full truncate px-0.5 group-hover/item:text-[#C9A227] transition-colors">
                   {biz.name}
                 </span>
               </Link>

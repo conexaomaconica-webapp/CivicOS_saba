@@ -21,7 +21,7 @@ import { DirectoryMapExplore } from '@/components/public/directory/DirectoryMapE
 import { DirectoryLodgesGuide } from '@/components/public/directory/DirectoryLodgesGuide';
 import { fetchLodgeGuideFacets } from '@/lib/lodges/lodge-facets';
 import { fetchFilterCategories } from '@/lib/directory/filter-categories';
-import { resolveHomeCategories } from '@/lib/directory/home-categories';
+import { resolveHomeCategories, selectMainHomeCategories } from '@/lib/directory/home-categories';
 import { getConfirmedConnectionsCountAction, getConnectionsFeedAction } from '@/app/actions/connections';
 import { DirectoryConnectionsMural } from '@/components/public/directory/DirectoryConnectionsMural';
 import { DirectoryConnectionsCta } from '@/components/public/directory/DirectoryConnectionsCta';
@@ -719,6 +719,12 @@ export default async function GuiaPage({ searchParams }: Props) {
     fallbackCategories: categories,
   });
 
+  // Carrossel "Explore por Categoria": apenas as categorias principais (as em destaque no painel); as demais ficam em "Ver todas".
+  const mainHomeCategories = selectMainHomeCategories(
+    homeCategories,
+    featCategoryEntries.map((fc: any) => fc.category_id || fc.categories?.id),
+  );
+
   // Seções da home: ordem e visibilidade vêm de /admin/guia/geral (a configuração gravada é completada com as seções reais).
   const sectionNodes: Record<string, React.ReactNode> = {
     hero: (
@@ -734,7 +740,7 @@ export default async function GuiaPage({ searchParams }: Props) {
     carousel: <DirectoryCarousel banners={banners} />,
     // Convite em destaque: registrar visita ou negócio com foto e comentário
     connections_cta: <DirectoryConnectionsCta />,
-    categories: <DirectoryCategories categories={homeCategories} />,
+    categories: <DirectoryCategories categories={mainHomeCategories} />,
     pedra_fundamental: <DirectoryFoundersMarquee items={foundersItems} />,
     sponsored: (
       <DirectorySponsored

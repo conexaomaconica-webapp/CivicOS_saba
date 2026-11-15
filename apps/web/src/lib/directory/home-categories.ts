@@ -8,6 +8,26 @@ export type FeaturedCategoryEntry = {
   display_order?: number | null;
 };
 
+/** Máximo de categorias principais exibidas no carrossel da home. */
+export const HOME_MAIN_CATEGORIES_MAX = 16;
+
+/**
+ * Categorias PRINCIPAIS para o carrossel "Explore por Categoria" da home.
+ * - Com categorias em destaque configuradas no painel (e com empresas): só elas, na ordem do painel;
+ * - Sem nenhuma em destaque: as primeiras da lista resolvida (nunca a lista inteira, que cresce com o catálogo).
+ * As demais continuam acessíveis em "Ver todas" e nos filtros.
+ */
+export function selectMainHomeCategories(
+  resolved: DirectoryCategoryItem[],
+  featuredCategoryIds: Array<string | null | undefined>,
+  max: number = HOME_MAIN_CATEGORIES_MAX,
+): DirectoryCategoryItem[] {
+  const featured = new Set(featuredCategoryIds.filter((id): id is string => Boolean(id)));
+  const featuredResolved = resolved.filter((c) => featured.has(c.id));
+  const picked = featuredResolved.length > 0 ? featuredResolved : resolved;
+  return picked.slice(0, Math.max(1, max));
+}
+
 /**
  * Resolve as categorias a serem exibidas na página principal do Guia.
  *

@@ -339,6 +339,70 @@
   gap: 20px;
   margin-top: 24px;
 }
+/* Carrossel de categorias principais: rolagem horizontal com encaixe; centralizado quando cabe tudo */
+.dh-categories-carousel-wrap {
+  position: relative;
+  margin-top: 20px;
+}
+.dh-categories-carousel {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 10px 6px 18px;
+  justify-content: safe center;
+  -webkit-overflow-scrolling: touch;
+}
+.dh-categories-carousel::-webkit-scrollbar {
+  display: none;
+}
+.dh-category-card--slide {
+  flex: 0 0 auto;
+  width: 150px;
+  scroll-snap-align: start;
+}
+.dh-categories-arrow {
+  position: absolute;
+  top: calc(50% - 8px);
+  transform: translateY(-50%);
+  z-index: 5;
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  border: 1px solid rgba(201, 162, 39, 0.5);
+  background: #ffffff;
+  color: #4b161b;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 6px 18px rgba(59, 11, 20, 0.18);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.dh-categories-arrow:hover {
+  background: #4b161b;
+  color: #ffffff;
+}
+.dh-categories-arrow--prev {
+  left: -6px;
+}
+.dh-categories-arrow--next {
+  right: -6px;
+}
+@media (max-width: 768px) {
+  .dh-categories-carousel {
+    gap: 12px;
+  }
+  .dh-category-card--slide {
+    width: 124px;
+    padding: 16px 10px;
+  }
+  .dh-categories-arrow {
+    width: 34px;
+    height: 34px;
+  }
+}
 .dh-category-card {
   background: #ffffff;
   border: none;

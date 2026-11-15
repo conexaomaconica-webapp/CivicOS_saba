@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveHomeCategories } from '../src/lib/directory/home-categories';
+import { resolveHomeCategories, selectMainHomeCategories, HOME_MAIN_CATEGORIES_MAX } from '../src/lib/directory/home-categories';
 import type { FilterCategory } from '../src/lib/directory/filter-categories';
 
 describe('resolveHomeCategories (Categorias da Página Principal)', () => {
@@ -73,5 +73,30 @@ describe('resolveHomeCategories (Categorias da Página Principal)', () => {
     });
 
     expect(result).toEqual(fallback);
+  });
+});
+
+describe('selectMainHomeCategories (carrossel "Explore por Categoria")', () => {
+  const many = Array.from({ length: 30 }, (_, i) => ({ id: `c${i}`, slug: `s${i}`, name: `Cat ${i}`, icon_name: null }));
+
+  it('com destaques no painel, exibe somente os destaques (na ordem resolvida)', () => {
+    const resolved = [many[5]!, many[2]!, ...many.filter((c) => c.id !== 'c5' && c.id !== 'c2')];
+    expect(selectMainHomeCategories(resolved, ['c5', 'c2']).map((c) => c.id)).toEqual(['c5', 'c2']);
+  });
+
+  it('destaque sem empresas (ausente da lista resolvida) é ignorado', () => {
+    expect(selectMainHomeCategories(many, ['c-inexistente', 'c1']).map((c) => c.id)).toEqual(['c1']);
+  });
+
+  it('sem nenhum destaque, limita a lista (nunca todas as categorias)', () => {
+    const picked = selectMainHomeCategories(many, []);
+    expect(picked).toHaveLength(HOME_MAIN_CATEGORIES_MAX);
+    expect(picked[0]!.id).toBe('c0');
+  });
+
+  it('respeita o máximo informado e nunca devolve lista vazia por limite inválido', () => {
+    expect(selectMainHomeCategories(many, [], 5)).toHaveLength(5);
+    expect(selectMainHomeCategories(many, [], 0)).toHaveLength(1);
+    expect(selectMainHomeCategories([], ['c1'])).toEqual([]);
   });
 });
