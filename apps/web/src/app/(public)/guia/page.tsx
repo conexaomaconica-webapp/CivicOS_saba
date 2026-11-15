@@ -21,7 +21,7 @@ import { DirectoryMapExplore } from '@/components/public/directory/DirectoryMapE
 import { DirectoryLodgesGuide } from '@/components/public/directory/DirectoryLodgesGuide';
 import { fetchLodgeGuideFacets } from '@/lib/lodges/lodge-facets';
 import { fetchFilterCategories } from '@/lib/directory/filter-categories';
-import { resolveHomeCategories, selectMainHomeCategories } from '@/lib/directory/home-categories';
+import { derivePrimaryCategories, resolveHomeCategories, selectMainHomeCategories } from '@/lib/directory/home-categories';
 import { getConfirmedConnectionsCountAction, getConnectionsFeedAction } from '@/app/actions/connections';
 import { DirectoryConnectionsMural } from '@/components/public/directory/DirectoryConnectionsMural';
 import { DirectoryConnectionsCta } from '@/components/public/directory/DirectoryConnectionsCta';
@@ -719,10 +719,25 @@ export default async function GuiaPage({ searchParams }: Props) {
     fallbackCategories: categories,
   });
 
-  // Carrossel "Explore por Categoria": apenas as categorias principais (as em destaque no painel); as demais ficam em "Ver todas".
+  // Categorias PRINCIPAIS (marcadas como principal no prontuário 360 das empresas publicadas; secundárias não contam).
+  let primaryCategories: DirectoryCategoryItem[] = [];
+  try {
+    const { data: primaryRows } = await (supabase as any)
+      .from('businesses')
+      .select('id, business_categories!inner(is_primary, categories(id, slug, name, icon))')
+      .eq('publication_status', 'published')
+      .eq('is_active', true)
+      .eq('business_categories.is_primary', true);
+    primaryCategories = derivePrimaryCategories((primaryRows as any[]) ?? []);
+  } catch {
+    primaryCategories = [];
+  }
+
+  // Carrossel "Explore por Categoria": destaques do painel; sem destaque, as principais (máx. 10); as demais ficam em "Ver todas".
   const mainHomeCategories = selectMainHomeCategories(
     homeCategories,
     featCategoryEntries.map((fc: any) => fc.category_id || fc.categories?.id),
+    primaryCategories,
   );
 
   // Seções da home: ordem e visibilidade vêm de /admin/guia/geral (a configuração gravada é completada com as seções reais).

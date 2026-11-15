@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveHomeCategories, selectMainHomeCategories, HOME_MAIN_CATEGORIES_MAX } from '../src/lib/directory/home-categories';
+import { resolveHomeCategories, selectMainHomeCategories, derivePrimaryCategories, HOME_MAIN_CATEGORIES_MAX } from '../src/lib/directory/home-categories';
 import type { FilterCategory } from '../src/lib/directory/filter-categories';
 
 describe('resolveHomeCategories (Categorias da Página Principal)', () => {
@@ -76,27 +76,53 @@ describe('resolveHomeCategories (Categorias da Página Principal)', () => {
   });
 });
 
-describe('selectMainHomeCategories (carrossel "Explore por Categoria")', () => {
+describe('categorias principais da home (carrossel "Explore por Categoria")', () => {
   const many = Array.from({ length: 30 }, (_, i) => ({ id: `c${i}`, slug: `s${i}`, name: `Cat ${i}`, icon_name: null }));
+  const biz = (cats: Array<[string, boolean]>) => ({
+    business_categories: cats.map(([id, primary]) => ({
+      is_primary: primary,
+      categories: { id, slug: `s${id.slice(1)}`, name: `Cat ${id.slice(1)}`, icon: null },
+    })),
+  });
 
-  it('com destaques no painel, exibe somente os destaques (na ordem resolvida)', () => {
+  it('derivePrimaryCategories conta só a categoria PRINCIPAL das empresas (secundárias não entram)', () => {
+    const result = derivePrimaryCategories([
+      biz([['c1', true], ['c2', false]]),
+      biz([['c1', true], ['c3', false]]),
+      biz([['c4', true], ['c1', false]]),
+      biz([['c2', false]]),
+    ]);
+    expect(result.map((c) => c.id)).toEqual(['c1', 'c4']);
+  });
+
+  it('ordena por quantidade de empresas e depois pelo nome', () => {
+    const result = derivePrimaryCategories([biz([['c9', true]]), biz([['c3', true]]), biz([['c3', true]]), biz([['c1', true]])]);
+    expect(result.map((c) => c.id)).toEqual(['c3', 'c1', 'c9']);
+  });
+
+  it('com destaques no painel, exibe somente os destaques com empresas, na ordem resolvida', () => {
     const resolved = [many[5]!, many[2]!, ...many.filter((c) => c.id !== 'c5' && c.id !== 'c2')];
-    expect(selectMainHomeCategories(resolved, ['c5', 'c2']).map((c) => c.id)).toEqual(['c5', 'c2']);
+    expect(selectMainHomeCategories(resolved, ['c5', 'c2', 'c-inexistente']).map((c) => c.id)).toEqual(['c5', 'c2']);
   });
 
-  it('destaque sem empresas (ausente da lista resolvida) é ignorado', () => {
-    expect(selectMainHomeCategories(many, ['c-inexistente', 'c1']).map((c) => c.id)).toEqual(['c1']);
+  it('sem destaque: usa as categorias principais do prontuário 360, no máximo 10', () => {
+    const primary = many.slice(0, 15);
+    const picked = selectMainHomeCategories(many, [], primary);
+    expect(HOME_MAIN_CATEGORIES_MAX).toBe(10);
+    expect(picked).toHaveLength(10);
+    expect(picked.map((c) => c.id)).toEqual(primary.slice(0, 10).map((c) => c.id));
   });
 
-  it('sem nenhum destaque, limita a lista (nunca todas as categorias)', () => {
-    const picked = selectMainHomeCategories(many, []);
-    expect(picked).toHaveLength(HOME_MAIN_CATEGORIES_MAX);
-    expect(picked[0]!.id).toBe('c0');
+  it('principal que não está na lista resolvida (sem empresa visível) é ignorada', () => {
+    const resolved = many.slice(0, 5);
+    const primary = [many[20]!, many[1]!, many[3]!];
+    expect(selectMainHomeCategories(resolved, [], primary).map((c) => c.id)).toEqual(['c1', 'c3']);
   });
 
-  it('respeita o máximo informado e nunca devolve lista vazia por limite inválido', () => {
-    expect(selectMainHomeCategories(many, [], 5)).toHaveLength(5);
-    expect(selectMainHomeCategories(many, [], 0)).toHaveLength(1);
-    expect(selectMainHomeCategories([], ['c1'])).toEqual([]);
+  it('sem destaque e sem principais conhecidas: nunca todas, apenas as 10 primeiras', () => {
+    expect(selectMainHomeCategories(many, [], [])).toHaveLength(10);
+    expect(selectMainHomeCategories(many, [], [], 5)).toHaveLength(5);
+    expect(selectMainHomeCategories(many, [], [], 0)).toHaveLength(1);
+    expect(selectMainHomeCategories([], ['c1'], [])).toEqual([]);
   });
 });

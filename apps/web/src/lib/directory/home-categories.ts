@@ -8,24 +8,65 @@ export type FeaturedCategoryEntry = {
   display_order?: number | null;
 };
 
-/** Máximo de categorias principais exibidas no carrossel da home. */
-export const HOME_MAIN_CATEGORIES_MAX = 16;
+/** Máximo de categorias principais exibidas no carrossel da home quando nenhuma está em destaque. */
+export const HOME_MAIN_CATEGORIES_MAX = 10;
+
+type PrimaryCategoryRef = { id?: string | null; slug?: string | null; name?: string | null; icon?: string | null } | null;
+export type PrimaryCategoryBusinessRow = {
+  business_categories?: Array<{ is_primary?: boolean | null; categories?: PrimaryCategoryRef | PrimaryCategoryRef[] }> | null;
+};
+
+const collator = new Intl.Collator('pt-BR');
 
 /**
- * Categorias PRINCIPAIS para o carrossel "Explore por Categoria" da home.
- * - Com categorias em destaque configuradas no painel (e com empresas): só elas, na ordem do painel;
- * - Sem nenhuma em destaque: as primeiras da lista resolvida (nunca a lista inteira, que cresce com o catálogo).
+ * Categorias PRINCIPAIS: as marcadas como categoria principal no prontuário 360 de empresas publicadas
+ * (business_categories.is_primary). Categorias apenas secundárias NÃO entram. Ordena pelas que têm mais empresas
+ * (empate pelo nome).
+ */
+export function derivePrimaryCategories(rows: PrimaryCategoryBusinessRow[]): DirectoryCategoryItem[] {
+  const counts = new Map<string, { item: DirectoryCategoryItem; count: number }>();
+  for (const row of rows ?? []) {
+    const seenInBusiness = new Set<string>();
+    for (const bc of row.business_categories ?? []) {
+      if (!bc?.is_primary) continue;
+      const refs = Array.isArray(bc.categories) ? bc.categories : [bc.categories];
+      for (const ref of refs) {
+        if (!ref?.id || !ref.slug || !ref.name || seenInBusiness.has(ref.id)) continue;
+        seenInBusiness.add(ref.id);
+        const current = counts.get(ref.id);
+        if (current) current.count += 1;
+        else counts.set(ref.id, { item: { id: ref.id, slug: ref.slug, name: ref.name, icon_name: ref.icon ?? null }, count: 1 });
+      }
+    }
+  }
+  return Array.from(counts.values())
+    .sort((x, y) => y.count - x.count || collator.compare(x.item.name, y.item.name))
+    .map((x) => x.item);
+}
+
+/**
+ * Categorias para o carrossel "Explore por Categoria" da home:
+ * 1. com categorias em destaque no painel (e com empresas): somente elas, na ordem do painel;
+ * 2. sem nenhuma em destaque: as categorias PRINCIPAIS do prontuário 360, no máximo `max` (10);
+ * 3. sem categorias principais conhecidas: as primeiras `max` da lista resolvida (nunca todas).
  * As demais continuam acessíveis em "Ver todas" e nos filtros.
  */
 export function selectMainHomeCategories(
   resolved: DirectoryCategoryItem[],
   featuredCategoryIds: Array<string | null | undefined>,
+  primaryCategories: DirectoryCategoryItem[] = [],
   max: number = HOME_MAIN_CATEGORIES_MAX,
 ): DirectoryCategoryItem[] {
+  const limit = Math.max(1, max);
   const featured = new Set(featuredCategoryIds.filter((id): id is string => Boolean(id)));
   const featuredResolved = resolved.filter((c) => featured.has(c.id));
-  const picked = featuredResolved.length > 0 ? featuredResolved : resolved;
-  return picked.slice(0, Math.max(1, max));
+  if (featuredResolved.length > 0) return featuredResolved;
+
+  const byId = new Map(resolved.map((c) => [c.id, c]));
+  const primaryResolved = primaryCategories.map((c) => byId.get(c.id)).filter((c): c is DirectoryCategoryItem => Boolean(c));
+  if (primaryResolved.length > 0) return primaryResolved.slice(0, limit);
+
+  return resolved.slice(0, limit);
 }
 
 /**
