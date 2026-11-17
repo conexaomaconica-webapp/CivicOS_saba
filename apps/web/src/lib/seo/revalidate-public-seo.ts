@@ -9,6 +9,7 @@ export function revalidatePublicSeo(slug?: string | null): void {
     revalidateTag('public-seo');
     revalidatePath('/sitemap.xml');
     revalidatePath('/guia');
+    revalidatePath('/');
     revalidatePath('/guia/empresas');
     if (slug) revalidatePath(`/guia/${slug}`);
   } catch {

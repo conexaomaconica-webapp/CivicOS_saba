@@ -16,11 +16,24 @@ export function latestDate(values: Array<string | null | undefined>): Date | nul
  * quando uma empresa é criada ou editada, então usam a edição mais recente. As demais não têm data confiável e a omitem
  * (o Google prefere nenhum lastmod a um que muda a cada requisição).
  */
-export function buildStaticSitemapEntries(lastBusinessUpdate: Date | null, lastEventUpdate: Date | null): MetadataRoute.Sitemap {
+export function buildStaticSitemapEntries(
+  lastBusinessUpdate: Date | null,
+  lastEventUpdate: Date | null,
+  homeSwitchActive: boolean = false,
+): MetadataRoute.Sitemap {
   const withDate = (date: Date | null) => (date ? { lastModified: date } : {});
+  // Depois da virada: "/" é o Guia (muda quando uma empresa muda), a landing está em /institucional e /guia redireciona (fora do sitemap).
+  const homeEntries: MetadataRoute.Sitemap = homeSwitchActive
+    ? [
+        { url: appUrl('/'), ...withDate(lastBusinessUpdate), changeFrequency: 'daily', priority: 1.0 },
+        { url: appUrl('/institucional'), changeFrequency: 'weekly', priority: 0.8 },
+      ]
+    : [
+        { url: appUrl('/'), changeFrequency: 'weekly', priority: 1.0 },
+        { url: appUrl('/guia'), ...withDate(lastBusinessUpdate), changeFrequency: 'daily', priority: 0.9 },
+      ];
   return [
-    { url: appUrl('/'), changeFrequency: 'weekly', priority: 1.0 },
-    { url: appUrl('/guia'), ...withDate(lastBusinessUpdate), changeFrequency: 'daily', priority: 0.9 },
+    ...homeEntries,
     { url: appUrl('/guia/empresas'), ...withDate(lastBusinessUpdate), changeFrequency: 'daily', priority: 0.8 },
     { url: appUrl('/guia/lojas'), changeFrequency: 'weekly', priority: 0.6 },
     { url: appUrl('/guia/eventos'), ...withDate(lastEventUpdate), changeFrequency: 'weekly', priority: 0.6 },

@@ -1,0 +1,106 @@
+{
+  "/": {
+    "status": 200,
+    "location": null,
+    "canonical": "http://localhost:3000",
+    "robots": "index, follow",
+    "title": "Conexão Maçônica — Empresas, Benefícios e Conexões",
+    "h1": "Muito além de um guia de empresas. Uma conexão que gera oportunidades.",
+    "textLength": 11570,
+    "textHash": "a96bcb3895d9"
+  },
+  "/guia": {
+    "status": 200,
+    "location": null,
+    "canonical": "http://localhost:3000/guia",
+    "robots": null,
+    "title": "Conexão Maçônica - Plataforma Comercial e Maçônico",
+    "h1": "Tradição que une! Conexão que fortalece!",
+    "textLength": 29472,
+    "textHash": "aa066a9ddbef"
+  },
+  "/guia?cidade=feira-de-santana": {
+    "status": 200,
+    "location": null,
+    "canonical": "http://localhost:3000/guia",
+    "robots": "noindex, follow",
+    "title": "Conexão Maçônica - Plataforma Comercial e Maçônico",
+    "h1": "Tradição que une! Conexão que fortalece!",
+    "textLength": 28245,
+    "textHash": "8d9ae5d7101c"
+  },
+  "/guia?q=otica": {
+    "status": 200,
+    "location": null,
+    "canonical": "http://localhost:3000/guia",
+    "robots": "noindex, follow",
+    "title": "Conexão Maçônica - Plataforma Comercial e Maçônico",
+    "h1": "Tradição que une! Conexão que fortalece!",
+    "textLength": 28668,
+    "textHash": "43ee7f90b979"
+  },
+  "/institucional": {
+    "status": 404,
+    "location": null,
+    "canonical": null,
+    "robots": "noindex",
+    "title": "Página não encontrada | Conexão Maçônica",
+    "h1": null,
+    "textLength": 40,
+    "textHash": "66b07374bd0d"
+  },
+  "/guia/empresas": {
+    "status": 200,
+    "location": null,
+    "canonical": "http://localhost:3000/guia/empresas",
+    "robots": null,
+    "title": "Empresas e Serviços Maçônicos | Conexão Maçônica",
+    "h1": "Encontre Empresas e Serviços de Confiança",
+    "textLength": 2547,
+    "textHash": "c470ff51575b"
+  },
+  "/conexoes": {
+    "status": 200,
+    "location": null,
+    "canonical": "http://localhost:3000/conexoes",
+    "robots": null,
+    "title": "Mural de Conexões | Conexão Maçônica",
+    "h1": "Mural de Conexões",
+    "textLength": 1170,
+    "textHash": "b84579ffcf89"
+  },
+  "/termos": {
+    "status": 200,
+    "location": null,
+    "canonical": "http://localhost:3000/termos",
+    "robots": "index, follow",
+    "title": "Termos de Uso | Conexão Maçônica",
+    "h1": "Termos de Uso da Plataforma",
+    "textLength": 4525,
+    "textHash": "84d6063b409a"
+  },
+  "/sitemap.xml": {
+    "status": 200,
+    "location": null,
+    "canonical": null,
+    "robots": null,
+    "title": null,
+    "h1": null,
+    "textLength": 0,
+    "textHash": null,
+    "loc": [
+      "http://localhost:3000/",
+      "http://localhost:3000/guia"
+    ]
+  },
+  "/robots.txt": {
+    "status": 200,
+    "location": null,
+    "canonical": null,
+    "robots": null,
+    "title": null,
+    "h1": null,
+    "textLength": 0,
+    "textHash": null
+  }
+}

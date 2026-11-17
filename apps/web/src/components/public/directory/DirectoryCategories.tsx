@@ -1,5 +1,7 @@
 'use client';
 
+import { isGuiaHomePathname } from '@/lib/site/home-switch';
+import { useHomeSwitchActive } from '@/components/public/home-switch-context';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
@@ -21,6 +23,7 @@ type DirectoryCategoriesProps = {
 export function DirectoryCategories({ categories = [], onCategorySelect }: DirectoryCategoriesProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const homeSwitchActive = useHomeSwitchActive();
   const searchParams = useSearchParams();
 
   // Carrossel: as setas só aparecem quando há mais categorias do que cabem na largura.
@@ -64,7 +67,7 @@ export function DirectoryCategories({ categories = [], onCategorySelect }: Direc
     const params = new URLSearchParams(searchParams ? searchParams.toString() : '');
     params.set('cat', catSlug);
     params.set('page', '1');
-    const targetPath = pathname === '/guia' || pathname === '/guia/' ? '/guia/empresas' : pathname;
+    const targetPath = isGuiaHomePathname(pathname, homeSwitchActive) ? '/guia/empresas' : pathname;
     router.push(`${targetPath}?${params.toString()}`);
   };
 

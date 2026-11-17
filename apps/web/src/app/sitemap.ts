@@ -4,6 +4,7 @@ import { buildDirectoryIndex, buildDirectorySitemapUrls } from '@/lib/seo/direct
 import { loadPublishedDirectoryRows } from '@/lib/seo/directory-seo-server';
 import { loadPublicSeoEvents } from '@/lib/seo/public-events-server';
 import { buildSitemapEventEntries, buildStaticSitemapEntries, latestDate } from '@/lib/seo/sitemap-entries';
+import { isHomeSwitchActive } from '@/lib/site/home-switch';
 
 // Sempre dinâmico: precisa do domínio da requisição para saber de qual tenant listar. As listas ficam em cache de
 // 5 minutos (invalidado na hora quando uma empresa é publicada ou suspensa).
@@ -15,7 +16,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const staticPages = buildStaticSitemapEntries(
     latestDate(rows.map((row) => row.updated_at)),
-    latestDate(events.map((event) => event.updated_at))
+    latestDate(events.map((event) => event.updated_at)),
+    isHomeSwitchActive(),
   );
   const businesses = buildSitemapBusinessEntries(rows);
   const directoryPages: MetadataRoute.Sitemap = buildDirectorySitemapUrls(buildDirectoryIndex(rows)).map((page) => ({

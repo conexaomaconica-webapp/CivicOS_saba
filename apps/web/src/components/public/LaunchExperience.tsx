@@ -1,5 +1,6 @@
 'use client';
 
+import { useHomeSwitchActive } from '@/components/public/home-switch-context';
 import React, { useEffect, useState, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 
@@ -37,6 +38,7 @@ type LaunchExperienceProps = {
 
 export function LaunchExperience({ forceShow = false }: LaunchExperienceProps) {
   const pathname = usePathname();
+  const homeSwitchActive = useHomeSwitchActive();
   const [visible, setVisible] = useState(false);
   const [fading, setFading] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -48,7 +50,7 @@ export function LaunchExperience({ forceShow = false }: LaunchExperienceProps) {
     if (prefersReducedMotion && !forceShow) return;
 
     // Apenas deve ser elegível para exibição automática na raiz da plataforma (home /)
-    const isRootLanding = pathname === '/' || pathname === '';
+    const isRootLanding = homeSwitchActive ? pathname === '/institucional' : pathname === '/' || pathname === '';
     if (!forceShow && !isRootLanding) {
       return;
     }
@@ -61,7 +63,7 @@ export function LaunchExperience({ forceShow = false }: LaunchExperienceProps) {
     // Marca imediatamente para não disparar em requisições paralelas ou re-renders
     markLaunchAsShown();
     setVisible(true);
-  }, [forceShow, pathname]);
+  }, [forceShow, pathname, homeSwitchActive]);
 
   const handleComplete = useCallback(() => {
     setFading(true);

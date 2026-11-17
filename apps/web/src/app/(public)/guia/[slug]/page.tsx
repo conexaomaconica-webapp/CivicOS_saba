@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { isHomeSwitchActive } from '@/lib/site/home-switch';
 import { headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
@@ -695,6 +696,7 @@ export default async function CompanyDetailsPage(props: Props & { searchParams?:
       category: business.identity.category,
     },
     await getDirectoryIndex().catch(() => []),
+    isHomeSwitchActive(),
   );
   const breadcrumbSchema = breadcrumbJsonLd(breadcrumbItems, business.identity.slug);
   const businessSchema = buildLocalBusinessSchema({

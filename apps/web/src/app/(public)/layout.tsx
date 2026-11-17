@@ -7,6 +7,8 @@ import { getPedraFundamentalCardConfigAction } from '@/app/actions/institutional
 import { PedraCardDisplayProvider } from '@/lib/directory/pedra-card-display-context';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
 import { VisitOriginCapture } from '@/components/analytics/VisitOriginCapture';
+import { HomeSwitchProvider } from '@/components/public/home-switch-context';
+import { isHomeSwitchActive } from '@/lib/site/home-switch';
 import '@/styles/public-experience.css';
 
 export default async function PublicLayout({ children }: { children: ReactNode }) {
@@ -16,19 +18,24 @@ export default async function PublicLayout({ children }: { children: ReactNode }
     getPublicSupportContact(),
   ]);
 
+  // Virada da página inicial (24/11): decidida por requisição no servidor; os componentes de navegação recebem o resultado.
+  const homeSwitchActive = isHomeSwitchActive();
+
   return (
-    <PedraCardDisplayProvider
-      value={pedraCardConfig.display}
-      horizontalSealUrl={pedraCardConfig.horizontalSealUrl}
-    >
-      <FavoritesProvider>
-        <PublicShell productName={brand.appName} logoUrl={brand.logoUrl}>
-          <VisitOriginCapture />
-          {children}
-          <FloatingWhatsApp whatsapp={support.whatsapp} email={support.email} />
-        </PublicShell>
-      </FavoritesProvider>
-    </PedraCardDisplayProvider>
+    <HomeSwitchProvider active={homeSwitchActive}>
+      <PedraCardDisplayProvider
+        value={pedraCardConfig.display}
+        horizontalSealUrl={pedraCardConfig.horizontalSealUrl}
+      >
+        <FavoritesProvider>
+          <PublicShell productName={brand.appName} logoUrl={brand.logoUrl}>
+            <VisitOriginCapture />
+            {children}
+            <FloatingWhatsApp whatsapp={support.whatsapp} email={support.email} />
+          </PublicShell>
+        </FavoritesProvider>
+      </PedraCardDisplayProvider>
+    </HomeSwitchProvider>
   );
 }
 

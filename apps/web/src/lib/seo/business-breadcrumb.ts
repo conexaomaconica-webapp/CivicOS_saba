@@ -14,15 +14,18 @@ type BreadcrumbBusiness = {
 };
 
 /**
- * Caminho da empresa: Início > Guia > Cidade > Categoria > Empresa.
+ * Caminho da empresa: Início > Guia > Cidade > Categoria > Empresa (depois da virada: Início > Cidade > Categoria > Empresa).
  * Cidade e categoria só entram quando a página correspondente EXISTE (está no índice do guia): assim o link nunca leva a
  * um 404. A empresa (último item) é a página atual e não tem link.
  */
-export function buildBusinessBreadcrumb(business: BreadcrumbBusiness, index: CityGroup[]): BreadcrumbItem[] {
-  const items: BreadcrumbItem[] = [
-    { name: 'Início', href: '/' },
-    { name: 'Guia', href: '/guia' },
-  ];
+export function buildBusinessBreadcrumb(business: BreadcrumbBusiness, index: CityGroup[], homeSwitchActive: boolean = false): BreadcrumbItem[] {
+  // Depois da virada o Guia É a página inicial: "Início" e "Guia" apontariam para o mesmo endereço, então só "Início" permanece.
+  const items: BreadcrumbItem[] = homeSwitchActive
+    ? [{ name: 'Início', href: '/' }]
+    : [
+        { name: 'Início', href: '/' },
+        { name: 'Guia', href: '/guia' },
+      ];
 
   const state = resolveState(business.state);
   const citySlug = slugify(business.city);

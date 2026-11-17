@@ -1,5 +1,7 @@
 'use client';
 
+import { isGuiaHomePathname, isLandingPathname } from '@/lib/site/home-switch';
+import { useHomeSwitchActive } from './home-switch-context';
 import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { PublicFooter } from './PublicFooter';
@@ -28,8 +30,10 @@ export function PublicShell({
   viewer,
 }: PublicShellProps) {
   const pathname = usePathname();
-  const isLandingPage = pathname === '/' || pathname === '/teste-landing';
-  const isGuiaOrLegal = pathname?.startsWith('/guia') || pathname?.startsWith('/conexoes') || pathname === '/privacidade' || pathname === '/termos';
+  // Antes da virada "/" é a landing; depois, "/" é o Guia e a landing está em /institucional (ver lib/site/home-switch.ts).
+  const homeSwitchActive = useHomeSwitchActive();
+  const isLandingPage = isLandingPathname(pathname, homeSwitchActive);
+  const isGuiaOrLegal = pathname?.startsWith('/guia') || pathname?.startsWith('/conexoes') || pathname === '/privacidade' || pathname === '/termos' || isGuiaHomePathname(pathname, homeSwitchActive);
 
   // A home (/) traz o próprio cabeçalho com logo e botão Entrar.
   const renderHeader = showHeader && !isGuiaOrLegal && !isLandingPage;

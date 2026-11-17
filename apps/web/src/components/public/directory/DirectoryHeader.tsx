@@ -1,5 +1,7 @@
 'use client';
 
+import { guiaHomePath, isGuiaHomePathname } from '@/lib/site/home-switch';
+import { useHomeSwitchActive } from '@/components/public/home-switch-context';
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -65,6 +67,7 @@ export function DirectoryHeader({
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  const homeSwitchActive = useHomeSwitchActive();
   const { favoritesCount, setIsModalOpen } = useFavorites();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -111,7 +114,7 @@ export function DirectoryHeader({
 
   // Depois de entrar (ou criar a conta), a pessoa volta para esta mesma página.
   const currentSearch = searchParams ? searchParams.toString() : '';
-  const returnTo = `${pathname || '/guia'}${currentSearch ? `?${currentSearch}` : ''}`;
+  const returnTo = `${pathname || guiaHomePath(homeSwitchActive)}${currentSearch ? `?${currentSearch}` : ''}`;
   const loginHref = `/login?redirect=${encodeURIComponent(returnTo)}`;
   const registerHref = `/register?redirect=${encodeURIComponent(returnTo)}`;
 
@@ -144,7 +147,7 @@ export function DirectoryHeader({
   const isBenefitsSection = Boolean(pathname?.startsWith('/guia/beneficios'));
   const isEventsSection = Boolean(pathname?.startsWith('/guia/eventos') || pathname?.startsWith('/eventos'));
   const isEmpresasListing = Boolean(pathname === '/guia/empresas' || pathname?.startsWith('/guia/empresas/'));
-  const isGuiaHome = Boolean(pathname === '/guia' || pathname === '/guia/');
+  const isGuiaHome = isGuiaHomePathname(pathname, homeSwitchActive);
   const isBusinessProfilePage = Boolean(
     hideMobileSearchAndCategories ||
       (pathname?.startsWith('/guia/') &&
@@ -249,8 +252,8 @@ export function DirectoryHeader({
 
     // Se o usuário está na página inicial do Guia (/guia), permanece em /guia e rola até a listagem #todas
     // Se está em /guia/empresas, permanece em /guia/empresas
-    const isGuiaHome = pathname === '/guia' || pathname === '/guia/';
-    const targetPath = isGuiaHome ? '/guia' : (pathname || '/guia/empresas');
+    const isGuiaHome = isGuiaHomePathname(pathname, homeSwitchActive);
+    const targetPath = isGuiaHome ? guiaHomePath(homeSwitchActive) : (pathname || '/guia/empresas');
     const hash = isGuiaHome ? '#todas' : '';
     router.push(`${targetPath}?${params.toString()}${hash}`);
   };
