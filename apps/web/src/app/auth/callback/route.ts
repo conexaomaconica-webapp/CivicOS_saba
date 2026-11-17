@@ -1,22 +1,32 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerSideClient } from '@/lib/supabase/server';
+import { sanitizeInternalRedirect } from '@/lib/auth/internal-redirect';
 
 /**
  * Exchanges the Auth code (e-mail confirmation / password recovery) for a
  * session and forwards the user to the intended destination.
+ *
+ * `next` só aceita caminho interno (antes aceitava qualquer endereço, o que permitia redirecionar a pessoa para outro site).
+ * Quando o link falha (expirado, já usado, aberto em outro navegador), a pessoa volta para a tela certa COM uma mensagem,
+ * em vez de cair no login sem explicação.
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/dashboard';
+  const next = sanitizeInternalRedirect(searchParams.get('next')) ?? '/dashboard';
 
   if (code) {
-    const supabase = await createServerSideClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      return NextResponse.redirect(new URL(next, request.url));
+    try {
+      const supabase = await createServerSideClient();
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (!error) {
+        return NextResponse.redirect(new URL(next, request.url));
+      }
+    } catch {
+      // Cai no redirecionamento de falha abaixo.
     }
   }
 
-  return NextResponse.redirect(new URL(`/login?error=sessao_invalida`, request.url));
+  const failure = next.startsWith('/update-password') ? '/forgot-password?erro=link_invalido' : '/login?error=sessao_invalida';
+  return NextResponse.redirect(new URL(failure, request.url));
 }

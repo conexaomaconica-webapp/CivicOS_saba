@@ -1,0 +1,32 @@
+[
+  {
+    "file": "recuperar-senha.html",
+    "supabase": "Reset Password (recovery)",
+    "subject": "Redefinir sua senha | Conexão Maçônica"
+  },
+  {
+    "file": "confirmar-cadastro.html",
+    "supabase": "Confirm sign up (confirmation)",
+    "subject": "Confirme seu e-mail | Conexão Maçônica"
+  },
+  {
+    "file": "convite.html",
+    "supabase": "Invite user (invite)",
+    "subject": "Você foi convidado(a) para a Conexão Maçônica"
+  },
+  {
+    "file": "link-de-acesso.html",
+    "supabase": "Magic Link (magic_link)",
+    "subject": "Seu link de acesso | Conexão Maçônica"
+  },
+  {
+    "file": "troca-de-email.html",
+    "supabase": "Change Email Address (email_change)",
+    "subject": "Confirme a troca de e-mail | Conexão Maçônica"
+  },
+  {
+    "file": "codigo-de-confirmacao.html",
+    "supabase": "Reauthentication (reauthentication)",
+    "subject": "Seu código de confirmação | Conexão Maçônica"
+  }
+]

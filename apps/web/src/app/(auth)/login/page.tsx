@@ -153,6 +153,14 @@ export default function LoginPage() {
     }
   }, []);
 
+  // Link do e-mail que não pôde ser usado (expirado, já usado, aberto em outro navegador): /auth/confirm e /auth/callback voltam com ?error=.
+  useEffect(() => {
+    const error = new URLSearchParams(window.location.search).get('error');
+    if (error === 'link_invalido' || error === 'sessao_invalida') {
+      setErrorMsg('Este link expirou, já foi usado ou é inválido. Entre com seu e-mail e senha ou peça um novo link em "Esqueci a senha".');
+    }
+  }, []);
+
   // Mantém o destino (redirect) ao ir para o cadastro de membro.
   const [registerHref, setRegisterHref] = useState('/register');
   useEffect(() => {

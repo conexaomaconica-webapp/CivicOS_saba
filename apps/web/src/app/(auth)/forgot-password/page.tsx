@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { sendPasswordResetEmail } from '@/lib/auth/auth-service';
@@ -26,6 +26,13 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Link do e-mail que falhou (expirado, já usado ou inválido): /auth/confirm e /auth/callback voltam para cá com ?erro=link_invalido.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('erro') === 'link_invalido') {
+      setErrorMsg('Este link de recuperação expirou, já foi usado ou é inválido. Informe seu e-mail abaixo para receber um novo.');
+    }
+  }, []);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
