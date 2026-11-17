@@ -13,6 +13,10 @@ const page = await context.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 
+// Preview protegido: o segredo vem só da variável BYPASS_SECRET e grava o cookie de bypass neste contexto.
+if (process.env.BYPASS_SECRET) {
+  await page.goto(`${base}/?x-vercel-protection-bypass=${encodeURIComponent(process.env.BYPASS_SECRET)}&x-vercel-set-bypass-cookie=true`, { waitUntil: 'load', timeout: 120000 }).catch(() => {});
+}
 await page.goto(base + '/', { waitUntil: 'load', timeout: 120000 });
 await page.waitForTimeout(2500);
 const rej = await page.$('button:has-text("Rejeitar opcionais")');

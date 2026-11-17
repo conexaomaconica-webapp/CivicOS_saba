@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { isHomeSwitchActive } from '@/lib/site/home-switch';
 import React from 'react';
 import { StructuredData } from '@/components/seo/StructuredData';
 import { appUrl } from '@/lib/seo/app-url';
@@ -112,22 +113,40 @@ const websiteSchema = {
   publisher: { '@id': appUrl('/#organization') },
 };
 
-const webPageSchema = {
-  '@context': 'https://schema.org',
-  '@type': 'WebPage',
-  '@id': appUrl('/#webpage'),
-  url: appUrl('/'),
-  name: 'Conexão Maçônica — Empresas, Benefícios e Conexões',
-  isPartOf: { '@id': appUrl('/#website') },
-  about: { '@id': appUrl('/#organization') },
-  inLanguage: 'pt-BR',
-  breadcrumb: {
-    '@type': 'BreadcrumbList',
-    itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Início', item: appUrl('/') }],
-  },
-};
+/**
+ * Caminho em que a landing está sendo servida: "/" antes da virada da página inicial, "/institucional" depois.
+ * Calculado A CADA REQUISIÇÃO (nunca em constante de módulo), porque a virada por horário acontece com o servidor no ar.
+ */
+function landingPath(): '/' | '/institucional' {
+  return isHomeSwitchActive() ? '/institucional' : '/';
+}
 
-const launchEventSchema = {
+function buildWebPageSchema(path: '/' | '/institucional') {
+  const onRoot = path === '/';
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    '@id': appUrl(onRoot ? '/#webpage' : `${path}#webpage`),
+    url: appUrl(path),
+    name: 'Conexão Maçônica — Empresas, Benefícios e Conexões',
+    isPartOf: { '@id': appUrl('/#website') },
+    about: { '@id': appUrl('/#organization') },
+    inLanguage: 'pt-BR',
+    breadcrumb: {
+      '@type': 'BreadcrumbList',
+      // Depois da virada "Início" é a página inicial do Guia ("/") e a landing é a segunda posição.
+      itemListElement: onRoot
+        ? [{ '@type': 'ListItem', position: 1, name: 'Início', item: appUrl('/') }]
+        : [
+            { '@type': 'ListItem', position: 1, name: 'Início', item: appUrl('/') },
+            { '@type': 'ListItem', position: 2, name: 'Institucional', item: appUrl(path) },
+          ],
+    },
+  };
+}
+
+function buildLaunchEventSchema(path: '/' | '/institucional') {
+  return {
   '@context': 'https://schema.org',
   '@type': 'Event',
   name: 'Lançamento oficial da Conexão Maçônica',
@@ -146,8 +165,9 @@ const launchEventSchema = {
     { '@type': 'Person', name: 'Dr. Alfredo Morais', jobTitle: 'Psicólogo' },
   ],
   organizer: { '@id': appUrl('/#organization') },
-  url: appUrl('/#lancamento'),
-};
+  url: appUrl(path === '/' ? '/#lancamento' : `${path}#lancamento`),
+  };
+}
 
 function buildPlansSchema(plans: CommercialPlan[]) {
   return {
@@ -197,6 +217,7 @@ async function loadPlans(): Promise<CommercialPlan[]> {
 }
 
 export default async function LandingHome() {
+  const currentLandingPath = landingPath();
   const [plans, brand, confirmedConnections, connectionsFeed] = await Promise.all([
     loadPlans(),
     resolveTenantBrandContext().catch(() => null),
@@ -217,8 +238,8 @@ export default async function LandingHome() {
     <>
       <StructuredData schema={organizationSchema} />
       <StructuredData schema={websiteSchema} />
-      <StructuredData schema={webPageSchema} />
-      <StructuredData schema={launchEventSchema} />
+      <StructuredData schema={buildWebPageSchema(currentLandingPath)} />
+      <StructuredData schema={buildLaunchEventSchema(currentLandingPath)} />
       <StructuredData schema={buildPlansSchema(sortedPlans)} />
       <StructuredData schema={faqSchema} />
       <div className="w-full">

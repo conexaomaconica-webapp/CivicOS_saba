@@ -25,13 +25,18 @@ const meta = (html, re) => (html.match(re) || [])[1] ?? null;
 
 const results = {};
 for (const p of paths) {
-  const res = await fetch(base + p, { redirect: 'manual', headers: { 'user-agent': 'HomologacaoViradaInicial/1.0 (verificacao interna)' } });
+  // Preview protegido pela Vercel: o segredo de bypass vem SOMENTE da variável de ambiente BYPASS_SECRET (nunca gravado em arquivo).
+  const headers = { 'user-agent': 'HomologacaoViradaInicial/1.0 (verificacao interna)' };
+  if (process.env.BYPASS_SECRET) headers['x-vercel-protection-bypass'] = process.env.BYPASS_SECRET;
+  const res = await fetch(base + p, { redirect: 'manual', headers });
   const body = await res.text();
   const isHtml = (res.headers.get('content-type') || '').includes('text/html');
   const text = isHtml ? strip(body) : '';
   results[p] = {
     status: res.status,
     location: res.headers.get('location'),
+    cacheControl: res.headers.get('cache-control'),
+    vercelCache: res.headers.get('x-vercel-cache'),
     canonical: meta(body, /<link[^>]*rel="canonical"[^>]*href="([^"]*)"/i) ?? meta(body, /<link[^>]*href="([^"]*)"[^>]*rel="canonical"/i),
     robots: meta(body, /<meta[^>]*name="robots"[^>]*content="([^"]*)"/i),
     title: meta(body, /<title>([^<]*)<\/title>/i),
