@@ -554,6 +554,8 @@ export interface AdminBusiness360DTO {
     cover_zoom?: number;
     cover_fit_mode?: 'cover' | 'contain';
     cover_background_color?: string;
+    /** Quantas imagens aparecem no topo do perfil no layout Prata (1 a 4; padrão 1). */
+    hero_image_count?: number;
     publication_status: 'draft' | 'pending_review' | 'published' | 'rejected' | 'suspended';
     is_active: boolean;
     is_founder: boolean;
@@ -1625,6 +1627,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
     let coverZoom: number | undefined = undefined;
     let coverFitMode: 'cover' | 'contain' | undefined = undefined;
     let coverBackgroundColor: string | undefined = undefined;
+    let heroImageCount = 1;
     let clientApproval: AdminBusiness360DTO['client_approval'] = undefined;
 
     try {
@@ -1650,6 +1653,10 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
           }
           if (attr.attribute_key === 'cover_background_color') {
             coverBackgroundColor = attr.attribute_value;
+          }
+          if (attr.attribute_key === 'hero_image_count') {
+            const parsed = Number.parseInt(String(attr.attribute_value), 10);
+            if (Number.isFinite(parsed)) heroImageCount = Math.min(4, Math.max(1, parsed));
           }
           if (attr.attribute_key === 'client_approved_at') {
             clientApproval = {
@@ -1766,6 +1773,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
         cover_zoom: coverZoom,
         cover_fit_mode: coverFitMode,
         cover_background_color: coverBackgroundColor,
+        hero_image_count: heroImageCount,
         publication_status: (b.publication_status || 'published') as any,
         is_active: Boolean(b.is_active),
         is_founder: Boolean(b.is_founder),
@@ -4277,6 +4285,50 @@ export async function manageAdminBenefitAction(
     return { success: true, data: savedBenefit };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao gerenciar benefício.' };
+  }
+}
+
+/**
+ * Define quantas imagens aparecem no topo do perfil no layout Prata (Compasso): de 1 a 4, POR EMPRESA (padrão 1).
+ * A primeira é a capa; as demais vêm da galeria, na ordem dela. Só administradores da plataforma (prontuário 360).
+ * Não altera imagens: só o atributo hero_image_count da empresa.
+ */
+export async function setBusinessHeroImageCountAction(
+  businessId: string,
+  count: number
+): Promise<{ success: boolean; count?: number; error?: string }> {
+  try {
+    if (!Number.isInteger(count) || count < 1 || count > 4) return { success: false, error: 'Escolha de 1 a 4 imagens.' };
+    const { user } = await assertPlatformAdminAccess();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) return { success: false, error: 'Configuração segura do Supabase indisponível.' };
+    const supabase = createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+
+    const { data: biz, error: lookupError } = await (supabase as any).from('businesses').select('id, slug, tenant_id').eq('id', businessId).maybeSingle();
+    if (lookupError) return { success: false, error: `Falha ao consultar empresa: ${lookupError.message}` };
+    if (!biz) return { success: false, error: 'Empresa não localizada.' };
+
+    await (supabase as any)
+      .from('business_attributes')
+      .upsert([{ business_id: businessId, tenant_id: biz.tenant_id, attribute_key: 'hero_image_count', attribute_value: String(count) }], { onConflict: 'business_id,attribute_key' })
+      .throwOnError();
+
+    await (supabase as any).from('admin_audit_logs').insert({
+      tenant_id: biz.tenant_id,
+      actor_id: user.id,
+      action: 'UPDATE_BUSINESS_HERO_IMAGE_COUNT',
+      entity_type: 'business_media',
+      entity_id: businessId,
+      after_value: { hero_image_count: count },
+      reason: 'Alteração da quantidade de imagens do topo do perfil via Admin 360º',
+    });
+
+    revalidatePath(`/guia/${biz.slug}`);
+    revalidatePath(`/admin/empresas/${businessId}`);
+    return { success: true, count };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Não foi possível salvar a opção.' };
   }
 }
 

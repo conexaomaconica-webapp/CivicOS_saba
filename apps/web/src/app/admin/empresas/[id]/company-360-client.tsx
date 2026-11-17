@@ -1,5 +1,6 @@
 'use client';
 
+import { HeroImageCountControl } from '@/components/admin/HeroImageCountControl';
 import React, { useEffect, useState, useRef } from 'react';
 import { CertificationLogo } from '@/components/public/business/shared/CertificationBadges';
 import Link from 'next/link';
@@ -3641,6 +3642,12 @@ export default function Company360Client({ initialData }: Props) {
               </div>
             </div>
           </div>
+
+          <HeroImageCountControl
+            businessId={data.business.id}
+            initial={data.business.hero_image_count ?? 1}
+            planCode={data.business.plan_code || data.subscription.plan_code}
+          />
 
           {data.subscription.entitlements.video_limit > 0 && (
             <div className="bg-white border border-stone-300 rounded-2xl p-6 shadow-xs space-y-4">

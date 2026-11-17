@@ -26,10 +26,13 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
   // 1. Filtrar lista de mídias eliminando duplicatas entre cover e gallery
   const coverAsset = media?.cover ?? null;
   const galleryAssets = media?.gallery ?? [];
-  const rawMediaList = [coverAsset, ...galleryAssets].filter(Boolean) as PublicMediaAsset[];
-  const heroImages = rawMediaList.filter((item, index, self) =>
-    index === self.findIndex((t) => t.url === item.url)
-  );
+  // Quantas imagens aparecem no topo: definido POR EMPRESA no prontuário 360 (1 a 4; padrão 1).
+  // Enviar fotos para a galeria NÃO muda o topo sozinho. A primeira imagem é a capa (sem capa, a primeira foto da galeria).
+  const heroCount = Math.min(4, Math.max(1, Math.round(Number(media?.heroImageCount ?? 1)) || 1));
+  const rawMediaList = [coverAsset ?? galleryAssets[0] ?? null, ...galleryAssets].filter(Boolean) as PublicMediaAsset[];
+  const heroImages = rawMediaList
+    .filter((item, index, self) => index === self.findIndex((t) => t.url === item.url))
+    .slice(0, heroCount);
 
   // "Indicar esta empresa": link de indicação rastreável (membro logado) ou link comum com convite para entrar.
   const handleShare = () => setReferOpen(true);

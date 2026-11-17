@@ -169,6 +169,8 @@ export type PublicBusinessPresentation = {
     cover: PublicMediaAsset | null;
     gallery: PublicMediaAsset[];
     video: PublicMediaAsset | null;
+    /** Quantas imagens aparecem no topo do perfil no layout Prata (1 a 4; padrão 1), definido por empresa no prontuário 360. */
+    heroImageCount?: number;
   };
   owner: {
     name: string;
@@ -410,6 +412,8 @@ export function toPublicBusinessPresentation(
   const coverFitMode: 'cover' | 'contain' | undefined =
     rawCoverFit === 'contain' || rawCoverFit === 'cover' ? rawCoverFit : undefined;
   const coverBackgroundColor = text((row as any).cover_background_color, 24) || undefined;
+  const rawHeroCount = Number.parseInt(text((row as any).hero_image_count, 4) || '', 10);
+  const heroImageCount = Number.isFinite(rawHeroCount) ? Math.min(4, Math.max(1, rawHeroCount)) : 1;
 
   const baseCover = images[0] ?? null;
   const cover: PublicMediaAsset | null = baseCover
@@ -569,7 +573,7 @@ export function toPublicBusinessPresentation(
       isPedraFundamental: pedraFundamental,
       isColunaDeHonra: colunaDeHonra,
     },
-    media: { cover, gallery, video },
+    media: { cover, gallery, video, heroImageCount },
     owner: (ownerName || commercialPlan === 'ouro' || (responsible && responsible.name) || row.business_name) ? {
       name: text(responsible?.name, 180) || ownerName || text((row as any).owner_name, 180) || row.business_name || 'Anunciante Titular',
       businessRole: resolveResponsibleRole({
