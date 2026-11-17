@@ -25,6 +25,7 @@ export function buildStaticSitemapEntries(lastBusinessUpdate: Date | null, lastE
     { url: appUrl('/guia/lojas'), changeFrequency: 'weekly', priority: 0.6 },
     { url: appUrl('/guia/eventos'), ...withDate(lastEventUpdate), changeFrequency: 'weekly', priority: 0.6 },
     { url: appUrl('/guia/beneficios'), changeFrequency: 'weekly', priority: 0.6 },
+    { url: appUrl('/conexoes'), changeFrequency: 'daily', priority: 0.5 },
     { url: appUrl('/termos'), changeFrequency: 'yearly', priority: 0.2 },
     { url: appUrl('/privacidade'), changeFrequency: 'yearly', priority: 0.2 },
   ];

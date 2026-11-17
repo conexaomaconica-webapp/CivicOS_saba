@@ -4,6 +4,9 @@ import { headers } from 'next/headers';
 import { findAdvertiserBusiness } from '@/lib/advertiser/advertiser-access';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { linkVisitorToCurrentUser } from '@/lib/referrals/attribution';
+import { FEED_DB_MAX, pickShowcaseRandom } from '@/lib/directory/connections-feed';
+import { CONNECTIONS_PAGE_SIZE, type ConnectionsListParams } from '@/lib/directory/connections-list';
+import { isConnectionId } from '@/lib/directory/connections-share';
 
 export type ConnectionType = 'compra' | 'servico' | 'parceria' | 'visita';
 export type ConnectionOrigin =
@@ -36,6 +39,21 @@ export type ConnectionFeedItem = PublicConnectionItem & {
   business_name: string;
   business_slug: string;
 };
+
+/** Item da página pública /conexoes (mesmos campos públicos do feed, mais o logotipo da empresa). */
+export type PublicConnectionListItem = ConnectionFeedItem & { business_logo_url: string | null };
+
+/** Conexão exibida na página individual (/conexoes/[id]): só campos públicos, sem curtidas. */
+export type PublicConnectionDetail = Omit<PublicConnectionListItem, 'like_count' | 'liked_by_me'>;
+
+export type ConnectionDetailResult =
+  | { status: 'ok'; item: PublicConnectionDetail }
+  | { status: 'not_found' }
+  | { status: 'error' };
+
+export type ConnectionsListResult =
+  | { ok: true; items: PublicConnectionListItem[]; total: number; page: number; pageSize: number; totalPages: number }
+  | { ok: false; error: string };
 
 export type BusinessConnectionRow = {
   id: string;
@@ -299,17 +317,95 @@ export async function removeConnectionPhotoAction(connectionId: string): Promise
   }
 }
 
+/**
+ * Uma conexão pública pelo identificador (id). Mesmas regras de visibilidade do feed (migration 246): qualquer registro
+ * inelegível (pendente, removido, sem consentimento, empresa despublicada, outro tenant...) vira 'not_found' (404).
+ * Falha de rede/banco vira 'error' (nunca confundida com "não existe").
+ */
+export async function getPublicConnectionDetailAction(connectionId: string): Promise<ConnectionDetailResult> {
+  if (!isConnectionId(connectionId)) return { status: 'not_found' };
+  try {
+    if (process.env.NODE_ENV !== 'production' && process.env.CONNECTIONS_LIST_FIXTURE === '1') {
+      const { fixtureDetail } = await import('@/lib/directory/connections-fixture');
+      const item = fixtureDetail(connectionId);
+      return item ? { status: 'ok', item } : { status: 'not_found' };
+    }
+    const supabase = await createServerSideClient();
+    const host = ((await headers()).get('host') || 'localhost').split(':')[0] || 'localhost';
+    const { data, error } = await (supabase as any).rpc('public_connection_detail', { p_host: host, p_connection_id: connectionId });
+    if (error) return { status: 'error' };
+    if (!data || typeof data !== 'object') return { status: 'not_found' };
+    return { status: 'ok', item: data as PublicConnectionDetail };
+  } catch {
+    return { status: 'error' };
+  }
+}
+
+/** Listagem pública paginada do Mural (/conexoes): busca, tipo, ordem e página decididos no banco (migration 245). */
+export async function getPublicConnectionsListAction(params: ConnectionsListParams, options?: { pageSize?: number }): Promise<ConnectionsListResult> {
+  const pageSize = options?.pageSize ?? CONNECTIONS_PAGE_SIZE;
+  try {
+    if (process.env.NODE_ENV !== 'production' && process.env.CONNECTIONS_LIST_FIXTURE === '1') {
+      const { fixtureList } = await import('@/lib/directory/connections-fixture');
+      return fixtureList(params, pageSize);
+    }
+    const supabase = await createServerSideClient();
+    const host = ((await headers()).get('host') || 'localhost').split(':')[0] || 'localhost';
+    const args = {
+      p_host: host,
+      p_query: params.q || null,
+      p_type: params.type || null,
+      p_order: params.order,
+      p_page: params.page,
+      p_page_size: pageSize,
+    };
+    let { data, error } = await (supabase as any).rpc('public_connections_list', { ...args, p_business_slug: params.empresa || null });
+    // Reserva (migration 247 ainda não aplicada): sem filtro por empresa a listagem da 245 continua funcionando.
+    if (error && !params.empresa) ({ data, error } = await (supabase as any).rpc('public_connections_list', args));
+    if (error || !data || typeof data !== 'object') return { ok: false, error: 'indisponivel' };
+    return {
+      ok: true,
+      items: Array.isArray(data.items) ? data.items : [],
+      total: Number(data.total) || 0,
+      page: Number(data.page) || params.page,
+      pageSize: Number(data.page_size) || pageSize,
+      totalPages: Number(data.total_pages) || 0,
+    };
+  } catch {
+    return { ok: false, error: 'indisponivel' };
+  }
+}
+
 /** Conexões confirmadas mais recentes da rede (seção do Mural na página principal). Fotos primeiro. */
-export async function getConnectionsFeedAction(limit = 6): Promise<ConnectionFeedItem[]> {
+export async function getConnectionsFeedAction(
+  limit = 6,
+  options?: { onePerBusiness?: boolean },
+): Promise<ConnectionFeedItem[]> {
   try {
     const supabase = await createServerSideClient();
     const host = ((await headers()).get('host') || 'localhost').split(':')[0] || 'localhost';
-    const { data } = await (supabase as any).rpc('public_connections_feed', {
-      p_host: host,
-      p_limit: limit,
-      p_only_with_photo: false,
-    });
-    return Array.isArray(data) ? data : [];
+    if (process.env.NODE_ENV !== 'production' && process.env.CONNECTIONS_LIST_FIXTURE === '1') {
+      const { fixtureFeed } = await import('@/lib/directory/connections-fixture');
+      return fixtureFeed(limit, Boolean(options?.onePerBusiness));
+    }
+    const base = { p_host: host, p_limit: limit, p_only_with_photo: false };
+
+    if (!options?.onePerBusiness) {
+      const { data } = await (supabase as any).rpc('public_connections_feed', base);
+      return Array.isArray(data) ? data : [];
+    }
+
+    // Vitrines compactas: sorteia `limit` conexões entre até 24 empresas DISTINTAS, preferindo as com foto aprovada
+    // (o banco entrega as com foto primeiro, migration 244). Cada carregamento pode mostrar um conjunto diferente.
+    const { data, error } = await (supabase as any).rpc('public_connections_feed', { ...base, p_limit: FEED_DB_MAX, p_one_per_business: true, p_prefer_photo: true });
+    if (!error && Array.isArray(data)) return pickShowcaseRandom(data, limit);
+
+    // Reserva (migration 244 ainda não aplicada): busca o máximo do banco, ordena por recência e escolhe 1 por empresa.
+    const { data: wide } = await (supabase as any).rpc('public_connections_feed', { ...base, p_limit: FEED_DB_MAX });
+    const recentFirst = (Array.isArray(wide) ? [...wide] : []).sort(
+      (a: ConnectionFeedItem, b: ConnectionFeedItem) => new Date(b.confirmed_at).getTime() - new Date(a.confirmed_at).getTime(),
+    );
+    return pickShowcaseRandom(recentFirst, limit);
   } catch {
     return [];
   }

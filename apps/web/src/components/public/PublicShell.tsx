@@ -29,7 +29,7 @@ export function PublicShell({
 }: PublicShellProps) {
   const pathname = usePathname();
   const isLandingPage = pathname === '/' || pathname === '/teste-landing';
-  const isGuiaOrLegal = pathname?.startsWith('/guia') || pathname === '/privacidade' || pathname === '/termos';
+  const isGuiaOrLegal = pathname?.startsWith('/guia') || pathname?.startsWith('/conexoes') || pathname === '/privacidade' || pathname === '/termos';
 
   // A home (/) traz o próprio cabeçalho com logo e botão Entrar.
   const renderHeader = showHeader && !isGuiaOrLegal && !isLandingPage;

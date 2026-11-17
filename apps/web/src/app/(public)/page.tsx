@@ -17,6 +17,7 @@ import {
 } from '@/components/landing/LandingSections';
 import { LandingDifferentialsSection } from '@/components/landing/LandingDifferentialsSection';
 import { LandingConnectionsMuralSection } from '@/components/landing/LandingConnectionsMuralSection';
+import { COMPACT_SHOWCASE_LIMIT } from '@/lib/directory/connections-feed';
 import { LandingMetricsPreviewSection } from '@/components/landing/LandingMetricsPreviewSection';
 import { LandingHowItWorksSection } from '@/components/landing/LandingHowItWorksSection';
 import { LandingLeadCapture } from '@/components/landing/LandingLeadCapture';
@@ -203,7 +204,7 @@ export default async function HomePage() {
       console.error('[Mural/ConnectionsCount] Erro ao carregar total de conexões:', err);
       return 0;
     }),
-    getConnectionsFeedAction(6).catch((err) => {
+    getConnectionsFeedAction(COMPACT_SHOWCASE_LIMIT, { onePerBusiness: true }).catch((err) => {
       console.error('[Mural/ConnectionsFeed] Erro ao carregar feed de conexões:', err);
       return [];
     }),

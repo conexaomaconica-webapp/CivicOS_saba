@@ -23,7 +23,8 @@ import { fetchLodgeGuideFacets } from '@/lib/lodges/lodge-facets';
 import { fetchFilterCategories } from '@/lib/directory/filter-categories';
 import { derivePrimaryCategories, resolveHomeCategories, selectMainHomeCategories } from '@/lib/directory/home-categories';
 import { getConfirmedConnectionsCountAction, getConnectionsFeedAction } from '@/app/actions/connections';
-import { DirectoryConnectionsMural } from '@/components/public/directory/DirectoryConnectionsMural';
+import { DirectoryConnectionsShowcase } from '@/components/public/directory/DirectoryConnectionsShowcase';
+import { COMPACT_SHOWCASE_LIMIT } from '@/lib/directory/connections-feed';
 import { DirectoryConnectionsCta } from '@/components/public/directory/DirectoryConnectionsCta';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
@@ -142,7 +143,7 @@ export default async function GuiaPage({ searchParams }: Props) {
     fetchLodgeGuideFacets(supabase),
     // Mural de Conexões: total de negócios confirmados pelas empresas (aparece no hero quando maior que zero).
     getConfirmedConnectionsCountAction(),
-    getConnectionsFeedAction(5),
+    getConnectionsFeedAction(COMPACT_SHOWCASE_LIMIT, { onePerBusiness: true }),
   ]);
 
   const homeData: any = homeDataRes.data || {
@@ -767,7 +768,7 @@ export default async function GuiaPage({ searchParams }: Props) {
       />
     ),
     // Mural de Conexões: prova social e convite para registrar uma conexão (fotos opcionais)
-    connections_mural: <DirectoryConnectionsMural items={connectionsFeed} confirmedTotal={confirmedConnections} />,
+    connections_mural: <DirectoryConnectionsShowcase items={connectionsFeed} confirmedTotal={confirmedConnections} />,
     all_businesses: (
       <DirectoryAllBusinesses
         items={businessItems}

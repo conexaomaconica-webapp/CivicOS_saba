@@ -122,6 +122,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
               if (attr.attribute_key === 'cover_zoom') (detailObj as any).cover_zoom = attr.attribute_value;
               if (attr.attribute_key === 'cover_fit_mode') (detailObj as any).cover_fit_mode = attr.attribute_value;
               if (attr.attribute_key === 'cover_background_color') (detailObj as any).cover_background_color = attr.attribute_value;
+              if (attr.attribute_key === 'hero_image_count') (detailObj as any).hero_image_count = attr.attribute_value;
               if (attr.attribute_key === 'client_approved_at') (detailObj as any).client_approved_at = attr.attribute_value;
               if (attr.attribute_key === 'client_approved_by') (detailObj as any).client_approved_by = attr.attribute_value;
             }
@@ -378,6 +379,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
     let coverZoom: string | null = null;
     let coverFitMode: string | null = null;
     let coverBackgroundColor: string | null = null;
+    let heroImageCount: string | null = null;
     let clientApprovedAt: string | null = null;
     let clientApprovedBy: string | null = null;
 
@@ -389,6 +391,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
         if (attr.attribute_key === 'cover_zoom') coverZoom = attr.attribute_value;
         if (attr.attribute_key === 'cover_fit_mode') coverFitMode = attr.attribute_value;
         if (attr.attribute_key === 'cover_background_color') coverBackgroundColor = attr.attribute_value;
+        if (attr.attribute_key === 'hero_image_count') heroImageCount = attr.attribute_value;
         if (attr.attribute_key === 'client_approved_at') clientApprovedAt = attr.attribute_value;
         if (attr.attribute_key === 'client_approved_by') clientApprovedBy = attr.attribute_value;
       }
@@ -495,6 +498,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
       cover_zoom: coverZoom,
       cover_fit_mode: coverFitMode,
       cover_background_color: coverBackgroundColor,
+      hero_image_count: heroImageCount,
     } as any;
 
     try {
@@ -638,6 +642,7 @@ import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
 import '@/styles/directory-home.css';
+import { BusinessConnectionsSection } from '@/components/public/business/sections/BusinessConnectionsSection';
 
 export default async function CompanyDetailsPage(props: Props & { searchParams?: any }) {
   const { slug } = await props.params;
@@ -747,6 +752,10 @@ export default async function CompanyDetailsPage(props: Props & { searchParams?:
       >
         <BusinessProfileRenderer business={business} />
       </BusinessContactTracker>
+      {/* Depois das informações essenciais da empresa: demonstração de credibilidade (somente empresas publicadas). */}
+      {business.publicationStatus === 'published' && !isPreview && (
+        <BusinessConnectionsSection slug={business.identity.slug} businessName={business.identity.name} />
+      )}
       <DirectoryFooter />
     </FavoritesProvider>
   );

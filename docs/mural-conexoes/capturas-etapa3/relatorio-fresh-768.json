@@ -1,0 +1,181 @@
+[
+  {
+    "width": 768,
+    "page": "conexoes",
+    "status": 200,
+    "horizontalScroll": false,
+    "h1": "Mural de Conexões",
+    "errors": [],
+    "breadcrumb": {
+      "colors": [
+        "rgb(253, 230, 138)",
+        "rgb(253, 230, 138)",
+        "rgb(255, 255, 255)"
+      ],
+      "ratios": [
+        11.79,
+        11.79,
+        14.69
+      ],
+      "minRatio": 11.79
+    }
+  },
+  {
+    "width": 768,
+    "page": "conexoes-busca",
+    "status": 200,
+    "horizontalScroll": false,
+    "h1": "Mural de Conexões",
+    "errors": [],
+    "breadcrumb": {
+      "colors": [
+        "rgb(253, 230, 138)",
+        "rgb(253, 230, 138)",
+        "rgb(255, 255, 255)"
+      ],
+      "ratios": [
+        11.79,
+        11.79,
+        14.69
+      ],
+      "minRatio": 11.79
+    }
+  },
+  {
+    "width": 768,
+    "page": "conexoes-sem-resultado",
+    "status": 200,
+    "horizontalScroll": false,
+    "h1": "Mural de Conexões",
+    "errors": [],
+    "breadcrumb": {
+      "colors": [
+        "rgb(253, 230, 138)",
+        "rgb(253, 230, 138)",
+        "rgb(255, 255, 255)"
+      ],
+      "ratios": [
+        11.79,
+        11.79,
+        14.69
+      ],
+      "minRatio": 11.79
+    }
+  },
+  {
+    "width": 768,
+    "page": "detalhe-com-foto",
+    "status": 200,
+    "horizontalScroll": false,
+    "h1": "João comprou pães artesanais em Padaria São José",
+    "errors": [],
+    "breadcrumb": {
+      "colors": [
+        "rgb(253, 230, 138)",
+        "rgb(253, 230, 138)",
+        "rgb(253, 230, 138)",
+        "rgb(255, 255, 255)"
+      ],
+      "ratios": [
+        11.79,
+        11.79,
+        11.79,
+        14.69
+      ],
+      "minRatio": 11.79
+    },
+    "detail": {
+      "images": 1,
+      "like": false,
+      "whatsapp": "https://wa.me/?text=Jo%C3%A3o%20comprou%20p%C3%A3es%20artesanais%20em%20Padaria%20S%C3%A3o%20Jos%C3%A9%3A%20uma%20conex%C3%A3o%20confirmada%20na%20Conex%C3%A3o%20Ma%C3%A7%C3%B4nica.%0Ahttp%3A%2F%2Flocalhost%3A3000%2Fconexoes%2F00000000-0000-4000-8000-000000000000",
+      "cta": "/guia/padaria-sao-jose?src=connection_page",
+      "canonical": "http://localhost:3000/conexoes/00000000-0000-4000-8000-000000000000",
+      "ogImage": "http://localhost:3000/logoconexao_red.png",
+      "ogTitle": "Compra em Padaria São José | Mural de Conexões | Conexão Maçônica",
+      "robots": "index, follow",
+      "copiedLabel": true,
+      "clipboard": "http://localhost:3000/conexoes/00000000-0000-4000-8000-000000000000"
+    }
+  },
+  {
+    "width": 768,
+    "page": "detalhe-sem-foto",
+    "status": 200,
+    "horizontalScroll": false,
+    "h1": "Pedro contratou em Ótica Central",
+    "errors": [],
+    "breadcrumb": {
+      "colors": [
+        "rgb(253, 230, 138)",
+        "rgb(253, 230, 138)",
+        "rgb(253, 230, 138)",
+        "rgb(255, 255, 255)"
+      ],
+      "ratios": [
+        11.79,
+        11.79,
+        11.79,
+        14.69
+      ],
+      "minRatio": 11.79
+    },
+    "detail": {
+      "images": 0,
+      "like": false,
+      "whatsapp": "https://wa.me/?text=Pedro%20contratou%20em%20%C3%93tica%20Central%3A%20uma%20conex%C3%A3o%20confirmada%20na%20Conex%C3%A3o%20Ma%C3%A7%C3%B4nica.%0Ahttp%3A%2F%2Flocalhost%3A3000%2Fconexoes%2F00000000-0000-4000-8000-000000000001",
+      "cta": "/guia/otica-central?src=connection_page",
+      "canonical": "http://localhost:3000/conexoes/00000000-0000-4000-8000-000000000001",
+      "ogImage": "http://localhost:3000/logoconexao_red.png",
+      "ogTitle": "Serviço em Ótica Central | Mural de Conexões | Conexão Maçônica",
+      "robots": "index, follow",
+      "copiedLabel": true,
+      "clipboard": "http://localhost:3000/conexoes/00000000-0000-4000-8000-000000000001"
+    }
+  },
+  {
+    "width": 768,
+    "page": "detalhe-inexistente",
+    "status": 404,
+    "horizontalScroll": false,
+    "h1": "Página ou Recurso Não Encontrado",
+    "errors": [],
+    "breadcrumb": null,
+    "noindex": "noindex, nofollow"
+  },
+  {
+    "width": 768,
+    "page": "detalhe-id-invalido",
+    "status": 404,
+    "horizontalScroll": false,
+    "h1": "Página ou Recurso Não Encontrado",
+    "errors": [],
+    "breadcrumb": null,
+    "noindex": "noindex, nofollow"
+  },
+  {
+    "width": 768,
+    "page": "guia-home",
+    "status": 200,
+    "horizontalScroll": false,
+    "h1": "Tradição que une! Conexão que fortalece!",
+    "errors": [],
+    "breadcrumb": null
+  },
+  {
+    "width": 768,
+    "page": "guia-empresas",
+    "status": 200,
+    "horizontalScroll": false,
+    "h1": "Encontre Empresas e Serviços de Confiança",
+    "errors": [],
+    "breadcrumb": {
+      "colors": [
+        "rgb(74, 14, 26)"
+      ],
+      "ratios": [
+        1.04
+      ],
+      "minRatio": 1.04
+    }
+  }
+]

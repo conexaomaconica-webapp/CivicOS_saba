@@ -1,0 +1,22 @@
+ 375px fresh conexoes               status=200 rolagemH=false h1="Mural de Conexões" erros=0 breadcrumbMin=11.79
+ 375px fresh conexoes-empresa       status=200 rolagemH=false h1="Mural de Conexões" erros=0 breadcrumbMin=11.79
+ 375px fresh conexoes-empresa-vazia status=200 rolagemH=false h1="Mural de Conexões" erros=0 breadcrumbMin=11.79
+ 375px fresh conexoes-busca         status=200 rolagemH=false h1="Mural de Conexões" erros=0 breadcrumbMin=11.79
+ 375px fresh conexoes-sem-resultado status=200 rolagemH=false h1="Mural de Conexões" erros=0 breadcrumbMin=11.79
+ 375px fresh detalhe-com-foto       status=200 rolagemH=false h1="João comprou pães artesanais em Padaria " erros=0 breadcrumbMin=11.79 detalhe={"img":1,"like":false,"copiado":true,"clip":"ok"}
+ 375px fresh detalhe-sem-foto       status=200 rolagemH=false h1="Pedro contratou em Ótica Central" erros=0 breadcrumbMin=11.79 detalhe={"img":0,"like":false,"copiado":true,"clip":"ok"}
+ 375px fresh detalhe-inexistente    status=404 rolagemH=false h1="Página ou Recurso Não Encontrado" erros=0 robots=noindex, nofollow
+ 375px fresh detalhe-id-invalido    status=404 rolagemH=false h1="Página ou Recurso Não Encontrado" erros=0 robots=noindex, nofollow
+ 375px fresh guia-home              status=200 rolagemH=false h1="Tradição que une! Conexão que fortalece!" erros=0 
+ 375px fresh guia-empresas          status=200 rolagemH=false h1="Encontre Empresas e Serviços de Confianç" erros=0 breadcrumbMin=1.04
+1280px fresh conexoes               status=200 rolagemH=false h1="Mural de Conexões" erros=0 breadcrumbMin=11.79
+1280px fresh conexoes-empresa       status=200 rolagemH=false h1="Mural de Conexões" erros=0 breadcrumbMin=11.79
+1280px fresh conexoes-empresa-vazia status=200 rolagemH=false h1="Mural de Conexões" erros=0 breadcrumbMin=11.79
+1280px fresh conexoes-busca         status=200 rolagemH=false h1="Mural de Conexões" erros=0 breadcrumbMin=11.79
+1280px fresh conexoes-sem-resultado status=200 rolagemH=false h1="Mural de Conexões" erros=0 breadcrumbMin=11.79
+1280px fresh detalhe-com-foto       status=200 rolagemH=false h1="João comprou pães artesanais em Padaria " erros=0 breadcrumbMin=11.79 detalhe={"img":1,"like":false,"copiado":true,"clip":"ok"}
+1280px fresh detalhe-sem-foto       status=200 rolagemH=false h1="Pedro contratou em Ótica Central" erros=0 breadcrumbMin=11.79 detalhe={"img":0,"like":false,"copiado":true,"clip":"ok"}
+1280px fresh detalhe-inexistente    status=404 rolagemH=false h1="Página ou Recurso Não Encontrado" erros=0 robots=noindex, nofollow
+1280px fresh detalhe-id-invalido    status=404 rolagemH=false h1="Página ou Recurso Não Encontrado" erros=0 robots=noindex, nofollow
+1280px fresh guia-home              status=200 rolagemH=false h1="Tradição que une! Conexão que fortalece!" erros=0 
+1280px fresh guia-empresas          status=200 rolagemH=false h1="Encontre Empresas e Serviços de Confianç" erros=0 breadcrumbMin=1.04
