@@ -5,6 +5,7 @@ import { headers } from 'next/headers';
 import { readVisitorKey } from '@/lib/referrals/attribution';
 import { generatePseudonymousSubjectId, generateSearchSessionHash } from '@/lib/analytics/privacy-hash';
 import { assertBusinessAnalyticsAccess } from '@/lib/analytics/analytics-auth';
+import { classifyTraffic, shouldExcludeFromMetrics } from '@/lib/analytics/internal-traffic';
 import {
   normalizeAcquisitionSource,
   normalizeDiscoverySource,
@@ -85,6 +86,13 @@ export async function trackDirectoryEventAction(payload: {
   let validCycleId: string | undefined = undefined;
   if (typeof payload.cycleId === 'string' && CYCLE_ID_REGEX.test(payload.cycleId)) {
     validCycleId = payload.cycleId;
+  }
+
+  // Política das estatísticas: dono/equipe da própria empresa, administrador e tráfego automatizado NÃO geram evento comercial.
+  // Decidido aqui, no servidor, pela sessão e pelo User-Agent da requisição (nada enviado pelo navegador é confiado).
+  if (!(process.env.NODE_ENV === 'test' && !process.env.SUPABASE_SERVICE_ROLE_KEY)) {
+    const traffic = await classifyTraffic([payload.businessId]);
+    if (shouldExcludeFromMetrics(traffic, payload.businessId)) return { ok: true, skipped: true };
   }
 
   let subjectId = '';
@@ -334,8 +342,12 @@ export async function trackSearchImpressionsAction(businessIds: string[], source
       return { ok: false, error: businessError?.message || 'BUSINESS_NOT_PUBLIC' };
     }
 
+    const traffic = await classifyTraffic(businesses.map((b: { id: string }) => b.id));
+    const countable = businesses.filter((b: { id: string }) => !shouldExcludeFromMetrics(traffic, b.id));
+    if (countable.length === 0) return { ok: true, count: 0, skipped: true };
+
     const { error } = await (supabase as any).from('analytics_events').insert(
-      businesses.map((b: { id: string; tenant_id: string }) => ({
+      countable.map((b: { id: string; tenant_id: string }) => ({
         tenant_id: b.tenant_id,
         business_id: b.id,
         event_name: 'search_impression',
@@ -345,7 +357,7 @@ export async function trackSearchImpressionsAction(businessIds: string[], source
       }))
     );
     if (error) return { ok: false, error: error.message };
-    return { ok: true, count: businesses.length };
+    return { ok: true, count: countable.length };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'ANALYTICS_WRITE_FAILED' };
   }
@@ -374,6 +386,9 @@ export async function trackQrScanAction(businessSlug: string) {
       .eq('publication_status', 'published')
       .maybeSingle();
     if (!business) return { ok: false, error: 'BUSINESS_NOT_PUBLIC' };
+
+    const traffic = await classifyTraffic([business.id]);
+    if (shouldExcludeFromMetrics(traffic, business.id)) return { ok: true, skipped: true };
 
     const { error } = await (supabase as any).from('analytics_events').insert({
       tenant_id: business.tenant_id,
