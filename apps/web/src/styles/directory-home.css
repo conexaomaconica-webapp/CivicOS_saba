@@ -743,3 +743,10 @@
 .dh-logo-marquee-track:hover {
   animation-play-state: paused;
 }
+
+/* Esteira com espaços maiores no desktop: duração própria (opcional) para manter a velocidade calma. */
+@media (min-width: 1024px) {
+  .dh-logo-marquee-track {
+    animation-duration: var(--marquee-speed-lg, var(--marquee-speed, 45s));
+  }
+}

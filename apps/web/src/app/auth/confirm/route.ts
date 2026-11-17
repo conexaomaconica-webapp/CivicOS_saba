@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { sanitizeInternalRedirect } from '@/lib/auth/internal-redirect';
+import { clearAccountTempPassword } from '@/lib/auth/account-temp-password-admin';
+import { getAccountTempPasswordState } from '@/lib/auth/account-temp-password';
 
 /**
  * Confirmação dos links enviados por e-mail pelo Supabase Auth (recuperar senha, cadastro, convite, link de acesso, troca de e-mail).
@@ -35,8 +37,13 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabase = await createServerSideClient();
-    const { error } = await supabase.auth.verifyOtp({ type: rawType, token_hash: tokenHash });
+    const { data, error } = await supabase.auth.verifyOtp({ type: rawType, token_hash: tokenHash });
     if (!error) {
+      // Recuperação de senha prova o controle do e-mail da conta: dispensa a troca obrigatória da senha temporária que ainda estava
+      // pendente (senão, depois de definir a nova senha, a pessoa seria levada de novo à tela de troca ou deslogada ao expirar).
+      if (rawType === 'recovery' && data?.user && getAccountTempPasswordState(data.user.app_metadata) !== 'none') {
+        await clearAccountTempPassword(data.user.id, data.user.app_metadata);
+      }
       return NextResponse.redirect(new URL(next, request.url));
     }
   } catch {

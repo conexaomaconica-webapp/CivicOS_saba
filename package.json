@@ -29,6 +29,7 @@
     "test:commercial-contract": "node scripts/test-migration-241-commercial-representative-contract.mjs",
     "test:commercial-reversals": "node scripts/test-migration-242-commercial-provider-reversals.mjs",
     "test:connections-detail": "node scripts/test-migration-246-connection-detail.mjs",
+    "test:admin-lodges-list": "node scripts/test-migration-252-admin-lodges-list.mjs",
     "test:connection-register-admin": "node scripts/test-migration-251-connection-register-admin.mjs",
     "test:security-definer-hardening": "node scripts/test-migration-250-security-definer-hardening.mjs",
     "test:analytics-authorization": "node scripts/test-migration-249-analytics-authorization.mjs",

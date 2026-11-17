@@ -12,6 +12,7 @@ import { isNoIndexFollowPath } from '@/lib/seo/noindex-paths';
 import { getProfileAuthorization } from '@/lib/member/profile-access-service';
 import { isCommercialModuleEnvEnabled, isCommercialAreaPath } from '@/lib/commercial/feature-flag';
 import { evaluateTempPasswordGate, getTempPasswordState, TEMP_PASSWORD_CHANGE_PATH } from '@/lib/commercial/temp-password';
+import { ACCOUNT_PASSWORD_CHANGE_PATH, getAccountTempPasswordState } from '@/lib/auth/account-temp-password';
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
@@ -96,6 +97,29 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
     if (gate.action === 'deny_api') {
+      return NextResponse.json({ error: 'Troca de senha pendente.' }, { status: 403 });
+    }
+  }
+
+  // Conta (anunciante ou membro) com senha temporária definida pelo administrador: enquanto a troca estiver pendente só a tela
+  // de troca e o login funcionam; senha temporária expirada encerra a sessão. Independe do módulo comercial. O estado vem do
+  // app_metadata (somente o servidor altera), sem consulta extra ao banco.
+  if (user) {
+    const accountGate = evaluateTempPasswordGate(path, getAccountTempPasswordState(user.app_metadata), ACCOUNT_PASSWORD_CHANGE_PATH);
+    if (accountGate.action === 'sign_out_expired') {
+      await supabase.auth.signOut();
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = '/login';
+      redirectUrl.search = '?senha_temporaria=conta_expirada';
+      return NextResponse.redirect(redirectUrl);
+    }
+    if (accountGate.action === 'redirect_change') {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = ACCOUNT_PASSWORD_CHANGE_PATH;
+      redirectUrl.search = '';
+      return NextResponse.redirect(redirectUrl);
+    }
+    if (accountGate.action === 'deny_api') {
       return NextResponse.json({ error: 'Troca de senha pendente.' }, { status: 403 });
     }
   }

@@ -111,6 +111,11 @@ export default function LoginPage() {
         setErrorMsg('E-mail ou senha incorretos.');
       } else if (data.user) {
         setActiveUser(data.user);
+        // Conta com senha temporária definida pelo administrador: vai direto para a troca obrigatória.
+        if (data.user.app_metadata?.account_must_change_password === true) {
+          router.push('/definir-senha');
+          return;
+        }
         // Representante com senha temporária: vai direto para a troca obrigatória.
         if (data.user.app_metadata?.must_change_password === true) {
           router.push('/definir-senha-representante');
@@ -148,8 +153,11 @@ export default function LoginPage() {
 
   // Aviso quando a senha temporária de representante expirou (o middleware encerrou a sessão).
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('senha_temporaria') === 'expirada') {
+    const temporaria = new URLSearchParams(window.location.search).get('senha_temporaria');
+    if (temporaria === 'expirada') {
       setErrorMsg('Sua senha temporária expirou. Solicite uma nova à equipe comercial.');
+    } else if (temporaria === 'conta_expirada') {
+      setErrorMsg('Sua senha temporária expirou. Use "Esqueci a senha" ou peça uma nova ao suporte da Conexão Maçônica.');
     }
   }, []);
 

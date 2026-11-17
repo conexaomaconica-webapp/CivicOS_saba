@@ -14,6 +14,9 @@ type DirectorySponsoredProps = {
   title?: string;
 };
 
+/** Desktop: exatamente 5 empresas visíveis por vez (largura = (área visível − 4 respiros de 40px) / 5); a esteira repete todas em loop. Estimativa de 240px por espaço só para a duração. */
+const DESKTOP_SLOT_PX = 240;
+
 export function DirectorySponsored({
   items = [],
   displayMode = 'logos',
@@ -29,6 +32,8 @@ export function DirectorySponsored({
       marqueeItems = [...marqueeItems, ...items];
     }
     const loopedItems = [...marqueeItems, ...marqueeItems];
+    // No desktop os espaços são maiores: a duração do ciclo acompanha o tamanho para o giro manter velocidade calma (~45px/s).
+    const desktopCycleSeconds = Math.max(Math.max(10, speed), Math.round((marqueeItems.length * DESKTOP_SLOT_PX) / 45));
 
     return (
       <section className="dh-container dh-mobile-visible-section py-4" id="patrocinadas">
@@ -39,14 +44,14 @@ export function DirectorySponsored({
         </div>
 
         {/* Esteira de Marcas Padronizada com o App (Com cantos sombreados suaves) */}
-        <div className="relative w-full overflow-hidden rounded-2xl bg-white/70 border border-stone-200/80 shadow-xs py-3.5 px-2 group">
+        <div className="relative w-full overflow-hidden rounded-2xl bg-white/70 border border-stone-200/80 shadow-xs py-3.5 px-2 group" style={{ containerType: 'inline-size' }}>
           <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-16 bg-gradient-to-r from-white via-white/80 to-transparent z-10 pointer-events-none" />
           <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-16 bg-gradient-to-l from-white via-white/80 to-transparent z-10 pointer-events-none" />
 
           {/* Marquee Track contínuo */}
           <div
-            className="dh-logo-marquee-track items-start gap-4 sm:gap-5"
-            style={{ '--marquee-speed': `${Math.max(10, speed)}s` } as React.CSSProperties}
+            className="dh-logo-marquee-track items-start gap-4 sm:gap-5 lg:gap-10"
+            style={{ '--marquee-speed': `${Math.max(10, speed)}s`, '--marquee-speed-lg': `${desktopCycleSeconds}s` } as React.CSSProperties}
           >
             {loopedItems.map((biz, idx) => {
               const businessTitle = `${biz.name}${biz.category_name ? ` • ${biz.category_name}` : ''}`;
@@ -57,12 +62,11 @@ export function DirectorySponsored({
                   key={`${biz.id}-${idx}`}
                   href={`/guia/${biz.slug}?src=featured_sponsored`}
                   title={businessTitle}
-                  className="group/item flex flex-col items-center gap-1.5 shrink-0 transition-transform duration-200 hover:-translate-y-0.5 focus:outline-none"
-                  style={{ width: '92px' }}
+                  className="group/item flex flex-col items-center gap-1.5 shrink-0 transition-transform duration-200 hover:-translate-y-0.5 focus:outline-none w-[92px] lg:w-[calc((100cqw_-_160px)/5)]"
                 >
                   {/* Container da Logo com Tamanho Aumentado e Fundo Adaptativo */}
                   <div
-                    className="relative w-20 h-20 rounded-[22px] border-2 border-[#e7dacd] group-hover/item:border-[#c9a227] shadow-xs group-hover/item:shadow-md flex items-center justify-center p-2 transition-all overflow-hidden"
+                    className="relative w-20 h-20 lg:w-28 lg:h-28 rounded-[22px] lg:rounded-[28px] border-2 border-[#e7dacd] group-hover/item:border-[#c9a227] shadow-xs group-hover/item:shadow-md flex items-center justify-center p-2 transition-all overflow-hidden"
                     style={{ backgroundColor: bgColor }}
                   >
                     {biz.logo_url ? (
@@ -81,7 +85,7 @@ export function DirectorySponsored({
                   </div>
 
                   {/* Nome da Marca abaixo do ícone */}
-                  <span className="text-[11px] font-bold text-[#4b161b] text-center w-full truncate px-0.5 group-hover/item:text-[#c9a227] transition-colors">
+                  <span className="text-[11px] lg:text-sm font-bold text-[#4b161b] text-center w-full truncate px-0.5 group-hover/item:text-[#c9a227] transition-colors">
                     {biz.name}
                   </span>
                 </Link>

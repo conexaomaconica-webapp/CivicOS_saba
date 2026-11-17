@@ -247,6 +247,12 @@ export const adminNavSections: NavSection[] = [
         icon: Mail,
       },
       {
+        id: 'contas',
+        label: 'Contas de Anunciantes e Membros',
+        path: '/admin/contas',
+        icon: Users,
+      },
+      {
         id: 'settings',
         label: 'Usuários & Permissões',
         path: '/admin/settings',

@@ -73,7 +73,7 @@ export function ConnectionsModerationClient({
           Mural de Conexões · Moderação
         </h1>
         <p className="mt-1 text-sm text-stone-600">
-          A empresa confirma o negócio; a plataforma aprova a <strong>foto</strong> antes de ela aparecer para o público. Denúncias de membros também chegam aqui.
+          A empresa confirma o negócio; a plataforma aprova a <strong>foto</strong> antes dela aparecer para o público. Denúncias de membros também chegam aqui.
         </p>
       </div>
 
@@ -93,9 +93,8 @@ export function ConnectionsModerationClient({
             key={key}
             type="button"
             onClick={() => setTab(key)}
-            className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-xs font-bold transition ${
-              tab === key ? 'border-[#3B0B14] bg-[#3B0B14] text-[#C9A227]' : 'border-stone-300 bg-white text-stone-700 hover:border-[#C9A227]'
-            }`}
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-xs font-bold transition ${tab === key ? 'border-[#3B0B14] bg-[#3B0B14] text-[#C9A227]' : 'border-stone-300 bg-white text-stone-700 hover:border-[#C9A227]'
+              }`}
           >
             <Icon className="h-3.5 w-3.5" />
             {label}

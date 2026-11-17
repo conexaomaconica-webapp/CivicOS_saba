@@ -82,11 +82,15 @@ export type TempPasswordGate =
  * Decisão do middleware. Com troca pendente só duas rotas funcionam: a página de troca e o login.
  * Senha temporária expirada encerra a sessão. APIs recebem 403 (sem redirecionamento).
  */
-export function evaluateTempPasswordGate(pathname: string, state: TempPasswordState): TempPasswordGate {
+export function evaluateTempPasswordGate(
+  pathname: string,
+  state: TempPasswordState,
+  changePath: string = TEMP_PASSWORD_CHANGE_PATH,
+): TempPasswordGate {
   if (state === 'none') return { action: 'allow' };
   if (pathname === '/login' || pathname.startsWith('/login/')) return { action: 'allow' };
   if (state === 'expired') return { action: 'sign_out_expired' };
-  if (pathname === TEMP_PASSWORD_CHANGE_PATH) return { action: 'allow' };
+  if (pathname === changePath) return { action: 'allow' };
   if (pathname.startsWith('/_next/')) return { action: 'allow' };
   if (pathname.startsWith('/api/')) return { action: 'deny_api' };
   return { action: 'redirect_change' };

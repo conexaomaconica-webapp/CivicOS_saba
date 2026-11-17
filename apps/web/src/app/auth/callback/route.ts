@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { sanitizeInternalRedirect } from '@/lib/auth/internal-redirect';
+import { clearAccountTempPassword } from '@/lib/auth/account-temp-password-admin';
+import { getAccountTempPasswordState } from '@/lib/auth/account-temp-password';
 
 /**
  * Exchanges the Auth code (e-mail confirmation / password recovery) for a
@@ -18,8 +20,12 @@ export async function GET(request: NextRequest) {
   if (code) {
     try {
       const supabase = await createServerSideClient();
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
       if (!error) {
+        // Fluxo de recuperação de senha (termina em /update-password): ver o comentário em /auth/confirm.
+        if (next.startsWith('/update-password') && data?.user && getAccountTempPasswordState(data.user.app_metadata) !== 'none') {
+          await clearAccountTempPassword(data.user.id, data.user.app_metadata);
+        }
         return NextResponse.redirect(new URL(next, request.url));
       }
     } catch {

@@ -32,7 +32,7 @@ Parecer provisório: **GO** para a lógica, rotas, cache, SEO e layout; **NO-GO 
 Depois da virada, a landing em `/institucional` declarava `WebPage` e `Event` com `url="/"` (a raiz, que passa a ser o Guia). Além disso, esses esquemas eram **constantes de módulo**, calculadas uma vez ao subir o servidor, e não acompanhariam a virada por horário. Agora são montados a cada requisição. Verificado na Vercel: `WebPage` e `Event` em `/institucional`, caminho de navegação "Início → /  |  Institucional → /institucional". 4 testes novos, inclusive atravessando as 10h no mesmo processo.
 
 ## Pendente (exige ação no painel da Vercel)
-1. **Virada automática por horário na Vercel:** em Preview, `HOME_SWITCH_MODE=scheduled` e `HOME_SWITCH_AT` alguns minutos à frente, redeploy, e observar a troca acontecer sozinha, sem novo deploy.
+1. **Virada automática por horário na Vercel (confirmada pelo responsável, observada no navegador em 17/11 às 17h05; não houve verificação automatizada de antes/depois):** em Preview, `HOME_SWITCH_MODE=scheduled` e `HOME_SWITCH_AT` alguns minutos à frente, redeploy, e observar a troca acontecer sozinha, sem novo deploy.
 2. **Rollback em navegador real:** depois da virada, voltar `HOME_SWITCH_MODE=off`, redeploy e conferir que `/guia` volta a responder 200, sem redirecionamento persistente no mesmo navegador.
 3. **Links de empresas e categorias** com dados reais: não dá para testar no Preview (sem tenant). Cobertos pelo teste local e pelos testes unitários.
 4. **Aplicativo Android:** só análise de código (pacote próprio do Capacitor, sem `server.url`).

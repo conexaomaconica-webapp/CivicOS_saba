@@ -2,6 +2,7 @@
 
 import { systemConfirm, systemNotify } from '@/components/system/SystemFeedback';
 import React, { useState, useEffect } from 'react';
+import { matchesApprovalSearch } from '@/lib/admin/approval-search';
 import {
   Search,
   Filter,
@@ -98,19 +99,7 @@ export default function AdminAprovacoesPage() {
     loadData(selectedFilter);
   }, [selectedFilter]);
 
-  const filteredItems = items.filter((item) => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return true;
-    
-    return (
-      (item.name && item.name.toLowerCase().includes(q)) ||
-      (item.owner_email && item.owner_email.toLowerCase().includes(q)) ||
-      (item.category && item.category.toLowerCase().includes(q)) ||
-      (item.cnpj && item.cnpj.replace(/\D/g, '').includes(q.replace(/\D/g, ''))) ||
-      (item.city && item.city.toLowerCase().includes(q)) ||
-      (item.owner_name && item.owner_name.toLowerCase().includes(q))
-    );
-  });
+  const filteredItems = items.filter((item) => matchesApprovalSearch(item, searchQuery));
 
   const clearFilters = () => {
     setSearchQuery('');
