@@ -93,3 +93,5 @@ export function homeRedirectTarget(searchParams: Record<string, string | string[
   const text = query.toString();
   return text ? `/?${text}` : '/';
 }
+
+// [preview de homologacao] comentario somente na branch de teste preview/home-switch-homologacao; nenhum efeito no comportamento.
