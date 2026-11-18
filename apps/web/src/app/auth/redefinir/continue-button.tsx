@@ -13,7 +13,7 @@ export function ContinueRecoveryButton({ tokenHash }: { tokenHash: string }) {
         setBusy(true);
         window.location.assign(`/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=recovery`);
       }}
-      style={{ background: '#5d1523', color: '#fff', border: 0, borderRadius: 10, padding: '13px 22px', fontSize: 15, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.7 : 1 }}
+      className="w-full rounded-xl bg-[#C9A227] px-4 py-3 text-sm font-bold text-[#2b060d] shadow-sm transition-colors hover:bg-[#d8b13a] disabled:cursor-default disabled:opacity-70"
     >
       {busy ? 'Abrindo…' : 'Continuar e criar nova senha'}
     </button>

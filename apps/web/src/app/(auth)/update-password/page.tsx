@@ -2,25 +2,55 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { getSession, updatePassword, signOut } from '@/lib/auth/auth-service';
 import { validatePassword, validateConfirmPassword, hasErrors } from '@/lib/auth/validation';
 
-const FIELD_ERROR_STYLE = {
-  marginTop: 'var(--space-1)',
-  fontSize: 'var(--text-xs)',
-  color: 'var(--color-error-500)',
-  fontWeight: 'var(--font-weight-medium)',
-} as const;
+// Fundo do cartão é bordô escuro: textos claros e campos escuros com borda dourada (contraste AA).
+const INPUT_CLASS =
+  'w-full rounded-xl border border-[#C9A227]/40 bg-[#1f0509]/70 py-3 pl-3 pr-11 text-sm text-white placeholder:text-stone-400 focus:border-[#C9A227] focus:outline-none focus:ring-2 focus:ring-[#C9A227]/40';
 
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null;
-  return <span style={FIELD_ERROR_STYLE}>{message}</span>;
+function PasswordField(props: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  error?: string;
+  autoComplete: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={props.id} className="text-xs font-semibold text-stone-100">{props.label}</label>
+      <div className="relative">
+        <input
+          id={props.id}
+          type={visible ? 'text' : 'password'}
+          required
+          autoComplete={props.autoComplete}
+          value={props.value}
+          onChange={(e) => props.onChange(e.target.value)}
+          placeholder={props.placeholder}
+          className={INPUT_CLASS}
+        />
+        <button
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          aria-label={visible ? 'Ocultar senha' : 'Mostrar senha'}
+          aria-pressed={visible}
+          className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-amber-200/90 hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#C9A227]/60"
+        >
+          {visible ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+        </button>
+      </div>
+      {props.error && <span className="text-xs font-medium text-red-200">{props.error}</span>}
+    </div>
+  );
 }
 
 export default function UpdatePasswordPage() {
-  const router = useRouter();
   const supabase = createClient();
 
   const [password, setPassword] = useState('');
@@ -30,6 +60,7 @@ export default function UpdatePasswordPage() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,9 +91,13 @@ export default function UpdatePasswordPage() {
     }
 
     try {
-      await updatePassword(supabase, password);
+      const result = await updatePassword(supabase, password);
+      if (result.error) {
+        setErrorMsg('Não foi possível alterar a senha. O link pode ter expirado: peça um novo link de recuperação.');
+        return;
+      }
       await signOut(supabase);
-      router.push('/login?reset=ok');
+      setDone(true);
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Erro ao atualizar sua senha.');
     } finally {
@@ -72,174 +107,80 @@ export default function UpdatePasswordPage() {
 
   if (checkingSession) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'var(--space-8) 0' }}>
-        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>Verificando sessão...</p>
+      <div className="flex flex-col items-center py-8">
+        <p className="text-sm text-stone-200">Verificando sessão…</p>
+      </div>
+    );
+  }
+
+  if (done) {
+    return (
+      <div role="status" className="flex w-full flex-col items-center gap-4 text-center">
+        <CheckCircle2 className="h-12 w-12 text-emerald-300" aria-hidden="true" />
+        <h2 className="text-lg font-semibold text-white">Senha alterada com sucesso!</h2>
+        <p className="text-sm text-stone-200">Sua nova senha já está valendo. Entre na sua conta com ela.</p>
+        <Link
+          href="/login"
+          className="mt-1 flex w-full items-center justify-center rounded-xl bg-[#C9A227] px-4 py-3 text-sm font-bold text-[#2b060d] shadow-sm transition-colors hover:bg-[#d8b13a]"
+        >
+          Ir para o login
+        </Link>
       </div>
     );
   }
 
   return (
-    <form
-      onSubmit={(e) => { void handleSubmit(e); }}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--space-4)',
-        width: '100%',
-      }}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-        <h3
-          style={{
-            fontSize: 'var(--text-lg)',
-            fontWeight: 'var(--font-weight-semibold)',
-            color: 'var(--text-primary)',
-          }}
-        >
-          Definir Nova Senha
-        </h3>
-        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
-          Escolha uma nova senha forte para sua conta.
-        </p>
+    <form onSubmit={(e) => { void handleSubmit(e); }} className="flex w-full flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <h2 className="text-lg font-semibold text-white">Definir nova senha</h2>
+        <p className="text-sm text-stone-200">Escolha uma nova senha forte para sua conta.</p>
       </div>
 
       {!authenticated && (
-        <div
-          style={{
-            padding: 'var(--space-3)',
-            backgroundColor: 'oklch(0.9 0.1 60 / 0.12)',
-            border: '1px solid var(--border-default)',
-            borderRadius: 'var(--radius-md)',
-            color: 'var(--text-secondary)',
-            fontSize: 'var(--text-sm)',
-          }}
-        >
+        <div className="rounded-xl border border-amber-300/50 bg-amber-400/10 p-3 text-sm text-amber-50">
           Você não possui uma sessão ativa de recuperação. Use o link enviado por e-mail para acessar esta página.{' '}
-          <Link href="/forgot-password" style={{ color: 'var(--text-link)', fontWeight: 'var(--font-weight-semibold)' }}>
+          <Link href="/forgot-password" className="font-semibold text-amber-300 underline hover:text-amber-200">
             Solicitar novo link
           </Link>
         </div>
       )}
 
       {errorMsg && (
-        <div
-          style={{
-            padding: 'var(--space-3)',
-            backgroundColor: 'oklch(0.95 0.05 25 / 0.1)',
-            border: '1px solid var(--color-error-500)',
-            borderRadius: 'var(--radius-md)',
-            color: 'var(--color-error-500)',
-            fontSize: 'var(--text-sm)',
-            fontWeight: 'var(--font-weight-medium)',
-          }}
-        >
+        <div role="alert" className="rounded-xl border border-red-400/60 bg-red-500/15 p-3 text-sm font-medium text-red-100">
           {errorMsg}
         </div>
       )}
 
-      {/* New Password */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-        <label
-          htmlFor="password"
-          style={{
-            fontSize: 'var(--text-xs)',
-            fontWeight: 'var(--font-weight-semibold)',
-            color: 'var(--text-secondary)',
-          }}
-        >
-          Nova Senha
-        </label>
-        <input
-          id="password"
-          type="password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Mínimo 8 caracteres"
-          style={{
-            padding: 'var(--space-3)',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--border-default)',
-            backgroundColor: 'var(--bg-tertiary)',
-            color: 'var(--text-primary)',
-            fontSize: 'var(--text-sm)',
-            transition: 'border-color var(--duration-fast) var(--ease-default)',
-            outline: 'none',
-          }}
-        />
-        <FieldError message={passwordError} />
-      </div>
+      <PasswordField
+        id="password"
+        label="Nova senha"
+        value={password}
+        onChange={setPassword}
+        placeholder="Mínimo 8 caracteres"
+        error={passwordError}
+        autoComplete="new-password"
+      />
+      <PasswordField
+        id="confirm-password"
+        label="Confirmar nova senha"
+        value={confirmPassword}
+        onChange={setConfirmPassword}
+        placeholder="Repita a nova senha"
+        error={confirmError}
+        autoComplete="new-password"
+      />
 
-      {/* Confirm New Password */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-        <label
-          htmlFor="confirm-password"
-          style={{
-            fontSize: 'var(--text-xs)',
-            fontWeight: 'var(--font-weight-semibold)',
-            color: 'var(--text-secondary)',
-          }}
-        >
-          Confirmar Nova Senha
-        </label>
-        <input
-          id="confirm-password"
-          type="password"
-          required
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          placeholder="Repita a nova senha"
-          style={{
-            padding: 'var(--space-3)',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--border-default)',
-            backgroundColor: 'var(--bg-tertiary)',
-            color: 'var(--text-primary)',
-            fontSize: 'var(--text-sm)',
-            transition: 'border-color var(--duration-fast) var(--ease-default)',
-            outline: 'none',
-          }}
-        />
-        <FieldError message={confirmError} />
-      </div>
-
-      {/* Submit Button */}
       <button
         type="submit"
         disabled={loading || !authenticated}
-        style={{
-          padding: 'var(--space-3)',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: (loading || !authenticated) ? 'var(--accent-subtle)' : 'var(--accent)',
-          color: 'var(--text-inverse)',
-          fontWeight: 'var(--font-weight-semibold)',
-          fontSize: 'var(--text-sm)',
-          border: 'none',
-          cursor: (loading || !authenticated) ? 'not-allowed' : 'pointer',
-          transition: 'background-color var(--duration-fast) var(--ease-default), transform var(--duration-fast) var(--ease-spring)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 'var(--space-2)',
-          boxShadow: 'var(--shadow-sm)',
-          marginTop: 'var(--space-2)',
-        }}
+        className="mt-1 flex items-center justify-center gap-2 rounded-xl bg-[#C9A227] px-4 py-3 text-sm font-bold text-[#2b060d] shadow-sm transition-colors hover:bg-[#d8b13a] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading ? 'Salvando...' : 'Salvar Nova Senha'}
+        {loading ? (<><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Salvando…</>) : 'Salvar nova senha'}
       </button>
 
-      {/* Back to Login Link */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          fontSize: 'var(--text-xs)',
-          color: 'var(--text-secondary)',
-          marginTop: 'var(--space-2)',
-        }}
-      >
-        <Link href="/login" style={{ color: 'var(--text-link)', fontWeight: 'var(--font-weight-semibold)' }}>
-          Voltar para o Login
+      <div className="mt-1 flex justify-center text-xs text-stone-200">
+        <Link href="/login" className="font-semibold text-amber-300 underline-offset-2 hover:text-amber-200 hover:underline">
+          Voltar para o login
         </Link>
       </div>
     </form>
