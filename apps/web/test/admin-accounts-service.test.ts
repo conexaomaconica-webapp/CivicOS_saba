@@ -184,10 +184,24 @@ describe('senha temporária', () => {
     expect(a.temporaryPassword).not.toBe(b.temporaryPassword);
   });
 
-  it('conta de representante comercial é recusada (o módulo comercial gerencia essa senha)', async () => {
+  it('anunciante que também é representante e JÁ definiu a própria senha: recebe a senha temporária normalmente', async () => {
     tables.commercial_representatives = [{ id: 'rep-1' }];
+    authCalls.getUserById.mockResolvedValue({ data: { user: authUser({ app_metadata: { provider: 'email', must_change_password: false } }) } });
     const r = await setAccountTemporaryPasswordAction(TARGET);
-    expect(r.success).toBe(false);
+    expect(r.success).toBe(true);
+    expect(authCalls.updateUserById).toHaveBeenCalledTimes(1);
+    const meta = authCalls.updateUserById.mock.calls[0]![1].app_metadata;
+    expect(meta.account_must_change_password).toBe(true);
+    expect(meta.must_change_password).toBe(false); // a chave do representante não é tocada
+  });
+
+  it('representante com a senha temporária DELE ainda pendente ou vencida: recusa e aponta o módulo comercial (um só caminho)', async () => {
+    for (const expires of ['2999-01-01T00:00:00Z', '2000-01-01T00:00:00Z']) {
+      authCalls.getUserById.mockResolvedValue({ data: { user: authUser({ app_metadata: { provider: 'email', must_change_password: true, temp_password_expires_at: expires } }) } });
+      const r = await setAccountTemporaryPasswordAction(TARGET);
+      expect(r.success).toBe(false);
+      if (!r.success) expect(r.error).toMatch(/Comercial → Representantes/);
+    }
     expect(authCalls.updateUserById).not.toHaveBeenCalled();
   });
 

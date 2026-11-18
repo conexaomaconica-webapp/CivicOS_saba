@@ -83,15 +83,6 @@ async function loadManageableTarget(actor: Actor, userId: string) {
   return { profile, authUser };
 }
 
-async function isCommercialRepresentative(actor: Actor, userId: string): Promise<boolean> {
-  try {
-    const { data } = await actor.admin.from('commercial_representatives').select('id').eq('user_id', userId).limit(1).maybeSingle();
-    return Boolean(data);
-  } catch {
-    return false;
-  }
-}
-
 // ---------------------------------------------------------------------------------------------------------------------
 // Listagem
 // ---------------------------------------------------------------------------------------------------------------------
@@ -244,8 +235,10 @@ export async function setAccountTemporaryPasswordAction(
   try {
     const actor = await requireAccountsManager();
     const { authUser } = await loadManageableTarget(actor, userId);
-    if (await isCommercialRepresentative(actor, userId)) {
-      return { success: false, error: 'Conta de representante comercial: a senha temporária é gerenciada no módulo comercial.' };
+    // Anunciante que também é representante: a troca obrigatória do REPRESENTANTE (chaves próprias, módulo comercial) só impede quando ainda está
+    // pendente ou vencida: aí é ela que vale e há UM só caminho. Depois que o representante definiu a própria senha, a conta é comum e esta tela atende.
+    if (getTempPasswordState(authUser.app_metadata) !== 'none') {
+      return { success: false, error: 'Esta conta tem uma senha temporária de representante ainda pendente: gere a nova em Comercial → Representantes (botão "Nova senha temporária").' };
     }
 
     const temporaryPassword = generateTempPassword(14);
