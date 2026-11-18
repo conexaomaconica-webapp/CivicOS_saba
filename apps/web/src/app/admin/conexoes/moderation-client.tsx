@@ -2,6 +2,7 @@
 
 import { systemConfirm } from '@/components/system/SystemFeedback';
 import { useState } from 'react';
+import Link from 'next/link';
 import { BadgeCheck, Check, Flag, Handshake, ImageOff, Loader2, ShieldAlert, Trash2, X } from 'lucide-react';
 import {
   moderateConnectionPhotoAction,
@@ -75,6 +76,10 @@ export function ConnectionsModerationClient({
         <p className="mt-1 text-sm text-stone-600">
           A empresa confirma o negócio; a plataforma aprova a <strong>foto</strong> antes dela aparecer para o público. Denúncias de membros também chegam aqui.
         </p>
+        <nav className="mt-3 flex gap-2 text-sm font-semibold" aria-label="Seções do Mural de Conexões">
+          <span aria-current="page" className="rounded-lg bg-[#3B0B14] px-3 py-1.5 text-white">Moderação</span>
+          <Link href="/admin/conexoes/todas" className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-stone-700 hover:bg-stone-50">Todas as conexões</Link>
+        </nav>
       </div>
 
       {loadError && <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{loadError}</div>}
