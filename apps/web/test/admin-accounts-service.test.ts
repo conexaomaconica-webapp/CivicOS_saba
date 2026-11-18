@@ -16,6 +16,8 @@ let insertError: { message: string } | null = null;
 
 vi.mock('next/headers', () => ({ headers: async () => new Headers({ host: 'www.conexaomaconica.com.br' }) }));
 vi.mock('next/cache', () => ({ revalidatePath: () => undefined }));
+const recoveryMock = vi.fn();
+vi.mock('@/lib/auth/password-recovery-email', () => ({ sendPasswordRecoveryEmail: (...a: any[]) => recoveryMock(...a) }));
 vi.mock('@/lib/admin/admin-tenant-context', () => ({
   resolveCanonicalAdminTenant: async () => {
     if (actorRole === 'anonimo') throw new Error('UNAUTHORIZED: Sessão expirada.');
@@ -86,6 +88,7 @@ beforeEach(() => {
   tables.commercial_representatives = null;
   authCalls.updateUserById.mockReset().mockResolvedValue({ error: null });
   authCalls.resetPasswordForEmail.mockReset().mockResolvedValue({ error: null });
+  recoveryMock.mockReset().mockResolvedValue({ ok: true });
   authCalls.getUserById.mockReset().mockResolvedValue({ data: { user: authUser() } });
 });
 
@@ -201,16 +204,25 @@ describe('e-mail de redefinição', () => {
   it('envia para o e-mail de LOGIN da conta e não devolve link algum ao administrador', async () => {
     const r = await sendAccountPasswordResetAction(TARGET);
     expect(r.success).toBe(true);
-    expect(authCalls.resetPasswordForEmail).toHaveBeenCalledWith('dono@optica.com.br', { redirectTo: 'https://www.conexaomaconica.com.br/auth/callback?next=/update-password' });
+    expect(recoveryMock).toHaveBeenCalledWith('dono@optica.com.br');
+    expect(authCalls.resetPasswordForEmail).not.toHaveBeenCalled(); // não usa mais o e-mail padrão do Supabase
     expect(JSON.stringify(r)).not.toMatch(/token|link|http/i);
     expect(audits()[0].action).toBe('ACCOUNT_RESET_EMAIL_SENT');
   });
 
-  it('falha de envio (SMTP) devolve mensagem útil e não audita sucesso', async () => {
-    authCalls.resetPasswordForEmail.mockResolvedValue({ error: { message: 'smtp' } });
+  it('falha de envio devolve mensagem útil e não audita sucesso', async () => {
+    recoveryMock.mockResolvedValue({ ok: false, reason: 'send_failed' });
     const r = await sendAccountPasswordResetAction(TARGET);
     expect(r.success).toBe(false);
-    if (!r.success) expect(r.error).toMatch(/SMTP/i);
+    if (!r.success) expect(r.error).toMatch(/não foi possível enviar/i);
+    expect(audits()).toHaveLength(0);
+  });
+
+  it('integração de e-mail não configurada: orienta onde configurar', async () => {
+    recoveryMock.mockResolvedValue({ ok: false, reason: 'not_configured' });
+    const r = await sendAccountPasswordResetAction(TARGET);
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error).toMatch(/Integrações/);
     expect(audits()).toHaveLength(0);
   });
 });

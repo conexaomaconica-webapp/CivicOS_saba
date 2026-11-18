@@ -2,8 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
-import { sendPasswordResetEmail } from '@/lib/auth/auth-service';
+import { requestPasswordRecoveryAction } from './actions';
 import { validateEmail } from '@/lib/auth/validation';
 
 const FIELD_ERROR_STYLE = {
@@ -19,8 +18,6 @@ function FieldError({ message }: { message?: string }) {
 }
 
 export default function ForgotPasswordPage() {
-  const supabase = createClient();
-
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
@@ -48,16 +45,12 @@ export default function ForgotPasswordPage() {
     }
 
     try {
-      const { error } = await sendPasswordResetEmail(
-        supabase,
-        email.trim(),
-        `${window.location.origin}/auth/callback?next=/update-password`,
-      );
-
-      if (error) {
-        setErrorMsg(error.message);
-      } else {
+      // O servidor envia o e-mail da plataforma (identidade da marca); a resposta é a mesma exista a conta ou não.
+      const result = await requestPasswordRecoveryAction(email.trim());
+      if (result.success) {
         setSuccess(true);
+      } else {
+        setErrorMsg(result.error);
       }
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Erro inesperado ao enviar link de recuperação.');

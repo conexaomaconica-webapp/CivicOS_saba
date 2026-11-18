@@ -17,6 +17,7 @@ const DEFAULT_CONFIGS: Record<string, RateLimitConfig> = {
   reviews: { maxRequests: 5, windowMs: 60_000, failOpen: false },
   checkout: { maxRequests: 5, windowMs: 60_000, failOpen: false },
   auth: { maxRequests: 10, windowMs: 60_000, failOpen: false },
+  passwordRecovery: { maxRequests: 3, windowMs: 10 * 60_000, failOpen: false },
   default: DEFAULT_CONFIG,
 };
 

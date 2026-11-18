@@ -1,6 +1,5 @@
 'use server';
 
-import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getProfileAuthorization } from '@/lib/member/profile-access-service';
@@ -11,6 +10,7 @@ import { generateTempPassword, getTempPasswordState } from '@/lib/commercial/tem
 import { validateName } from '@/lib/auth/validation';
 import { validatePhone } from '@/lib/onboarding/onboarding-validation';
 import { sanitizeAccountSearchTerm } from '@/lib/admin/accounts-search';
+import { sendPasswordRecoveryEmail } from '@/lib/auth/password-recovery-email';
 import type { AccountBusinessLink, AccountListItem, AccountMissingProfile } from '@/types/admin-accounts';
 
 /**
@@ -90,13 +90,6 @@ async function isCommercialRepresentative(actor: Actor, userId: string): Promise
   } catch {
     return false;
   }
-}
-
-function siteOrigin(host: string | null): string {
-  const configured = (process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '');
-  if (/^https:\/\//i.test(configured)) return configured;
-  const h = (host || '').split(',')[0]!.trim();
-  return h ? `https://${h}` : 'https://www.conexaomaconica.com.br';
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -226,9 +219,13 @@ export async function sendAccountPasswordResetAction(userId: string): Promise<{ 
     const { authUser } = await loadManageableTarget(actor, userId);
     if (!authUser.email) return { success: false, error: 'A conta não tem e-mail de login.' };
 
-    const origin = siteOrigin((await headers()).get('host'));
-    const { error } = await actor.admin.auth.resetPasswordForEmail(authUser.email, { redirectTo: `${origin}/auth/callback?next=/update-password` });
-    if (error) return { success: false, error: 'Não foi possível enviar o e-mail agora. Confira o envio de e-mails do Supabase (SMTP) e tente novamente.' };
+    // E-mail próprio da plataforma (identidade da marca, pela integração de e-mail). O link é validado no servidor em /auth/confirm.
+    const sent = await sendPasswordRecoveryEmail(authUser.email);
+    if (!sent.ok) {
+      return { success: false, error: sent.reason === 'not_configured'
+        ? 'O envio de e-mails da plataforma não está configurado. Verifique Admin → Integrações → E-mail.'
+        : 'Não foi possível enviar o e-mail agora. Tente novamente em instantes.' };
+    }
 
     await audit(actor, userId, 'ACCOUNT_RESET_EMAIL_SENT', { channel: 'email' });
     return { success: true, message: `E-mail de redefinição enviado para ${authUser.email}.` };

@@ -1,3 +1,4 @@
+import { sendPasswordRecoveryEmail } from '@/lib/auth/password-recovery-email';
 import {
   createMobileSupabaseClients,
   mobileCorsOptionsResponse,
@@ -29,11 +30,17 @@ export async function POST(request: Request) {
     return mobileJsonResponse({ success: false, error: 'Serviço indisponível.' }, 503);
   }
 
-  const { error } = await clients.anonClient.auth.resetPasswordForEmail(email, {
-    redirectTo: 'https://conexaomaconica.com.br/update-password',
-  });
+  // E-mail próprio da plataforma; se o envio próprio falhar (não por falta de conta), usa o e-mail do Supabase como alternativa.
+  const own = await sendPasswordRecoveryEmail(email);
+  let failed = false;
+  if (!own.ok && own.reason !== 'no_account') {
+    const { error } = await clients.anonClient.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://conexaomaconica.com.br/update-password',
+    });
+    failed = Boolean(error);
+  }
 
-  if (error) {
+  if (failed) {
     return mobileJsonResponse(
       { success: false, error: 'Não foi possível enviar o e-mail de recuperação agora. Tente novamente.' },
       400
