@@ -31,14 +31,50 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
   // "Indicar esta empresa": link de indicação rastreável (membro logado) ou link comum com convite para entrar.
   const handleShare = () => setReferOpen(true);
 
+  // Os mesmos três botões em dois lugares: flutuantes sobre a capa (md+) e em linha dentro do painel (celular).
+  const renderActionButtons = (inline: boolean) => (
+    <>
+      <button
+        type="button"
+        onClick={handleShare}
+        className={`inline-flex h-9 items-center gap-1.5 rounded-full border border-white/20 bg-black/40 font-semibold text-white shadow-xs backdrop-blur-md transition-all hover:bg-black/60 sm:h-auto sm:py-1.5 cursor-pointer ${inline ? 'px-3.5' : 'px-2.5 sm:px-3.5'}`}
+      >
+        <Share2 className="w-3.5 h-3.5 text-white" />
+        <span className={inline ? '' : 'hidden sm:inline'}>Indicar</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => toggleFavorite(identity.slug)}
+        className={`inline-flex h-9 items-center gap-1.5 rounded-full border shadow-xs backdrop-blur-md transition-all sm:h-auto sm:py-1.5 cursor-pointer ${inline ? 'px-3.5' : 'px-2.5 sm:px-3.5'} ${isFavorited
+          ? 'bg-rose-600 text-white border-rose-500 font-bold'
+          : 'bg-black/40 hover:bg-black/60 text-white font-semibold border-white/20'
+          }`}
+      >
+        <Heart className={`w-3.5 h-3.5 ${isFavorited ? 'fill-white text-white' : 'text-white'}`} />
+        <span className={inline ? '' : 'hidden sm:inline'}>{isFavorited ? 'Favoritado' : 'Favoritar'}</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setAdModalOpen(true)}
+        title="Ver anúncio com capa, contatos e traçar rota"
+        className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#f5d76e] bg-gradient-to-r from-[#d4af37] to-[#b5891c] px-3 font-extrabold text-[#2b060d] shadow-md transition-all hover:brightness-105 sm:h-auto sm:px-3.5 sm:py-1.5 cursor-pointer"
+      >
+        <span>🪧</span>
+        <span>Ver Anúncio</span>
+      </button>
+    </>
+  );
+
   return (
     <div className="min-h-screen overflow-x-clip bg-[#F8F7F5] pb-16 font-sans text-stone-900">
 
       {/* 1. HERO HEADER INTERATIVO DO PLANO ACÁCIA (Fundo Bordô Nobre Canônico #4B161B) */}
-      <section className="relative w-full bg-[#4B161B] text-white overflow-hidden shadow-xl border-b-2 border-[#C9A227] min-h-[380px] sm:min-h-[420px] lg:min-h-[440px] flex flex-col justify-center">
+      <section className="relative w-full bg-[#4B161B] text-white overflow-hidden shadow-xl border-b-2 border-[#C9A227] md:min-h-[420px] lg:min-h-[440px] flex flex-col justify-center">
         {/* Imagem de Capa Nítida: 100% fotográfica, sem véu translúcido lavando as pessoas e o banner */}
         <div
-          className="absolute inset-0 z-0 overflow-hidden"
+          className={`relative z-0 w-full overflow-hidden md:absolute md:inset-0 md:aspect-auto md:h-auto md:max-h-none ${hasCover ? 'aspect-[2/1] max-h-[300px]' : 'h-24'}`}
           style={{ backgroundColor: media.cover?.backgroundColor || '#4B161B' }}
         >
           <img
@@ -56,7 +92,7 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
                 className="absolute inset-0 md:hidden"
                 style={{
                   background:
-                    'linear-gradient(0deg, rgba(59, 11, 20, 0.96) 0%, rgba(75, 22, 27, 0.88) 54%, rgba(75, 22, 27, 0.45) 100%)',
+                    'linear-gradient(0deg, rgba(59, 11, 20, 0.6) 0%, rgba(59, 11, 20, 0) 45%)',
                 }}
               />
 
@@ -75,53 +111,25 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
           )}
         </div>
 
-          {/* Botões de Ação Flutuantes (Canto Superior Direito) */}
-          <div className="absolute top-4 right-4 z-30 flex items-center gap-2 text-xs font-medium sm:top-6 sm:right-8">
-            <button
-              type="button"
-              onClick={handleShare}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/20 bg-black/40 px-2.5 font-semibold text-white shadow-xs backdrop-blur-md transition-all hover:bg-black/60 sm:h-auto sm:px-3.5 sm:py-1.5 cursor-pointer"
-            >
-              <Share2 className="w-3.5 h-3.5 text-white" />
-              <span className="hidden sm:inline">Indicar</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => toggleFavorite(identity.slug)}
-              className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 shadow-xs backdrop-blur-md transition-all sm:h-auto sm:px-3.5 sm:py-1.5 cursor-pointer ${isFavorited
-                ? 'bg-rose-600 text-white border-rose-500 font-bold'
-                : 'bg-black/40 hover:bg-black/60 text-white font-semibold border-white/20'
-                }`}
-            >
-              <Heart className={`w-3.5 h-3.5 ${isFavorited ? 'fill-white text-white' : 'text-white'}`} />
-              <span className="hidden sm:inline">{isFavorited ? 'Favoritado' : 'Favoritar'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setAdModalOpen(true)}
-              title="Ver anúncio com capa, contatos e traçar rota"
-              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#f5d76e] bg-gradient-to-r from-[#d4af37] to-[#b5891c] px-3 font-extrabold text-[#2b060d] shadow-md transition-all hover:brightness-105 sm:h-auto sm:px-3.5 sm:py-1.5 cursor-pointer"
-            >
-              <span>🪧</span>
-              <span>Ver Anúncio</span>
-            </button>
+          {/* Botões de ação flutuantes (a partir de md). No celular eles ficam no painel de dados, para não cobrir a pessoa da foto da capa. */}
+          <div className="absolute top-4 right-4 z-30 hidden items-center gap-2 text-xs font-medium sm:top-6 sm:right-8 md:flex">
+            {renderActionButtons(false)}
           </div>
 
           {/* Conteúdo Institucional do Hero Banner com Altura Ampliada */}
-          <div className="relative z-20 mx-auto w-full max-w-7xl px-4 pb-16 pt-20 sm:px-6 sm:py-20 sm:pb-28 lg:px-8">
+          <div className="relative z-20 -mt-6 rounded-t-[26px] bg-[#4B161B] shadow-[0_-10px_30px_rgba(29,3,6,0.35)] md:mt-0 md:rounded-none md:bg-transparent md:shadow-none">
+          <div className="relative z-20 mx-auto w-full max-w-7xl px-4 pb-16 pt-0 sm:px-6 md:py-20 md:pb-28 lg:px-8">
 
             <div className="flex flex-col items-center gap-6 text-center sm:gap-7 md:flex-row md:items-start md:text-left">
 
               {/* Logo da Empresa com Moldura Dourada Ornamentada, Brilho #C9A227 e Ampliação Lightbox (Fundo Branco Padrão, exceto cor customizada) */}
-              <div className="relative group shrink-0">
+              <div className="relative group shrink-0 -mt-12 md:mt-0">
                 <div className="absolute -inset-1 bg-gradient-to-r from-[#C9A227] via-[#FFD700] to-[#C9A227] rounded-3xl blur-xs opacity-80 group-hover:opacity-100 transition duration-300 pointer-events-none" />
                 <CompanyLogoWithZoom
                   logo={identity.logo}
                   businessName={identity.name}
                   backgroundColor={identity.logoBgColor || '#ffffff'}
-                  className="w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 rounded-2xl border-2 border-[#C9A227] p-1.5 shrink-0 flex items-center justify-center shadow-2xl relative z-20 group cursor-pointer overflow-hidden bg-white"
+                  className="w-24 h-24 sm:w-28 sm:h-28 md:w-36 md:h-36 lg:w-40 lg:h-40 rounded-2xl border-2 border-[#C9A227] p-1.5 shrink-0 flex items-center justify-center shadow-2xl relative z-20 group cursor-pointer overflow-hidden bg-white"
                   imgClassName="w-full h-full object-contain rounded-xl transition-transform group-hover:scale-105"
                 />
               </div>
@@ -184,10 +192,16 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
                   )}
                 </div>
 
+                {/* Celular: ações em linha dentro do painel (md+ usa os botões flutuantes da capa) */}
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-2 text-xs font-medium md:hidden">
+                  {renderActionButtons(true)}
+                </div>
+
               </div>
 
             </div>
 
+          </div>
           </div>
       </section>
 
