@@ -6,9 +6,15 @@ import { ImageZoomModal } from './ImageZoomModal';
 
 type Certification = { id: string; url: string; zoom_percent?: number };
 
+/** Fator de tamanho (1 a 3) a partir do zoom do cadastro (100–300%). */
+export function certificationScale(zoom?: number | null): number {
+  return Math.min(3, Math.max(1, (Number(zoom) || 100) / 100));
+}
+
 /**
- * Logo de certificação dentro de um quadro fixo. O zoom (100–300%) amplia a arte dentro do quadro,
- * útil quando a logo enviada tem muita margem em volta.
+ * Selo de certificação: a logo aparece SOLTA, sem caixa, sem fundo branco e sem moldura (como os demais selos do cabeçalho).
+ * O zoom (100–300%) aumenta o TAMANHO do selo: a altura é a altura-base (definida por quem usa, em `className`, com `--z`) vezes o fator.
+ * A largura acompanha a proporção da logo; nunca passa de 70% da largura da tela.
  */
 export function CertificationLogo({
   url,
@@ -19,21 +25,19 @@ export function CertificationLogo({
   url: string;
   zoom?: number;
   alt: string;
+  /** Altura-base com o fator: ex. `h-[calc(3.5rem*var(--z))]`. */
   className?: string;
 }) {
-  const scale = Math.min(3, Math.max(1, (zoom || 100) / 100));
   return (
-    <div className={`overflow-hidden bg-white flex items-center justify-center ${className}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={url}
-        alt={alt}
-        loading="lazy"
-        draggable={false}
-        style={{ transform: `scale(${scale})` }}
-        className="max-h-full max-w-full object-contain"
-      />
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt={alt}
+      loading="lazy"
+      draggable={false}
+      style={{ '--z': certificationScale(zoom) } as React.CSSProperties}
+      className={`block w-auto max-w-[70vw] object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)] ${className}`}
+    />
   );
 }
 
@@ -64,19 +68,13 @@ export function CertificationBadges({ certifications, businessName, variant = 'i
       onClick={() => setZoomed(cert)}
       title="Clique para ampliar"
       aria-label={`Ampliar ${alt}`}
-      className={`shrink-0 cursor-zoom-in transition-transform duration-300 hover:scale-105 ${
-        isInline ? 'rounded-xl' : 'rounded-2xl shadow-lg'
-      }`}
+      className="shrink-0 cursor-zoom-in rounded-xl transition-transform duration-300 hover:scale-105"
     >
       <CertificationLogo
         url={cert.url}
         zoom={cert.zoom_percent}
         alt={alt}
-        className={
-          isInline
-            ? 'h-14 w-14 sm:h-16 sm:w-16 rounded-xl border border-[#C9A227]/50 shadow-md'
-            : 'h-28 w-28 sm:h-32 sm:w-32 rounded-2xl border border-[#C9A227]/40'
-        }
+        className={isInline ? 'h-[calc(3.5rem*var(--z))] sm:h-[calc(4rem*var(--z))]' : 'h-[calc(6rem*var(--z))] sm:h-[calc(7rem*var(--z))]'}
       />
     </button>
   ));

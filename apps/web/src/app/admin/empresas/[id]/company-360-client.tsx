@@ -98,6 +98,30 @@ interface Props {
   initialData: AdminBusiness360DTO;
 }
 
+
+/** Prévia da capa num formato real de exibição. Mesmo enquadramento (zoom, posição, ajuste) e cor de fundo que serão gravados. */
+function CoverPreviewFrame({ label, aspect, className = '', url, zoom, offsetY, fit, background, draft }: {
+  label: string; aspect: string; className?: string; url: string; zoom: number; offsetY: number; fit: 'cover' | 'contain'; background: string; draft: boolean;
+}) {
+  return (
+    <div className={className}>
+      <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-stone-600">
+        <span>{label}</span>
+        {draft && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-900">Ainda não salvo</span>}
+      </div>
+      <div className={`relative w-full ${aspect} overflow-hidden rounded-xl border border-stone-300 shadow-inner`} style={{ backgroundColor: background }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={url}
+          alt={`Prévia da capa: ${label}`}
+          style={{ transform: `scale(${zoom})`, transformOrigin: `center ${offsetY}%`, objectPosition: `center ${offsetY}%`, objectFit: fit }}
+          className="h-full w-full"
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function Company360Client({ initialData }: Props) {
   const router = useRouter();
   const [data, setData] = useState<AdminBusiness360DTO>(initialData);
@@ -1529,8 +1553,45 @@ export default function Company360Client({ initialData }: Props) {
   const [imageBackgroundColor, setImageBackgroundColor] = useState(data.business.logo_background_color || '#ffffff');
   const [selectedFileForCrop, setSelectedFileForCrop] = useState<File | null>(null);
 
+  // Capa: escolher o arquivo só MOSTRA uma prévia local. O envio e a gravação acontecem apenas em "Salvar Mídia" (sem arquivos órfãos ao cancelar).
+  const coverPreviewUrlRef = useRef<string | null>(null);
+  const clearCoverLocalPreview = () => {
+    if (coverPreviewUrlRef.current) {
+      URL.revokeObjectURL(coverPreviewUrlRef.current);
+      coverPreviewUrlRef.current = null;
+    }
+  };
+  useEffect(() => {
+    if (!showMediaModal) {
+      clearCoverLocalPreview();
+      setSelectedFileForCrop(null);
+    }
+  }, [showMediaModal]);
+  useEffect(() => () => clearCoverLocalPreview(), []);
+
+  const handleSelectCoverFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setMessage({ type: 'error', text: 'Use uma imagem PNG, JPG ou WebP.' });
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      setMessage({ type: 'error', text: `O arquivo "${file.name}" excede o limite máximo de 15MB.` });
+      return;
+    }
+    clearCoverLocalPreview();
+    const url = URL.createObjectURL(file);
+    coverPreviewUrlRef.current = url;
+    setSelectedFileForCrop(file);
+    setMediaUrlInput(url);
+    setMessage({ type: 'success', text: 'Imagem escolhida. Ela só será enviada e gravada quando você clicar em "Salvar Mídia".' });
+  };
+
   const reprocessSelectedImage = (backgroundColor: string) => {
-    if (!selectedFileForCrop) return;
+    // Na capa a cor é só uma configuração (não é incorporada ao arquivo): nada a reprocessar nem enviar.
+    if (!selectedFileForCrop || mediaMode === 'update_cover') return;
     void handleAdminFileUpload(
       { target: { files: [selectedFileForCrop] } } as unknown as React.ChangeEvent<HTMLInputElement>,
       undefined,
@@ -1731,7 +1792,29 @@ export default function Company360Client({ initialData }: Props) {
     setLoading(true);
     setMessage(null);
     try {
-      const normalizedMediaUrl = mediaUrlInput.trim();
+      let normalizedMediaUrl = mediaUrlInput.trim();
+      if (mediaMode === 'update_cover' && selectedFileForCrop) {
+        setUploadingFile(true);
+        try {
+          const optimized = await compressImageOnClient(selectedFileForCrop, 1920, 0.82, 0.5, 'cover', 1.0, undefined);
+          const fd = new FormData();
+          fd.append('file', optimized);
+          fd.append('businessId', data.business.id);
+          fd.append('assetType', 'cover');
+          if (mediaTitleInput) fd.append('title', mediaTitleInput);
+          const up = await uploadAdminBusinessAssetAction(fd);
+          if (!up.success || !up.url) {
+            setMessage({ type: 'error', text: up.error || 'Falha ao enviar a imagem da capa. Nada foi salvo.' });
+            return;
+          }
+          normalizedMediaUrl = up.url;
+          setMediaUrlInput(up.url);
+          setSelectedFileForCrop(null);
+          clearCoverLocalPreview();
+        } finally {
+          setUploadingFile(false);
+        }
+      }
       const res = await manageAdminMediaAction(data.business.id, mediaMode, {
         media_id: editingMediaId,
         url: normalizedMediaUrl,
@@ -3599,7 +3682,7 @@ export default function Company360Client({ initialData }: Props) {
                       setImageOffsetY(data.business.cover_offset_y ?? 50);
                       setImageZoom(data.business.cover_zoom ?? 1.0);
                       setImageFitMode(data.business.cover_fit_mode ?? 'cover');
-                      setImageBackgroundColor(data.business.cover_background_color || '#3b0b14');
+                      setImageBackgroundColor(data.business.cover_background_color || '#ffffff');
                       setSelectedFileForCrop(null);
                       setShowMediaModal(true);
                     }}
@@ -3613,7 +3696,7 @@ export default function Company360Client({ initialData }: Props) {
                   {data.cover_item?.url ? (
                     <div
                       className="w-28 h-16 rounded-xl border border-stone-300 overflow-hidden shrink-0"
-                      style={{ backgroundColor: data.business.cover_background_color || '#3b0b14' }}
+                      style={{ backgroundColor: data.business.cover_background_color || '#ffffff' }}
                     >
                       <img
                         src={data.cover_item.url}
@@ -3860,12 +3943,15 @@ export default function Company360Client({ initialData }: Props) {
                   {(data.certifications_items || []).map((cert) => (
                     <div key={cert.id} className="w-36 space-y-2">
                       <div className="relative">
-                        <CertificationLogo
-                          url={cert.url}
-                          zoom={cert.zoom_percent}
-                          alt="Certificação da empresa"
-                          className="h-32 w-32 rounded-2xl border border-stone-300 mx-auto"
-                        />
+                        {/* Prévia no fundo bordô do cabeçalho: sem caixa branca; o zoom aumenta o TAMANHO do selo (como na página pública). */}
+                        <div className="flex min-h-32 items-center justify-center rounded-2xl border border-stone-300 bg-[#4B161B] p-3">
+                          <CertificationLogo
+                            url={cert.url}
+                            zoom={cert.zoom_percent}
+                            alt="Certificação da empresa"
+                            className="h-[calc(3.5rem*var(--z))] !max-w-full"
+                          />
+                        </div>
                         <button
                           type="button"
                           onClick={() => handleDeleteCertification(cert.id)}
@@ -3878,7 +3964,7 @@ export default function Company360Client({ initialData }: Props) {
                         </button>
                       </div>
                       <label className="block text-[11px] font-semibold text-stone-600">
-                        Zoom {cert.zoom_percent ?? 100}%
+                        Tamanho do selo (zoom) {cert.zoom_percent ?? 100}%
                         <input
                           type="range"
                           min={100}
@@ -5590,9 +5676,16 @@ export default function Company360Client({ initialData }: Props) {
                           : 'Foto da Galeria'}
                     </label>
 
-                    {mediaUrlInput && (
+                    {mediaUrlInput && mediaMode === 'update_cover' && (
+                      <div className="space-y-2">
+                        <CoverPreviewFrame label="Desktop (largura total)" aspect="aspect-[29/10]" url={mediaUrlInput} zoom={imageZoom} offsetY={imageOffsetY} fit={imageFitMode} background={imageBackgroundColor} draft={Boolean(selectedFileForCrop)} />
+                        <CoverPreviewFrame label="Celular (faixa)" aspect="aspect-[2/1]" className="mx-auto w-[72%]" url={mediaUrlInput} zoom={imageZoom} offsetY={imageOffsetY} fit={imageFitMode} background={imageBackgroundColor} draft={Boolean(selectedFileForCrop)} />
+                      </div>
+                    )}
+
+                    {mediaUrlInput && mediaMode !== 'update_cover' && (
                       <div
-                        className={`relative w-full rounded-2xl border border-stone-300 overflow-hidden flex items-center justify-center shadow-inner group ${mediaMode === 'update_cover' ? 'aspect-[16/6]' : 'h-44'}`}
+                        className="relative w-full h-44 rounded-2xl border border-stone-300 overflow-hidden flex items-center justify-center shadow-inner group"
                         style={{ backgroundColor: ['update_logo', 'update_cover'].includes(mediaMode) ? imageBackgroundColor : '#e7e5e4' }}
                       >
                         <img
@@ -5791,7 +5884,7 @@ export default function Company360Client({ initialData }: Props) {
                             multiple={mediaMode === 'add_gallery'}
                             accept="image/png,image/jpeg,image/webp"
                             className="hidden"
-                            onChange={(e) => handleAdminFileUpload(e)}
+                            onChange={(e) => (mediaMode === 'update_cover' ? handleSelectCoverFile(e) : handleAdminFileUpload(e))}
                             disabled={uploadingFile}
                           />
                         </label>
@@ -5811,7 +5904,9 @@ export default function Company360Client({ initialData }: Props) {
                             {mediaMode === 'update_logo' ? 'Cor de fundo da logomarca' : 'Cor de fundo do banner'}
                           </label>
                           <p className="mt-0.5 text-[10px] text-stone-500">
-                            A cor será incorporada à imagem otimizada e preencherá as áreas livres do enquadramento.
+                            {mediaMode === 'update_cover'
+                              ? 'Preenche as áreas livres quando o banner é exibido inteiro. Padrão: branco. Só é gravada ao clicar em "Salvar Mídia".'
+                              : 'A cor será incorporada à imagem otimizada e preencherá as áreas livres do enquadramento.'}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -5841,7 +5936,7 @@ export default function Company360Client({ initialData }: Props) {
                             <Pipette className="h-4 w-4" /> Conta-gotas
                           </button>
                         </div>
-                        {selectedFileForCrop && (
+                        {selectedFileForCrop && mediaMode === 'update_logo' && (
                           <button
                             type="button"
                             disabled={uploadingFile}
