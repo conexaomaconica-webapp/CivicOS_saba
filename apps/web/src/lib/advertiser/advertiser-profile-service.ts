@@ -327,7 +327,8 @@ async function saveBusinessLocation(
   if (primary) {
     const { error } = await supabase
       .from('business_locations')
-      .update({ ...next, ...(coordinates || {}), updated_at: new Date().toISOString() })
+      // Endereço mudou e não foi localizado: o ponto antigo estaria errado, então é limpo (o mapa só usa o que está certo).
+      .update({ ...next, ...(coordinates || (changed && hadCoordinates ? { latitude: null, longitude: null } : {})), updated_at: new Date().toISOString() })
       .eq('id', primary.id);
     if (error) return { ok: false, message: `Os dados da empresa foram salvos, mas não foi possível salvar o endereço: ${error.message}` };
   } else {

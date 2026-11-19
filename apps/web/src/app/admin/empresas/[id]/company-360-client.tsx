@@ -204,11 +204,13 @@ export default function Company360Client({ initialData }: Props) {
   const handleLocate = async () => {
     setLocating(true);
     setLocationHint(null);
+    // Número, bairro e CEP guardados pertencem ao endereço SALVO: com endereço novo, a busca lê tudo do texto digitado.
+    const unchanged = (data.business.address || '').trim() === address.trim() && (data.business.city || '') === city && (data.business.state || '') === state;
     const res = await locateBusinessAddressAction({
       address,
-      number: data.business.number,
-      neighborhood: data.business.neighborhood,
-      postal_code: data.business.postal_code,
+      number: unchanged ? data.business.number ?? undefined : undefined,
+      neighborhood: unchanged ? data.business.neighborhood ?? undefined : undefined,
+      postal_code: unchanged ? data.business.postal_code ?? undefined : undefined,
       city,
       state,
     });
@@ -216,11 +218,12 @@ export default function Company360Client({ initialData }: Props) {
     if (res.success && res.latitude != null && res.longitude != null) {
       setLatitudeText(String(res.latitude));
       setLongitudeText(String(res.longitude));
-      const approximate = res.precision === 'postal_code' || res.precision === 'city';
+      const approximateLabel: Record<string, string> = { street: 'rua (sem o número exato)', neighborhood: 'bairro', postal_code: 'CEP', city: 'cidade' };
+      const approximate = res.precision != null && res.precision in approximateLabel;
       setLocationHint({
         ok: !approximate,
         text: approximate
-          ? `Localizada por ${res.precision === 'city' ? 'cidade' : 'CEP'} (posição aproximada). Confira e ajuste as coordenadas se necessário, depois salve.`
+          ? `Localizada por ${approximateLabel[res.precision as string]} (posição aproximada). Confira o ponto no mapa e ajuste a latitude e a longitude se necessário, depois salve.`
           : 'Localizada pelo endereço. Confira o ponto no mapa e salve.',
       });
     } else {
@@ -1019,6 +1022,18 @@ export default function Company360Client({ initialData }: Props) {
       });
 
       if (res.success && res.data) {
+        // Coordenadas que de fato ficaram gravadas (o servidor pode ter achado novas ou limpado as antigas).
+        if (res.data.latitude !== undefined) {
+          setLatitudeText(res.data.latitude != null ? String(res.data.latitude) : '');
+          setLongitudeText(res.data.longitude != null ? String(res.data.longitude) : '');
+        }
+        if (res.data.coordinates_cleared) {
+          setLocationHint({ ok: false, text: 'Endereço salvo, mas não encontramos as coordenadas do novo endereço. As antigas foram removidas para não apontar o lugar errado. Use "Localizar pelo endereço" ou digite a latitude e a longitude do Google Maps.' });
+        } else if (res.data.geocode_precision && !['address', 'manual'].includes(res.data.geocode_precision)) {
+          setLocationHint({ ok: false, text: 'Endereço salvo. As coordenadas foram encontradas de forma aproximada (rua, bairro, CEP ou cidade). Confira o ponto e, se precisar, ajuste a latitude e a longitude.' });
+        } else if (res.data.geocode_precision === 'address') {
+          setLocationHint({ ok: true, text: 'Endereço salvo e localizado no mapa.' });
+        }
         const savedCnpj = res.data.cnpj_cpf || res.data.cnpj || cnpjCpf;
         setCnpjCpf(formatCpfCnpj(savedCnpj));
         setSlug(res.data.slug || slug);

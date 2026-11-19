@@ -5,7 +5,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { parseLegacyAddress } from '@/lib/admin/legacy-address';
 import { pickResponsibleName } from '@/lib/contracts/responsible-name';
 import { assertPlatformAdminAccess } from './admin-auth-helper';
-import { geocodeBrazilianAddress, isValidBrazilianCoordinate, type GeocodePrecision } from '@/lib/geo/geocode';
+import { geocodeBrazilianAddress, isValidBrazilianCoordinate, parseAddressLine, type GeocodePrecision } from '@/lib/geo/geocode';
 import { resolveCanonicalAdminTenant } from './admin-tenant-context';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
@@ -2477,6 +2477,8 @@ export async function updateAdminBusinessDetailsAction(
     revalidatePath('/guia', 'layout');
 
     let geocodePrecisionResult: GeocodePrecision | null = null;
+    let coordinatesCleared = false;
+    let finalCoordinates: { latitude: number | null; longitude: number | null } | null = null;
     if (payload.city !== undefined || payload.state !== undefined) {
       const cityVal = payload.city?.trim() || '';
       const stateVal = payload.state?.trim().toUpperCase() || '';
@@ -2526,19 +2528,31 @@ export async function updateAdminBusinessDetailsAction(
         coordinates = { latitude: payload.latitude as number, longitude: payload.longitude as number };
         geocodePrecision = 'manual';
       } else if (!hadCoordinates || addressChanged) {
+        // CEP, número e bairro guardados pertencem ao endereço ANTIGO: só valem se o endereço não mudou.
+        // Com endereço novo, a busca lê número, bairro e CEP do próprio texto digitado.
+        const keepStored = !addressChanged;
         const located = await geocodeBrazilianAddress({
           street: payload.address?.trim() || '',
-          number: payload.number,
-          neighborhood: payload.neighborhood,
+          number: keepStored ? payload.number : undefined,
+          neighborhood: keepStored ? payload.neighborhood : undefined,
           city: canonicalCity.name,
           state: stateVal,
-          postalCode: payload.postal_code || primaryLoc?.postal_code,
+          postalCode: keepStored ? payload.postal_code || primaryLoc?.postal_code : undefined,
         });
         if (located) {
           coordinates = { latitude: located.latitude, longitude: located.longitude };
           geocodePrecision = located.precision;
         }
       }
+
+      // Endereço novo que não foi localizado: as coordenadas antigas apontam para o lugar ERRADO. Melhor sem ponto do que um ponto errado.
+      coordinatesCleared = !coordinates && addressChanged && hadCoordinates && !manualChanged;
+      finalCoordinates = coordinates
+        ? coordinates
+        : coordinatesCleared
+          ? { latitude: null, longitude: null }
+          : { latitude: primaryLoc?.latitude != null ? Number(primaryLoc.latitude) : null, longitude: primaryLoc?.longitude != null ? Number(primaryLoc.longitude) : null };
+      const parsedPostal = parseAddressLine(payload.address).postalCode;
 
       geocodePrecisionResult = geocodePrecision;
 
@@ -2551,7 +2565,9 @@ export async function updateAdminBusinessDetailsAction(
             state: stateVal,
             street: canonicalAddress,
             number: null,
+            ...(parsedPostal ? { postal_code: parsedPostal } : {}),
             ...(coordinates || {}),
+            ...(coordinatesCleared ? { latitude: null, longitude: null } : {}),
             updated_at: new Date().toISOString(),
           })
           .eq('id', primaryLoc.id);
@@ -2637,6 +2653,9 @@ export async function updateAdminBusinessDetailsAction(
       data: {
         ...updated,
         geocode_precision: geocodePrecisionResult,
+        coordinates_cleared: coordinatesCleared,
+        latitude: finalCoordinates?.latitude ?? null,
+        longitude: finalCoordinates?.longitude ?? null,
         slug: nextSlug,
         category_id: selectedCategory?.id,
         category: selectedCategory?.name || updated.category,
