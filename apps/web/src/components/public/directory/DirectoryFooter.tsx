@@ -63,6 +63,9 @@ export function DirectoryFooter() {
             <Link href="/privacidade" className="text-gray-300 hover:text-amber-400 transition-colors">
               Privacidade e LGPD
             </Link>
+            <Link href="/excluir-conta" className="text-gray-300 hover:text-amber-400 transition-colors">
+              Excluir conta
+            </Link>
             <CookiePreferencesButton className="text-gray-300 hover:text-amber-400 transition-colors cursor-pointer" />
           </div>
 

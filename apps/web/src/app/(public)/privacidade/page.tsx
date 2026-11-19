@@ -2,7 +2,7 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { appUrl } from '@/lib/seo/app-url';
 import Link from 'next/link';
-import { ShieldCheck, Lock, Eye, FileText, UserCheck, Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Lock, Eye, FileText, UserCheck, Mail, ArrowLeft, CheckCircle2, Trash2 } from 'lucide-react';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { StructuredData } from '@/components/seo/StructuredData';
@@ -224,6 +224,10 @@ export default function PrivacidadePage() {
                   <span>Revogação do consentimento concedido</span>
                 </div>
               </div>
+              <p className="text-stone-300 pt-2">
+                Para <strong className="text-white">excluir a sua conta e os seus dados</strong>, siga o passo a passo em{' '}
+                <Link href="/excluir-conta" className="text-[#C9A227] underline">conexaomaconica.com.br/excluir-conta</Link>.
+              </p>
             </section>
 
             {/* Section 7 */}
@@ -298,6 +302,28 @@ export default function PrivacidadePage() {
                   </p>
                 </div>
               </div>
+            </section>
+
+            {/* Section 9 */}
+            <section className="space-y-3" id="exclusao-de-conta">
+              <h2 className="text-xl font-bold text-[#C9A227] flex items-center gap-2 border-b border-stone-800 pb-2">
+                <Trash2 className="w-5 h-5 shrink-0" />
+                <span>9. Exclusão de Conta e dos Dados Pessoais</span>
+              </h2>
+              <p className="text-stone-300">
+                Você pode excluir a sua conta a qualquer momento, sem custo, de três formas:
+              </p>
+              <ul className="list-disc pl-5 space-y-1.5 text-stone-400">
+                <li><strong className="text-stone-200">No aplicativo:</strong> Mais &rarr; Minha Conta &rarr; &ldquo;Excluir minha conta definitivamente&rdquo;. A exclusão é imediata.</li>
+                <li><strong className="text-stone-200">No site:</strong> Meu perfil &rarr; Privacidade &rarr; &ldquo;Excluir minha conta&rdquo;.</li>
+                <li><strong className="text-stone-200">Por e-mail:</strong> escreva para <a href="mailto:privacidade@conexaomaconica.com.br" className="text-[#C9A227] underline">privacidade@conexaomaconica.com.br</a> a partir do e-mail cadastrado; concluímos o pedido em até 15 dias após a confirmação da sua identidade.</li>
+              </ul>
+              <p className="text-stone-300">
+                Ao excluir, o seu acesso e os dados do seu perfil são removidos, os seus consentimentos são revogados e a afiliação maçônica declarada é eliminada. Registros que a lei nos obriga a guardar (contratos e pagamentos, aceite dos Termos e consentimentos, trilha de segurança) são mantidos apenas pelo prazo legal, com acesso restrito (LGPD, art. 16). A exclusão fica bloqueada enquanto houver assinatura, pagamento ou reserva pendente.
+              </p>
+              <p className="text-stone-300">
+                Veja os detalhes e o passo a passo em <Link href="/excluir-conta" className="text-[#C9A227] underline">conexaomaconica.com.br/excluir-conta</Link>.
+              </p>
             </section>
 
             <footer className="pt-6 border-t border-stone-800 text-xs text-stone-500 italic text-center">

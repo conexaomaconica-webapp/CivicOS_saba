@@ -33,7 +33,7 @@ export function PublicShell({
   // Antes da virada "/" é a landing; depois, "/" é o Guia e a landing está em /institucional (ver lib/site/home-switch.ts).
   const homeSwitchActive = useHomeSwitchActive();
   const isLandingPage = isLandingPathname(pathname, homeSwitchActive);
-  const isGuiaOrLegal = pathname?.startsWith('/guia') || pathname?.startsWith('/conexoes') || pathname === '/privacidade' || pathname === '/termos' || isGuiaHomePathname(pathname, homeSwitchActive);
+  const isGuiaOrLegal = pathname?.startsWith('/guia') || pathname?.startsWith('/conexoes') || pathname === '/privacidade' || pathname === '/termos' || pathname === '/excluir-conta' || isGuiaHomePathname(pathname, homeSwitchActive);
 
   // A home (/) traz o próprio cabeçalho com logo e botão Entrar.
   const renderHeader = showHeader && !isGuiaOrLegal && !isLandingPage;

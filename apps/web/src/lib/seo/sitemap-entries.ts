@@ -41,6 +41,7 @@ export function buildStaticSitemapEntries(
     { url: appUrl('/conexoes'), changeFrequency: 'daily', priority: 0.5 },
     { url: appUrl('/termos'), changeFrequency: 'yearly', priority: 0.2 },
     { url: appUrl('/privacidade'), changeFrequency: 'yearly', priority: 0.2 },
+    { url: appUrl('/excluir-conta'), changeFrequency: 'yearly', priority: 0.2 },
   ];
 }
 
