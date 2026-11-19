@@ -15,8 +15,13 @@ export function BusinessLocationCard({
 }: BusinessLocationCardProps) {
   if (!location || !location.address) return null;
 
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${businessName}, ${location.address}`)}`;
-  const embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(`${location.address}`)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+  // Coordenadas do prontuário 360 (digitadas à mão ou localizadas) marcam o ponto EXATO; sem elas, vale o endereço em texto.
+  const hasCoordinates = Number.isFinite(location.latitude) && Number.isFinite(location.longitude);
+  const point = hasCoordinates ? `${location.latitude},${location.longitude}` : null;
+  const mapsUrl = point
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(point)}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${businessName}, ${location.address}`)}`;
+  const embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(point ?? location.address)}&t=&z=${point ? 17 : 15}&ie=UTF8&iwloc=&output=embed`;
 
   return (
     <section id="localizacao" className={`p-4 rounded-2xl bg-white border border-[#E8E5DF] shadow-xs space-y-3 ${className}`}>

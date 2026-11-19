@@ -307,7 +307,9 @@ function publicAsset(url: string | null, alt: string, type: 'image' | 'video' = 
 }
 
 function addressOf(location: Record<string, Json>): string | null {
-  const line = ['street', 'number', 'complement', 'neighborhood', 'city', 'state', 'postal_code']
+  // Endereço antigo em texto livre (coluna address) serve de alternativa quando não há rua estruturada.
+  const keys = text(location.street, 160) ? ['street', 'number', 'complement', 'neighborhood', 'city', 'state', 'postal_code'] : ['address', 'number', 'complement', 'neighborhood', 'city', 'state', 'postal_code'];
+  const line = keys
     .map((key) => text(location[key], 160))
     .filter(Boolean)
     .join(', ');

@@ -212,6 +212,9 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
               .from('business_locations')
               .select('city, state, address, street, number')
               .eq('business_id', bizId)
+              .order('is_headquarters', { ascending: false })
+              .order('created_at', { ascending: true })
+              .limit(1)
               .maybeSingle();
 
             if (bLoc) {
@@ -368,7 +371,8 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
       (dbReader as any).from('business_recognitions').select('recognition_key, is_active').eq('business_id', bizId).eq('is_active', true),
       (dbReader as any).from('business_masonic_links').select('status, eligibility_type, reference_mason_name, reference_mason_cim, family_relationship, organizations(name)').eq('business_id', bizId).maybeSingle(),
       (dbReader as any).from('business_categories').select('is_primary, categories(name)').eq('business_id', bizId).order('is_primary', { ascending: false }).limit(1),
-      (dbReader as any).from('business_locations').select('city, state, address, street, number, postal_code, neighborhood, latitude, longitude').eq('business_id', bizId).maybeSingle(),
+      // Mais de uma linha de endereço (matriz + outra) NÃO pode derrubar a leitura: pega a matriz primeiro, depois a mais antiga.
+      (dbReader as any).from('business_locations').select('city, state, address, street, number, postal_code, neighborhood, latitude, longitude').eq('business_id', bizId).order('is_headquarters', { ascending: false }).order('created_at', { ascending: true }).limit(1).maybeSingle(),
       (dbReader as any).from('business_hours').select('*').eq('business_id', bizId),
       (dbReader as any).from('business_attributes').select('attribute_key, attribute_value').eq('business_id', bizId),
       (dbReader as any).from('business_certifications').select('id, image_url, display_order, zoom_percent').eq('business_id', bizId).order('display_order', { ascending: true }).order('created_at', { ascending: true }),
