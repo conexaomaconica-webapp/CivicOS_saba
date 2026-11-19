@@ -15,8 +15,9 @@ export function BusinessLocationCard({
 }: BusinessLocationCardProps) {
   if (!location || !location.address) return null;
 
-  // Coordenadas do prontuário 360 (digitadas à mão ou localizadas) marcam o ponto EXATO; sem elas, vale o endereço em texto.
-  const hasCoordinates = Number.isFinite(location.latitude) && Number.isFinite(location.longitude);
+  // Coordenadas CONFIRMADAS por um administrador (digitadas ou coladas do Google Maps) marcam o ponto EXATO.
+  // Achadas automaticamente (podem errar) ou sem marca (empresas antigas): vale o endereço em texto, que o Google localiza bem.
+  const hasCoordinates = location.coordinatesTrusted === true && Number.isFinite(location.latitude) && Number.isFinite(location.longitude);
   const point = hasCoordinates ? `${location.latitude},${location.longitude}` : null;
   const mapsUrl = point
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(point)}`

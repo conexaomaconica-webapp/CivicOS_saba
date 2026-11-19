@@ -20,12 +20,24 @@ describe('cartão de localização da página da empresa', () => {
     expect(screen.getByRole('link', { name: /Traçar rota/ }).getAttribute('href')).toContain(encodeURIComponent('Empresa X, ' + base.address));
   });
 
-  it('com coordenadas (digitadas no prontuário 360): o ponto exato marca o mapa e a rota', () => {
-    render(<BusinessLocationCard location={{ ...base, latitude: -12.2664, longitude: -38.9663 }} businessName="Empresa X" />);
+  it('com coordenadas CONFIRMADAS (digitadas ou coladas no prontuário 360): o ponto exato marca o mapa e a rota', () => {
+    render(<BusinessLocationCard location={{ ...base, latitude: -12.2664, longitude: -38.9663, coordinatesTrusted: true }} businessName="Empresa X" />);
     const iframe = screen.getByTitle(/Mapa de localização/) as HTMLIFrameElement;
     expect(decodeURIComponent(iframe.src)).toContain('q=-12.2664,-38.9663');
     expect(iframe.src).toContain('z=17');
     expect(decodeURIComponent(screen.getByRole('link', { name: /Traçar rota/ }).getAttribute('href')!)).toContain('query=-12.2664,-38.9663');
+  });
+
+  it('coordenadas NÃO confirmadas (achadas automaticamente, centro da cidade ou empresa antiga): o mapa usa o texto do endereço', () => {
+    const centroDaCidade = { ...base, latitude: -12.2578934, longitude: -38.9598047 };
+    for (const trusted of [undefined, false]) {
+      cleanup();
+      render(<BusinessLocationCard location={{ ...centroDaCidade, coordinatesTrusted: trusted }} businessName="Empresa X" />);
+      const iframe = screen.getByTitle(/Mapa de localização/) as HTMLIFrameElement;
+      expect(iframe.src).toContain(encodeURIComponent(base.address));
+      expect(decodeURIComponent(iframe.src)).not.toContain('-12.2578934');
+      expect(decodeURIComponent(screen.getByRole('link', { name: /Traçar rota/ }).getAttribute('href')!)).not.toContain('-12.2578934');
+    }
   });
 
   it('sem endereço: o cartão não aparece', () => {
@@ -58,5 +70,19 @@ describe('endereço montado a partir do cadastro', () => {
       { street: 'Matriz', city: 'Feira de Santana', state: 'BA', is_headquarters: true },
     ]);
     expect(p.location?.address).toContain('Matriz');
+  });
+});
+
+describe('marca de precisão das coordenadas na apresentação pública', () => {
+  const withPrecision = (location_precision?: string) => toPublicBusinessPresentation({
+    business_id: 'b1', business_slug: 'x', business_name: 'X', effective_plan_code: 'ouro', location_precision,
+    locations: [{ street: 'Rua A', city: 'Feira de Santana', state: 'BA', is_headquarters: true, latitude: -12.2578934, longitude: -38.9598047 }],
+  } as any);
+
+  it('só "manual" é confiável; qualquer outra precisão, ou nenhuma, não é', () => {
+    expect(withPrecision('manual').location?.coordinatesTrusted).toBe(true);
+    for (const precision of ['address', 'street', 'postal_code', 'city', 'none', undefined]) {
+      expect(withPrecision(precision).location?.coordinatesTrusted).toBe(false);
+    }
   });
 });

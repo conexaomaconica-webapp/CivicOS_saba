@@ -51,6 +51,7 @@ const existingLocation = (o: Record<string, unknown> = {}) => ({
   neighborhood: 'Centro', city: 'Feira de Santana', state: 'BA', postal_code: '44000-000', ...o,
 });
 
+const precisionWrites = () => ops.filter((o) => o.table === 'business_attributes' && o.op === 'upsert' && o.values?.attribute_key === 'location_precision').map((o) => o.values.attribute_value);
 const locationWrites = () => ops.filter((o) => o.table === 'business_locations' && ['update', 'insert'].includes(o.op));
 
 beforeEach(() => {
@@ -138,5 +139,28 @@ describe('prontuário 360: endereço em campos (rua, número, complemento, bairr
     const res = await updateAdminBusinessDetailsAction(BIZ, { ...base, address: 'Av. Brasil, 200 - Centro' });
     expect(res.success).toBe(true);
     expect(locationWrites()[0]!.values).toMatchObject({ street: 'Av. Brasil, 200 - Centro', number: null });
+  });
+});
+
+describe('precisão do ponto gravada para o mapa da página', () => {
+  it('coordenadas digitadas/coladas: "manual" (é o que a página usa no mapa)', async () => {
+    await updateAdminBusinessDetailsAction(BIZ, { ...base, street: 'Rua Nova', number: '1', postal_code: '44001-000', latitude: -12.3, longitude: -38.8 });
+    expect(precisionWrites()).toEqual(['manual']);
+  });
+
+  it('achado pela busca automática: a precisão da busca (a página NÃO usa o ponto no mapa)', async () => {
+    await updateAdminBusinessDetailsAction(BIZ, { ...base, street: 'Rua Nova', number: '1', postal_code: '44001-000' });
+    expect(precisionWrites()).toEqual(['address']);
+  });
+
+  it('endereço novo não encontrado: "none" (as coordenadas antigas foram limpas)', async () => {
+    geocode.mockResolvedValue(null);
+    await updateAdminBusinessDetailsAction(BIZ, { ...base, street: 'Rua Que Não Existe', number: '1', postal_code: '44001-000' });
+    expect(precisionWrites()).toEqual(['none']);
+  });
+
+  it('nada mudou nas coordenadas: não mexe na marca existente', async () => {
+    await updateAdminBusinessDetailsAction(BIZ, { ...base, street: 'Rua Antiga', number: '10', neighborhood: 'Centro', postal_code: '44000-000' });
+    expect(precisionWrites()).toEqual([]);
   });
 });

@@ -202,6 +202,8 @@ export type PublicBusinessPresentation = {
     state: string | null;
     latitude: number | null;
     longitude: number | null;
+    /** true só quando o ponto foi digitado ou colado por um administrador ("manual"). Achado automaticamente ou sem marca (empresas antigas): o mapa usa o texto do endereço. */
+    coordinatesTrusted?: boolean;
     mapImage: PublicMediaAsset | null;
   } | null;
   hours: Array<{
@@ -629,6 +631,7 @@ export function toPublicBusinessPresentation(
       state: text(primaryLocation.state, 8),
       latitude: numeric(primaryLocation.latitude),
       longitude: numeric(primaryLocation.longitude),
+      coordinatesTrusted: String((row as any).location_precision ?? '') === 'manual',
       mapImage: null,
     } : null,
     hours: records(row.business_hours).map((item) => ({

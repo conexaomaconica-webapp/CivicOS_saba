@@ -124,6 +124,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
               if (attr.attribute_key === 'cover_fit_mode') (detailObj as any).cover_fit_mode = attr.attribute_value;
               if (attr.attribute_key === 'cover_background_color') (detailObj as any).cover_background_color = attr.attribute_value;
               if (attr.attribute_key === 'hero_image_count') (detailObj as any).hero_image_count = attr.attribute_value;
+              if (attr.attribute_key === 'location_precision') (detailObj as any).location_precision = attr.attribute_value;
               if (attr.attribute_key === 'client_approved_at') (detailObj as any).client_approved_at = attr.attribute_value;
               if (attr.attribute_key === 'client_approved_by') (detailObj as any).client_approved_by = attr.attribute_value;
             }
@@ -385,6 +386,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
     let coverFitMode: string | null = null;
     let coverBackgroundColor: string | null = null;
     let heroImageCount: string | null = null;
+    let locationPrecision: string | null = null;
     let clientApprovedAt: string | null = null;
     let clientApprovedBy: string | null = null;
 
@@ -397,6 +399,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
         if (attr.attribute_key === 'cover_fit_mode') coverFitMode = attr.attribute_value;
         if (attr.attribute_key === 'cover_background_color') coverBackgroundColor = attr.attribute_value;
         if (attr.attribute_key === 'hero_image_count') heroImageCount = attr.attribute_value;
+        if (attr.attribute_key === 'location_precision') locationPrecision = attr.attribute_value;
         if (attr.attribute_key === 'client_approved_at') clientApprovedAt = attr.attribute_value;
         if (attr.attribute_key === 'client_approved_by') clientApprovedBy = attr.attribute_value;
       }
@@ -504,6 +507,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
       cover_fit_mode: coverFitMode,
       cover_background_color: coverBackgroundColor,
       hero_image_count: heroImageCount,
+      location_precision: locationPrecision,
     } as any;
 
     try {

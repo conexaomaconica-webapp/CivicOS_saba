@@ -2576,6 +2576,18 @@ export async function updateAdminBusinessDetailsAction(
 
       geocodePrecisionResult = geocodePrecision;
 
+      // Marca a precisão do ponto gravado (o mapa da página só confia em "manual" e "address").
+      const precisionToStore = coordinatesCleared ? 'none' : coordinates ? geocodePrecision : null;
+      if (precisionToStore) {
+        const { error: precisionError } = await (supabase as any)
+          .from('business_attributes')
+          .upsert(
+            { business_id: businessId, tenant_id: existing.tenant_id, attribute_key: 'location_precision', attribute_value: precisionToStore },
+            { onConflict: 'business_id,attribute_key' },
+          );
+        if (precisionError) console.error('[updateAdminBusinessDetailsAction] location_precision', precisionError);
+      }
+
       if (primaryLoc) {
         const { error: locationUpdateError } = await (supabase as any)
           .from('business_locations')
