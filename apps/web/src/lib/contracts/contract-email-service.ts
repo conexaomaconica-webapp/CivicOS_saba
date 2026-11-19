@@ -67,7 +67,7 @@ export async function dispatchContractEmail(
   }
 
   // 2. Localiza contrato em aguardo de assinatura ou recém-gerado
-  const { data: contract, error: contractErr } = await (dbClient as any)
+  const { data: firstContract, error: contractErr } = await (dbClient as any)
     .from('contracts')
     .select('id, status, tenant_id')
     .eq('business_id', businessId)
@@ -76,7 +76,7 @@ export async function dispatchContractEmail(
     .limit(1)
     .maybeSingle();
 
-  if (contractErr || !contract) {
+  if (contractErr || !firstContract) {
     return {
       success: false,
       status: 'failed',
@@ -85,16 +85,48 @@ export async function dispatchContractEmail(
     };
   }
 
-  // 3. Localiza o snapshot imutável ativo do contrato
-  const { data: activeSnapshot, error: snapErr } = await (dbClient as any)
-    .from('contract_snapshots')
-    .select('id, sha256_hash, template_title')
-    .eq('contract_id', contract.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  let contract = firstContract;
 
-  if (snapErr || !activeSnapshot) {
+  // 3. Localiza o snapshot imutável ativo do contrato
+  const loadSnapshot = async (contractId: string) => {
+    const { data } = await (dbClient as any)
+      .from('contract_snapshots')
+      .select('id, sha256_hash, template_title')
+      .eq('contract_id', contractId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return data as { id: string; sha256_hash: string; template_title: string } | null;
+  };
+
+  let activeSnapshot = await loadSnapshot(contract.id);
+
+  // O contrato mais recente pode ser um rascunho SEM snapshot (sobra de uma geração interrompida, ou outro contrato criado depois de
+  // revogar o link). Em vez de falhar, usa outro contrato em aberto desta empresa que TENHA snapshot (preferindo o aguardando assinatura).
+  if (!activeSnapshot) {
+    const { data: others } = await (dbClient as any)
+      .from('contracts')
+      .select('id, status, tenant_id, created_at')
+      .eq('business_id', businessId)
+      .in('status', ['awaiting_signature', 'draft'])
+      .order('created_at', { ascending: false })
+      .limit(10);
+    const candidates = ((others ?? []) as Array<{ id: string; status: string; tenant_id: string }>)
+      .filter((other) => other.id !== contract.id)
+      .sort((a, b) => Number(b.status === 'awaiting_signature') - Number(a.status === 'awaiting_signature'));
+    for (const other of candidates) {
+      const found = await loadSnapshot(other.id);
+      if (found) {
+        console.warn('[dispatchContractEmail] contrato mais recente sem snapshot; usando outro contrato em aberto', { businessId, ignored: contract.id, used: other.id });
+        contract = other;
+        activeSnapshot = found;
+        break;
+      }
+    }
+  }
+
+  if (!activeSnapshot) {
+    console.error('[dispatchContractEmail] nenhum contrato em aberto tem snapshot', { businessId, contractId: contract.id });
     return {
       success: false,
       status: 'failed',
