@@ -261,7 +261,8 @@ export async function getAdminContractDraftPreviewAction(
           (ctRow.plan_name?.toLowerCase().includes('acácia') && ctRow.is_pedra_fundamental) ||
           (ctRow.plan_name?.toLowerCase().includes('acacia') && ctRow.is_pedra_fundamental)
         ),
-        ctRow.plan_name
+        ctRow.plan_name,
+        ctRow.plan_code
       ),
       data_inicio_vigencia: formatDataInicioVigencia(ctRow.contract_start_date ?? null),
       valor_total: formatCurrencyBRL(ctRow.amount_cents),
@@ -585,7 +586,8 @@ export async function generateAdminContractSnapshotAction(
           (ctRow.plan_name?.toLowerCase().includes('acácia') && ctRow.is_pedra_fundamental) ||
           (ctRow.plan_name?.toLowerCase().includes('acacia') && ctRow.is_pedra_fundamental)
         ),
-        ctRow.plan_name
+        ctRow.plan_name,
+        ctRow.plan_code
       ),
       data_inicio_vigencia: formatDataInicioVigencia(ctRow.contract_start_date ?? null),
       valor_total: formatCurrencyBRL(ctRow.amount_cents),

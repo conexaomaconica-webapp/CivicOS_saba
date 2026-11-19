@@ -139,11 +139,13 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
 
   // Estados locais do formulário de conferência
   const [selectedPlan, setSelectedPlan] = useState<'bronze' | 'prata' | 'ouro'>(initialPlanTier);
-  const [isPedraFundamental, setIsPedraFundamental] = useState<boolean>(
-    savedTerms ? Boolean(savedTerms.is_pedra_fundamental) : Boolean(business.is_pedra_fundamental)
-  );
+  // Pedra Fundamental só vale com o plano Acácia ("ouro"): a empresa pode ter o reconhecimento e escolher outro plano, que fica em 1 ano
+  // (a menos que o cliente escolha pagar 2 anos). Antes, o reconhecimento da empresa abria a tela com o ciclo bienal e "Anual" bloqueado em qualquer plano.
+  const initialPedraFundamental =
+    initialPlanTier === 'ouro' && (savedTerms ? Boolean(savedTerms.is_pedra_fundamental) : Boolean(business.is_pedra_fundamental));
+  const [isPedraFundamental, setIsPedraFundamental] = useState<boolean>(initialPedraFundamental);
   const [billingCycle, setBillingCycle] = useState<'annual' | 'biennial'>(
-    savedTerms?.billing_cycle || (business.is_pedra_fundamental ? 'biennial' : 'annual')
+    savedTerms?.billing_cycle || (initialPedraFundamental ? 'biennial' : 'annual')
   );
   const [paymentMethod, setPaymentMethod] = useState<'avista' | 'parcelado' | 'permuta_100' | 'permuta_50' | 'parceria'>(
     (savedTerms?.payment_method as any) || 'avista'

@@ -227,16 +227,33 @@ export function formatVigencia(monthsOrCycle: number | string): string {
   return monthsOrCycle || '12 meses';
 }
 
+/** O plano é o Acácia? (código canônico "acacia"/"ouro"/"ouro_founder"/"acacia_pedra_fundamental" ou o nome do plano). */
+export function isAcaciaPlan(planCode?: string | null, planName?: string | null): boolean {
+  const code = String(planCode ?? '').trim().toLowerCase();
+  const name = String(planName ?? '').trim().toLowerCase();
+  return (
+    code.startsWith('acacia') || code.startsWith('acácia') || code === 'ouro' || code === 'gold' || code === 'ouro_founder' || code.includes('pedra') ||
+    name.includes('acacia') || name.includes('acácia') || name.includes('ouro') || name.includes('pedra fundamental')
+  );
+}
+
 /**
  * Formata o prazo de vigência por extenso para utilização em cláusulas contratuais
  * (ex: "vigorará durante o período de um ano corrente da contratação").
- * Para o Plano Acácia com Pedra Fundamental (ou bienal / 24 meses), retorna "dois anos correntes".
- * Para os demais planos (anual / 12 meses), retorna "um ano corrente".
+ *
+ * REGRA: "dois anos correntes" SOMENTE quando
+ *   (a) o plano é o Acácia COM Pedra Fundamental; ou
+ *   (b) o cliente escolheu pagar por 2 anos o plano escolhido (ciclo bienal / 24 meses), qualquer que seja o plano.
+ * Em qualquer outro caso, "um ano corrente". O reconhecimento "Pedra Fundamental" da EMPRESA não estende o prazo de um plano que não é o Acácia
+ * (Esquadro e Compasso ficam em um ano, salvo se o cliente escolheu o ciclo bienal).
+ *
+ * Compatibilidade: sem nenhuma informação do plano (nem código nem nome), vale o sinal "Pedra Fundamental" recebido.
  */
 export function formatPrazoVigenciaExtenso(
   monthsOrCycle?: number | string | null,
   isPedraFundamental?: boolean,
-  planName?: string | null
+  planName?: string | null,
+  planCode?: string | null
 ): string {
   const planStr = String(planName ?? '').toLowerCase();
   const hasPedra = Boolean(
@@ -245,8 +262,9 @@ export function formatPrazoVigenciaExtenso(
     (planStr.includes('acacia') && planStr.includes('pedra')) ||
     (planStr.includes('acácia') && planStr.includes('pedra'))
   );
+  const planKnown = Boolean(planStr.trim() || String(planCode ?? '').trim());
 
-  if (hasPedra) {
+  if (hasPedra && (!planKnown || isAcaciaPlan(planCode, planName))) {
     return 'dois anos correntes';
   }
   const str = String(monthsOrCycle ?? '').trim().toLowerCase();
