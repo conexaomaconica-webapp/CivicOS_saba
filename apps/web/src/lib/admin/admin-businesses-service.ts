@@ -5,7 +5,8 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { parseLegacyAddress } from '@/lib/admin/legacy-address';
 import { pickResponsibleName } from '@/lib/contracts/responsible-name';
 import { assertPlatformAdminAccess } from './admin-auth-helper';
-import { geocodeBrazilianAddress, isValidBrazilianCoordinate, parseAddressLine, type GeocodePrecision } from '@/lib/geo/geocode';
+import { geocodeBrazilianAddress, geocodeBrazilianAddressWithTrace, isValidBrazilianCoordinate, parseAddressLine, type GeocodePrecision, type GeocodeTraceStep } from '@/lib/geo/geocode';
+import { isAllowedMapsLink, parseCoordinatesText, parseGoogleUrl } from '@/lib/geo/maps-link';
 import { resolveCanonicalAdminTenant } from './admin-tenant-context';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
@@ -2098,7 +2099,10 @@ export async function updateAdminBusinessDetailsAction(
     phone?: string;
     whatsapp?: string;
     address?: string;
+    /** Endereço em campos (como no cadastro). Quando `street` vem preenchido, ele manda; `address` fica só como texto de compatibilidade. */
+    street?: string;
     number?: string;
+    complement?: string;
     neighborhood?: string;
     postal_code?: string;
     /** Coordenadas digitadas à mão (prevalecem sobre a localização automática). */
@@ -2506,18 +2510,34 @@ export async function updateAdminBusinessDetailsAction(
 
       const { data: locs } = await (supabase as any)
         .from('business_locations')
-        .select('id, is_headquarters, latitude, longitude, street, city, state, postal_code')
+        .select('id, is_headquarters, latitude, longitude, street, number, complement, neighborhood, city, state, postal_code')
         .eq('business_id', businessId);
 
       const primaryLoc = (locs || []).find((l: any) => l.is_headquarters === true) || (locs || [])[0];
-      const canonicalAddress =
-        stripLocationTail(payload.address?.trim() || '', canonicalCity.name, stateVal) || 'Endereço não informado';
+      // Endereço em campos (rua, número, complemento, bairro, CEP) quando vem `street`; senão, o texto único de antes.
+      const structured = payload.street !== undefined;
+      const canonicalAddress = (structured
+        ? stripLocationTail(payload.street!.trim(), canonicalCity.name, stateVal)
+        : stripLocationTail(payload.address?.trim() || '', canonicalCity.name, stateVal)) || 'Endereço não informado';
+      const numberValue = structured ? (payload.number?.trim() || null) : null;
+      const complementValue = structured ? (payload.complement?.trim() || null) : null;
+      const neighborhoodValue = structured ? (payload.neighborhood?.trim() || null) : null;
+      const postalDigits = structured ? String(payload.postal_code ?? '').replace(/\D/g, '') : '';
+      if (structured && postalDigits && postalDigits.length !== 8) {
+        return { success: false, error: 'CEP inválido: informe 8 dígitos (ex.: 44000-000).' };
+      }
+      const postalValue = postalDigits.length === 8 ? `${postalDigits.slice(0, 5)}-${postalDigits.slice(5)}` : null;
 
       // Coordenadas: as digitadas à mão prevalecem; senão, localiza pelo endereço (com queda para CEP e cidade)
       // quando a empresa ainda não tem coordenadas ou o endereço mudou. Coordenadas já salvas não são refeitas à toa.
       const hadCoordinates = primaryLoc?.latitude != null && primaryLoc?.longitude != null;
       const addressChanged =
-        !primaryLoc || primaryLoc.street !== canonicalAddress || primaryLoc.city !== canonicalCity.name || primaryLoc.state !== stateVal;
+        !primaryLoc || primaryLoc.street !== canonicalAddress || primaryLoc.city !== canonicalCity.name || primaryLoc.state !== stateVal ||
+        (structured && (
+          (primaryLoc.number ?? null) !== numberValue ||
+          (primaryLoc.neighborhood ?? null) !== neighborhoodValue ||
+          (postalValue !== null && primaryLoc.postal_code !== postalValue)
+        ));
       const manualChanged =
         isValidBrazilianCoordinate(payload.latitude, payload.longitude) &&
         (!hadCoordinates || Number(primaryLoc.latitude) !== payload.latitude || Number(primaryLoc.longitude) !== payload.longitude);
@@ -2532,12 +2552,12 @@ export async function updateAdminBusinessDetailsAction(
         // Com endereço novo, a busca lê número, bairro e CEP do próprio texto digitado.
         const keepStored = !addressChanged;
         const located = await geocodeBrazilianAddress({
-          street: payload.address?.trim() || '',
-          number: keepStored ? payload.number : undefined,
-          neighborhood: keepStored ? payload.neighborhood : undefined,
+          street: structured ? canonicalAddress : payload.address?.trim() || '',
+          number: structured ? numberValue ?? undefined : keepStored ? payload.number : undefined,
+          neighborhood: structured ? neighborhoodValue ?? undefined : keepStored ? payload.neighborhood : undefined,
           city: canonicalCity.name,
           state: stateVal,
-          postalCode: keepStored ? payload.postal_code || primaryLoc?.postal_code : undefined,
+          postalCode: structured ? postalValue ?? undefined : keepStored ? payload.postal_code || primaryLoc?.postal_code : undefined,
         });
         if (located) {
           coordinates = { latitude: located.latitude, longitude: located.longitude };
@@ -2552,7 +2572,7 @@ export async function updateAdminBusinessDetailsAction(
         : coordinatesCleared
           ? { latitude: null, longitude: null }
           : { latitude: primaryLoc?.latitude != null ? Number(primaryLoc.latitude) : null, longitude: primaryLoc?.longitude != null ? Number(primaryLoc.longitude) : null };
-      const parsedPostal = parseAddressLine(payload.address).postalCode;
+      const parsedPostal = structured ? '' : parseAddressLine(payload.address).postalCode;
 
       geocodePrecisionResult = geocodePrecision;
 
@@ -2564,8 +2584,9 @@ export async function updateAdminBusinessDetailsAction(
             city: canonicalCity.name,
             state: stateVal,
             street: canonicalAddress,
-            number: null,
-            ...(parsedPostal ? { postal_code: parsedPostal } : {}),
+            number: numberValue,
+            ...(structured ? { complement: complementValue, neighborhood: neighborhoodValue } : {}),
+            ...(structured ? (postalValue ? { postal_code: postalValue } : {}) : parsedPostal ? { postal_code: parsedPostal } : {}),
             ...(coordinates || {}),
             ...(coordinatesCleared ? { latitude: null, longitude: null } : {}),
             updated_at: new Date().toISOString(),
@@ -2585,8 +2606,11 @@ export async function updateAdminBusinessDetailsAction(
             city_ibge_code: canonicalCity.ibge_code,
             city: canonicalCity.name,
             state: stateVal,
-            postal_code: '00000-000',
+            postal_code: postalValue ?? '00000-000',
             street: canonicalAddress,
+            number: numberValue,
+            complement: complementValue,
+            neighborhood: neighborhoodValue,
             latitude: coordinates?.latitude ?? null,
             longitude: coordinates?.longitude ?? null,
             is_headquarters: true,
@@ -5128,10 +5152,10 @@ export async function locateBusinessAddressAction(input: {
   postal_code?: string;
   city: string;
   state: string;
-}): Promise<{ success: boolean; latitude?: number; longitude?: number; precision?: GeocodePrecision; error?: string }> {
+}): Promise<{ success: boolean; latitude?: number; longitude?: number; precision?: GeocodePrecision; tried?: GeocodeTraceStep[]; error?: string }> {
   try {
     await assertPlatformAdminAccess();
-    const located = await geocodeBrazilianAddress({
+    const { result: located, trace } = await geocodeBrazilianAddressWithTrace({
       street: input.address,
       number: input.number,
       neighborhood: input.neighborhood,
@@ -5139,11 +5163,60 @@ export async function locateBusinessAddressAction(input: {
       state: input.state,
       postalCode: input.postal_code,
     });
-    if (!located) return { success: false, error: 'Não foi possível localizar este endereço. Informe as coordenadas manualmente.' };
-    return { success: true, latitude: located.latitude, longitude: located.longitude, precision: located.precision };
+    if (!located) return { success: false, tried: trace, error: 'Não foi possível localizar este endereço. Informe as coordenadas manualmente.' };
+    return { success: true, latitude: located.latitude, longitude: located.longitude, precision: located.precision, tried: trace };
   } catch (err) {
     console.error('[locateBusinessAddressAction]', err);
     return { success: false, error: 'Não foi possível localizar o endereço agora.' };
+  }
+}
+
+/**
+ * Converte um link do Google Maps (inclusive o curto, maps.app.goo.gl) ou um par "lat, lng" em coordenadas.
+ * O servidor só segue links https de hosts do Google, no máximo 5 redirecionamentos, com tempo limite.
+ */
+export async function resolveMapsLinkAction(input: string): Promise<{ success: boolean; latitude?: number; longitude?: number; error?: string }> {
+  try {
+    await assertPlatformAdminAccess();
+    const text = String(input ?? '').trim().slice(0, 2000);
+    if (!text) return { success: false, error: 'Cole um link do Google Maps ou as coordenadas (ex.: -12.25, -38.95).' };
+
+    const direct = parseCoordinatesText(text);
+    if (direct) return { success: true, ...direct };
+
+    if (!/^https:\/\//i.test(text)) return { success: false, error: 'Não reconheci as coordenadas. Cole o link do Google Maps ou um par como -12.25, -38.95.' };
+
+    let url = text;
+    for (let hop = 0; hop < 6; hop += 1) {
+      if (!isAllowedMapsLink(url)) return { success: false, error: 'Só links do Google Maps são aceitos.' };
+      const response = await fetch(url, {
+        redirect: 'manual',
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ConexaoMaconica/1.0)', 'Accept-Language': 'pt-BR' },
+        signal: AbortSignal.timeout(8000),
+        cache: 'no-store',
+      });
+      const found = parseGoogleUrl(url);
+      if (found) return { success: true, ...found };
+      const location = response.headers.get('location');
+      if (response.status >= 300 && response.status < 400 && location) {
+        url = new URL(location, url).toString();
+        const next = parseGoogleUrl(url);
+        if (next) return { success: true, ...next };
+        continue;
+      }
+      // Página final sem as coordenadas no endereço: procura no começo do conteúdo.
+      const html = (await response.text()).slice(0, 300_000);
+      const inBody = html.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/) || html.match(/!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)/);
+      if (inBody) {
+        const point = parseCoordinatesText(inBody[1] + ', ' + inBody[2]);
+        if (point) return { success: true, ...point };
+      }
+      break;
+    }
+    return { success: false, error: 'Não encontrei as coordenadas nesse link. Abra o local no Google Maps, clique com o botão direito no ponto e cole as coordenadas.' };
+  } catch (err) {
+    console.error('[resolveMapsLinkAction]', err);
+    return { success: false, error: 'Não foi possível ler esse link agora. Cole as coordenadas diretamente.' };
   }
 }
 

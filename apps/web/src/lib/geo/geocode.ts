@@ -37,6 +37,26 @@ export const PRECISION_LABEL: Record<GeocodePrecision, string> = {
   manual: 'informada manualmente',
 };
 
+/** Nome legível de cada tentativa, para a tela explicar o que foi tentado. */
+export const TRACE_LABELS: Record<string, string> = {
+  'rua+numero': 'rua com número',
+  'livre+bairro': 'endereço completo',
+  livre: 'rua e número',
+  rua: 'rua',
+  'rua+bairro': 'rua e bairro',
+  'cep-brasilapi': 'CEP',
+  'cep-nominatim': 'CEP (mapa)',
+  'viacep-rua': 'rua pelo CEP',
+  bairro: 'bairro',
+  cidade: 'cidade',
+};
+
+export interface GeocodeTraceStep {
+  label: string;
+  precision: GeocodePrecision;
+  found: boolean;
+}
+
 const USER_AGENT = 'ConexaoMaconica-Geocoder/1.0 (+https://conexaomaconica.com.br)';
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 /** Depois deste tempo só resta a tentativa final (cidade): evita estourar o limite da execução no servidor. */
@@ -161,12 +181,29 @@ async function brasilApiCep(postalCode: string): Promise<Point | null> {
   return isValidBrazilianCoordinate(latitude, longitude) ? { latitude, longitude } : null;
 }
 
+/** Nome oficial da rua e do bairro pelo CEP (ViaCEP). */
+async function viaCep(postalCode: string): Promise<{ street: string; neighborhood: string } | null> {
+  const digits = postalCode.replace(/\D/g, '');
+  if (digits.length !== 8) return null;
+  const response = await fetch('https://viacep.com.br/ws/' + digits + '/json/', {
+    headers: { Accept: 'application/json', 'User-Agent': USER_AGENT },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(6_000),
+  });
+  if (!response.ok) return null;
+  const body = (await response.json()) as { erro?: unknown; logradouro?: string; bairro?: string };
+  if (body.erro || !body.logradouro) return null;
+  return { street: body.logradouro, neighborhood: body.bairro ?? '' };
+}
+
 type Attempt = { precision: GeocodePrecision; label: string; run: () => Promise<Point | null>; nominatim: boolean };
 
-export async function geocodeBrazilianAddress(input: GeocodeInput): Promise<GeocodeResult | null> {
+/** Igual a geocodeBrazilianAddress, mas também devolve o que foi tentado (para a tela explicar o resultado). */
+export async function geocodeBrazilianAddressWithTrace(input: GeocodeInput): Promise<{ result: GeocodeResult | null; trace: GeocodeTraceStep[] }> {
+  const trace: GeocodeTraceStep[] = [];
   const city = input.city?.trim();
   const state = input.state?.trim();
-  if (!city || !state) return null;
+  if (!city || !state) return { result: null, trace };
 
   const parsed = parseAddressLine(input.street);
   const street = parsed.street;
@@ -199,6 +236,11 @@ export async function geocodeBrazilianAddress(input: GeocodeInput): Promise<Geoc
   if (hasRealPostal) {
     add('postal_code', 'cep-brasilapi', false, () => brasilApiCep(postal));
     add('postal_code', 'cep-nominatim', true, () => nominatim({ postalcode: postal, country: 'Brasil' }));
+    add(digits ? 'address' : 'street', 'viacep-rua', true, async () => {
+      const official = await viaCep(postal);
+      if (!official) return null;
+      return nominatim(digits ? { street: digits + ' ' + official.street, ...base } : { street: official.street, ...base });
+    });
   }
   if (neighborhood) add('neighborhood', 'bairro', true, () => nominatim({ q: free([neighborhood, city, state, 'Brasil']) }));
   add('city', 'cidade', true, () => nominatim({ city, state, country: 'Brasil' }));
@@ -211,12 +253,18 @@ export async function geocodeBrazilianAddress(input: GeocodeInput): Promise<Geoc
     if (!isLast && Date.now() - started > SOFT_DEADLINE_MS) continue;
     try {
       const hit = await attempt.run();
-      if (hit) return { ...hit, precision: attempt.precision };
+      trace.push({ label: TRACE_LABELS[attempt.label] ?? attempt.label, precision: attempt.precision, found: Boolean(hit) });
+      if (hit) return { result: { ...hit, precision: attempt.precision }, trace };
     } catch {
       // Falha de rede nesta tentativa: segue para a próxima, menos precisa.
+      trace.push({ label: TRACE_LABELS[attempt.label] ?? attempt.label, precision: attempt.precision, found: false });
     }
     const next = attempts[i + 1];
     if (next && attempt.nominatim && next.nominatim) await sleep(1000);
   }
-  return null;
+  return { result: null, trace };
+}
+
+export async function geocodeBrazilianAddress(input: GeocodeInput): Promise<GeocodeResult | null> {
+  return (await geocodeBrazilianAddressWithTrace(input)).result;
 }

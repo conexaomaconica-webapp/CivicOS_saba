@@ -60,6 +60,7 @@ import {
   toggleRecognitionAction,
   updateAdminBusinessDetailsAction,
   locateBusinessAddressAction,
+  resolveMapsLinkAction,
   verifyAdminMasonicLinkAction,
   upsertAdminMasonicLinkAction,
   manageAdminServiceAction,
@@ -77,6 +78,8 @@ import {
   listAdminCanonicalLocationsAction,
 } from '@/lib/admin/admin-businesses-service';
 import { compressImageOnClient } from '@/lib/media/client-image-compressor';
+import { parseAddressLine } from '@/lib/geo/geocode';
+import { parseCoordinatesText } from '@/lib/geo/maps-link';
 import { formatCpfCnpj, formatPhone } from '@/lib/onboarding/onboarding-validation';
 import { AdminLodgeNameCombobox } from '@/components/admin/AdminLodgeNameCombobox';
 import { getCommercialPlanName } from '@/lib/admin/approval-display';
@@ -191,7 +194,50 @@ export default function Company360Client({ initialData }: Props) {
   const [state, setState] = useState(data.business.state || '');
   const [locationOptions, setLocationOptions] = useState<Array<{ city: string; state: string }>>([]);
   const [loadingLocations, setLoadingLocations] = useState(true);
-  const [address, setAddress] = useState(data.business.address || '');
+  // Endereço em campos (como no cadastro). Registros antigos guardam tudo numa linha só: ela é separada aqui para o administrador conferir.
+  const legacyAddress = !data.business.number && !data.business.neighborhood ? parseAddressLine(data.business.street || '') : null;
+  const storedPostal = data.business.postal_code && data.business.postal_code !== '00000-000' ? data.business.postal_code : '';
+  const [postalCode, setPostalCode] = useState(storedPostal || legacyAddress?.postalCode || '');
+  const [street, setStreet] = useState(legacyAddress?.street || data.business.street || '');
+  const [streetNumber, setStreetNumber] = useState(legacyAddress ? legacyAddress.number : data.business.number || '');
+  const [complement, setComplement] = useState(data.business.complement || '');
+  const [neighborhood, setNeighborhood] = useState(legacyAddress ? legacyAddress.neighborhood : data.business.neighborhood || '');
+  const [cepBusy, setCepBusy] = useState(false);
+  const [cepFeedback, setCepFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+  // Texto único (compatibilidade com o campo antigo "address" da empresa): rua, número, complemento, bairro.
+  const streetLine = street.trim() + (streetNumber.trim() ? ', ' + streetNumber.trim() : '');
+  const address = [streetLine, complement.trim(), neighborhood.trim()].filter(Boolean).join(', ');
+  const formatCep = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 8);
+    return digits.length > 5 ? digits.slice(0, 5) + '-' + digits.slice(5) : digits;
+  };
+  const handleCepLookup = async (raw?: string) => {
+    const digits = (raw ?? postalCode).replace(/\D/g, '');
+    if (digits.length !== 8) {
+      setCepFeedback({ ok: false, text: 'Informe um CEP válido com 8 dígitos.' });
+      return;
+    }
+    setCepBusy(true);
+    setCepFeedback(null);
+    try {
+      const response = await fetch('https://viacep.com.br/ws/' + digits + '/json/');
+      if (!response.ok) throw new Error('indisponivel');
+      const body = (await response.json()) as { erro?: boolean; logradouro?: string; bairro?: string; localidade?: string; uf?: string };
+      if (body.erro) {
+        setCepFeedback({ ok: false, text: 'CEP não encontrado nos Correios. Preencha o endereço manualmente.' });
+        return;
+      }
+      if (body.logradouro) setStreet(body.logradouro);
+      if (body.bairro) setNeighborhood(body.bairro);
+      if (body.uf) setState(String(body.uf).toUpperCase());
+      if (body.localidade) setCity(body.localidade);
+      setCepFeedback({ ok: true, text: 'Endereço encontrado pelo CEP. Informe o número e o complemento e clique em "Localizar pelo endereço".' });
+    } catch {
+      setCepFeedback({ ok: false, text: 'Não foi possível consultar o CEP agora. Preencha o endereço manualmente.' });
+    } finally {
+      setCepBusy(false);
+    }
+  };
   // Localização no mapa do Guia: coordenadas como texto (aceita vírgula), preenchidas pelo botão "Localizar" ou à mão.
   const [latitudeText, setLatitudeText] = useState(data.business.latitude != null ? String(data.business.latitude) : '');
   const [longitudeText, setLongitudeText] = useState(data.business.longitude != null ? String(data.business.longitude) : '');
@@ -204,18 +250,26 @@ export default function Company360Client({ initialData }: Props) {
   const handleLocate = async () => {
     setLocating(true);
     setLocationHint(null);
-    // Número, bairro e CEP guardados pertencem ao endereço SALVO: com endereço novo, a busca lê tudo do texto digitado.
-    const unchanged = (data.business.address || '').trim() === address.trim() && (data.business.city || '') === city && (data.business.state || '') === state;
+    // Tudo vem dos campos que estão na tela agora (rua, número, bairro, CEP, cidade e UF): nada do endereço antigo.
     const res = await locateBusinessAddressAction({
-      address,
-      number: unchanged ? data.business.number ?? undefined : undefined,
-      neighborhood: unchanged ? data.business.neighborhood ?? undefined : undefined,
-      postal_code: unchanged ? data.business.postal_code ?? undefined : undefined,
+      address: street,
+      number: streetNumber,
+      neighborhood,
+      postal_code: postalCode,
       city,
       state,
     });
     setLocating(false);
-    if (res.success && res.latitude != null && res.longitude != null) {
+    const triedText = res.tried && res.tried.length > 0
+      ? ' Tentativas: ' + res.tried.map((step) => step.label + (step.found ? ' ✓' : ' ✗')).join(' · ') + '.'
+      : '';
+    if (res.success && res.precision === 'city') {
+      // Só o centro da cidade: é o MESMO ponto para qualquer endereço. Não preenche, para não parecer que o endereço foi localizado.
+      setLocationHint({
+        ok: false,
+        text: 'Não encontramos esse endereço no mapa (só a cidade). As coordenadas NÃO foram alteradas. Abra o local no Google Maps, clique com o botão direito no ponto e cole o link ou as coordenadas no campo abaixo.' + triedText,
+      });
+    } else if (res.success && res.latitude != null && res.longitude != null) {
       setLatitudeText(String(res.latitude));
       setLongitudeText(String(res.longitude));
       const approximateLabel: Record<string, string> = { street: 'rua (sem o número exato)', neighborhood: 'bairro', postal_code: 'CEP', city: 'cidade' };
@@ -223,12 +277,34 @@ export default function Company360Client({ initialData }: Props) {
       setLocationHint({
         ok: !approximate,
         text: approximate
-          ? `Localizada por ${approximateLabel[res.precision as string]} (posição aproximada). Confira o ponto no mapa e ajuste a latitude e a longitude se necessário, depois salve.`
+          ? `Localizada por ${approximateLabel[res.precision as string]} (posição aproximada). Confira o ponto no mapa e ajuste a latitude e a longitude se necessário, depois salve.` + triedText
           : 'Localizada pelo endereço. Confira o ponto no mapa e salve.',
       });
     } else {
-      setLocationHint({ ok: false, text: res.error || 'Não foi possível localizar.' });
+      setLocationHint({ ok: false, text: (res.error || 'Não foi possível localizar.') + ' Cole o link ou as coordenadas do Google Maps no campo abaixo.' + triedText });
     }
+  };
+
+  // Colar o link do Google Maps ou "lat, lng": preenche latitude e longitude (links curtos são resolvidos no servidor).
+  const [mapsPaste, setMapsPaste] = useState('');
+  const [mapsBusy, setMapsBusy] = useState(false);
+  const applyMapsPaste = async () => {
+    const text = mapsPaste.trim();
+    if (!text) return;
+    setMapsBusy(true);
+    const local = parseCoordinatesText(text);
+    const resolved = local
+      ? { success: true as const, latitude: local.latitude, longitude: local.longitude }
+      : await resolveMapsLinkAction(text);
+    setMapsBusy(false);
+    if (resolved.success && resolved.latitude != null && resolved.longitude != null) {
+      setLatitudeText(String(resolved.latitude));
+      setLongitudeText(String(resolved.longitude));
+      setMapsPaste('');
+      setLocationHint({ ok: true, text: 'Coordenadas aplicadas. Confira o ponto no mapa e salve.' });
+      return;
+    }
+    setLocationHint({ ok: false, text: ('error' in resolved && resolved.error) || 'Não reconheci as coordenadas. Cole o link do Google Maps ou um par como -12.25, -38.95.' });
   };
   const [description, setDescription] = useState(data.business.description || '');
 
@@ -1008,11 +1084,13 @@ export default function Company360Client({ initialData }: Props) {
         city,
         state,
         address,
+        street,
+        number: streetNumber,
+        complement,
+        neighborhood,
+        postal_code: postalCode,
         latitude: parseCoordinate(latitudeText),
         longitude: parseCoordinate(longitudeText),
-        number: data.business.number,
-        neighborhood: data.business.neighborhood,
-        postal_code: data.business.postal_code,
         description,
         responsible_name: respName,
         responsible_role: respRole,
@@ -1063,6 +1141,11 @@ export default function Company360Client({ initialData }: Props) {
             city: res.data.city,
             state: res.data.state,
             address: res.data.address,
+            street: street.trim() || undefined,
+            number: streetNumber.trim() || undefined,
+            complement: complement.trim() || undefined,
+            neighborhood: neighborhood.trim() || undefined,
+            postal_code: postalCode || undefined,
             description: res.data.description,
             updated_at: res.data.updated_at,
           },
@@ -3069,6 +3152,38 @@ export default function Company360Client({ initialData }: Props) {
                 />
               </div>
 
+              <div className="md:col-span-2">
+                <label className="block font-bold text-stone-800 mb-1">CEP</label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={postalCode}
+                    onChange={(e) => {
+                      const next = formatCep(e.target.value);
+                      setPostalCode(next);
+                      setCepFeedback(null);
+                      if (next.replace(/\D/g, '').length === 8) void handleCepLookup(next);
+                    }}
+                    placeholder="00000-000"
+                    maxLength={9}
+                    aria-label="CEP"
+                    className="w-40 px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleCepLookup()}
+                    disabled={cepBusy}
+                    className="px-3 py-2 rounded-xl bg-[#3B0B14] text-[#C9A227] font-bold text-xs disabled:opacity-50"
+                  >
+                    {cepBusy ? 'Buscando…' : 'Buscar endereço pelo CEP'}
+                  </button>
+                </div>
+                {cepFeedback && (
+                  <p className={'mt-1 text-xs font-semibold ' + (cepFeedback.ok ? 'text-emerald-700' : 'text-amber-800')}>{cepFeedback.text}</p>
+                )}
+              </div>
+
               <div>
                 <label className="block font-bold text-stone-800 mb-1">Estado (UF)</label>
                 <select
@@ -3097,14 +3212,46 @@ export default function Company360Client({ initialData }: Props) {
                 </select>
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block font-bold text-stone-800 mb-1">Endereço Físico Completo</label>
-                <input
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
-                />
+              <div className="md:col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-6">
+                <div className="sm:col-span-4">
+                  <label className="block font-bold text-stone-800 mb-1">Rua / Logradouro</label>
+                  <input
+                    type="text"
+                    value={street}
+                    onChange={(e) => setStreet(e.target.value)}
+                    placeholder="Ex.: Avenida Getúlio Vargas"
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block font-bold text-stone-800 mb-1">Número</label>
+                  <input
+                    type="text"
+                    value={streetNumber}
+                    onChange={(e) => setStreetNumber(e.target.value)}
+                    placeholder="Ex.: 500 ou s/n"
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="block font-bold text-stone-800 mb-1">Complemento</label>
+                  <input
+                    type="text"
+                    value={complement}
+                    onChange={(e) => setComplement(e.target.value)}
+                    placeholder="Sala, loja, bloco…"
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="block font-bold text-stone-800 mb-1">Bairro</label>
+                  <input
+                    type="text"
+                    value={neighborhood}
+                    onChange={(e) => setNeighborhood(e.target.value)}
+                    className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                  />
+                </div>
               </div>
 
               <div className="md:col-span-2 rounded-xl border border-stone-200 bg-stone-50/60 p-3 space-y-2">
@@ -3127,6 +3274,14 @@ export default function Company360Client({ initialData }: Props) {
                       inputMode="decimal"
                       value={latitudeText}
                       onChange={(e) => setLatitudeText(e.target.value)}
+                      onPaste={(e) => {
+                        const pair = parseCoordinatesText(e.clipboardData.getData('text'));
+                        if (pair) {
+                          e.preventDefault();
+                          setLatitudeText(String(pair.latitude));
+                          setLongitudeText(String(pair.longitude));
+                        }
+                      }}
                       placeholder="-12.2740977"
                       className="mt-1 w-full px-3 py-2 border border-stone-300 rounded-xl bg-white text-stone-900 font-normal outline-none focus:ring-2 focus:ring-[#3B0B14]"
                     />
@@ -3146,6 +3301,37 @@ export default function Company360Client({ initialData }: Props) {
                 {locationHint && (
                   <p className={`text-xs font-semibold ${locationHint.ok ? 'text-emerald-700' : 'text-amber-800'}`}>{locationHint.text}</p>
                 )}
+                <div className="rounded-lg border border-stone-200 bg-white p-2.5 space-y-1.5">
+                  <label className="block text-stone-700 font-semibold text-xs">
+                    Colar link do Google Maps ou coordenadas
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      <input
+                        type="text"
+                        value={mapsPaste}
+                        onChange={(e) => setMapsPaste(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void applyMapsPaste(); } }}
+                        placeholder="https://maps.app.goo.gl/… ou -12.2578, -38.9598"
+                        className="min-w-0 flex-1 px-3 py-2 border border-stone-300 rounded-xl bg-white text-stone-900 font-normal outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void applyMapsPaste()}
+                        disabled={mapsBusy || !mapsPaste.trim()}
+                        className="px-3 py-2 rounded-xl bg-stone-800 text-white font-bold text-xs disabled:opacity-50"
+                      >
+                        {mapsBusy ? 'Lendo…' : 'Usar'}
+                      </button>
+                    </div>
+                  </label>
+                  <a
+                    href={'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent([address, neighborhood, city, state, postalCode, 'Brasil'].filter(Boolean).join(', '))}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block text-xs font-bold text-[#3B0B14] underline"
+                  >
+                    Abrir este endereço no Google Maps (copie o link ou clique com o botão direito no ponto)
+                  </a>
+                </div>
                 {parseCoordinate(latitudeText) !== undefined && parseCoordinate(longitudeText) !== undefined && (
                   <a
                     href={`https://www.google.com/maps?q=${parseCoordinate(latitudeText)},${parseCoordinate(longitudeText)}`}
