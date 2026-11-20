@@ -5,6 +5,7 @@ import { Phone, Mail, MapPin, Globe } from 'lucide-react';
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
 import { trackEvent } from '@/lib/analytics/track-client';
 import type { AllowedEventType } from '@/lib/analytics/analytics-service';
+import { normalizeSocialUrl } from '@/lib/business/social-links';
 
 type BusinessActionButtonsProps = {
   contacts: PublicBusinessPresentation['contacts'];
@@ -45,27 +46,14 @@ export function QuickActionBar({
     ? (/^https?:\/\//i.test(contacts.website) ? contacts.website : `https://${contacts.website}`)
     : null;
 
-  const mapsUrl = location
+  const mapsUrl = location?.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${businessName}, ${location.address}`)}`
     : null;
 
-  const getSocialUrl = (raw: string | undefined | null, defaultDomain: string): string | null => {
-    if (!raw) return null;
-    const trimmed = raw.trim();
-    if (!trimmed) return null;
-    if (/^https?:\/\//i.test(trimmed)) return trimmed;
-    if (trimmed.includes('.') || (defaultDomain && trimmed.toLowerCase().includes(defaultDomain))) {
-      return `https://${trimmed.replace(/^\/+/, '')}`;
-    }
-    const isYoutubeHandle = defaultDomain === 'youtube.com' && trimmed.startsWith('@');
-    const clean = trimmed.replace(/^@/, '').replace(/^\/+/, '');
-    return `https://${defaultDomain}/${isYoutubeHandle ? '@' : ''}${clean}`;
-  };
-
-  const instagramUrl = getSocialUrl(contacts.instagram, 'instagram.com');
-  const facebookUrl = getSocialUrl(contacts.facebook, 'facebook.com');
-  const linkedinUrl = getSocialUrl(contacts.linkedin, 'linkedin.com');
-  const youtubeUrl = getSocialUrl(contacts.youtube, 'youtube.com');
+  const instagramUrl = normalizeSocialUrl(contacts.instagram, 'instagram');
+  const facebookUrl = normalizeSocialUrl(contacts.facebook, 'facebook');
+  const linkedinUrl = normalizeSocialUrl(contacts.linkedin, 'linkedin');
+  const youtubeUrl = normalizeSocialUrl(contacts.youtube, 'youtube');
 
   const tabs = [
     { id: 'visao-geral', label: 'Visão geral' },
@@ -73,7 +61,7 @@ export function QuickActionBar({
     { id: 'fotos-videos', label: 'Fotos e vídeos' },
     { id: 'beneficios', label: 'Benefícios' },
     { id: 'comentarios', label: 'Comentários' },
-    { id: 'localizacao', label: 'Localização' },
+    ...(location?.address ? [{ id: 'localizacao', label: 'Localização' }] : []),
   ];
 
   return (

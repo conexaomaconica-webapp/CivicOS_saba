@@ -26,6 +26,9 @@ export function CompanyLogoWithZoom({
   const logoUrl = logo?.url || '/logofallback.png';
   const altText = logo?.alt || `Logomarca Oficial — ${businessName}`;
   const resolvedBgColor = backgroundColor || logo?.backgroundColor || '#ffffff';
+  const zoom = typeof logo?.zoom === 'number' && Number.isFinite(logo.zoom) ? logo.zoom : 1.0;
+  const objectPosition = logo?.objectPosition || 'center center';
+  const fitMode = logo?.fitMode || 'contain';
 
   return (
     <>
@@ -36,7 +39,17 @@ export function CompanyLogoWithZoom({
         style={{ backgroundColor: resolvedBgColor }}
         className={`${className} transition-all hover:scale-[1.03] hover:border-[#C9A227]`}
       >
-        <img src={logoUrl} alt={altText} className={imgClassName} />
+        <img
+          src={logoUrl}
+          alt={altText}
+          className={imgClassName}
+          style={{
+            transform: zoom !== 1 ? `scale(${zoom})` : undefined,
+            transformOrigin: objectPosition,
+            objectPosition,
+            objectFit: fitMode,
+          }}
+        />
         
         {/* Overlay do ícone de Zoom no hover */}
         <div className="absolute inset-0 bg-stone-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl backdrop-blur-2xs">

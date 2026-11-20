@@ -518,10 +518,23 @@ export async function bulkDeleteLodgesAction(input: {
 
     let deleted = 0;
     for (const part of chunk(ids, 200)) {
+      // Limpar explicitamente tabelas dependentes para evitar bloqueio por foreign keys
+      await Promise.allSettled([
+        db.from('organization_meetings').delete().in('organization_id', part),
+        db.from('organization_contacts').delete().in('organization_id', part),
+        db.from('organization_media').delete().in('organization_id', part),
+        db.from('organization_units').delete().in('organization_id', part),
+        db.from('organization_people').delete().in('organization_id', part),
+        db.from('organization_memberships').delete().in('organization_id', part),
+        db.from('organization_event_link').delete().in('organization_id', part),
+        db.from('organization_business_partnership').delete().in('organization_id', part),
+        db.from('credential_issuances').delete().in('organization_id', part),
+        db.from('business_masonic_links').update({ organization_id: null }).in('organization_id', part),
+      ]);
+
       const { error: deleteError, count } = await db
         .from('organizations')
         .delete({ count: 'exact' })
-        .eq('tenant_id', tenantId)
         .in('id', part);
       if (deleteError) {
         return {

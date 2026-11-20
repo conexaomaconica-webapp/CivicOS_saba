@@ -3,7 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { assertPlatformAdminAccess } from './admin-auth-helper';
 import { resolveCanonicalAdminTenant } from './admin-tenant-context';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { LODGE_GALLERY_MAX_PHOTOS } from '@/lib/media/lodge-media-policy';
 
 function getAdminSupabase() {
@@ -533,10 +533,12 @@ export async function deleteAdminLodgeAction(
   lodgeId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { supabase } = await assertPlatformAdminAccess();
+    await assertPlatformAdminAccess();
     if (!lodgeId?.trim()) return { success: false, error: 'ID da Loja não informado.' };
 
-    const { data: lodge, error: findError } = await (supabase as any)
+    const db = getAdminSupabase();
+
+    const { data: lodge, error: findError } = await (db as any)
       .from('organizations')
       .select('id, slug')
       .eq('id', lodgeId)
@@ -545,9 +547,24 @@ export async function deleteAdminLodgeAction(
     if (findError) return { success: false, error: `Falha ao localizar a Loja: ${findError.message}` };
     if (!lodge) return { success: false, error: 'Loja Maçônica não encontrada.' };
 
-    const { error: deleteError } = await (supabase as any)
+    // Limpar explicitamente tabelas dependentes para evitar bloqueio por foreign keys
+    await Promise.allSettled([
+      (db as any).from('organization_meetings').delete().eq('organization_id', lodgeId),
+      (db as any).from('organization_contacts').delete().eq('organization_id', lodgeId),
+      (db as any).from('organization_media').delete().eq('organization_id', lodgeId),
+      (db as any).from('organization_units').delete().eq('organization_id', lodgeId),
+      (db as any).from('organization_people').delete().eq('organization_id', lodgeId),
+      (db as any).from('organization_memberships').delete().eq('organization_id', lodgeId),
+      (db as any).from('organization_relationships').delete().or(`source_organization_id.eq.${lodgeId},target_organization_id.eq.${lodgeId}`),
+      (db as any).from('organization_event_link').delete().eq('organization_id', lodgeId),
+      (db as any).from('organization_business_partnership').delete().eq('organization_id', lodgeId),
+      (db as any).from('credential_issuances').delete().eq('organization_id', lodgeId),
+      (db as any).from('business_masonic_links').update({ organization_id: null }).eq('organization_id', lodgeId),
+    ]);
+
+    const { error: deleteError, count } = await (db as any)
       .from('organizations')
-      .delete()
+      .delete({ count: 'exact' })
       .eq('id', lodgeId);
 
     if (deleteError) {
@@ -557,10 +574,21 @@ export async function deleteAdminLodgeAction(
       };
     }
 
+    if (count === 0) {
+      return {
+        success: false,
+        error: 'Nenhum registro foi removido no banco de dados. A Loja pode já ter sido excluída.',
+      };
+    }
+
+    try {
+      revalidateTag('admin-lodges');
+    } catch (_e) {}
     revalidatePath('/admin/lojas');
     revalidatePath(`/admin/lojas/${lodgeId}`);
     revalidatePath('/guia/lojas');
     if (lodge.slug) revalidatePath(`/guia/lojas/${lodge.slug}`);
+    revalidatePath('/guia');
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Erro inesperado ao excluir a Loja Maçônica.' };
@@ -814,6 +842,9 @@ export async function createAdminLodgeAction(payload: AdminLodgeFormPayload): Pr
       await (supabase as any).from('organization_contacts').insert(contactsToInsert);
     }
 
+    try {
+      revalidateTag('admin-lodges');
+    } catch (_e) {}
     revalidatePath('/admin/lojas');
     revalidatePath('/guia/lojas');
     revalidatePath(`/guia/lojas/${slug}`);
@@ -882,7 +913,8 @@ export async function updateAdminLodgeAction(lodgeId: string, payload: AdminLodg
       updated_at: new Date().toISOString(),
     };
 
-    const { data: orgData, error: orgError } = await (supabase as any)
+    const db = getAdminSupabase();
+    const { data: orgData, error: orgError } = await (db as any)
       .from('organizations')
       .update(orgUpdatePayload)
       .eq('id', lodgeId)
@@ -898,9 +930,9 @@ export async function updateAdminLodgeAction(lodgeId: string, payload: AdminLodg
     }
 
     if (payload.meeting_day) {
-      const { error: deleteMeetingError } = await (supabase as any).from('organization_meetings').delete().eq('organization_id', lodgeId);
+      const { error: deleteMeetingError } = await (db as any).from('organization_meetings').delete().eq('organization_id', lodgeId);
       if (deleteMeetingError) return { success: false, error: `Falha ao atualizar reunião: ${deleteMeetingError.message}` };
-      const { error: meetingError } = await (supabase as any).from('organization_meetings').insert({
+      const { error: meetingError } = await (db as any).from('organization_meetings').insert({
         tenant_id: tenantId,
         organization_id: lodgeId,
         meeting_day: payload.meeting_day,
@@ -911,7 +943,7 @@ export async function updateAdminLodgeAction(lodgeId: string, payload: AdminLodg
       if (meetingError) return { success: false, error: `Falha ao salvar reunião: ${meetingError.message}` };
     }
 
-    const { error: deleteContactsError } = await (supabase as any).from('organization_contacts').delete().eq('organization_id', lodgeId);
+    const { error: deleteContactsError } = await (db as any).from('organization_contacts').delete().eq('organization_id', lodgeId);
     if (deleteContactsError) return { success: false, error: `Falha ao atualizar contatos: ${deleteContactsError.message}` };
     const contactsToInsert = [];
     if (payload.phone) contactsToInsert.push({ tenant_id: tenantId, organization_id: lodgeId, type: 'phone', value: payload.phone, label: 'Telefone Institucional', is_public: true });
@@ -922,12 +954,12 @@ export async function updateAdminLodgeAction(lodgeId: string, payload: AdminLodg
     if (payload.fraternity_instagram) contactsToInsert.push({ tenant_id: tenantId, organization_id: lodgeId, type: 'fraternity_instagram', value: payload.fraternity_instagram, label: 'Instagram da Fraternidade Feminina', is_public: true });
 
     if (contactsToInsert.length > 0) {
-      const { error: contactsError } = await (supabase as any).from('organization_contacts').insert(contactsToInsert);
+      const { error: contactsError } = await (db as any).from('organization_contacts').insert(contactsToInsert);
       if (contactsError) return { success: false, error: `Falha ao salvar contatos: ${contactsError.message}` };
     }
 
     if (payload.gallery) {
-      const { error: deleteMediaError } = await (supabase as any)
+      const { error: deleteMediaError } = await (db as any)
         .from('organization_media')
         .delete()
         .eq('organization_id', lodgeId)
@@ -938,7 +970,7 @@ export async function updateAdminLodgeAction(lodgeId: string, payload: AdminLodg
       }
 
       if (payload.gallery.length > 0) {
-        const { error: mediaError } = await (supabase as any).from('organization_media').insert(
+        const { error: mediaError } = await (db as any).from('organization_media').insert(
           payload.gallery.map((item, index) => ({
             tenant_id: tenantId,
             organization_id: lodgeId,
@@ -955,6 +987,9 @@ export async function updateAdminLodgeAction(lodgeId: string, payload: AdminLodg
       }
     }
 
+    try {
+      revalidateTag('admin-lodges');
+    } catch (_e) {}
     revalidatePath('/admin/lojas');
     revalidatePath(`/admin/lojas/${lodgeId}`);
     revalidatePath('/guia/lojas');

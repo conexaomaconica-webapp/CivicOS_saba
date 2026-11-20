@@ -260,6 +260,68 @@ function getMergedCategories(
   });
 }
 
+function resolveSocialLink(
+  raw: string | undefined | null,
+  platform: 'instagram' | 'facebook' | 'linkedin' | 'youtube' | 'website'
+): string {
+  if (!raw) return '#';
+  const val = raw.trim();
+  if (!val) return '#';
+  if (/^(javascript|data|file):/i.test(val)) return '#';
+
+  if (platform === 'website') {
+    return val.startsWith('http') ? val : `https://${val.replace(/^\/+/, '')}`;
+  }
+
+  const domainMap: Record<string, string> = {
+    instagram: 'instagram.com',
+    facebook: 'facebook.com',
+    linkedin: 'linkedin.com',
+    youtube: 'youtube.com',
+  };
+  const domain = domainMap[platform] || 'instagram.com';
+
+  if (val.startsWith('http')) {
+    if (platform !== 'youtube' && val.includes(`${domain}/@`)) {
+      return val.replace(`${domain}/@`, `${domain}/`);
+    }
+    return val;
+  }
+
+  if (val.toLowerCase().includes(domain)) {
+    let clean = val.replace(/^\/+/, '');
+    if (!clean.startsWith('http')) clean = `https://${clean}`;
+    if (platform !== 'youtube' && clean.includes(`${domain}/@`)) {
+      clean = clean.replace(`${domain}/@`, `${domain}/`);
+    }
+    return clean;
+  }
+
+  const cleanHandle = val.replace(/^@+/, '').replace(/^\/+/, '');
+  if (!cleanHandle) return '#';
+
+  if (platform === 'youtube') {
+    return `https://www.youtube.com/@${cleanHandle}`;
+  }
+
+  return `https://www.${domain}/${cleanHandle}`;
+}
+
+function hasPhysicalAddress(detail?: { address?: string | null; city?: string | null } | null): boolean {
+  if (!detail || !detail.address) return false;
+  const addr = detail.address.trim();
+  if (addr.length < 3) return false;
+  const forbidden = /^(online|atendimento online|100% online|sem endere[cç]o|n[aã]o informado|-|\.)$/i;
+  if (forbidden.test(addr)) return false;
+
+  const city = (detail.city || '').trim().toLowerCase();
+  const cleanAddr = addr.toLowerCase();
+  if (city && (cleanAddr === city || cleanAddr.startsWith(`${city},`) || cleanAddr.startsWith(`${city} -`))) {
+    return false;
+  }
+  return true;
+}
+
 function useOnlineStatus() {
   const [online, setOnline] = useState(navigator.onLine);
   useEffect(() => {
@@ -2710,11 +2772,7 @@ function AnuncioModal({
               <div className="contacts-grid">
                 {instagramContact && (
                   <a
-                    href={
-                      instagramContact.value.startsWith('http')
-                        ? instagramContact.value
-                        : `https://instagram.com/${instagramContact.value.replace('@', '')}`
-                    }
+                    href={resolveSocialLink(instagramContact.value, 'instagram')}
                     target="_blank"
                     rel="noreferrer"
                     className="contact-item-btn"
@@ -2725,11 +2783,7 @@ function AnuncioModal({
                 )}
                 {websiteContact && (
                   <a
-                    href={
-                      websiteContact.value.startsWith('http')
-                        ? websiteContact.value
-                        : `https://${websiteContact.value}`
-                    }
+                    href={resolveSocialLink(websiteContact.value, 'website')}
                     target="_blank"
                     rel="noreferrer"
                     className="contact-item-btn"
@@ -2740,11 +2794,7 @@ function AnuncioModal({
                 )}
                 {facebookContact && (
                   <a
-                    href={
-                      facebookContact.value.startsWith('http')
-                        ? facebookContact.value
-                        : `https://facebook.com/${facebookContact.value.replace(/^@/, '')}`
-                    }
+                    href={resolveSocialLink(facebookContact.value, 'facebook')}
                     target="_blank"
                     rel="noreferrer"
                     className="contact-item-btn"
@@ -2755,11 +2805,7 @@ function AnuncioModal({
                 )}
                 {linkedinContact && (
                   <a
-                    href={
-                      linkedinContact.value.startsWith('http')
-                        ? linkedinContact.value
-                        : `https://linkedin.com/in/${linkedinContact.value.replace(/^@/, '')}`
-                    }
+                    href={resolveSocialLink(linkedinContact.value, 'linkedin')}
                     target="_blank"
                     rel="noreferrer"
                     className="contact-item-btn"
@@ -2770,11 +2816,7 @@ function AnuncioModal({
                 )}
                 {youtubeContact && (
                   <a
-                    href={
-                      youtubeContact.value.startsWith('http')
-                        ? youtubeContact.value
-                        : `https://youtube.com/${youtubeContact.value}`
-                    }
+                    href={resolveSocialLink(youtubeContact.value, 'youtube')}
                     target="_blank"
                     rel="noreferrer"
                     className="contact-item-btn"
@@ -3431,6 +3473,12 @@ function BusinessDetailModal({
                           className="detail-logo-img"
                           src={detail.logo_url}
                           alt={detail.business_name}
+                          style={{
+                            transform: detail.logo_zoom && detail.logo_zoom !== 1 ? `scale(${detail.logo_zoom})` : undefined,
+                            transformOrigin: `center ${detail.logo_offset_y ?? 50}%`,
+                            objectPosition: `center ${detail.logo_offset_y ?? 50}%`,
+                            objectFit: detail.logo_fit_mode || 'contain',
+                          }}
                         />
                       </button>
                     ) : (
@@ -3711,11 +3759,7 @@ function BusinessDetailModal({
                     )}
                     {instagramContact && (
                       <a
-                        href={
-                          instagramContact.value.startsWith('http')
-                            ? instagramContact.value
-                            : `https://instagram.com/${instagramContact.value.replace('@', '')}`
-                        }
+                        href={resolveSocialLink(instagramContact.value, 'instagram')}
                         target="_blank"
                         rel="noreferrer"
                         className="contact-item-btn"
@@ -3736,11 +3780,7 @@ function BusinessDetailModal({
                     )}
                     {websiteContact && (
                       <a
-                        href={
-                          websiteContact.value.startsWith('http')
-                            ? websiteContact.value
-                            : `https://${websiteContact.value}`
-                        }
+                        href={resolveSocialLink(websiteContact.value, 'website')}
                         target="_blank"
                         rel="noreferrer"
                         className="contact-item-btn"
@@ -3761,11 +3801,7 @@ function BusinessDetailModal({
                     )}
                     {facebookContact && (
                       <a
-                        href={
-                          facebookContact.value.startsWith('http')
-                            ? facebookContact.value
-                            : `https://facebook.com/${facebookContact.value.replace(/^@/, '')}`
-                        }
+                        href={resolveSocialLink(facebookContact.value, 'facebook')}
                         target="_blank"
                         rel="noreferrer"
                         className="contact-item-btn"
@@ -3776,11 +3812,7 @@ function BusinessDetailModal({
                     )}
                     {linkedinContact && (
                       <a
-                        href={
-                          linkedinContact.value.startsWith('http')
-                            ? linkedinContact.value
-                            : `https://linkedin.com/in/${linkedinContact.value.replace(/^@/, '')}`
-                        }
+                        href={resolveSocialLink(linkedinContact.value, 'linkedin')}
                         target="_blank"
                         rel="noreferrer"
                         className="contact-item-btn"
@@ -3791,11 +3823,7 @@ function BusinessDetailModal({
                     )}
                     {youtubeContact && (
                       <a
-                        href={
-                          youtubeContact.value.startsWith('http')
-                            ? youtubeContact.value
-                            : `https://youtube.com/${youtubeContact.value}`
-                        }
+                        href={resolveSocialLink(youtubeContact.value, 'youtube')}
                         target="_blank"
                         rel="noreferrer"
                         className="contact-item-btn"
@@ -3804,7 +3832,7 @@ function BusinessDetailModal({
                         <span>YouTube</span>
                       </a>
                     )}
-                    {(detail.address || detail.city) && (
+                    {hasPhysicalAddress(detail) && (
                       <a
                         href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
                           `${detail.business_name} ${detail.address || ''} ${detail.city || ''}`
@@ -3909,16 +3937,18 @@ function BusinessDetailModal({
                   >
                     Comentários
                   </button>
-                  <button
-                    type="button"
-                    className={`profile-tab-btn ${activeTab === 'localizacao' ? 'active' : ''}`}
-                    onClick={() => {
-                      setActiveTab('localizacao');
-                      document.getElementById('section-localizacao')?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                  >
-                    Localização
-                  </button>
+                  {hasPhysicalAddress(detail) && (
+                    <button
+                      type="button"
+                      className={`profile-tab-btn ${activeTab === 'localizacao' ? 'active' : ''}`}
+                      onClick={() => {
+                        setActiveTab('localizacao');
+                        document.getElementById('section-localizacao')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                    >
+                      Localização
+                    </button>
+                  )}
                 </div>
 
                 {/* 1. SOBRE A EMPRESA (Vem logo após os contatos e abas) */}
@@ -4368,7 +4398,7 @@ function BusinessDetailModal({
                 </div>
 
                 {/* 9. LOCALIZAÇÃO & ENDEREÇO */}
-                {(detail.address || detail.city) && (
+                {hasPhysicalAddress(detail) && (
                   <div id="section-localizacao" className="detail-section-block">
                     <h3 className="detail-section-title">Localização</h3>
                     <div className="info-card-block">

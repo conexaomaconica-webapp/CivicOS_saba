@@ -1,6 +1,7 @@
 import React from 'react';
 import { Phone, Mail, Globe, MessageCircle } from 'lucide-react';
 import type { PublicBusinessPresentation } from '@/lib/business/public-business-presentation';
+import { normalizeSocialUrl, type SupportedSocialPlatform } from '@/lib/business/social-links';
 
 function InstagramIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -87,31 +88,13 @@ export function BusinessContacts({
   }
 
   // Helper para normalização e higienização estrita de URLs
-  const toSafeUrl = (raw: string, defaultDomain: string): { url: string; display: string } | null => {
-    let input = raw.trim();
-    if (!input) return null;
-
-    // Bloqueia esquemas perigosos (javascript:, data:, file:)
-    if (/^(javascript|data|file):/i.test(input)) return null;
-
-    let fullUrl = input;
-    if (!/^https?:\/\//i.test(fullUrl)) {
-      if (fullUrl.includes('.') || (defaultDomain && fullUrl.toLowerCase().includes(defaultDomain))) {
-        fullUrl = `https://${fullUrl.replace(/^\/+/, '')}`;
-      } else if (defaultDomain) {
-        const isYoutubeHandle = defaultDomain === 'youtube.com' && fullUrl.startsWith('@');
-        const cleanHandle = fullUrl.replace(/^@/, '').replace(/^\/+/, '');
-        fullUrl = `https://${defaultDomain}/${isYoutubeHandle ? '@' : ''}${cleanHandle}`;
-      } else {
-        fullUrl = `https://${fullUrl.replace(/^\/+/, '')}`;
-      }
-    }
+  const toSafeUrl = (raw: string, platform: SupportedSocialPlatform): { url: string; display: string } | null => {
+    const fullUrl = normalizeSocialUrl(raw, platform);
+    if (!fullUrl) return null;
 
     try {
       const parsed = new URL(fullUrl);
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
-
-      let display = parsed.pathname.replace(/^\//, '') || parsed.hostname;
+      let display = parsed.pathname.replace(/^\//, '').replace(/^@/, '') || parsed.hostname;
       if (display.length > 30) {
         display = `${display.substring(0, 27)}...`;
       }
@@ -125,7 +108,7 @@ export function BusinessContacts({
   };
 
   if (contacts.instagram) {
-    const parsed = toSafeUrl(contacts.instagram, 'instagram.com');
+    const parsed = toSafeUrl(contacts.instagram, 'instagram');
     if (parsed) {
       items.push({
         label: 'Instagram',
@@ -138,7 +121,7 @@ export function BusinessContacts({
   }
 
   if (contacts.facebook) {
-    const parsed = toSafeUrl(contacts.facebook, 'facebook.com');
+    const parsed = toSafeUrl(contacts.facebook, 'facebook');
     if (parsed) {
       items.push({
         label: 'Facebook',
@@ -151,7 +134,7 @@ export function BusinessContacts({
   }
 
   if (contacts.linkedin) {
-    const parsed = toSafeUrl(contacts.linkedin, 'linkedin.com');
+    const parsed = toSafeUrl(contacts.linkedin, 'linkedin');
     if (parsed) {
       items.push({
         label: 'LinkedIn',
@@ -164,7 +147,7 @@ export function BusinessContacts({
   }
 
   if (contacts.youtube) {
-    const parsed = toSafeUrl(contacts.youtube, 'youtube.com');
+    const parsed = toSafeUrl(contacts.youtube, 'youtube');
     if (parsed) {
       items.push({
         label: 'YouTube',
@@ -177,7 +160,7 @@ export function BusinessContacts({
   }
 
   if (contacts.website) {
-    const parsed = toSafeUrl(contacts.website, '');
+    const parsed = toSafeUrl(contacts.website, 'website');
     if (parsed) {
       items.push({
         label: 'Website',

@@ -403,6 +403,9 @@ export type MobileBusinessDetail = {
   cover_fit_mode?: 'cover' | 'contain' | null;
   cover_background_color?: string | null;
   logo_background_color?: string | null;
+  logo_offset_y?: number | null;
+  logo_zoom?: number | null;
+  logo_fit_mode?: 'cover' | 'contain' | null;
   views_count?: number;
   is_pedra_fundamental: boolean;
   is_coluna_honra: boolean;
@@ -669,6 +672,20 @@ export async function loadBusinessDetailFromDirectSupabase(
         typeof b.cover_background_color === 'string' ? b.cover_background_color : null,
       logo_background_color:
         typeof b.logo_background_color === 'string' ? b.logo_background_color : null,
+      logo_offset_y:
+        typeof b.logo_offset_y === 'number'
+          ? b.logo_offset_y
+          : typeof b.logo_offset_y === 'string' && !isNaN(Number(b.logo_offset_y))
+            ? Number(b.logo_offset_y)
+            : null,
+      logo_zoom:
+        typeof b.logo_zoom === 'number'
+          ? b.logo_zoom
+          : typeof b.logo_zoom === 'string' && !isNaN(Number(b.logo_zoom))
+            ? Number(b.logo_zoom)
+            : null,
+      logo_fit_mode:
+        b.logo_fit_mode === 'contain' || b.logo_fit_mode === 'cover' ? b.logo_fit_mode : null,
       views_count: typeof b.views_count === 'number' ? b.views_count : undefined,
       is_pedra_fundamental: b.is_pedra_fundamental === true,
       is_coluna_honra: b.is_coluna_honra === true,

@@ -36,6 +36,7 @@ import { getNextServiceOrder, moveBusinessService } from '@/lib/business/service
 import { MAX_BUSINESS_CERTIFICATIONS, normalizeCertificationZoom, planAllowsCertifications } from '@/lib/business/certifications';
 import { cleanRichTextHtml } from '@/lib/text/rich-text-clean';
 import { getInternalProfileDTO } from '@/lib/member/profile-access-service';
+import { normalizeSocialUrl } from '@/lib/business/social-links';
 
 function normalizeMasonicStatus(status: string | null | undefined): 'pending' | 'verified' | 'rejected' {
   if (status === 'verified' || status === 'approved' || status === 'active') return 'verified';
@@ -551,6 +552,9 @@ export interface AdminBusiness360DTO {
     cover_url?: string;
     short_description?: string;
     logo_background_color?: string;
+    logo_offset_y?: number;
+    logo_zoom?: number;
+    logo_fit_mode?: 'cover' | 'contain';
     cover_offset_y?: number;
     cover_zoom?: number;
     cover_fit_mode?: 'cover' | 'contain';
@@ -1624,6 +1628,9 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
 
     let shortDescription: string | undefined = undefined;
     let logoBackgroundColor: string | undefined = undefined;
+    let logoOffsetY: number | undefined = undefined;
+    let logoZoom: number | undefined = undefined;
+    let logoFitMode: 'cover' | 'contain' | undefined = undefined;
     let coverOffsetY: number | undefined = undefined;
     let coverZoom: number | undefined = undefined;
     let coverFitMode: 'cover' | 'contain' | undefined = undefined;
@@ -1641,6 +1648,17 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
         for (const attr of attrRows) {
           if (attr.attribute_key === 'short_description') shortDescription = attr.attribute_value;
           if (attr.attribute_key === 'logo_background_color' || attr.attribute_key === 'logo_bg_color') logoBackgroundColor = attr.attribute_value;
+          if (attr.attribute_key === 'logo_offset_y') {
+            const parsed = Number(attr.attribute_value);
+            if (Number.isFinite(parsed)) logoOffsetY = parsed;
+          }
+          if (attr.attribute_key === 'logo_zoom') {
+            const parsed = Number(attr.attribute_value);
+            if (Number.isFinite(parsed)) logoZoom = parsed;
+          }
+          if (attr.attribute_key === 'logo_fit_mode' && (attr.attribute_value === 'cover' || attr.attribute_value === 'contain')) {
+            logoFitMode = attr.attribute_value;
+          }
           if (attr.attribute_key === 'cover_offset_y') {
             const parsed = Number(attr.attribute_value);
             if (Number.isFinite(parsed)) coverOffsetY = parsed;
@@ -1770,6 +1788,9 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
         cover_url: cover_item?.url || b.cover_url || undefined,
         short_description: shortDescription,
         logo_background_color: logoBackgroundColor,
+        logo_offset_y: logoOffsetY,
+        logo_zoom: logoZoom,
+        logo_fit_mode: logoFitMode,
         cover_offset_y: coverOffsetY,
         cover_zoom: coverZoom,
         cover_fit_mode: coverFitMode,
@@ -2461,14 +2482,11 @@ export async function updateAdminBusinessDetailsAction(
     await upsertContact('whatsapp', payload.whatsapp);
     await upsertContact('phone', payload.phone);
     await upsertContact('email', payload.email);
-    await upsertContact('website', payload.website);
-    await upsertContact('instagram', payload.instagram);
-    await upsertContact('facebook', payload.facebook);
-    await upsertContact('linkedin', payload.linkedin);
-    const normalizedYoutube = payload.youtube?.trim().startsWith('@')
-      ? `https://www.youtube.com/${payload.youtube.trim()}`
-      : payload.youtube;
-    await upsertContact('youtube', normalizedYoutube);
+    await upsertContact('website', payload.website ? (normalizeSocialUrl(payload.website, 'website') || payload.website.trim()) : payload.website);
+    await upsertContact('instagram', payload.instagram ? (normalizeSocialUrl(payload.instagram, 'instagram') || payload.instagram.trim()) : payload.instagram);
+    await upsertContact('facebook', payload.facebook ? (normalizeSocialUrl(payload.facebook, 'facebook') || payload.facebook.trim()) : payload.facebook);
+    await upsertContact('linkedin', payload.linkedin ? (normalizeSocialUrl(payload.linkedin, 'linkedin') || payload.linkedin.trim()) : payload.linkedin);
+    await upsertContact('youtube', payload.youtube ? (normalizeSocialUrl(payload.youtube, 'youtube') || payload.youtube.trim()) : payload.youtube);
 
     revalidatePath(`/admin/empresas`);
     revalidatePath(`/admin/empresas/${businessId}`);
@@ -4396,6 +4414,9 @@ export async function manageAdminMediaAction(
     title?: string;
     direction?: 'up' | 'down';
     logo_background_color?: string;
+    logo_offset_y?: number;
+    logo_zoom?: number;
+    logo_fit_mode?: 'cover' | 'contain';
     cover_offset_y?: number;
     cover_zoom?: number;
     cover_fit_mode?: 'cover' | 'contain';
@@ -4480,7 +4501,7 @@ export async function manageAdminMediaAction(
           .eq('id', businessId).throwOnError();
       }
 
-      if (payload.logo_background_color) {
+      if (payload.logo_background_color !== undefined) {
         await (supabase as any)
           .from('business_attributes')
           .upsert(
@@ -4495,6 +4516,45 @@ export async function manageAdminMediaAction(
           .throwOnError();
       }
 
+      const logoAttributesToUpsert: Array<{
+        business_id: string;
+        tenant_id: string;
+        attribute_key: string;
+        attribute_value: string;
+      }> = [];
+
+      if (typeof payload.logo_offset_y === 'number' && Number.isFinite(payload.logo_offset_y)) {
+        logoAttributesToUpsert.push({
+          business_id: businessId,
+          tenant_id: biz.tenant_id,
+          attribute_key: 'logo_offset_y',
+          attribute_value: String(Math.max(0, Math.min(100, Math.round(payload.logo_offset_y)))),
+        });
+      }
+      if (typeof payload.logo_zoom === 'number' && Number.isFinite(payload.logo_zoom)) {
+        logoAttributesToUpsert.push({
+          business_id: businessId,
+          tenant_id: biz.tenant_id,
+          attribute_key: 'logo_zoom',
+          attribute_value: String(Math.max(0.4, Math.min(3.0, Number(payload.logo_zoom.toFixed(2))))),
+        });
+      }
+      if (payload.logo_fit_mode === 'cover' || payload.logo_fit_mode === 'contain') {
+        logoAttributesToUpsert.push({
+          business_id: businessId,
+          tenant_id: biz.tenant_id,
+          attribute_key: 'logo_fit_mode',
+          attribute_value: payload.logo_fit_mode,
+        });
+      }
+
+      for (const item of logoAttributesToUpsert) {
+        await (supabase as any)
+          .from('business_attributes')
+          .upsert(item, { onConflict: 'business_id,attribute_key' })
+          .throwOnError();
+      }
+
       await (supabase as any).from('admin_audit_logs').insert({
         tenant_id: biz.tenant_id,
         actor_id: user.id,
@@ -4502,8 +4562,14 @@ export async function manageAdminMediaAction(
         entity_type: 'business',
         entity_id: businessId,
         before_value: { logo_url: biz.logo_url },
-        after_value: { logo_url: payload.url?.trim() || biz.logo_url, logo_background_color: payload.logo_background_color },
-        reason: 'Atualização da logo oficial e cor de fundo via Admin 360º',
+        after_value: {
+          logo_url: payload.url?.trim() || biz.logo_url,
+          logo_background_color: payload.logo_background_color,
+          logo_offset_y: payload.logo_offset_y,
+          logo_zoom: payload.logo_zoom,
+          logo_fit_mode: payload.logo_fit_mode,
+        },
+        reason: 'Atualização da logo oficial, zoom e enquadramento via Admin 360º',
       });
     } else if (action === 'update_cover' && payload.url) {
       const { data: existingCovers } = await (supabase as any)

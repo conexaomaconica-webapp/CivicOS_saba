@@ -318,6 +318,34 @@ function addressOf(location: Record<string, Json>): string | null {
   return line || null;
 }
 
+function hasPhysicalStreetAddress(location: Record<string, Json> | null | undefined): boolean {
+  if (!location) return false;
+  const street = text(location.street, 160);
+  const address = text(location.address, 240);
+  const forbidden = /^(online|atendimento online|100% online|sem endere[cç]o|n[aã]o informado|-|\.)$/i;
+
+  if (street && street.length >= 2 && !forbidden.test(street.trim())) {
+    return true;
+  }
+  if (address && address.length >= 3 && !forbidden.test(address.trim())) {
+    const city = text(location.city, 120);
+    const state = text(location.state, 8);
+    const cleanAddr = address.trim().toLowerCase();
+    const cityLower = city?.toLowerCase() || '';
+    const stateLower = state?.toLowerCase() || '';
+    const isOnlyCityOrState =
+      cleanAddr === cityLower ||
+      cleanAddr === stateLower ||
+      cleanAddr === `${cityLower}, ${stateLower}` ||
+      cleanAddr === `${cityLower} - ${stateLower}` ||
+      cleanAddr === `${cityLower}/${stateLower}`;
+    if (!isOnlyCityOrState) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function toPublicBusinessPresentation(
   row: DetailRow,
   reviewRows: ReviewRow[] = [],
@@ -410,6 +438,11 @@ export function toPublicBusinessPresentation(
   };
 
   const images = rawMedia.filter((item) => item.type === 'image');
+  const logoOffsetY = numeric((row as any).logo_offset_y);
+  const logoZoom = numeric((row as any).logo_zoom);
+  const rawLogoFit = text((row as any).logo_fit_mode, 16);
+  const logoFitMode: 'cover' | 'contain' | undefined =
+    rawLogoFit === 'contain' || rawLogoFit === 'cover' ? rawLogoFit : undefined;
   const coverOffsetY = numeric((row as any).cover_offset_y);
   const coverZoom = numeric((row as any).cover_zoom);
   const rawCoverFit = text((row as any).cover_fit_mode, 16);
@@ -566,7 +599,18 @@ export function toPublicBusinessPresentation(
       shortDescription: text((row as any).short_description, 160) || null,
       category: row.primary_category_name,
       description: row.description,
-      logo: (() => { const asset = publicAsset(row.logo_url, `Logotipo de ${row.business_name}`); const bg = text((row as any).logo_background_color || (row as any).logo_bg_color, 24) || undefined; return asset && bg ? { ...asset, backgroundColor: bg } : asset; })(),
+      logo: (() => {
+        const asset = publicAsset(row.logo_url, `Logotipo de ${row.business_name}`);
+        if (!asset) return null;
+        const bg = text((row as any).logo_background_color || (row as any).logo_bg_color, 24) || undefined;
+        return {
+          ...asset,
+          backgroundColor: bg,
+          zoom: logoZoom !== null ? Math.max(0.4, Math.min(3.0, logoZoom)) : undefined,
+          objectPosition: logoOffsetY !== null ? `center ${Math.max(0, Math.min(100, logoOffsetY))}%` : undefined,
+          fitMode: logoFitMode,
+        };
+      })(),
       logoBgColor: text((row as any).logo_background_color || (row as any).logo_bg_color, 24) || null,
     },
     authority: {
@@ -625,7 +669,7 @@ export function toPublicBusinessPresentation(
       youtube: canShowSocialLinks ? contact('youtube') : null,
       website: canShowWebsite ? contact('website') : null,
     },
-    location: primaryLocation && addressOf(primaryLocation) ? {
+    location: (primaryLocation && hasPhysicalStreetAddress(primaryLocation) && addressOf(primaryLocation)) ? {
       address: addressOf(primaryLocation)!,
       city: text(primaryLocation.city, 120),
       state: text(primaryLocation.state, 8),

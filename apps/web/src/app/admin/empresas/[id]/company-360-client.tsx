@@ -1918,6 +1918,9 @@ export default function Company360Client({ initialData }: Props) {
         url: normalizedMediaUrl,
         title: mediaTitleInput,
         logo_background_color: mediaMode === 'update_logo' ? imageBackgroundColor : undefined,
+        logo_offset_y: mediaMode === 'update_logo' ? imageOffsetY : undefined,
+        logo_zoom: mediaMode === 'update_logo' ? imageZoom : undefined,
+        logo_fit_mode: mediaMode === 'update_logo' ? imageFitMode : undefined,
         cover_offset_y: mediaMode === 'update_cover' ? imageOffsetY : undefined,
         cover_zoom: mediaMode === 'update_cover' ? imageZoom : undefined,
         cover_fit_mode: mediaMode === 'update_cover' ? imageFitMode : undefined,
@@ -1931,6 +1934,9 @@ export default function Company360Client({ initialData }: Props) {
               ...prev.business,
               logo_url: normalizedMediaUrl,
               logo_background_color: imageBackgroundColor,
+              logo_offset_y: imageOffsetY,
+              logo_zoom: imageZoom,
+              logo_fit_mode: imageFitMode,
             },
           }));
         } else if (mediaMode === 'update_cover') {
@@ -3213,13 +3219,41 @@ export default function Company360Client({ initialData }: Props) {
               </div>
 
               <div className="md:col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-6">
+                {!street.trim() ? (
+                  <div className="sm:col-span-6 bg-amber-50/80 border border-amber-200 rounded-xl p-2.5 flex items-center justify-between gap-2 text-stone-700">
+                    <span className="text-[11px] leading-tight flex items-center gap-1.5 font-medium">
+                      <span className="text-amber-800 font-bold">🌐 Atendimento Online / Sem Ponto Físico Aberto:</span>
+                      <span>Como a rua está em branco, o mapa interativo e o botão &quot;Localização&quot; são ocultados do perfil público.</span>
+                    </span>
+                  </div>
+                ) : (
+                  <div className="sm:col-span-6 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStreet('');
+                        setStreetNumber('');
+                        setComplement('');
+                        setNeighborhood('');
+                        setPostalCode('');
+                        setLatitudeText('');
+                        setLongitudeText('');
+                        setLocationHint({ ok: true, text: 'Endereço físico removido. O anúncio funcionará como atendimento 100% online (mapa e localização ocultados da página).' });
+                      }}
+                      className="text-[11px] font-bold text-[#3B0B14] hover:underline cursor-pointer"
+                    >
+                      Definir como atendimento 100% online (remover ponto físico)
+                    </button>
+                  </div>
+                )}
+
                 <div className="sm:col-span-4">
                   <label className="block font-bold text-stone-800 mb-1">Rua / Logradouro</label>
                   <input
                     type="text"
                     value={street}
                     onChange={(e) => setStreet(e.target.value)}
-                    placeholder="Ex.: Avenida Getúlio Vargas"
+                    placeholder="Ex.: Avenida Getúlio Vargas (ou deixe vazio para online)"
                     className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
                   />
                 </div>
@@ -3840,6 +3874,10 @@ export default function Company360Client({ initialData }: Props) {
                       setMediaMode('update_logo');
                       setMediaUrlInput(data.business.logo_url || '');
                       setImageBackgroundColor(data.business.logo_background_color || '#ffffff');
+                      setImageOffsetY(data.business.logo_offset_y ?? 50);
+                      setImageZoom(data.business.logo_zoom ?? 1.0);
+                      setImageFitMode(data.business.logo_fit_mode ?? 'contain');
+                      setSelectedFileForCrop(null);
                       setShowMediaModal(true);
                     }}
                     className="px-2.5 py-1 bg-[#3B0B14] hover:bg-[#5d1523] text-white font-bold rounded-lg flex items-center gap-1 text-[11px] cursor-pointer"
@@ -3850,12 +3888,22 @@ export default function Company360Client({ initialData }: Props) {
 
                 <div className="flex items-center gap-4">
                   {data.business.logo_url ? (
-                    <img
-                      src={data.business.logo_url}
-                      alt="Logo Oficial"
+                    <div
                       style={{ backgroundColor: data.business.logo_background_color || '#ffffff' }}
-                      className="w-16 h-16 object-contain rounded-xl border border-stone-300 p-1"
-                    />
+                      className="w-16 h-16 rounded-xl border border-stone-300 p-1 overflow-hidden shrink-0 flex items-center justify-center"
+                    >
+                      <img
+                        src={data.business.logo_url}
+                        alt="Logo Oficial"
+                        style={{
+                          transform: data.business.logo_zoom && data.business.logo_zoom !== 1 ? `scale(${data.business.logo_zoom})` : undefined,
+                          transformOrigin: `center ${data.business.logo_offset_y ?? 50}%`,
+                          objectPosition: `center ${data.business.logo_offset_y ?? 50}%`,
+                          objectFit: data.business.logo_fit_mode || 'contain',
+                        }}
+                        className="w-full h-full"
+                      />
+                    </div>
                   ) : (
                     <div className="w-16 h-16 rounded-xl border border-dashed border-stone-400 bg-stone-200 flex items-center justify-center text-stone-500 font-bold text-[10px]">
                       Sem Logo

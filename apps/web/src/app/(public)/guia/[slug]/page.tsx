@@ -119,6 +119,9 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
             for (const attr of attrRows) {
               if (attr.attribute_key === 'short_description') (detailObj as any).short_description = attr.attribute_value;
               if (attr.attribute_key === 'logo_background_color' || attr.attribute_key === 'logo_bg_color') (detailObj as any).logo_background_color = attr.attribute_value;
+              if (attr.attribute_key === 'logo_offset_y') (detailObj as any).logo_offset_y = attr.attribute_value;
+              if (attr.attribute_key === 'logo_zoom') (detailObj as any).logo_zoom = attr.attribute_value;
+              if (attr.attribute_key === 'logo_fit_mode') (detailObj as any).logo_fit_mode = attr.attribute_value;
               if (attr.attribute_key === 'cover_offset_y') (detailObj as any).cover_offset_y = attr.attribute_value;
               if (attr.attribute_key === 'cover_zoom') (detailObj as any).cover_zoom = attr.attribute_value;
               if (attr.attribute_key === 'cover_fit_mode') (detailObj as any).cover_fit_mode = attr.attribute_value;
@@ -381,6 +384,9 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
 
     let shortDescription: string | null = null;
     let logoBackgroundColor: string | null = null;
+    let logoOffsetY: string | null = null;
+    let logoZoom: string | null = null;
+    let logoFitMode: string | null = null;
     let coverOffsetY: string | null = null;
     let coverZoom: string | null = null;
     let coverFitMode: string | null = null;
@@ -394,6 +400,9 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
       for (const attr of attrRows) {
         if (attr.attribute_key === 'short_description') shortDescription = attr.attribute_value;
         if (attr.attribute_key === 'logo_background_color' || attr.attribute_key === 'logo_bg_color') logoBackgroundColor = attr.attribute_value;
+        if (attr.attribute_key === 'logo_offset_y') logoOffsetY = attr.attribute_value;
+        if (attr.attribute_key === 'logo_zoom') logoZoom = attr.attribute_value;
+        if (attr.attribute_key === 'logo_fit_mode') logoFitMode = attr.attribute_value;
         if (attr.attribute_key === 'cover_offset_y') coverOffsetY = attr.attribute_value;
         if (attr.attribute_key === 'cover_zoom') coverZoom = attr.attribute_value;
         if (attr.attribute_key === 'cover_fit_mode') coverFitMode = attr.attribute_value;
@@ -502,6 +511,9 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
       publication_status: bObj.publication_status,
       short_description: shortDescription,
       logo_background_color: logoBackgroundColor,
+      logo_offset_y: logoOffsetY,
+      logo_zoom: logoZoom,
+      logo_fit_mode: logoFitMode,
       cover_offset_y: coverOffsetY,
       cover_zoom: coverZoom,
       cover_fit_mode: coverFitMode,
