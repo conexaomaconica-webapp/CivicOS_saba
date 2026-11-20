@@ -31,6 +31,7 @@ import {
 } from './benefit-redemption';
 import {
   createMobileGuideService,
+  isSafeImageCoverUrl,
   type MobileBusinessDetail,
   type MobileConnectionFeedItem,
   type MobileEventItem,
@@ -2468,7 +2469,13 @@ function AnuncioModal({
   if (!isOpen || !detail) return null;
 
   const plan = normalizePlanCode(detail.effective_plan_code);
-  const flyerUrl = detail.cover_url || detail.media?.[0]?.url;
+  const anuncioPhotoMedia = (detail.media ?? []).filter(
+    (m) => m.media_type !== 'video' && isSafeImageCoverUrl(m.url)
+  );
+  const flyerUrl =
+    (isSafeImageCoverUrl(detail.cover_url) ? detail.cover_url : null) ||
+    anuncioPhotoMedia[0]?.url ||
+    null;
 
   const contacts = detail.contacts ?? [];
   const whatsappContact =
@@ -3304,13 +3311,16 @@ function BusinessDetailModal({
   // Mídias
   const mediaList = detail?.media ?? [];
   const videoMedia = mediaList.find(
-    (m) => m.media_type === 'video' || m.url.toLowerCase().endsWith('.mp4')
+    (m) => m.media_type === 'video' || !isSafeImageCoverUrl(m.url)
   );
   const photoMedia = mediaList.filter(
-    (m) => m !== videoMedia && (m.media_type === 'image' || !m.url.toLowerCase().endsWith('.mp4'))
+    (m) => m !== videoMedia && m.media_type !== 'video' && isSafeImageCoverUrl(m.url)
   );
 
-  const heroCoverUrl = detail?.cover_url || photoMedia[0]?.url || null;
+  const heroCoverUrl =
+    (isSafeImageCoverUrl(detail?.cover_url) ? detail.cover_url : null) ||
+    photoMedia[0]?.url ||
+    null;
 
   return (
     <>

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   createMobileGuideService,
+  isSafeImageCoverUrl,
+  loadBusinessDetailFromDirectSupabase,
   loadEventsFromDirectSupabase,
+  mergeBusinessRecords,
   pickMainCategories,
   MOBILE_MAIN_CATEGORIES_MAX,
   submitMobileEventRSVP,
@@ -157,6 +160,132 @@ describe('mobile guide data', () => {
 
     expect(res.success).toBe(false);
     expect(res.error).toContain('Maçônica');
+  });
+
+  it('impede que sponsored com URL de vídeo do YouTube sobrescreva cover_url de imagem válida (Comandos, FISION, Grupo MAP)', () => {
+    expect(isSafeImageCoverUrl('https://youtu.be/am3teVpl-Ow')).toBe(false);
+    expect(isSafeImageCoverUrl('https://youtube.com/shorts/05Lm_cJzs34')).toBe(false);
+    expect(isSafeImageCoverUrl('https://youtu.be/2bHPkewankE?is=tYJ5AFPO9TsGODz0')).toBe(false);
+    expect(isSafeImageCoverUrl('https://cdn.example.com/capa.webp')).toBe(true);
+    expect(isSafeImageCoverUrl('https://cdn.example.com/capa.png')).toBe(true);
+    expect(isSafeImageCoverUrl('https://cdn.example.com/capa.jpg')).toBe(true);
+
+    const searchRow = {
+      id: '5d355d41-a5a2-4e86-808c-57f7ef86afef',
+      name: 'FISION — Fisioterapia e Pilates',
+      slug: 'fision',
+      cover_url: 'https://rwvztwsjcjljphqttiws.supabase.co/storage/v1/object/public/business-assets/00000000-0000-0000-0000-000000000000/5d355d41-a5a2-4e86-808c-57f7ef86afef/cover/d7b72e7f-f92d-4345-8346-3c334b16b84c.webp',
+    };
+    const sponsoredExtraWithYoutube = {
+      id: '5d355d41-a5a2-4e86-808c-57f7ef86afef',
+      name: 'FISION — Fisioterapia e Pilates',
+      slug: 'fision',
+      cover_url: 'https://youtube.com/shorts/05Lm_cJzs34',
+      is_featured: true,
+      views_count: 42,
+      cover_offset_y: 11,
+      cover_zoom: 1,
+      cover_fit_mode: 'cover',
+    };
+
+    const merged = mergeBusinessRecords(searchRow, sponsoredExtraWithYoutube);
+    expect(merged.cover_url).toBe(searchRow.cover_url);
+    expect(merged.is_featured).toBe(true);
+    expect(merged.views_count).toBe(42);
+    expect(merged.cover_offset_y).toBe(11);
+  });
+
+  it('resolve cover_url a partir da primeira mídia de imagem no detalhe da empresa, preservando o vídeo institucional', async () => {
+    const fisionCover =
+      'https://rwvztwsjcjljphqttiws.supabase.co/storage/v1/object/public/business-assets/00000000-0000-0000-0000-000000000000/5d355d41-a5a2-4e86-808c-57f7ef86afef/cover/d7b72e7f-f92d-4345-8346-3c334b16b84c.webp';
+
+    const detail = await loadBusinessDetailFromDirectSupabase(
+      async (input) => {
+        const url = String(input);
+        if (url.includes('/rpc/public_business_detail')) {
+          return new Response(
+            JSON.stringify([
+              {
+                business_id: '5d355d41-a5a2-4e86-808c-57f7ef86afef',
+                business_name: 'FISION — Fisioterapia e Pilates',
+                business_slug: 'fision',
+                effective_plan_code: 'acacia',
+                media: [
+                  { id: 'v1', media_type: 'video', url: 'https://youtube.com/shorts/05Lm_cJzs34', display_order: 0 },
+                  { id: 'c1', media_type: 'image', url: fisionCover, display_order: 0 },
+                ],
+              },
+            ]),
+            { status: 200 },
+          );
+        }
+        return new Response(JSON.stringify({}), { status: 200 });
+      },
+      'fision',
+    );
+
+    expect(detail).not.toBeNull();
+    expect(detail?.cover_url).toBe(fisionCover);
+    expect(detail?.media).toHaveLength(2);
+    expect(detail?.media.find((m) => m.media_type === 'video')?.url).toBe('https://youtube.com/shorts/05Lm_cJzs34');
+  });
+
+  it('homologação das 3 empresas afetadas (Comandos, FISION, Grupo MAP) no loadHome: corrige sponsored e preserva businesses sem URLs do YouTube', async () => {
+    const comandosCover = 'https://rwvztwsjcjljphqttiws.supabase.co/storage/v1/object/public/business-assets/00000000-0000-0000-0000-000000000010/00000000-0000-0000-0000-000000000201/cover/1789991047944-images__8_.webp';
+    const fisionCover = 'https://rwvztwsjcjljphqttiws.supabase.co/storage/v1/object/public/business-assets/00000000-0000-0000-0000-000000000000/5d355d41-a5a2-4e86-808c-57f7ef86afef/cover/d7b72e7f-f92d-4345-8346-3c334b16b84c.webp';
+    const grupomapCover = 'https://rwvztwsjcjljphqttiws.supabase.co/storage/v1/object/public/business-assets/00000000-0000-0000-0000-000000000000/1caa6064-765b-4c59-b55b-6894edcd4792/cover/a6e9d096-f5d0-427a-aa76-108652472e31.webp';
+
+    const service = createMobileGuideService(async (input) => {
+      const url = String(input);
+      if (url.includes('/rpc/public_directory_home_data')) {
+        return new Response(
+          JSON.stringify({
+            settings: { hero_title: 'Guia Oficial' },
+            sponsored: [
+              { id: '00000000-0000-0000-0000-000000000201', name: 'Comandos', slug: 'comandos', cover_url: 'https://youtu.be/am3teVpl-Ow' },
+              { id: '5d355d41-a5a2-4e86-808c-57f7ef86afef', name: 'FISION — Fisioterapia e Pilates', slug: 'fision', cover_url: 'https://youtube.com/shorts/05Lm_cJzs34' },
+              { id: '1caa6064-765b-4c59-b55b-6894edcd4792', name: 'Grupo MAP', slug: 'grupomap', cover_url: 'https://youtu.be/2bHPkewankE?is=tYJ5AFPO9TsGODz0' },
+            ],
+            available_cities: ['Feira de Santana'],
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('/rpc/public_businesses_search')) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              { id: '00000000-0000-0000-0000-000000000201', name: 'Comandos', slug: 'comandos', cover_url: comandosCover },
+              { id: '5d355d41-a5a2-4e86-808c-57f7ef86afef', name: 'FISION — Fisioterapia e Pilates', slug: 'fision', cover_url: fisionCover },
+              { id: '1caa6064-765b-4c59-b55b-6894edcd4792', name: 'Grupo MAP', slug: 'grupomap', cover_url: grupomapCover },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('/api/mobile/guide')) {
+        return new Response(
+          JSON.stringify({
+            businesses: [
+              { id: '00000000-0000-0000-0000-000000000201', name: 'Comandos', slug: 'comandos', cover_url: comandosCover, views_count: 15 },
+              { id: '5d355d41-a5a2-4e86-808c-57f7ef86afef', name: 'FISION — Fisioterapia e Pilates', slug: 'fision', cover_url: fisionCover, views_count: 22 },
+              { id: '1caa6064-765b-4c59-b55b-6894edcd4792', name: 'Grupo MAP', slug: 'grupomap', cover_url: grupomapCover, views_count: 18 },
+            ],
+            sponsored: [
+              { id: '00000000-0000-0000-0000-000000000201', name: 'Comandos', slug: 'comandos', cover_url: 'https://youtu.be/am3teVpl-Ow', is_featured: true },
+              { id: '5d355d41-a5a2-4e86-808c-57f7ef86afef', name: 'FISION — Fisioterapia e Pilates', slug: 'fision', cover_url: 'https://youtube.com/shorts/05Lm_cJzs34', is_featured: true },
+              { id: '1caa6064-765b-4c59-b55b-6894edcd4792', name: 'Grupo MAP', slug: 'grupomap', cover_url: 'https://youtu.be/2bHPkewankE?is=tYJ5AFPO9TsGODz0', is_featured: true },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+
+    const home = await service.loadHome();
+    expect(home.businesses.map((b) => b.cover_url)).toEqual([comandosCover, fisionCover, grupomapCover]);
+    expect(home.sponsored.map((b) => b.cover_url)).toEqual([comandosCover, fisionCover, grupomapCover]);
   });
 });
 

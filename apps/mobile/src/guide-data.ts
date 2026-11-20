@@ -41,6 +41,70 @@ export type MobileGuideSponsoredBusiness = {
 /** Máximo de categorias exibidas na home do app quando o servidor não informa as principais. */
 export const MOBILE_MAIN_CATEGORIES_MAX = 10;
 
+const VIDEO_HOST_PATTERNS = [
+  /(^|\.)youtube\.com$/i,
+  /(^|\.)youtu\.be$/i,
+  /(^|\.)youtube-nocookie\.com$/i,
+  /(^|\.)vimeo\.com$/i,
+  /(^|\.)dailymotion\.com$/i,
+  /(^|\.)dai\.ly$/i,
+  /(^|\.)tiktok\.com$/i,
+  /(^|\.)loom\.com$/i,
+  /(^|\.)fb\.watch$/i,
+];
+
+const VIDEO_PATH_OR_EXT_REGEX =
+  /\.(mp4|webm|mov|m4v|avi|mkv|m3u8|mp3|wav|ogg)(?:[?#]|$)/i;
+
+const SOCIAL_VIDEO_PATH_REGEX =
+  /\/(shorts|watch|embed|reel|reels)\b/i;
+
+/**
+ * Verifica se uma URL é segura para ser usada como imagem de capa (rejeita links do YouTube, Vimeo, Reels, MP4 etc.,
+ * aceitando qualquer formato de imagem válido como .webp, .png, .jpg, .jpeg, .avif, .svg ou URL de imagem de CDN).
+ */
+export function isSafeImageCoverUrl(url: unknown): url is string {
+  if (typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  if (VIDEO_PATH_OR_EXT_REGEX.test(trimmed)) return false;
+  if (trimmed.startsWith('/')) return true;
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
+    if (VIDEO_HOST_PATTERNS.some((pattern) => pattern.test(host))) return false;
+    if (
+      (host.includes('instagram.com') || host.includes('facebook.com')) &&
+      SOCIAL_VIDEO_PATH_REGEX.test(parsed.pathname)
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Mescla registros de empresas preservando todos os atributos enriquecidos (sponsored / BFF),
+ * mas nunca permitindo que uma URL de vídeo ou nula sobrescreva uma URL de imagem de capa válida.
+ */
+export function mergeBusinessRecords(
+  baseRow: Record<string, unknown>,
+  extraRow?: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!extraRow) return baseRow;
+  const baseCover = isSafeImageCoverUrl(baseRow.cover_url) ? baseRow.cover_url.trim() : null;
+  const extraCover = isSafeImageCoverUrl(extraRow.cover_url) ? extraRow.cover_url.trim() : null;
+  return {
+    ...baseRow,
+    ...extraRow,
+    cover_url: baseCover ?? extraCover ?? null,
+  };
+}
+
 /**
  * Categorias principais para a home do app (topo e "Explore por Categoria").
  * Usa a lista do servidor (destaques do painel ou principais do prontuário 360, mesma regra da home web);
@@ -163,7 +227,7 @@ function parseHomeData(value: unknown, activeCategoriesList?: unknown[]): Mobile
           city: typeof row.city === 'string' ? row.city : null,
           state: typeof row.state === 'string' ? row.state : null,
           logo_url: typeof row.logo_url === 'string' ? row.logo_url : null,
-          cover_url: typeof row.cover_url === 'string' ? row.cover_url : null,
+          cover_url: isSafeImageCoverUrl(row.cover_url) ? row.cover_url.trim() : null,
           description:
             typeof row.description === 'string'
               ? row.description
@@ -321,14 +385,38 @@ async function loadFromDirectSupabase(
   const bffPayload = bffRes && bffRes.ok ? await bffRes.json().catch(() => null) : null;
 
   const extraById = new Map<string, Record<string, unknown>>();
+  const validCoverById = new Map<string, string>();
+
+  const registerCoverCandidate = (item: unknown) => {
+    if (!item || typeof item !== 'object') return;
+    const rec = item as Record<string, unknown>;
+    if (typeof rec.id === 'string' && !validCoverById.has(rec.id) && isSafeImageCoverUrl(rec.cover_url)) {
+      validCoverById.set(rec.id, rec.cover_url.trim());
+    }
+  };
+
+  if (Array.isArray(searchPayload?.items)) {
+    for (const item of searchPayload.items) registerCoverCandidate(item);
+  }
+  if (Array.isArray(homePayload?.sponsored)) {
+    for (const item of homePayload.sponsored) registerCoverCandidate(item);
+  }
+
   if (bffPayload && typeof bffPayload === 'object') {
     const bffBizs = [
-      ...(Array.isArray(bffPayload.businesses) ? bffPayload.businesses : []),
       ...(Array.isArray(bffPayload.sponsored) ? bffPayload.sponsored : []),
+      ...(Array.isArray(bffPayload.businesses) ? bffPayload.businesses : []),
     ];
     for (const item of bffBizs) {
+      registerCoverCandidate(item);
       if (item && typeof item === 'object' && typeof item.id === 'string') {
-        extraById.set(item.id, item as Record<string, unknown>);
+        const current = extraById.get(item.id);
+        extraById.set(
+          item.id,
+          current
+            ? mergeBusinessRecords(current, item as Record<string, unknown>)
+            : (item as Record<string, unknown>),
+        );
       }
     }
   }
@@ -339,7 +427,11 @@ async function loadFromDirectSupabase(
       const row = item as Record<string, unknown>;
       const id = typeof row.id === 'string' ? row.id : '';
       const extra = id ? extraById.get(id) : undefined;
-      return extra ? { ...row, ...extra } : row;
+      const merged = mergeBusinessRecords(row, extra);
+      if (!isSafeImageCoverUrl(merged.cover_url) && id && validCoverById.has(id)) {
+        merged.cover_url = validCoverById.get(id)!;
+      }
+      return merged;
     });
 
   return parseHomeData(
@@ -642,6 +734,17 @@ export async function loadBusinessDetailFromDirectSupabase(
       price_info: typeof s?.price_info === 'string' ? s.price_info : null,
     }));
 
+    const rawMediaList = Array.isArray(b.media) ? b.media : [];
+    const fallbackCoverMedia = rawMediaList.find(
+      (m: Record<string, unknown>) =>
+        String(m?.media_type ?? '').toLowerCase() !== 'video' && isSafeImageCoverUrl(m?.url),
+    );
+    const resolvedDetailCoverUrl = isSafeImageCoverUrl(b.cover_url)
+      ? b.cover_url.trim()
+      : isSafeImageCoverUrl(fallbackCoverMedia?.url)
+        ? String(fallbackCoverMedia.url).trim()
+        : null;
+
     return {
       business_id: String(b.business_id || ''),
       business_name: String(b.business_name || ''),
@@ -653,7 +756,7 @@ export async function loadBusinessDetailFromDirectSupabase(
       address: typeof b.address === 'string' ? b.address : null,
       description: typeof b.description === 'string' ? b.description : null,
       logo_url: typeof b.logo_url === 'string' ? b.logo_url : null,
-      cover_url: typeof b.cover_url === 'string' ? b.cover_url : null,
+      cover_url: resolvedDetailCoverUrl,
       cover_offset_y:
         typeof b.cover_offset_y === 'number'
           ? b.cover_offset_y
