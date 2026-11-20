@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { MAX_BUSINESS_CERTIFICATIONS, normalizeCertificationZoom, planAllowsCertifications } from '@/lib/business/certifications';
 import { fetchMainHomeCategories } from '@/lib/directory/home-main-categories';
+import { isSafeImageCoverUrl, resolveCoverUrlFromMediaList, sortMediaImagesFirst } from '@/lib/business/cover-url-guard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -112,6 +113,10 @@ export async function GET(request: Request) {
             if (attr.attribute_key === 'logo_background_color' || attr.attribute_key === 'logo_bg_color') detail.logo_background_color = attr.attribute_value;
           }
         }
+        if (Array.isArray(detail.media)) {
+          detail.media = sortMediaImagesFirst(detail.media);
+        }
+        detail.cover_url = resolveCoverUrlFromMediaList(detail.media, detail.cover_url);
       }
       return NextResponse.json({ detail }, { headers: { 'Cache-Control': 'no-store', ...corsHeaders } });
     }
@@ -178,9 +183,17 @@ export async function GET(request: Request) {
 
     const viewsMap = new Map<string, number>();
     const attrsMap = new Map<string, Record<string, any>>();
+    const validCoverMap = new Map<string, string>();
+
+    for (const b of [...rawBusinesses, ...rawSponsored]) {
+      if (b && typeof b.id === 'string' && !validCoverMap.has(b.id) && isSafeImageCoverUrl(b.cover_url)) {
+        validCoverMap.set(b.id, b.cover_url.trim());
+      }
+    }
 
     if (allBizIds.length > 0 && serviceRoleKey) {
-      const [{ data: viewEvents }, { data: attrRows }] = await Promise.all([
+      const missingCoverBizIds = allBizIds.filter((id) => !validCoverMap.has(id));
+      const [{ data: viewEvents }, { data: attrRows }, { data: coverMediaRows }] = await Promise.all([
         adminDb
           .from('analytics_events')
           .select('business_id')
@@ -193,7 +206,25 @@ export async function GET(request: Request) {
           .in('business_id', allBizIds)
           .in('attribute_key', ['cover_offset_y', 'cover_zoom', 'cover_fit_mode', 'cover_background_color', 'logo_background_color', 'logo_bg_color'])
           .then((r: any) => r, () => ({ data: [] })),
+        missingCoverBizIds.length > 0
+          ? adminDb
+              .from('business_media')
+              .select('business_id, url, media_type, display_order')
+              .in('business_id', missingCoverBizIds)
+              .in('media_type', ['cover', 'image'])
+              .order('display_order', { ascending: true })
+              .order('created_at', { ascending: true })
+              .then((r: any) => r, () => ({ data: [] }))
+          : Promise.resolve({ data: [] }),
       ]);
+
+      if (Array.isArray(coverMediaRows)) {
+        for (const row of coverMediaRows) {
+          if (row?.business_id && !validCoverMap.has(row.business_id) && isSafeImageCoverUrl(row.url)) {
+            validCoverMap.set(row.business_id, row.url.trim());
+          }
+        }
+      }
 
       if (Array.isArray(viewEvents)) {
         for (const ev of viewEvents) {
@@ -220,8 +251,12 @@ export async function GET(request: Request) {
     const enrichBiz = (b: any) => {
       if (!b || typeof b !== 'object') return b;
       const extra = attrsMap.get(b.id) || {};
+      const resolvedCover = isSafeImageCoverUrl(b.cover_url)
+        ? b.cover_url.trim()
+        : (validCoverMap.get(b.id) ?? null);
       return {
         ...b,
+        cover_url: resolvedCover,
         views_count: viewsMap.get(b.id) ?? b.views_count ?? 0,
         ...extra,
       };
