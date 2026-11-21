@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - release/ios-first-build
     paths:
       - 'apps/mobile/**'
       - '.github/workflows/mobile-ios.yml'

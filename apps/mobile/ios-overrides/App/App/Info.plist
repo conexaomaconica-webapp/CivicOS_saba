@@ -28,6 +28,8 @@
 	<string>Precisamos de acesso à câmera para captura de fotos de perfil e publicações no mural.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Precisamos de acesso às fotos para seleção de imagens de perfil e publicações no mural.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Precisamos de permissão para salvar comprovantes de benefícios e imagens na sua galeria de fotos.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
