@@ -185,6 +185,18 @@ jobs:
           PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$PROFILE_PLIST")"
           PROFILE_TEAM="$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$PROFILE_PLIST")"
           PROFILE_APP_ID="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$PROFILE_PLIST")"
+          PROFILE_PREFIX="$(/usr/libexec/PlistBuddy -c 'Print :ApplicationIdentifierPrefix:0' "$PROFILE_PLIST" 2>/dev/null || echo 'ABSENT')"
+          PROFILE_APS="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:aps-environment' "$PROFILE_PLIST" 2>/dev/null || echo 'ABSENT')"
+          PROFILE_GET_TASK="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:get-task-allow' "$PROFILE_PLIST" 2>/dev/null || echo 'ABSENT')"
+          PROFILE_EXP="$(/usr/libexec/PlistBuddy -c 'Print :ExpirationDate' "$PROFILE_PLIST" 2>/dev/null || echo 'ABSENT')"
+
+          echo "Provisioning Profile -> UUID=$PROFILE_UUID | Team=$PROFILE_TEAM | Prefix=$PROFILE_PREFIX | Exp=$PROFILE_EXP"
+          echo "Profile Entitlements -> app-id=$PROFILE_APP_ID | aps-environment=$PROFILE_APS | get-task-allow=$PROFILE_GET_TASK"
+
+          if [ "$PROFILE_APS" != "production" ]; then
+            echo "::error::Provisioning Profile nao autoriza aps-environment=production (valor='$PROFILE_APS'). Regenere o Provisioning Profile App Store com a capability Push Notifications ativa no Apple Developer Portal."
+            exit 1
+          fi
 
           if [ "$PROFILE_TEAM" != "$IOS_TEAM_ID" ]; then
             echo "::error::Team ID do Provisioning Profile ($PROFILE_TEAM) difere de IOS_TEAM_ID."
@@ -245,11 +257,17 @@ jobs:
           EOF
           plutil -lint "$EXPORT_PLIST"
 
-          # Aplica assinatura manual e Provisioning Profile exclusivamente no target App (Release),
+          # Aplica assinatura manual, CODE_SIGN_ENTITLEMENTS e Provisioning Profile exclusivamente no target App (Release),
           # evitando impor PROVISIONING_PROFILE_SPECIFIER globalmente aos targets CocoaPods.
           IOS_TEAM_ID="$IOS_TEAM_ID" \
           IOS_PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
           node ../../scripts/apply-ios-overrides.mjs
+
+          echo "=== Build Settings efetivas (target App / Release) ==="
+          xcodebuild -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -showBuildSettings | grep -E "PRODUCT_BUNDLE_IDENTIFIER|CODE_SIGN_ENTITLEMENTS|CODE_SIGN_STYLE|DEVELOPMENT_TEAM|PROVISIONING_PROFILE_SPECIFIER" || true
 
           xcodebuild -workspace App.xcworkspace \
             -scheme App \
@@ -259,6 +277,15 @@ jobs:
             MARKETING_VERSION="1.0.0" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             clean archive 2>&1 | tee "$RUNNER_TEMP/xcodebuild-archive.log"
+
+          echo "=== Entitlements assinados no App.xcarchive ==="
+          ARCHIVE_APP="$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
+          codesign -d --entitlements - --xml "$ARCHIVE_APP" > "$RUNNER_TEMP/archive-entitlements.plist"
+          plutil -lint "$RUNNER_TEMP/archive-entitlements.plist"
+          ARCHIVE_APS="$(/usr/libexec/PlistBuddy -c 'Print :aps-environment' "$RUNNER_TEMP/archive-entitlements.plist" 2>/dev/null || echo 'ABSENT')"
+          ARCHIVE_APP_ID="$(/usr/libexec/PlistBuddy -c 'Print :application-identifier' "$RUNNER_TEMP/archive-entitlements.plist" 2>/dev/null || echo 'ABSENT')"
+          ARCHIVE_GET_TASK="$(/usr/libexec/PlistBuddy -c 'Print :get-task-allow' "$RUNNER_TEMP/archive-entitlements.plist" 2>/dev/null || echo 'ABSENT')"
+          echo "Archive Entitlements -> aps-environment=$ARCHIVE_APS | application-identifier=$ARCHIVE_APP_ID | get-task-allow=$ARCHIVE_GET_TASK"
 
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/App.xcarchive" \
@@ -358,7 +385,8 @@ jobs:
                 "$RUNNER_TEMP/profile_decoded.plist" \
                 "$RUNNER_TEMP/ExportOptions.plist" \
                 "$RUNNER_TEMP/entitlements.txt" \
-                "$RUNNER_TEMP/entitlements.plist"
+                "$RUNNER_TEMP/entitlements.plist" \
+                "$RUNNER_TEMP/archive-entitlements.plist"
           rm -rf "$HOME/Library/MobileDevice/Provisioning Profiles" \
                  "$HOME/.appstoreconnect/private_keys"
           echo "🧹 Credenciais temporarias e keychain removidos do runner."

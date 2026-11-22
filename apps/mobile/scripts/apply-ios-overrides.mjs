@@ -60,6 +60,30 @@ function ensurePrivacyManifestInPbxproj(pbxprojContent) {
   return content;
 }
 
+function ensureCodeSignEntitlementsInAppTarget(pbxprojContent) {
+  let content = pbxprojContent;
+
+  const ensureInBlock = (blockId, configName) => {
+    const regex = new RegExp(
+      `(${blockId} \\/\\* ${configName} \\*\\/ = \\{\\s*isa = XCBuildConfiguration;[\\s\\S]*?buildSettings = \\{\\n)([\\s\\S]*?)(\\n\\t\\t\\t\\};[\\s\\S]*?name = ${configName};)`,
+    );
+    content = content.replace(regex, (_full, prefix, settingsBody, suffix) => {
+      if (/CODE_SIGN_ENTITLEMENTS\s*=/.test(settingsBody)) {
+        const updated = settingsBody.replace(
+          /CODE_SIGN_ENTITLEMENTS = [^;]+;/g,
+          'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;',
+        );
+        return `${prefix}${updated}${suffix}`;
+      }
+      return `${prefix}\t\t\t\tCODE_SIGN_ENTITLEMENTS = App/App.entitlements;\n${settingsBody}${suffix}`;
+    });
+  };
+
+  ensureInBlock('504EC3171FED79650016851F', 'Debug');
+  ensureInBlock('504EC3181FED79650016851F', 'Release');
+  return content;
+}
+
 function applyAppTargetReleaseSigning(pbxprojContent, { teamId, profileSpecifier }) {
   const releaseBlockRegex =
     /(504EC3181FED79650016851F \/\* Release \*\/ = \{\s*isa = XCBuildConfiguration;[\s\S]*?buildSettings = \{\n)([\s\S]*?)(\n\t\t\t\};[\s\S]*?name = Release;)/;
@@ -113,6 +137,7 @@ try {
     // Foco inicial exclusivo em iPhone (TARGETED_DEVICE_FAMILY = "1") para evitar rejeição de layout iPad Landscape
     pbxproj = pbxproj.replace(/TARGETED_DEVICE_FAMILY = "1,2";/g, 'TARGETED_DEVICE_FAMILY = "1";');
     pbxproj = ensurePrivacyManifestInPbxproj(pbxproj);
+    pbxproj = ensureCodeSignEntitlementsInAppTarget(pbxproj);
     const teamId = (process.env.IOS_TEAM_ID || 'K695SZBF67').trim();
     const profileSpecifier = (process.env.IOS_PROVISIONING_PROFILE_SPECIFIER || '').trim();
     pbxproj = applyAppTargetReleaseSigning(pbxproj, { teamId, profileSpecifier });
