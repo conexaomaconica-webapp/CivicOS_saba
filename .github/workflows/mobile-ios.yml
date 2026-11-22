@@ -290,10 +290,36 @@ jobs:
           SHORT_VER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_BUNDLE/Info.plist")"
           echo "Bundle ID: $BUNDLE_ID | Versao: $SHORT_VER"
 
+          if [ "$BUNDLE_ID" != "com.conexaomaconica.app" ]; then
+            echo "::error::CFBundleIdentifier invalido: '$BUNDLE_ID' (esperado 'com.conexaomaconica.app')."
+            exit 1
+          fi
+
           codesign -v --strict "$APP_BUNDLE"
-          codesign -d --entitlements :- "$APP_BUNDLE" > "$RUNNER_TEMP/entitlements.txt" 2>/dev/null || true
-          if ! grep -q "production" "$RUNNER_TEMP/entitlements.txt"; then
-            echo "::warning::aps-environment production nao detectado nos entitlements finais."
+
+          ENTITLEMENTS_PLIST="$RUNNER_TEMP/entitlements.plist"
+          codesign -d --entitlements - --xml "$APP_BUNDLE" > "$ENTITLEMENTS_PLIST"
+          plutil -lint "$ENTITLEMENTS_PLIST"
+
+          APS_ENV="$(/usr/libexec/PlistBuddy -c 'Print :aps-environment' "$ENTITLEMENTS_PLIST")"
+          APP_ID_ENT="$(/usr/libexec/PlistBuddy -c 'Print :application-identifier' "$ENTITLEMENTS_PLIST")"
+          GET_TASK_ALLOW="$(/usr/libexec/PlistBuddy -c 'Print :get-task-allow' "$ENTITLEMENTS_PLIST" 2>/dev/null || echo 'ABSENT')"
+
+          echo "Entitlements validados -> aps-environment=$APS_ENV | application-identifier=$APP_ID_ENT | get-task-allow=$GET_TASK_ALLOW"
+
+          if [ "$APS_ENV" != "production" ]; then
+            echo "::error::aps-environment esperado 'production', encontrado '$APS_ENV'."
+            exit 1
+          fi
+
+          if [ "$APP_ID_ENT" != "${IOS_TEAM_ID}.com.conexaomaconica.app" ]; then
+            echo "::error::application-identifier esperado '${IOS_TEAM_ID}.com.conexaomaconica.app', encontrado '$APP_ID_ENT'."
+            exit 1
+          fi
+
+          if [ "$GET_TASK_ALLOW" != "ABSENT" ] && [ "$GET_TASK_ALLOW" != "false" ]; then
+            echo "::error::get-task-allow deve ser 'false' em build de distribuicao, encontrado '$GET_TASK_ALLOW'."
+            exit 1
           fi
           rm -rf "$UNZIP_DIR"
 
@@ -331,7 +357,8 @@ jobs:
                 "$RUNNER_TEMP/app_store.mobileprovision" \
                 "$RUNNER_TEMP/profile_decoded.plist" \
                 "$RUNNER_TEMP/ExportOptions.plist" \
-                "$RUNNER_TEMP/entitlements.txt"
+                "$RUNNER_TEMP/entitlements.txt" \
+                "$RUNNER_TEMP/entitlements.plist"
           rm -rf "$HOME/Library/MobileDevice/Provisioning Profiles" \
                  "$HOME/.appstoreconnect/private_keys"
           echo "🧹 Credenciais temporarias e keychain removidos do runner."
