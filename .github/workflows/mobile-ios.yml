@@ -245,6 +245,12 @@ jobs:
           EOF
           plutil -lint "$EXPORT_PLIST"
 
+          # Aplica assinatura manual e Provisioning Profile exclusivamente no target App (Release),
+          # evitando impor PROVISIONING_PROFILE_SPECIFIER globalmente aos targets CocoaPods.
+          IOS_TEAM_ID="$IOS_TEAM_ID" \
+          IOS_PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
+          node ../../scripts/apply-ios-overrides.mjs
+
           xcodebuild -workspace App.xcworkspace \
             -scheme App \
             -configuration Release \
@@ -252,10 +258,6 @@ jobs:
             -archivePath "$RUNNER_TEMP/App.xcarchive" \
             MARKETING_VERSION="1.0.0" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
-            DEVELOPMENT_TEAM="$IOS_TEAM_ID" \
-            CODE_SIGN_STYLE="Manual" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
             clean archive 2>&1 | tee "$RUNNER_TEMP/xcodebuild-archive.log"
 
           xcodebuild -exportArchive \

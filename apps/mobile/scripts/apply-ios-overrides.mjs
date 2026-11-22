@@ -60,6 +60,39 @@ function ensurePrivacyManifestInPbxproj(pbxprojContent) {
   return content;
 }
 
+function applyAppTargetReleaseSigning(pbxprojContent, { teamId, profileSpecifier }) {
+  const releaseBlockRegex =
+    /(504EC3181FED79650016851F \/\* Release \*\/ = \{\s*isa = XCBuildConfiguration;[\s\S]*?buildSettings = \{\n)([\s\S]*?)(\n\t\t\t\};[\s\S]*?name = Release;)/;
+
+  if (!releaseBlockRegex.test(pbxprojContent)) {
+    return pbxprojContent;
+  }
+
+  return pbxprojContent.replace(releaseBlockRegex, (_full, prefix, settingsBody, suffix) => {
+    let nextBody = settingsBody
+      .replace(/^\t\t\t\tCODE_SIGN_STYLE = [^;]+;\n?/gm, '')
+      .replace(/^\t\t\t\tDEVELOPMENT_TEAM = [^;]+;\n?/gm, '')
+      .replace(/^\t\t\t\tCODE_SIGN_IDENTITY = [^;]+;\n?/gm, '')
+      .replace(/^\t\t\t\t"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = [^;]+;\n?/gm, '')
+      .replace(/^\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = [^;]+;\n?/gm, '');
+
+    if (profileSpecifier) {
+      const signingLines = [
+        `\t\t\t\tCODE_SIGN_STYLE = Manual;`,
+        `\t\t\t\tCODE_SIGN_IDENTITY = "Apple Distribution";`,
+        `\t\t\t\t"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";`,
+        `\t\t\t\tDEVELOPMENT_TEAM = ${teamId};`,
+        `\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "${profileSpecifier}";`,
+      ].join('\n');
+      nextBody = `${signingLines}\n${nextBody.replace(/^\n+/, '')}`;
+    } else {
+      nextBody = `\t\t\t\tCODE_SIGN_STYLE = Automatic;\n${nextBody.replace(/^\n+/, '')}`;
+    }
+
+    return `${prefix}${nextBody.replace(/\n+$/, '')}${suffix}`;
+  });
+}
+
 if (!fs.existsSync(iosDir)) {
   console.warn('⚠️ Pasta ios/ não encontrada. Execute "npx cap add ios" primeiro.');
   process.exit(0);
@@ -80,8 +113,13 @@ try {
     // Foco inicial exclusivo em iPhone (TARGETED_DEVICE_FAMILY = "1") para evitar rejeição de layout iPad Landscape
     pbxproj = pbxproj.replace(/TARGETED_DEVICE_FAMILY = "1,2";/g, 'TARGETED_DEVICE_FAMILY = "1";');
     pbxproj = ensurePrivacyManifestInPbxproj(pbxproj);
+    const teamId = (process.env.IOS_TEAM_ID || 'K695SZBF67').trim();
+    const profileSpecifier = (process.env.IOS_PROVISIONING_PROFILE_SPECIFIER || '').trim();
+    pbxproj = applyAppTargetReleaseSigning(pbxproj, { teamId, profileSpecifier });
     fs.writeFileSync(pbxprojPath, pbxproj, 'utf8');
-    console.log(`✅ MARKETING_VERSION sincronizado para ${version}, TARGETED_DEVICE_FAMILY="1" (iPhone) e PrivacyInfo.xcprivacy vinculado ao target App.`);
+    console.log(
+      `✅ MARKETING_VERSION sincronizado para ${version}, TARGETED_DEVICE_FAMILY="1" (iPhone), PrivacyInfo.xcprivacy vinculado ao target App${profileSpecifier ? ` e assinatura Manual aplicada somente ao target App (Release, Team ${teamId})` : ''}.`,
+    );
   }
 } catch (err) {
   console.warn('⚠️ Não foi possível atualizar project.pbxproj:', err);
