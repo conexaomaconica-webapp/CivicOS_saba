@@ -1,0 +1,15 @@
+name: iOS Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch-guard:
+    name: iOS Build (Use branch release/ios-first-build)
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Select release/ios-first-build when running manually."
