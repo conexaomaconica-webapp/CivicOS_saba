@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -51,7 +51,7 @@ function PasswordField(props: {
 }
 
 export default function UpdatePasswordPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -64,12 +64,49 @@ export default function UpdatePasswordPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    const safetyTimer = setTimeout(() => {
+      if (!cancelled) setCheckingSession(false);
+    }, 3000);
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled) return;
+      if (session?.user || event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+        setAuthenticated(Boolean(session?.user));
+        setCheckingSession(false);
+      }
+    });
+
     const check = async () => {
-      const { user } = await getSession(supabase);
-      setAuthenticated(Boolean(user));
-      setCheckingSession(false);
+      try {
+        if (typeof window !== 'undefined') {
+          const code = new URLSearchParams(window.location.search).get('code');
+          if (code) {
+            await supabase.auth.exchangeCodeForSession(code).catch(() => null);
+          }
+        }
+        const { user } = await getSession(supabase);
+        if (!cancelled) {
+          setAuthenticated(Boolean(user));
+        }
+      } catch {
+        if (!cancelled) {
+          setAuthenticated(false);
+        }
+      } finally {
+        if (!cancelled) {
+          clearTimeout(safetyTimer);
+          setCheckingSession(false);
+        }
+      }
     };
     void check();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(safetyTimer);
+      authListener.subscription.unsubscribe();
+    };
   }, [supabase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
