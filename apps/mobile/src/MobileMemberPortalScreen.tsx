@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   createMobileGuideService,
   type MobileGuideSponsoredBusiness,
@@ -42,6 +42,7 @@ type MobileMemberPortalScreenProps = {
   onDeleteAccount: () => Promise<boolean>;
   onToast: (msg: string) => void;
   onExploreCatalog: () => void;
+  renderFavoriteCard?: (business: MobileGuideSponsoredBusiness) => ReactNode;
 };
 
 export function MobileMemberPortalScreen({
@@ -60,6 +61,7 @@ export function MobileMemberPortalScreen({
   onDeleteAccount,
   onToast,
   onExploreCatalog,
+  renderFavoriteCard,
 }: MobileMemberPortalScreenProps) {
   const [activeTab, setActiveTab] = useState<MemberPortalTab>(initialTab);
   const [overview, setOverview] = useState<MobileMemberOverview | null>(null);
@@ -456,10 +458,39 @@ export function MobileMemberPortalScreen({
               <div className="mobile-member-empty-box">
                 Não foi possível carregar os detalhes das empresas favoritas neste momento.
               </div>
+            ) : renderFavoriteCard ? (
+              <div className="business-list">
+                {favBusinesses.map((biz) => renderFavoriteCard(biz))}
+              </div>
             ) : (
               <div className="mobile-member-fav-list">
                 {favBusinesses.map((biz) => (
                   <article key={biz.slug} className="mobile-member-fav-card">
+                    <div
+                      className="mobile-member-fav-cover"
+                      onClick={() => onSelectBusiness(biz.slug)}
+                    >
+                      <img
+                        src={biz.cover_url || '/capafallback.png'}
+                        alt={`Capa de ${biz.name}`}
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.src = '/capafallback.png';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="mobile-member-fav-remove"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleFavorite(biz.slug, biz.name);
+                        }}
+                        aria-label={`Remover ${biz.name} dos favoritos`}
+                        title="Remover dos favoritos"
+                      >
+                        ❤️
+                      </button>
+                    </div>
                     <button
                       type="button"
                       className="mobile-member-fav-main"
@@ -481,15 +512,6 @@ export function MobileMemberPortalScreen({
                           {[biz.category_name, biz.city, biz.state].filter(Boolean).join(' • ') || 'Empresa Parceira'}
                         </span>
                       </div>
-                    </button>
-                    <button
-                      type="button"
-                      className="mobile-member-fav-remove"
-                      onClick={() => onToggleFavorite(biz.slug, biz.name)}
-                      aria-label={`Remover ${biz.name} dos favoritos`}
-                      title="Remover dos favoritos"
-                    >
-                      ❤️
                     </button>
                   </article>
                 ))}
