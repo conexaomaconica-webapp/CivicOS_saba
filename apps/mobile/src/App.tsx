@@ -28,10 +28,12 @@ import {
   redeemBenefit,
   downloadBenefitVoucher,
   formatVoucherExpiration,
+  formatBenefitBadgeLabel,
 } from './benefit-redemption';
 import {
   createMobileGuideService,
   isSafeImageCoverUrl,
+  type MobileBusinessBenefit,
   type MobileBusinessDetail,
   type MobileConnectionFeedItem,
   type MobileEventItem,
@@ -4646,7 +4648,7 @@ function BusinessDetailModal({
                               <div className="mobile-benefit-header">
                                 <div className="mobile-benefit-tags">
                                   <span className="mobile-benefit-tag">
-                                    🏷️ {b.badge_text || b.benefit_type || 'Oferta Exclusiva'}
+                                    🏷️ {formatBenefitBadgeLabel(b.badge_text, b.benefit_type)}
                                   </span>
                                 </div>
                                 {b.discount_percentage ? (
@@ -4735,29 +4737,57 @@ function BusinessDetailModal({
                     <div className="detail-section-block">
                       <h3 className="detail-section-title">Apresentação Institucional</h3>
                       {parsedVideo.kind === 'youtube' ? (
-                        <div className="detail-video-wrapper detail-video-youtube-wrapper">
-                          <div className="detail-video-iframe-box">
-                            <iframe
-                              src={parsedVideo.embedUrl}
-                              title={videoMedia.title || `Apresentação Institucional — ${detail.business_name}`}
-                              className="detail-video-iframe"
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                              referrerPolicy="strict-origin-when-cross-origin"
-                              allowFullScreen
-                            />
+                        Capacitor.getPlatform() === 'ios' ? (
+                          <a
+                            href={parsedVideo.watchUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="detail-video-wrapper detail-video-youtube-wrapper detail-video-ios-card"
+                            aria-label={`Assistir vídeo institucional de ${detail.business_name} no YouTube`}
+                          >
+                            <div className="detail-video-iframe-box">
+                              <img
+                                src={parsedVideo.thumbnailUrl}
+                                alt={videoMedia.title || `Vídeo institucional — ${detail.business_name}`}
+                                className="detail-video-thumb-img"
+                                loading="lazy"
+                              />
+                              <span className="detail-video-play-overlay" aria-hidden="true">
+                                ▶
+                              </span>
+                            </div>
+                            <div className="detail-video-external-bar">
+                              <span className="detail-video-external-link">
+                                <span>▶️</span>
+                                <span>Assistir no YouTube</span>
+                              </span>
+                            </div>
+                          </a>
+                        ) : (
+                          <div className="detail-video-wrapper detail-video-youtube-wrapper">
+                            <div className="detail-video-iframe-box">
+                              <iframe
+                                src={parsedVideo.embedUrl}
+                                title={videoMedia.title || `Apresentação Institucional — ${detail.business_name}`}
+                                className="detail-video-iframe"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                referrerPolicy="strict-origin-when-cross-origin"
+                                allowFullScreen
+                              />
+                            </div>
+                            <div className="detail-video-external-bar">
+                              <a
+                                href={parsedVideo.watchUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="detail-video-external-link"
+                              >
+                                <span>▶️</span>
+                                <span>Assistir no YouTube</span>
+                              </a>
+                            </div>
                           </div>
-                          <div className="detail-video-external-bar">
-                            <a
-                              href={parsedVideo.watchUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="detail-video-external-link"
-                            >
-                              <span>▶️</span>
-                              <span>Assistir no YouTube</span>
-                            </a>
-                          </div>
-                        </div>
+                        )
                       ) : parsedVideo.kind === 'direct' ? (
                         <div className="detail-video-wrapper">
                           <video
@@ -4973,6 +5003,9 @@ function BeneficiosScreen({
   favoritesCount,
   onLoadedData,
   onOpenVoucherModal,
+  memberUser,
+  onOpenMemberLogin,
+  onRequestRedeemWithLogin,
   viewsOverrides,
 }: {
   search: string;
@@ -4989,10 +5022,20 @@ function BeneficiosScreen({
   favoritesCount?: number;
   onLoadedData?: (data: MobileGuideHomeData) => void;
   onOpenVoucherModal?: (voucher: MobileBenefitRedemption) => void;
+  memberUser?: { id: string; name: string; email: string } | null;
+  onOpenMemberLogin?: () => void;
+  onRequestRedeemWithLogin?: (
+    benefit: MobileBenefitItem,
+    businessName: string,
+    businessSlug: string,
+    businessId?: string,
+    businessWhatsapp?: string | null
+  ) => void;
   viewsOverrides?: Record<string, number>;
 }) {
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [guideData, setGuideData] = useState<MobileGuideHomeData | null>(null);
+  const [benefitsByBusiness, setBenefitsByBusiness] = useState<Record<string, MobileBusinessBenefit[]>>({});
   const [loading, setLoading] = useState(true);
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
   const [redeemedList, setRedeemedList] = useState<MobileBenefitRedemption[]>(() => loadRedeemedBenefits());
@@ -5001,16 +5044,23 @@ function BeneficiosScreen({
 
   useEffect(() => {
     setRedeemedList(loadRedeemedBenefits());
-  }, []);
+  }, [memberUser]);
 
   const fetchBenefitBusinesses = (q = search, c = city, cat = selectedCategory, manualPull = false) => {
     if (manualPull) setIsPullRefreshing(true);
     setLoading(true);
     guideServiceRef.current
       .loadHome({ query: q, city: c, category: cat, hasBenefits: true })
-      .then((data) => {
+      .then(async (data) => {
         setGuideData(data);
         onLoadedData?.(data);
+        const ids = (data.businesses ?? []).map((b) => b.id).filter(Boolean);
+        if (ids.length > 0) {
+          const grouped = await guideServiceRef.current.loadBenefitsForBusinesses(ids);
+          setBenefitsByBusiness(grouped);
+        } else {
+          setBenefitsByBusiness({});
+        }
       })
       .catch(() => {
         setGuideData((prev) =>
@@ -5248,18 +5298,104 @@ function BeneficiosScreen({
         </div>
       ) : (
         <div className="business-list">
-          {displayedBusinesses.map((biz) => (
-            <BusinessCard
-              key={biz.id}
-              business={biz}
-              onSelect={onSelectBusiness}
-              onZoomLogo={onZoomLogo}
-              isFavorited={isFavorite?.(biz.slug)}
-              onToggleFavorite={onToggleFavorite}
-              onRefer={onRefer}
-              showBenefitBadge
-            />
-          ))}
+          {displayedBusinesses.map((biz) => {
+            const bizBenefits = benefitsByBusiness[biz.id] ?? [];
+            return (
+              <div key={biz.id} className="benefit-directory-card-shell">
+                <BusinessCard
+                  business={biz}
+                  onSelect={onSelectBusiness}
+                  onZoomLogo={onZoomLogo}
+                  isFavorited={isFavorite?.(biz.slug)}
+                  onToggleFavorite={onToggleFavorite}
+                  onRefer={onRefer}
+                  showBenefitBadge
+                />
+
+                {bizBenefits.length > 0 && (
+                  <div className="benefit-directory-inline-offers">
+                    {bizBenefits.map((b) => {
+                      const voucher = getRedeemedBenefit(b.id);
+                      const isRedeemed = Boolean(voucher);
+                      return (
+                        <div key={b.id || b.title} className="mobile-benefit-card benefit-directory-inline-card">
+                          <div className="mobile-benefit-header">
+                            <div className="mobile-benefit-tags">
+                              <span className="mobile-benefit-tag">
+                                🏷️ {formatBenefitBadgeLabel(b.badge_text, b.benefit_type)}
+                              </span>
+                            </div>
+                            {b.discount_percentage ? (
+                              <span className="mobile-benefit-discount-pill">
+                                {b.discount_percentage}% Desconto
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <h4 className="mobile-benefit-title">{b.title}</h4>
+                          {b.description && (
+                            <p className="mobile-benefit-desc">{b.description}</p>
+                          )}
+
+                          <div className="mobile-benefit-footer">
+                            <div className="mobile-benefit-status">
+                              {isRedeemed ? (
+                                <span className="benefit-code-badge">
+                                  ✓ Código: <b>{voucher?.code}</b>
+                                </span>
+                              ) : (
+                                <span className="benefit-hint-text">
+                                  Código pessoal gerado no resgate
+                                </span>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              className={`benefit-redeem-btn ${isRedeemed ? 'redeemed' : ''}`}
+                              onClick={() => {
+                                if (isRedeemed && voucher) {
+                                  onOpenVoucherModal?.(voucher);
+                                  return;
+                                }
+                                if (!memberUser) {
+                                  if (onRequestRedeemWithLogin) {
+                                    onRequestRedeemWithLogin(
+                                      b,
+                                      biz.name,
+                                      biz.slug,
+                                      biz.id,
+                                      null
+                                    );
+                                  } else if (onOpenMemberLogin) {
+                                    onOpenMemberLogin();
+                                  }
+                                  return;
+                                }
+                                const newVoucher = redeemBenefit({
+                                  benefit: b,
+                                  businessName: biz.name,
+                                  businessSlug: biz.slug,
+                                  businessId: biz.id,
+                                  businessWhatsapp: null,
+                                  user: memberUser,
+                                });
+                                setRedeemedList(loadRedeemedBenefits());
+                                onOpenVoucherModal?.(newVoucher);
+                              }}
+                            >
+                              <span>{isRedeemed ? 'Ver Comprovante' : 'Resgatar Benefício'}</span>
+                              <span>{isRedeemed ? '🎫' : '⚡'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -9872,6 +10008,21 @@ export function App() {
             favoritesCount={favorites.length}
             viewsOverrides={viewsOverrides}
             onOpenVoucherModal={(v) => setActiveVoucherModal(v)}
+            memberUser={memberUser}
+            onOpenMemberLogin={() => {
+              setOpenShareAfterLogin(false);
+              setIsMemberLoginModalOpen(true);
+            }}
+            onRequestRedeemWithLogin={(benefit, bizName, bizSlug, bizId, bizWa) => {
+              setPendingBenefitToRedeem({
+                benefit,
+                businessName: bizName,
+                businessSlug: bizSlug,
+                businessId: bizId,
+                businessWhatsapp: bizWa,
+              });
+              setIsMemberLoginModalOpen(true);
+            }}
             onLoadedData={(data) => {
               if (data.available_cities?.length) {
                 setAvailableCities(data.available_cities);

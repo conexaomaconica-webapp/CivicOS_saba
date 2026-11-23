@@ -13,6 +13,7 @@ export type ParsedInstitutionalVideo =
       videoId: string;
       embedUrl: string;
       watchUrl: string;
+      thumbnailUrl: string;
     }
   | {
       kind: 'direct';
@@ -105,6 +106,7 @@ export function parseInstitutionalVideoUrl(rawUrl: string | undefined | null): P
       videoId: ytId,
       embedUrl: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(ytId)}?playsinline=1&rel=0&modestbranding=1`,
       watchUrl: `https://www.youtube.com/watch?v=${encodeURIComponent(ytId)}`,
+      thumbnailUrl: `https://i.ytimg.com/vi/${encodeURIComponent(ytId)}/hqdefault.jpg`,
     };
   }
 

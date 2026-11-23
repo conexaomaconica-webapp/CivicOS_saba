@@ -731,7 +731,10 @@ export async function getAsaasDynamicConfig(
         query = query.eq('tenant_id', tenantId);
       }
 
-      const { data: activeSetting } = await query.maybeSingle();
+      const { data: activeSetting } = await query
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (activeSetting) {
         const env: AsaasEnvironment = activeSetting.environment;

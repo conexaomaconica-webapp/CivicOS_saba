@@ -135,7 +135,7 @@ describe('estrutura das páginas de listagem e da empresa (leitura do código)',
 
   it('o passo a passo de resgate descreve só o que o fluxo faz (conta, resgatar, código validado pela empresa)', () => {
     const source = read('src/app/(public)/guia/beneficios/page.tsx');
-    expect(source).toContain('Escolha a oferta e abra o perfil da empresa.');
+    expect(source).toContain('Escolha a oferta desejada diretamente no card da empresa acima.');
     expect(source).toContain('Apresente o código recebido à empresa, que confirma o uso do benefício.');
   });
 

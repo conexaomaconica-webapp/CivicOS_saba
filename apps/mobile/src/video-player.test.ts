@@ -13,6 +13,7 @@ describe('Institutional Video Player URL Classifier (iOS WKWebView & Android Com
       videoId: '9yG8W3mX1pQ',
       embedUrl: 'https://www.youtube-nocookie.com/embed/9yG8W3mX1pQ?playsinline=1&rel=0&modestbranding=1',
       watchUrl: 'https://www.youtube.com/watch?v=9yG8W3mX1pQ',
+      thumbnailUrl: 'https://i.ytimg.com/vi/9yG8W3mX1pQ/hqdefault.jpg',
     });
   });
 
@@ -23,6 +24,7 @@ describe('Institutional Video Player URL Classifier (iOS WKWebView & Android Com
       videoId: 'abc123XYZ_9',
       embedUrl: 'https://www.youtube-nocookie.com/embed/abc123XYZ_9?playsinline=1&rel=0&modestbranding=1',
       watchUrl: 'https://www.youtube.com/watch?v=abc123XYZ_9',
+      thumbnailUrl: 'https://i.ytimg.com/vi/abc123XYZ_9/hqdefault.jpg',
     });
   });
 
@@ -33,6 +35,7 @@ describe('Institutional Video Player URL Classifier (iOS WKWebView & Android Com
       videoId: 'fisionShort01',
       embedUrl: 'https://www.youtube-nocookie.com/embed/fisionShort01?playsinline=1&rel=0&modestbranding=1',
       watchUrl: 'https://www.youtube.com/watch?v=fisionShort01',
+      thumbnailUrl: 'https://i.ytimg.com/vi/fisionShort01/hqdefault.jpg',
     });
   });
 

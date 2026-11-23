@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CreditCard, QrCode, CheckCircle2, ShieldCheck, Copy, AlertCircle, Lock, ArrowRight } from 'lucide-react';
-import { processPixCheckoutAction, processCreditCardCheckoutAction, getPlanPaymentRulesAction, PlanPaymentRules } from '@/lib/payment/payment-service';
+import { processPixCheckoutAction, processCreditCardCheckoutAction, checkPixCheckoutStatusAction, getPlanPaymentRulesAction, PlanPaymentRules } from '@/lib/payment/payment-service';
 import { trackGaOnce } from '@/lib/analytics/ga';
 
 type CheckoutPaymentProps = {
@@ -30,11 +30,40 @@ export default function CheckoutPaymentClient({
 
   // Estado PIX gerado
   const [pixResult, setPixResult] = useState<{
+    paymentId?: string;
     pixCopiaECola: string;
     qrCodeBase64?: string;
     amountCents: number;
     status: string;
   } | null>(null);
+  const [pixConfirmed, setPixConfirmed] = useState(false);
+
+  // Polling automático para detectar confirmação de PIX no Asaas
+  useEffect(() => {
+    if (method !== 'pix' || !pixResult?.paymentId || pixConfirmed) return;
+    let active = true;
+    const interval = setInterval(async () => {
+      try {
+        const res = await checkPixCheckoutStatusAction({
+          businessId,
+          paymentId: pixResult.paymentId!,
+        });
+        if (active && res.confirmed) {
+          setPixConfirmed(true);
+          setStatusMsg('Pagamento PIX confirmado com sucesso! Redirecionando para assinatura do contrato...');
+          setTimeout(() => {
+            router.push('/anunciar/passo-7');
+          }, 1500);
+        }
+      } catch {
+        // Ignora falha transitória de polling
+      }
+    }, 4000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [method, pixResult?.paymentId, pixConfirmed, businessId, router]);
 
   // Estado Cartão de Crédito
   const [cardHolder, setCardHolder] = useState('');
@@ -69,6 +98,7 @@ export default function CheckoutPaymentClient({
 
       if (res.success) {
         setPixResult({
+          paymentId: res.paymentId,
           pixCopiaECola: res.pixCopiaECola,
           qrCodeBase64: res.qrCodeBase64,
           amountCents: res.amountCents || rules?.pixAmountCents || rules?.amountCents || 178800,
