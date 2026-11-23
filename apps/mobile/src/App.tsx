@@ -1718,6 +1718,8 @@ function MemberLoginModal({
   const [stateUf, setStateUf] = useState('BA');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -2010,32 +2012,74 @@ function MemberLoginModal({
               <label className="experience-field-label">
                 Senha {mode === 'register' ? '(mínimo 8 caracteres) *' : '*'}
               </label>
-              <input
-                type="password"
-                className="member-login-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={mode === 'register' ? 'Mínimo 8 caracteres' : '••••••••'}
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                disabled={loading}
-                required
-              />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  className="member-login-input"
+                  style={{ paddingRight: 72, width: '100%' }}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={mode === 'register' ? 'Mínimo 8 caracteres' : '••••••••'}
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  disabled={loading}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? 'Ocultar senha' : 'Ver senha'}
+                  style={{
+                    position: 'absolute',
+                    right: 10,
+                    background: 'transparent',
+                    border: 0,
+                    color: '#4b161b',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    padding: '4px 6px',
+                  }}
+                >
+                  {showPassword ? 'Ocultar' : 'Ver'}
+                </button>
+              </div>
             </>
           )}
 
           {mode === 'register' && (
             <>
               <label className="experience-field-label">Confirmar Senha *</label>
-              <input
-                type="password"
-                className="member-login-input"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Repita a sua senha"
-                autoComplete="new-password"
-                disabled={loading}
-                required
-              />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  className="member-login-input"
+                  style={{ paddingRight: 72, width: '100%' }}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repita a sua senha"
+                  autoComplete="new-password"
+                  disabled={loading}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  aria-label={showConfirmPassword ? 'Ocultar confirmação de senha' : 'Ver confirmação de senha'}
+                  style={{
+                    position: 'absolute',
+                    right: 10,
+                    background: 'transparent',
+                    border: 0,
+                    color: '#4b161b',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    padding: '4px 6px',
+                  }}
+                >
+                  {showConfirmPassword ? 'Ocultar' : 'Ver'}
+                </button>
+              </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '4px 0 12px', fontSize: '0.74rem', color: '#44403c' }}>
                 <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
