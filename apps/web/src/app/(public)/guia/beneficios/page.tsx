@@ -2,12 +2,14 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { appUrl } from '@/lib/seo/app-url';
 import Link from 'next/link';
-import { ChevronRight, Award, Tag, Sparkles, ArrowRight, Store, Search } from 'lucide-react';
+import { ChevronRight, Award, Sparkles, Search } from 'lucide-react';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
+import { BenefitsDirectoryCards, type BenefitDirectoryBusinessItem } from '@/components/public/directory/BenefitsDirectoryCards';
 import { StructuredData } from '@/components/seo/StructuredData';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
+import type { PublicBusinessBenefit } from '@/lib/business/public-business-presentation';
 import '@/styles/directory-home.css';
 
 export const metadata: Metadata = {
@@ -43,7 +45,85 @@ export default async function PublicBenefitsDirectoryPage({ searchParams }: Prop
     p_page_size: 24,
   });
 
-  const items = (searchRes as any)?.items || [];
+  const rawItems = (searchRes as any)?.items || [];
+  const businessIds = rawItems
+    .map((biz: any) => biz.business_id || biz.id)
+    .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
+
+  const benefitsByBusiness = new Map<string, PublicBusinessBenefit[]>();
+  if (businessIds.length > 0) {
+    const { data: benefitRows } = await (supabase as any)
+      .from('business_benefits')
+      .select('id, business_id, title, description, benefit_type, discount_percentage, badge_text, valid_until')
+      .in('business_id', businessIds)
+      .eq('status', 'active')
+      .order('display_order', { ascending: true });
+
+    for (const row of benefitRows || []) {
+      const bizId = String(row.business_id || '');
+      if (!bizId) continue;
+      const list = benefitsByBusiness.get(bizId) || [];
+      list.push({
+        id: String(row.id),
+        title: String(row.title || 'Benefício Exclusivo'),
+        description: String(row.description || ''),
+        benefitType: row.benefit_type ? String(row.benefit_type) : 'special_condition',
+        discountPercentage: row.discount_percentage != null ? Number(row.discount_percentage) : null,
+        badgeText: row.badge_text ? String(row.badge_text) : null,
+        validUntil: row.valid_until ? String(row.valid_until) : null,
+      });
+      benefitsByBusiness.set(bizId, list);
+    }
+  }
+
+  const items: BenefitDirectoryBusinessItem[] = rawItems.map((biz: any) => {
+    const bizId = String(biz.business_id || biz.id || '');
+    const bizSlug = String(biz.business_slug || biz.slug || '');
+    const bizName = String(biz.business_name || biz.name || '');
+    return {
+      business_id: bizId,
+      business_name: bizName,
+      business_slug: bizSlug,
+      primary_category_name: biz.primary_category_name || biz.category || null,
+      city: biz.city || null,
+      state: biz.state || null,
+      description: biz.description || null,
+      logo_url: biz.logo_url || null,
+      cover_url: biz.cover_url || null,
+      is_founder: Boolean(biz.is_founder),
+      is_pedra_fundamental: Boolean(biz.is_pedra_fundamental),
+      card: {
+        id: bizId,
+        slug: bizSlug,
+        name: bizName,
+        short_description: biz.short_description || biz.description || null,
+        logo_url: biz.logo_url || null,
+        logo_background_color: biz.logo_background_color || null,
+        cover_url: biz.cover_url || null,
+        category_name: biz.primary_category_name || biz.category || null,
+        city: biz.city || null,
+        state: biz.state || null,
+        is_verified: Boolean(biz.is_verified),
+        is_founder: Boolean(biz.is_founder),
+        is_pedra_fundamental: Boolean(biz.is_pedra_fundamental),
+        pedra_fundamental_card_display: biz.pedra_fundamental_card_display || null,
+        effective_plan_code: biz.effective_plan_code || biz.plan_code || null,
+        rating_average: biz.rating_average != null ? Number(biz.rating_average) : null,
+        reviews_count: biz.reviews_count != null ? Number(biz.reviews_count) : undefined,
+        views_count: biz.views_count != null ? Number(biz.views_count) : null,
+        badge_custom_text: biz.badge_custom_text || null,
+        badge_custom_icon_url: biz.badge_custom_icon_url || null,
+        has_benefits: true,
+        masonic_relationship_type: biz.masonic_relationship_type || null,
+        masonic_member_name: biz.masonic_member_name || null,
+        masonic_brother_name: biz.masonic_brother_name || null,
+        masonic_lodge_name: biz.masonic_lodge_name || null,
+        is_masonic_connection_public:
+          typeof biz.is_masonic_connection_public === 'boolean' ? biz.is_masonic_connection_public : undefined,
+      },
+      benefits: benefitsByBusiness.get(bizId) || [],
+    };
+  });
 
   const breadcrumbSchema = {
     '@context': 'https://schema.org',
@@ -128,7 +208,7 @@ export default async function PublicBenefitsDirectoryPage({ searchParams }: Prop
         <main className="dh-container space-y-8 py-7 sm:py-10">
           <section aria-labelledby="beneficios-lista-titulo">
             <h2 id="beneficios-lista-titulo" className="font-serif text-xl font-bold text-[#1f1914]">
-              Ofertas ativas na rede
+              Conexão de Ofertas ativas
             </h2>
             <p className="mt-1 text-xs text-[#6b625b]">
               {items.length === 0
@@ -137,52 +217,9 @@ export default async function PublicBenefitsDirectoryPage({ searchParams }: Prop
             </p>
           </section>
 
-          {/* Grid de Ofertas */}
+          {/* Grid de Ofertas Diretas com Botão de Resgate */}
           {items.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3 xl:gap-6">
-              {items.map((biz: any) => (
-                <div
-                  key={biz.business_id || biz.slug}
-                  className="group flex min-w-0 flex-col justify-between space-y-4 rounded-2xl border border-[#e8e2d9] bg-white p-4 shadow-sm transition-all hover:border-[#c59b27]/60 hover:shadow-md sm:p-5 lg:p-6"
-                >
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="flex max-w-full items-center gap-1.5 rounded-full border border-[#c59b27]/40 bg-[#fdf8eb] px-3 py-1 text-[11px] font-bold text-[#3b0b14] shadow-xs">
-                        <Tag className="w-3.5 h-3.5 text-[#c59b27]" /> Benefício Ativo
-                      </span>
-                      {biz.is_founder && (
-                        <span className="bg-[#3b0b14] text-[#c59b27] font-bold text-[10px] px-2.5 py-0.5 rounded border border-[#c59b27]/50 shadow-xs">
-                          Pedra Fundamental
-                        </span>
-                      )}
-                    </div>
-
-                    <div>
-                      <h3 className="break-words font-serif text-lg font-bold leading-tight text-[#1f1914] transition-colors group-hover:text-[#3b0b14] sm:text-xl">
-                        {biz.business_name || biz.name}
-                      </h3>
-                      <p className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-[#6b625b]">
-                        <Store className="h-3.5 w-3.5 shrink-0 text-[#c59b27]" />
-                        <span className="break-words">{biz.primary_category_name || biz.category || 'Empresa Parceira'}</span>
-                        {biz.city && <span>• {biz.city}</span>}
-                      </p>
-                    </div>
-
-                    <p className="text-xs text-[#6b625b] leading-relaxed line-clamp-3">
-                      {biz.description || 'Confira as condições especiais de atendimento e descontos exclusivos no perfil público.'}
-                    </p>
-                  </div>
-
-                  <Link
-                    href={`/guia/${biz.business_slug || biz.slug}`}
-                    className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#3b0b14] px-3 py-2.5 text-center text-xs font-bold text-white shadow-sm transition-all hover:bg-[#c59b27] hover:text-[#1f1914]"
-                  >
-                    <span>Ver Benefício no Perfil</span>
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </Link>
-                </div>
-              ))}
-            </div>
+            <BenefitsDirectoryCards items={items} />
           ) : (
             <div className="p-12 bg-white border border-[#e8e2d9] rounded-2xl text-center space-y-3 shadow-xs">
               <Sparkles className="w-10 h-10 text-[#c59b27] mx-auto" />
@@ -197,8 +234,8 @@ export default async function PublicBenefitsDirectoryPage({ searchParams }: Prop
               Como resgatar um benefício
             </h2>
             <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-[#6b625b]">
-              <li>Escolha a oferta e abra o perfil da empresa.</li>
-              <li>Entre na sua conta (o cadastro é gratuito) e use o botão para resgatar.</li>
+              <li>Escolha a oferta desejada diretamente no card da empresa acima.</li>
+              <li>Entre na sua conta (o cadastro é gratuito) e clique em &ldquo;Resgatar benefício&rdquo;.</li>
               <li>Apresente o código recebido à empresa, que confirma o uso do benefício.</li>
             </ol>
           </section>

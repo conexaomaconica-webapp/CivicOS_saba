@@ -1160,6 +1160,71 @@ export async function submitMobileEventRSVP(
   }
 }
 
+export async function loadBenefitsForBusinessesFromDirectSupabase(
+  fetchImpl: typeof fetch,
+  businessIds: string[],
+): Promise<Record<string, MobileBusinessBenefit[]>> {
+  const cleanIds = Array.from(new Set(businessIds.map((id) => id.trim()).filter(Boolean)));
+  if (cleanIds.length === 0) return {};
+
+  const supabaseUrl = 'https://rwvztwsjcjljphqttiws.supabase.co';
+  const anonKey =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3dnp0d3NqY2psanBocXR0aXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3ODk4MTIsImV4cCI6MjEwMTM2NTgxMn0.1p7e82BNjYQBKkOdbSlXZ0WLiV-Hl8T-IGicUTn9GHc';
+
+  try {
+    const res = await fetchWithTimeout(
+      fetchImpl,
+      `${supabaseUrl}/rest/v1/business_benefits?select=id,business_id,title,description,benefit_type,discount_percentage,badge_text,valid_until&business_id=in.(${cleanIds.join(',')})&status=eq.active&order=display_order.asc`,
+      {
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+        },
+      },
+      3000,
+    );
+
+    if (!res.ok) return {};
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return {};
+
+    const grouped: Record<string, MobileBusinessBenefit[]> = {};
+    for (const row of rows) {
+      if (!row || typeof row !== 'object') continue;
+      const bizId = String((row as Record<string, unknown>).business_id || '');
+      if (!bizId) continue;
+      if (!grouped[bizId]) grouped[bizId] = [];
+      grouped[bizId]!.push({
+        id: String((row as Record<string, unknown>).id || ''),
+        title: String((row as Record<string, unknown>).title || 'Benefício Exclusivo'),
+        description:
+          typeof (row as Record<string, unknown>).description === 'string'
+            ? String((row as Record<string, unknown>).description)
+            : '',
+        benefit_type:
+          typeof (row as Record<string, unknown>).benefit_type === 'string'
+            ? String((row as Record<string, unknown>).benefit_type)
+            : null,
+        discount_percentage:
+          (row as Record<string, unknown>).discount_percentage != null
+            ? Number((row as Record<string, unknown>).discount_percentage)
+            : null,
+        badge_text:
+          typeof (row as Record<string, unknown>).badge_text === 'string'
+            ? String((row as Record<string, unknown>).badge_text)
+            : null,
+        valid_until:
+          typeof (row as Record<string, unknown>).valid_until === 'string'
+            ? String((row as Record<string, unknown>).valid_until)
+            : null,
+      });
+    }
+    return grouped;
+  } catch {
+    return {};
+  }
+}
+
 export function createMobileGuideService(
   fetchImpl: typeof fetch = fetch,
   endpoint = ((import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_MOBILE_GUIDE_API_URL)?.trim() || '',
@@ -1253,6 +1318,10 @@ export function createMobileGuideService(
 
     async loadEvents() {
       return await loadEventsFromDirectSupabase(fetchImpl);
+    },
+
+    async loadBenefitsForBusinesses(businessIds: string[]) {
+      return await loadBenefitsForBusinessesFromDirectSupabase(fetchImpl, businessIds);
     },
   };
 }

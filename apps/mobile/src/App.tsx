@@ -28,10 +28,12 @@ import {
   redeemBenefit,
   downloadBenefitVoucher,
   formatVoucherExpiration,
+  formatBenefitBadgeLabel,
 } from './benefit-redemption';
 import {
   createMobileGuideService,
   isSafeImageCoverUrl,
+  type MobileBusinessBenefit,
   type MobileBusinessDetail,
   type MobileConnectionFeedItem,
   type MobileEventItem,
@@ -50,6 +52,22 @@ import { routeFromHash, routeHref, routeLabels, routes, type Route } from './nav
 import { setupPushNotifications, sendTokenToSupabase } from './push-service';
 import { executeAccountDeletion, purgeLocalAccountState } from './account-lifecycle';
 import { setupDeepLinkListeners } from './deep-links';
+import {
+  REPORT_REASON_OPTIONS,
+  UGC_ABUSE_CONTACT_EMAIL,
+  UGC_TERMS_URL,
+  blockMuralAuthor,
+  buildConnectionAuthorKey,
+  clearLocalModerationBlocks,
+  filterModeratedConnections,
+  getBlockedAuthorKeys,
+  getReportedConnectionIds,
+  hasAcceptedUgcTerms,
+  setAcceptedUgcTerms,
+  submitConnectionModerationReport,
+  type ConnectionReportReason,
+} from './ugc-moderation';
+import { parseInstitutionalVideoUrl } from './video-player';
 
 const launchOnThisBoot = claimColdLaunch(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
@@ -1184,20 +1202,31 @@ function ReferBusinessModal({
 function MuralDeConexoesSection({
   onOpenShareExperience,
   onSelectBusiness,
+  isAuthenticatedMember = false,
+  onOpenMemberLogin,
 }: {
   onOpenShareExperience: () => void;
   onSelectBusiness?: (slug: string) => void;
+  isAuthenticatedMember?: boolean;
+  onOpenMemberLogin?: () => void;
 }) {
-  const [feedItems, setFeedItems] = useState<MobileConnectionFeedItem[]>([]);
+  const [rawFeedItems, setRawFeedItems] = useState<MobileConnectionFeedItem[]>([]);
   const [confirmedTotal, setConfirmedTotal] = useState<number>(0);
   const [likes, setLikes] = useState<Record<string, { count: number; liked: boolean }>>({});
+  const [moderationVersion, setModerationVersion] = useState(0);
+  const [reportingItem, setReportingItem] = useState<MobileConnectionFeedItem | null>(null);
+  const [reportReason, setReportReason] = useState<ConnectionReportReason>('ofensivo');
+  const [reportDetails, setReportDetails] = useState('');
+  const [alsoBlockAuthor, setAlsoBlockAuthor] = useState(true);
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [moderationNotice, setModerationNotice] = useState<string | null>(null);
   const guideServiceRef = useRef(createMobileGuideService());
 
   useEffect(() => {
     guideServiceRef.current
       .loadConnectionsFeed(6)
       .then((res) => {
-        setFeedItems(res.items || []);
+        setRawFeedItems(res.items || []);
         setConfirmedTotal(res.confirmedTotal || 0);
         const initialLikes: Record<string, { count: number; liked: boolean }> = {};
         for (const item of res.items || []) {
@@ -1207,6 +1236,16 @@ function MuralDeConexoesSection({
       })
       .catch(() => { });
   }, []);
+
+  const feedItems = useMemo(
+    () => filterModeratedConnections(rawFeedItems),
+    [rawFeedItems, moderationVersion],
+  );
+
+  const hasHiddenModerationItems = useMemo(
+    () => getReportedConnectionIds().length > 0 || getBlockedAuthorKeys().length > 0,
+    [moderationVersion],
+  );
 
   const toggleLike = (id: string) => {
     setLikes((prev) => {
@@ -1220,6 +1259,50 @@ function MuralDeConexoesSection({
         },
       };
     });
+  };
+
+  const openReportDialog = (item: MobileConnectionFeedItem) => {
+    setReportingItem(item);
+    setReportReason('ofensivo');
+    setReportDetails('');
+    setAlsoBlockAuthor(true);
+  };
+
+  const handleConfirmReport = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!reportingItem) return;
+    setReportSubmitting(true);
+    try {
+      const authorKey = buildConnectionAuthorKey(reportingItem);
+      const res = await submitConnectionModerationReport({
+        connectionId: reportingItem.id,
+        reason: reportReason,
+        details: reportDetails,
+        blockAuthor: alsoBlockAuthor,
+        authorKey,
+      });
+      setModerationVersion((v) => v + 1);
+      setModerationNotice(res.message);
+      setReportingItem(null);
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
+  const handleQuickBlockAuthor = async (item: MobileConnectionFeedItem) => {
+    setReportSubmitting(true);
+    try {
+      const authorKey = buildConnectionAuthorKey(item);
+      const res = await blockMuralAuthor({
+        connectionId: item.id,
+        authorKey,
+      });
+      setModerationVersion((v) => v + 1);
+      setModerationNotice(res.message);
+      setReportingItem(null);
+    } finally {
+      setReportSubmitting(false);
+    }
   };
 
   const verbForType = (type: MobileConnectionFeedItem['connection_type']) => {
@@ -1317,6 +1400,20 @@ function MuralDeConexoesSection({
         </div>
       </div>
 
+      {moderationNotice && (
+        <div className="mural-moderation-feedback-bar" role="status">
+          <span>🛡️ {moderationNotice}</span>
+          <button
+            type="button"
+            className="mural-moderation-dismiss-btn"
+            onClick={() => setModerationNotice(null)}
+            aria-label="Fechar aviso de moderação"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Feed com registros confirmados pela comunidade */}
       {feedItems.length > 0 && (
         <div className="mural-feed-list" aria-label="Depoimentos recentes do Mural">
@@ -1338,6 +1435,15 @@ function MuralDeConexoesSection({
                     </a>
                     {item.item_description && <span style={{ color: '#6b7280' }}> ({item.item_description})</span>}
                   </span>
+                  <button
+                    type="button"
+                    className="mural-feed-more-btn"
+                    onClick={() => openReportDialog(item)}
+                    title="Denunciar conteúdo ou bloquear autor"
+                    aria-label={`Opções de moderação para publicação de ${item.member_first_name}`}
+                  >
+                    ⋯
+                  </button>
                 </div>
 
                 {item.message && (
@@ -1350,19 +1456,240 @@ function MuralDeConexoesSection({
                   <span className="mural-feed-verified-badge">
                     <span>✓</span> Confirmado pela empresa
                   </span>
-                  <button
-                    type="button"
-                    className={'mural-feed-like-btn ' + (likeState.liked ? 'liked' : '')}
-                    onClick={() => toggleLike(item.id)}
-                    title={likeState.liked ? 'Descurtir' : 'Apoiar e curtir'}
-                  >
-                    <span>{likeState.liked ? '❤️' : '🤍'}</span>
-                    <span>{likeState.count}</span>
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button
+                      type="button"
+                      className="mural-feed-report-link-btn"
+                      onClick={() => openReportDialog(item)}
+                      title="Denunciar publicação ou bloquear autor"
+                    >
+                      Denunciar
+                    </button>
+                    <button
+                      type="button"
+                      className={'mural-feed-like-btn ' + (likeState.liked ? 'liked' : '')}
+                      onClick={() => toggleLike(item.id)}
+                      title={likeState.liked ? 'Descurtir' : 'Apoiar e curtir'}
+                    >
+                      <span>{likeState.liked ? '❤️' : '🤍'}</span>
+                      <span>{likeState.count}</span>
+                    </button>
+                  </div>
                 </div>
               </article>
             );
           })}
+        </div>
+      )}
+
+      {hasHiddenModerationItems && (
+        <div className="mural-moderation-footer-row">
+          <span>Publicações denunciadas ou de autores bloqueados estão ocultas neste dispositivo.</span>
+          <button
+            type="button"
+            className="mural-moderation-restore-btn"
+            onClick={() => {
+              clearLocalModerationBlocks();
+              setModerationVersion((v) => v + 1);
+              setModerationNotice('Filtros locais de bloqueio redefinidos.');
+            }}
+          >
+            Restaurar ocultos
+          </button>
+        </div>
+      )}
+
+      {reportingItem && (
+        <div
+          className="experience-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Denunciar conteúdo ou bloquear autor"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !reportSubmitting) {
+              setReportingItem(null);
+            }
+          }}
+        >
+          <div className="experience-modal-card" style={{ maxWidth: 420 }}>
+            <button
+              type="button"
+              className="modal-close-btn"
+              style={{ position: 'absolute', top: 14, right: 14 }}
+              onClick={() => setReportingItem(null)}
+              disabled={reportSubmitting}
+              aria-label="Fechar"
+            >
+              ✕
+            </button>
+
+            <div className="experience-modal-header">
+              <div className="experience-header-icon" style={{ color: '#b91c1c', background: '#fef2f2', borderColor: '#fecaca' }}>
+                🛡️
+              </div>
+              <div>
+                <h3 className="experience-header-title" style={{ fontSize: '1.1rem' }}>
+                  Moderação & Segurança
+                </h3>
+                <p className="experience-header-subtitle">
+                  Publicação de <strong>{reportingItem.member_first_name}</strong> sobre <strong>{reportingItem.business_name}</strong>
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={(e) => { void handleConfirmReport(e); }}>
+              <label className="experience-field-label">
+                Motivo da denúncia:
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                {REPORT_REASON_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 8,
+                      padding: '8px 10px',
+                      borderRadius: 12,
+                      border: reportReason === opt.value ? '1.5px solid #4b161b' : '1px solid #e5e7eb',
+                      background: reportReason === opt.value ? '#fdf8f0' : '#ffffff',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="mural-report-reason"
+                      value={opt.value}
+                      checked={reportReason === opt.value}
+                      onChange={() => setReportReason(opt.value)}
+                      style={{ marginTop: 3, accentColor: '#4b161b' }}
+                    />
+                    <div>
+                      <strong style={{ display: 'block', fontSize: '0.8rem', color: '#1f2937' }}>
+                        {opt.label}
+                      </strong>
+                      <span style={{ display: 'block', fontSize: '0.72rem', color: '#6b7280', lineHeight: 1.35 }}>
+                        {opt.description}
+                      </span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+
+              <label className="experience-field-label">
+                Detalhes adicionais <span>(opcional)</span>:
+              </label>
+              <textarea
+                className="experience-textarea"
+                rows={2}
+                maxLength={300}
+                value={reportDetails}
+                onChange={(e) => setReportDetails(e.target.value)}
+                placeholder="Descreva brevemente o problema para a equipe de moderação..."
+                style={{ minHeight: 58 }}
+              />
+
+              <label className="experience-share-checkbox-card" style={{ marginBottom: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={alsoBlockAuthor}
+                  onChange={(e) => setAlsoBlockAuthor(e.target.checked)}
+                />
+                <div>
+                  <span className="experience-share-checkbox-title">
+                    Bloquear este autor ({reportingItem.member_first_name})
+                  </span>
+                  <span className="experience-share-checkbox-desc">
+                    Remove imediatamente todas as publicações deste autor do seu Mural de Conexões.
+                  </span>
+                </div>
+              </label>
+
+              <p style={{ margin: '0 0 12px', fontSize: '0.72rem', color: '#6b7280', lineHeight: 1.4 }}>
+                {isAuthenticatedMember
+                  ? 'A equipe de moderação analisa todas as denúncias em até 24h. '
+                  : 'Você está como visitante: ocultar/bloquear aplica-se apenas a este aparelho. Para registrar denúncia na fila da administração, entre na sua conta ou envie por e-mail. '}
+                Canal direto anti-abuso:{' '}
+                <a href={`mailto:${UGC_ABUSE_CONTACT_EMAIL}?subject=${encodeURIComponent(`Denúncia Mural — ${reportingItem.business_name}`)}`} style={{ color: '#4b161b', fontWeight: 700 }}>
+                  {UGC_ABUSE_CONTACT_EMAIL}
+                </a>
+                .
+              </p>
+
+              {!isAuthenticatedMember && onOpenMemberLogin && (
+                <div
+                  style={{
+                    marginBottom: 12,
+                    padding: '10px 12px',
+                    borderRadius: 12,
+                    background: '#fffbeb',
+                    border: '1px solid #fde68a',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <span style={{ fontSize: '0.74rem', color: '#92400e', fontWeight: 600 }}>
+                    Entre para registrar a denúncia oficialmente na administração.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReportingItem(null);
+                      onOpenMemberLogin();
+                    }}
+                    style={{
+                      background: '#4b161b',
+                      color: '#f3eedd',
+                      border: 'none',
+                      borderRadius: 8,
+                      padding: '6px 12px',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Entrar para Denunciar
+                  </button>
+                </div>
+              )}
+
+              <div className="experience-modal-actions-row" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="experience-cancel-btn"
+                  onClick={() => { void handleQuickBlockAuthor(reportingItem); }}
+                  disabled={reportSubmitting}
+                  style={{ fontSize: '0.76rem', color: '#991b1b', borderColor: '#fecaca', background: '#fef2f2' }}
+                >
+                  {isAuthenticatedMember ? 'Apenas bloquear autor' : 'Bloquear autor neste aparelho'}
+                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    className="experience-cancel-btn"
+                    onClick={() => setReportingItem(null)}
+                    disabled={reportSubmitting}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="experience-submit-btn"
+                    disabled={reportSubmitting}
+                  >
+                    {reportSubmitting
+                      ? 'Processando...'
+                      : isAuthenticatedMember
+                        ? 'Enviar Denúncia'
+                        : 'Ocultar neste aparelho'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </section>
@@ -1853,6 +2180,8 @@ function ShareExperienceModal({
   const [comment, setComment] = useState('');
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [shareOnMural, setShareOnMural] = useState(true);
+  const [acceptedAntiAbuseTerms, setAcceptedAntiAbuseTerms] = useState(() => hasAcceptedUgcTerms());
+  const [termsError, setTermsError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [isDone, setIsDone] = useState(false);
 
@@ -1889,6 +2218,12 @@ function ShareExperienceModal({
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!currentBusiness) return;
+    if (!acceptedAntiAbuseTerms) {
+      setTermsError('Confirme o aceite dos Termos de Uso e da Política Anti-Abuso da comunidade para enviar seu relato.');
+      return;
+    }
+    setTermsError(null);
+    setAcceptedUgcTerms(true);
     setSubmitting(true);
 
     setTimeout(() => {
@@ -2176,7 +2511,42 @@ function ShareExperienceModal({
                   </div>
                 </label>
 
-                {/* 6. AVISO DE VALIDAÇÃO PRÉVIA PELA EMPRESA E ADMIN */}
+                {/* 6. ACEITE DOS TERMOS DE USO E POLÍTICA ANTI-ABUSO (Apple Guideline 1.2) */}
+                <label className="experience-share-checkbox-card" style={{ marginBottom: 10 }}>
+                  <input
+                    type="checkbox"
+                    checked={acceptedAntiAbuseTerms}
+                    onChange={(e) => {
+                      setAcceptedAntiAbuseTerms(e.target.checked);
+                      if (e.target.checked) setTermsError(null);
+                    }}
+                  />
+                  <div>
+                    <span className="experience-share-checkbox-title">
+                      Compromisso de Conduta & Termos de Uso *
+                    </span>
+                    <span className="experience-share-checkbox-desc">
+                      Declaro que este relato é legítimo e respeita os{' '}
+                      <a
+                        href={UGC_TERMS_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: '#4b161b', fontWeight: 700, textDecoration: 'underline' }}
+                      >
+                        Termos de Uso e Política Anti-Abuso
+                      </a>
+                      . Conteúdos ofensivos, falsos ou inadequados não são tolerados, serão removidos pela moderação e a conta infratora poderá ser suspensa.
+                    </span>
+                  </div>
+                </label>
+
+                {termsError && (
+                  <p style={{ color: '#be123c', fontSize: '0.76rem', fontWeight: 700, margin: '0 0 10px' }}>
+                    {termsError}
+                  </p>
+                )}
+
+                {/* 7. AVISO DE VALIDAÇÃO PRÉVIA PELA EMPRESA E ADMIN */}
                 <div className="experience-validation-alert-box">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -4278,7 +4648,7 @@ function BusinessDetailModal({
                               <div className="mobile-benefit-header">
                                 <div className="mobile-benefit-tags">
                                   <span className="mobile-benefit-tag">
-                                    🏷️ {b.badge_text || b.benefit_type || 'Oferta Exclusiva'}
+                                    🏷️ {formatBenefitBadgeLabel(b.badge_text, b.benefit_type)}
                                   </span>
                                 </div>
                                 {b.discount_percentage ? (
@@ -4360,20 +4730,90 @@ function BusinessDetailModal({
                 )}
 
                 {/* 7. VÍDEO DE APRESENTAÇÃO INSTITUCIONAL (Plano Acácia) */}
-                {isAcacia && videoMedia && (
-                  <div className="detail-section-block">
-                    <h3 className="detail-section-title">Apresentação Institucional</h3>
-                    <div className="detail-video-wrapper">
-                      <video
-                        src={videoMedia.url}
-                        controls
-                        playsInline
-                        preload="metadata"
-                        className="detail-video-player"
-                      />
+                {isAcacia && videoMedia && (() => {
+                  const parsedVideo = parseInstitutionalVideoUrl(videoMedia.url);
+                  if (!parsedVideo) return null;
+                  return (
+                    <div className="detail-section-block">
+                      <h3 className="detail-section-title">Apresentação Institucional</h3>
+                      {parsedVideo.kind === 'youtube' ? (
+                        Capacitor.getPlatform() === 'ios' ? (
+                          <a
+                            href={parsedVideo.watchUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="detail-video-wrapper detail-video-youtube-wrapper detail-video-ios-card"
+                            aria-label={`Assistir vídeo institucional de ${detail.business_name} no YouTube`}
+                          >
+                            <div className="detail-video-iframe-box">
+                              <img
+                                src={parsedVideo.thumbnailUrl}
+                                alt={videoMedia.title || `Vídeo institucional — ${detail.business_name}`}
+                                className="detail-video-thumb-img"
+                                loading="lazy"
+                              />
+                              <span className="detail-video-play-overlay" aria-hidden="true">
+                                ▶
+                              </span>
+                            </div>
+                            <div className="detail-video-external-bar">
+                              <span className="detail-video-external-link">
+                                <span>▶️</span>
+                                <span>Assistir no YouTube</span>
+                              </span>
+                            </div>
+                          </a>
+                        ) : (
+                          <div className="detail-video-wrapper detail-video-youtube-wrapper">
+                            <div className="detail-video-iframe-box">
+                              <iframe
+                                src={parsedVideo.embedUrl}
+                                title={videoMedia.title || `Apresentação Institucional — ${detail.business_name}`}
+                                className="detail-video-iframe"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                referrerPolicy="strict-origin-when-cross-origin"
+                                allowFullScreen
+                              />
+                            </div>
+                            <div className="detail-video-external-bar">
+                              <a
+                                href={parsedVideo.watchUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="detail-video-external-link"
+                              >
+                                <span>▶️</span>
+                                <span>Assistir no YouTube</span>
+                              </a>
+                            </div>
+                          </div>
+                        )
+                      ) : parsedVideo.kind === 'direct' ? (
+                        <div className="detail-video-wrapper">
+                          <video
+                            src={parsedVideo.src}
+                            controls
+                            playsInline
+                            preload="metadata"
+                            className="detail-video-player"
+                          />
+                        </div>
+                      ) : (
+                        <div className="detail-video-wrapper detail-video-external-only">
+                          <a
+                            href={parsedVideo.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="detail-video-external-link"
+                          >
+                            <span>▶️</span>
+                            <span>Assistir Vídeo Institucional</span>
+                          </a>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* 8. COMENTÁRIOS E AVALIAÇÕES DA REDE */}
                 <div id="section-comentarios" className="detail-section-block">
@@ -4563,6 +5003,9 @@ function BeneficiosScreen({
   favoritesCount,
   onLoadedData,
   onOpenVoucherModal,
+  memberUser,
+  onOpenMemberLogin,
+  onRequestRedeemWithLogin,
   viewsOverrides,
 }: {
   search: string;
@@ -4579,10 +5022,20 @@ function BeneficiosScreen({
   favoritesCount?: number;
   onLoadedData?: (data: MobileGuideHomeData) => void;
   onOpenVoucherModal?: (voucher: MobileBenefitRedemption) => void;
+  memberUser?: { id: string; name: string; email: string } | null;
+  onOpenMemberLogin?: () => void;
+  onRequestRedeemWithLogin?: (
+    benefit: MobileBenefitItem,
+    businessName: string,
+    businessSlug: string,
+    businessId?: string,
+    businessWhatsapp?: string | null
+  ) => void;
   viewsOverrides?: Record<string, number>;
 }) {
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [guideData, setGuideData] = useState<MobileGuideHomeData | null>(null);
+  const [benefitsByBusiness, setBenefitsByBusiness] = useState<Record<string, MobileBusinessBenefit[]>>({});
   const [loading, setLoading] = useState(true);
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
   const [redeemedList, setRedeemedList] = useState<MobileBenefitRedemption[]>(() => loadRedeemedBenefits());
@@ -4591,16 +5044,23 @@ function BeneficiosScreen({
 
   useEffect(() => {
     setRedeemedList(loadRedeemedBenefits());
-  }, []);
+  }, [memberUser]);
 
   const fetchBenefitBusinesses = (q = search, c = city, cat = selectedCategory, manualPull = false) => {
     if (manualPull) setIsPullRefreshing(true);
     setLoading(true);
     guideServiceRef.current
       .loadHome({ query: q, city: c, category: cat, hasBenefits: true })
-      .then((data) => {
+      .then(async (data) => {
         setGuideData(data);
         onLoadedData?.(data);
+        const ids = (data.businesses ?? []).map((b) => b.id).filter(Boolean);
+        if (ids.length > 0) {
+          const grouped = await guideServiceRef.current.loadBenefitsForBusinesses(ids);
+          setBenefitsByBusiness(grouped);
+        } else {
+          setBenefitsByBusiness({});
+        }
       })
       .catch(() => {
         setGuideData((prev) =>
@@ -4838,18 +5298,104 @@ function BeneficiosScreen({
         </div>
       ) : (
         <div className="business-list">
-          {displayedBusinesses.map((biz) => (
-            <BusinessCard
-              key={biz.id}
-              business={biz}
-              onSelect={onSelectBusiness}
-              onZoomLogo={onZoomLogo}
-              isFavorited={isFavorite?.(biz.slug)}
-              onToggleFavorite={onToggleFavorite}
-              onRefer={onRefer}
-              showBenefitBadge
-            />
-          ))}
+          {displayedBusinesses.map((biz) => {
+            const bizBenefits = benefitsByBusiness[biz.id] ?? [];
+            return (
+              <div key={biz.id} className="benefit-directory-card-shell">
+                <BusinessCard
+                  business={biz}
+                  onSelect={onSelectBusiness}
+                  onZoomLogo={onZoomLogo}
+                  isFavorited={isFavorite?.(biz.slug)}
+                  onToggleFavorite={onToggleFavorite}
+                  onRefer={onRefer}
+                  showBenefitBadge
+                />
+
+                {bizBenefits.length > 0 && (
+                  <div className="benefit-directory-inline-offers">
+                    {bizBenefits.map((b) => {
+                      const voucher = getRedeemedBenefit(b.id);
+                      const isRedeemed = Boolean(voucher);
+                      return (
+                        <div key={b.id || b.title} className="mobile-benefit-card benefit-directory-inline-card">
+                          <div className="mobile-benefit-header">
+                            <div className="mobile-benefit-tags">
+                              <span className="mobile-benefit-tag">
+                                🏷️ {formatBenefitBadgeLabel(b.badge_text, b.benefit_type)}
+                              </span>
+                            </div>
+                            {b.discount_percentage ? (
+                              <span className="mobile-benefit-discount-pill">
+                                {b.discount_percentage}% Desconto
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <h4 className="mobile-benefit-title">{b.title}</h4>
+                          {b.description && (
+                            <p className="mobile-benefit-desc">{b.description}</p>
+                          )}
+
+                          <div className="mobile-benefit-footer">
+                            <div className="mobile-benefit-status">
+                              {isRedeemed ? (
+                                <span className="benefit-code-badge">
+                                  ✓ Código: <b>{voucher?.code}</b>
+                                </span>
+                              ) : (
+                                <span className="benefit-hint-text">
+                                  Código pessoal gerado no resgate
+                                </span>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              className={`benefit-redeem-btn ${isRedeemed ? 'redeemed' : ''}`}
+                              onClick={() => {
+                                if (isRedeemed && voucher) {
+                                  onOpenVoucherModal?.(voucher);
+                                  return;
+                                }
+                                if (!memberUser) {
+                                  if (onRequestRedeemWithLogin) {
+                                    onRequestRedeemWithLogin(
+                                      b,
+                                      biz.name,
+                                      biz.slug,
+                                      biz.id,
+                                      null
+                                    );
+                                  } else if (onOpenMemberLogin) {
+                                    onOpenMemberLogin();
+                                  }
+                                  return;
+                                }
+                                const newVoucher = redeemBenefit({
+                                  benefit: b,
+                                  businessName: biz.name,
+                                  businessSlug: biz.slug,
+                                  businessId: biz.id,
+                                  businessWhatsapp: null,
+                                  user: memberUser,
+                                });
+                                setRedeemedList(loadRedeemedBenefits());
+                                onOpenVoucherModal?.(newVoucher);
+                              }}
+                            >
+                              <span>{isRedeemed ? 'Ver Comprovante' : 'Resgatar Benefício'}</span>
+                              <span>{isRedeemed ? '🎫' : '⚡'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -8381,6 +8927,8 @@ function Home({
   onToggleFavorite,
   onRefer,
   onStartShareExperience,
+  isAuthenticatedMember,
+  onOpenMemberLogin,
   viewsOverrides,
 }: {
   city: string;
@@ -8394,6 +8942,8 @@ function Home({
   onToggleFavorite?: (slug: string, name?: string) => void;
   onRefer?: (name: string, slug: string) => void;
   onStartShareExperience?: (slug?: string) => void;
+  isAuthenticatedMember?: boolean;
+  onOpenMemberLogin?: () => void;
   viewsOverrides?: Record<string, number>;
 }) {
   const [guideData, setGuideData] = useState<MobileGuideHomeData | null>(null);
@@ -8508,6 +9058,8 @@ function Home({
       <MuralDeConexoesSection
         onOpenShareExperience={() => onStartShareExperience?.()}
         onSelectBusiness={onSelectBusiness}
+        isAuthenticatedMember={isAuthenticatedMember}
+        onOpenMemberLogin={onOpenMemberLogin}
       />
     ),
     all_businesses: (
@@ -8666,6 +9218,8 @@ function Home({
       <MuralDeConexoesSection
         onOpenShareExperience={() => onStartShareExperience?.()}
         onSelectBusiness={onSelectBusiness}
+        isAuthenticatedMember={isAuthenticatedMember}
+        onOpenMemberLogin={onOpenMemberLogin}
       />
     ),
     all_businesses: guideData ? (() => {
@@ -9380,6 +9934,11 @@ export function App() {
             onToggleFavorite={handleToggleFavorite}
             onRefer={handleOpenRefer}
             onStartShareExperience={handleStartShareExperience}
+            isAuthenticatedMember={Boolean(memberUser && memberSession?.accessToken)}
+            onOpenMemberLogin={() => {
+              setOpenShareAfterLogin(false);
+              setIsMemberLoginModalOpen(true);
+            }}
             viewsOverrides={viewsOverrides}
             onLoadedData={(data) => {
               if (data.available_cities?.length) {
@@ -9449,6 +10008,21 @@ export function App() {
             favoritesCount={favorites.length}
             viewsOverrides={viewsOverrides}
             onOpenVoucherModal={(v) => setActiveVoucherModal(v)}
+            memberUser={memberUser}
+            onOpenMemberLogin={() => {
+              setOpenShareAfterLogin(false);
+              setIsMemberLoginModalOpen(true);
+            }}
+            onRequestRedeemWithLogin={(benefit, bizName, bizSlug, bizId, bizWa) => {
+              setPendingBenefitToRedeem({
+                benefit,
+                businessName: bizName,
+                businessSlug: bizSlug,
+                businessId: bizId,
+                businessWhatsapp: bizWa,
+              });
+              setIsMemberLoginModalOpen(true);
+            }}
             onLoadedData={(data) => {
               if (data.available_cities?.length) {
                 setAvailableCities(data.available_cities);

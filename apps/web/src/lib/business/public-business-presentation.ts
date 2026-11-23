@@ -98,6 +98,33 @@ export type PublicBusinessBenefit = {
   validUntil?: string | null;
 };
 
+const BENEFIT_TYPE_LABELS: Record<string, string> = {
+  special_condition: 'Condição especial',
+  discount: 'Oferta',
+  offer: 'Oferta',
+  exclusive_offer: 'Oferta',
+  benefit: 'Oferta',
+  gift: 'Brinde',
+  freebie: 'Brinde',
+  cashback: 'Cashback',
+  priority_service: 'Atendimento prioritário',
+};
+
+export function formatBenefitBadgeLabel(
+  badgeText?: string | null,
+  benefitType?: string | null,
+): string {
+  const candidates = [badgeText, benefitType];
+  for (const candidate of candidates) {
+    const raw = (candidate ?? '').trim();
+    if (!raw) continue;
+    const mapped = BENEFIT_TYPE_LABELS[raw.toLowerCase()];
+    if (mapped) return mapped;
+    return raw.replace(/\bOFF\b/gi, 'Desconto');
+  }
+  return 'Oferta';
+}
+
 export type PublicBusinessEvent = {
   id: string;
   title: string;

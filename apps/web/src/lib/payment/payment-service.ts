@@ -3,6 +3,7 @@
 import { createServerSideClient } from '@/lib/supabase/server';
 import { resolveRequestOperationalTenantId } from '@/lib/tenant/tenant-policy';
 import { AsaasPaymentProvider } from './asaas-payment-provider';
+import { getAsaasDynamicConfig } from './asaas-config-service';
 import { CreditCardPayload, PixChargeResult, CreditCardChargeResult } from './payment-provider.interface';
 
 import { PlanPaymentRules, CANONICAL_PLAN_PAYMENT_RULES } from './payment-rules-types';
@@ -251,6 +252,7 @@ export async function processPixCheckoutAction(payload: {
       .from('payment_attempts')
       .update({
         status: finalStatus,
+        provider_charge_id: result.paymentId || null,
         error_code: result.success ? null : (result.error?.includes('TIMEOUT') ? 'TIMEOUT_RECONCILIATION_REQUIRED' : 'GATEWAY_ERROR'),
         error_message: result.error || null,
         response_received: {
@@ -263,6 +265,71 @@ export async function processPixCheckoutAction(payload: {
   }
 
   return result;
+}
+
+/**
+ * Consulta ativa de confirmação de pagamento PIX no Asaas para o checkout de contratação.
+ */
+export async function checkPixCheckoutStatusAction(payload: {
+  businessId: string;
+  paymentId: string;
+}): Promise<{ confirmed: boolean; status?: string }> {
+  const cleanId = (payload.paymentId || '').trim();
+  if (!cleanId || cleanId.startsWith('pay_pix_sim_')) {
+    return { confirmed: false };
+  }
+
+  const authRes = await authorizeBusinessAccess(payload.businessId);
+  const { supabase, tenantId } = authRes;
+  if (!supabase) return { confirmed: false };
+
+  const asaasConfig = await getAsaasDynamicConfig(tenantId);
+  const paymentProvider = new AsaasPaymentProvider(asaasConfig);
+  const live = await paymentProvider.getPaymentStatus(cleanId);
+  const status = String(live.status || '').toUpperCase();
+
+  if (!live.found || !['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(status)) {
+    return { confirmed: false, status: live.status };
+  }
+
+  const confirmedAt = new Date().toISOString();
+  const { data: attempt } = await (supabase as any)
+    .from('payment_attempts')
+    .select('id, invoice_id')
+    .eq('business_id', payload.businessId)
+    .or(`provider_charge_id.eq.${cleanId},response_received->>payment_id.eq.${cleanId}`)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (attempt?.id) {
+    await (supabase as any)
+      .from('payment_attempts')
+      .update({ status: 'success', provider_charge_id: cleanId })
+      .eq('id', attempt.id);
+  }
+
+  if (attempt?.invoice_id) {
+    const { data: inv } = await (supabase as any)
+      .from('invoices')
+      .select('id, status, amount_due')
+      .eq('id', attempt.invoice_id)
+      .maybeSingle();
+
+    if (inv && inv.status !== 'paid') {
+      await (supabase as any)
+        .from('invoices')
+        .update({
+          status: 'paid',
+          amount_paid: inv.amount_due,
+          paid_at: confirmedAt,
+          updated_at: confirmedAt,
+        })
+        .eq('id', inv.id);
+    }
+  }
+
+  return { confirmed: true, status };
 }
 
 /**

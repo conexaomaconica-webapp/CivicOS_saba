@@ -714,7 +714,7 @@ export async function checkCommercialPaymentStatusAction(token: string): Promise
     // Busca empresa
     const { data: biz, error: bizErr } = await (dbClient as any)
       .from('businesses')
-      .select('commercial_status')
+      .select('commercial_status, tenant_id, owner_id')
       .eq('id', tokenRow.business_id)
       .single();
 
@@ -731,11 +731,12 @@ export async function checkCommercialPaymentStatusAction(token: string): Promise
     let effectiveCommercialStatus = biz.commercial_status;
     let isConfirmed = confirmedCommercialStatuses.includes(effectiveCommercialStatus);
 
-    // Reconciliação de segurança para pagamentos aprovados antes do webhook.
-    // Recupera inclusive transações sandbox já concluídas que ficaram presas em
-    // aguardando_pagamento por dependerem exclusivamente do evento assíncrono.
+    // Reconciliação de segurança para pagamentos aprovados antes do webhook (Cartão ou PIX).
+    // 1) Verifica evidência já persistida no banco (invoices / payment_attempts);
+    // 2) Se ainda estiver pendente e houver cobrança Asaas em aberto, consulta diretamente
+    //    GET /payments/{id} no Asaas para não deixar PIX preso caso o webhook atrase ou falhe.
     if (!isConfirmed) {
-      const [{ data: paidInvoice }, { data: successfulAttempt }] = await Promise.all([
+      const [{ data: paidInvoice }, { data: latestAttempt }] = await Promise.all([
         (dbClient as any)
           .from('invoices')
           .select('id')
@@ -745,19 +746,57 @@ export async function checkCommercialPaymentStatusAction(token: string): Promise
           .maybeSingle(),
         (dbClient as any)
           .from('payment_attempts')
-          .select('id, status, payload_received')
+          .select('id, invoice_id, provider_code, provider_charge_id, status, payload_received, response_received')
           .eq('business_id', tokenRow.business_id)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
       ]);
 
-      const gatewayStatus = String(successfulAttempt?.payload_received?.status || '').toUpperCase();
-      const hasConfirmedEvidence = Boolean(
+      const gatewayStatus = String(latestAttempt?.payload_received?.status || '').toUpperCase();
+      let hasConfirmedEvidence = Boolean(
         paidInvoice
-        || successfulAttempt?.status === 'success'
-        || ['CONFIRMED', 'RECEIVED'].includes(gatewayStatus)
+        || latestAttempt?.status === 'success'
+        || ['CONFIRMED', 'RECEIVED', 'RECEIVED_IN_CASH'].includes(gatewayStatus)
       );
+      let confirmedGatewayStatus = gatewayStatus;
+      let confirmedViaAsaasPoll = false;
+
+      const asaasPaymentId = String(
+        latestAttempt?.provider_charge_id
+        || latestAttempt?.payload_received?.payment_id
+        || latestAttempt?.response_received?.payment_id
+        || ''
+      ).trim();
+
+      if (
+        !hasConfirmedEvidence
+        && latestAttempt?.provider_code === 'asaas'
+        && asaasPaymentId
+        && !asaasPaymentId.startsWith('pay_pix_sim_')
+        && !asaasPaymentId.startsWith('manual_')
+      ) {
+        try {
+          const { getAsaasDynamicConfig } = await import('./asaas-config-service');
+          const { AsaasPaymentProvider } = await import('./asaas-payment-provider');
+          const asaasConfig = await getAsaasDynamicConfig(biz.tenant_id);
+          const provider = new AsaasPaymentProvider(asaasConfig);
+          const livePayment = await provider.getPaymentStatus(asaasPaymentId);
+          const liveStatus = String(livePayment.status || '').toUpperCase();
+
+          if (livePayment.found && ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(liveStatus)) {
+            hasConfirmedEvidence = true;
+            confirmedGatewayStatus = liveStatus;
+            confirmedViaAsaasPoll = true;
+          }
+        } catch (pollErr) {
+          logger.warn('Falha não impeditiva ao consultar status de pagamento no Asaas', {
+            businessId: tokenRow.business_id,
+            asaasPaymentId,
+            error: pollErr instanceof Error ? pollErr.message : String(pollErr),
+          });
+        }
+      }
 
       if (hasConfirmedEvidence && ['contrato_assinado', 'aguardando_pagamento'].includes(effectiveCommercialStatus)) {
         const confirmedAt = new Date().toISOString();
@@ -769,11 +808,70 @@ export async function checkCommercialPaymentStatusAction(token: string): Promise
         if (!reconciliationError) {
           effectiveCommercialStatus = 'pagamento_confirmado';
           isConfirmed = true;
-          if (successfulAttempt?.id) {
-            await (dbClient as any)
-              .from('payment_attempts')
-              .update({ status: 'success' })
-              .eq('id', successfulAttempt.id).throwOnError();
+
+          if (confirmedViaAsaasPoll && latestAttempt?.invoice_id) {
+            try {
+              const { data: openInvoice } = await (dbClient as any)
+                .from('invoices')
+                .select('id, status, amount_due')
+                .eq('id', latestAttempt.invoice_id)
+                .maybeSingle();
+
+              if (openInvoice && openInvoice.status !== 'paid') {
+                await (dbClient as any)
+                  .from('invoices')
+                  .update({
+                    status: 'paid',
+                    amount_paid: openInvoice.amount_due,
+                    paid_at: confirmedAt,
+                    updated_at: confirmedAt,
+                  })
+                  .eq('id', openInvoice.id);
+              }
+            } catch {
+              /* melhor esforço */
+            }
+          }
+
+          if (latestAttempt?.id) {
+            try {
+              await (dbClient as any)
+                .from('payment_attempts')
+                .update({
+                  status: 'success',
+                  provider_charge_id: asaasPaymentId || latestAttempt.provider_charge_id || null,
+                  response_received: {
+                    ...(latestAttempt.response_received || {}),
+                    asaas_poll_confirmed: confirmedViaAsaasPoll
+                      ? { status: confirmedGatewayStatus, confirmed_at: confirmedAt }
+                      : undefined,
+                  },
+                })
+                .eq('id', latestAttempt.id);
+            } catch {
+              /* melhor esforço */
+            }
+          }
+
+          if (confirmedViaAsaasPoll) {
+            try {
+              await (dbClient as any).from('admin_audit_logs').insert({
+                tenant_id: biz.tenant_id,
+                actor_id: biz.owner_id || '00000000-0000-0000-0000-000000000001',
+                action: 'RECONCILE_COMMERCIAL_PAYMENT_ASAAS_POLL',
+                entity_type: 'businesses',
+                entity_id: tokenRow.business_id,
+                before_value: { commercial_status: biz.commercial_status },
+                after_value: {
+                  commercial_status: 'pagamento_confirmado',
+                  gateway_status: confirmedGatewayStatus,
+                  asaas_payment_id: asaasPaymentId,
+                },
+                reason: `Pagamento PIX/Asaas confirmado via consulta direta ao gateway (${confirmedGatewayStatus}).`,
+              });
+            } catch {
+              /* auditoria best-effort */
+            }
           }
         }
       }

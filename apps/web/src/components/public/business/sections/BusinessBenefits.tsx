@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { CalendarDays, Check, Download, Loader2, Sparkles, Tag, X } from 'lucide-react';
-import type { PublicBusinessBenefit } from '@/lib/business/public-business-presentation';
+import { formatBenefitBadgeLabel, type PublicBusinessBenefit } from '@/lib/business/public-business-presentation';
 import { redeemBenefitAction } from '@/lib/business/benefit-redemption-service';
 import { useBusinessAnalytics } from '@/components/public/business/BusinessContactTracker';
 import { formatDateBR } from '@/lib/format/datetime-br';
@@ -143,7 +143,7 @@ export function BusinessBenefits({ benefits, businessName, className = '' }: Bus
                   <div className="space-y-1.5 min-w-0 flex-1 w-full sm:w-auto">
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-[#C9A227]/20 text-[#C9A227] border border-[#C9A227]/30 max-w-full truncate">
                       <Tag className="w-3 h-3 shrink-0" />
-                      <span className="truncate">{inPortuguese(benefit.badgeText || benefit.benefitType || 'Oferta Exclusiva')}</span>
+                      <span className="truncate">{formatBenefitBadgeLabel(benefit.badgeText, benefit.benefitType)}</span>
                     </span>
 
                     <h3 className="font-serif font-bold text-sm sm:text-base text-[#F3EEDD] leading-snug break-words">

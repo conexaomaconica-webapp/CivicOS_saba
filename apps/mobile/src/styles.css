@@ -33,7 +33,7 @@ button, input { font: inherit; }
 .launch-skip-btn:active {
   background: rgba(0, 0, 0, 0.7);
 }
-.launch-fallback button { width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.launch-fallback-continue-btn { width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .launch-fallback img { width: 100%; height: 100%; object-fit: contain; }
 
 .app-shell { min-height: 100vh; min-height: 100dvh; padding-bottom: calc(76px + env(safe-area-inset-bottom)); background: #f7f3ec; }
@@ -2453,6 +2453,7 @@ button, input { font: inherit; }
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center top;
   display: block;
 }
 .card-cover-actions {
@@ -7356,4 +7357,204 @@ button, input { font: inherit; }
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+}
+
+/* ==========================================================================
+   VÍDEO INSTITUCIONAL YOUTUBE / SHORTS (iOS WKWebView & Android Compatibility)
+   ========================================================================== */
+.detail-video-youtube-wrapper {
+  display: flex;
+  flex-direction: column;
+  background: #140507;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #ebd9c8;
+}
+
+.detail-video-iframe-box {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000000;
+}
+
+.detail-video-iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.detail-video-external-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  background: #fbf6ee;
+  border-top: 1px solid #ebd9c8;
+}
+
+.detail-video-external-only {
+  padding: 16px;
+  background: #fbf6ee;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.detail-video-ios-card {
+  text-decoration: none;
+}
+
+.detail-video-thumb-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.detail-video-play-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  border-radius: 999px;
+  background: rgba(75, 22, 27, 0.9);
+  border: 2px solid #c9a227;
+  color: #f3eedd;
+  font-size: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* ==========================================================================
+   BENEFÍCIOS INLINE NOS CARDS DA TELA DE BENEFÍCIOS (Android, iOS & WebView)
+   ========================================================================== */
+.benefit-directory-card-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.benefit-directory-inline-offers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: -2px;
+}
+
+.benefit-directory-inline-card {
+  box-shadow: 0 4px 14px rgba(42, 7, 14, 0.18);
+}
+
+.detail-video-external-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 750;
+  color: #4b161b;
+  text-decoration: none;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #c9a227;
+}
+
+/* ==========================================================================
+   MODERAÇÃO DO MURAL DE CONEXÕES (Denúncia & Bloqueio de Autor — Guideline 1.2)
+   ========================================================================== */
+.mural-feed-more-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #9ca3af;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mural-feed-more-btn:hover,
+.mural-feed-more-btn:active {
+  background: #fdf8f0;
+  border-color: #ebd9c8;
+  color: #4b161b;
+}
+
+.mural-feed-report-link-btn {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 3px 6px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.mural-feed-report-link-btn:hover,
+.mural-feed-report-link-btn:active {
+  color: #991b1b;
+}
+
+.mural-moderation-feedback-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.mural-moderation-dismiss-btn {
+  background: transparent;
+  border: none;
+  color: #065f46;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.mural-moderation-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #faf6f0;
+  border: 1px dashed #e5d5c3;
+  font-size: 0.72rem;
+  color: #78716c;
+}
+
+.mural-moderation-restore-btn {
+  background: transparent;
+  border: none;
+  color: #8c671d;
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-decoration: underline;
+  cursor: pointer;
 }

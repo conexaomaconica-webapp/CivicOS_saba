@@ -66,7 +66,7 @@ export function LaunchExperience({ onComplete }: LaunchExperienceProps) {
         >
           Pular
         </button>
-        <button type="button" onClick={onComplete} aria-label="Continuar para o aplicativo">
+        <button type="button" className="launch-fallback-continue-btn" onClick={onComplete} aria-label="Continuar para o aplicativo">
           <img src="./splash.svg" alt="Conexão Maçônica — Tradição que une! conexão que fortalece!" />
         </button>
       </section>
@@ -94,6 +94,7 @@ export function LaunchExperience({ onComplete }: LaunchExperienceProps) {
         onEnded={onComplete}
         onError={() => setFailed(true)}
       >
+        <source src="./splash_conexao1.mp4" type="video/mp4" />
         <source src="./splash_conexao1.webm" type="video/webm" />
       </video>
     </section>

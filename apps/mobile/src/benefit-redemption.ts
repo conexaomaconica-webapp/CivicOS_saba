@@ -83,6 +83,33 @@ export function formatVoucherExpiration(value?: string | null): string {
   }
 }
 
+const MOBILE_BENEFIT_TYPE_LABELS: Record<string, string> = {
+  special_condition: 'Condição especial',
+  discount: 'Oferta',
+  offer: 'Oferta',
+  exclusive_offer: 'Oferta',
+  benefit: 'Oferta',
+  gift: 'Brinde',
+  freebie: 'Brinde',
+  cashback: 'Cashback',
+  priority_service: 'Atendimento prioritário',
+};
+
+export function formatBenefitBadgeLabel(
+  badgeText?: string | null,
+  benefitType?: string | null,
+): string {
+  const candidates = [badgeText, benefitType];
+  for (const candidate of candidates) {
+    const raw = (candidate ?? '').trim();
+    if (!raw) continue;
+    const mapped = MOBILE_BENEFIT_TYPE_LABELS[raw.toLowerCase()];
+    if (mapped) return mapped;
+    return raw.replace(/\bOFF\b/gi, 'Desconto');
+  }
+  return 'Oferta';
+}
+
 export function redeemBenefit({
   benefit,
   businessName,
@@ -124,7 +151,7 @@ export function redeemBenefit({
     title: benefit.title.trim(),
     description: (benefit.description || '').trim(),
     discountPercentage: benefit.discount_percentage ?? null,
-    badgeText: benefit.badge_text || benefit.benefit_type || 'Oferta Exclusiva',
+    badgeText: formatBenefitBadgeLabel(benefit.badge_text, benefit.benefit_type),
     code,
     redeemedAt: new Date().toISOString(),
     expiresAt,

@@ -63,6 +63,57 @@ export class AsaasPaymentProvider implements IPaymentProvider {
     }
   }
 
+  /**
+   * Consulta direta do status atual de uma cobrança específica no Asaas (somente leitura).
+   * Usado para reconciliação ativa de PIX quando o webhook ainda não foi entregue.
+   */
+  async getPaymentStatus(paymentId: string): Promise<{
+    found: boolean;
+    paymentId?: string;
+    status?: string;
+    billingType?: string;
+    amountCents?: number;
+    confirmedDate?: string | null;
+    paymentDate?: string | null;
+  }> {
+    const cleanId = (paymentId || '').trim();
+    if (!this.isConfigured() || !cleanId || cleanId.startsWith('pay_pix_sim_') || cleanId.startsWith('manual_')) {
+      return { found: false };
+    }
+
+    try {
+      const res = await fetch(`${this.baseUrl}/payments/${encodeURIComponent(cleanId)}`, {
+        method: 'GET',
+        headers: {
+          access_token: this.apiKey,
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store',
+      });
+
+      if (!res.ok) {
+        return { found: false };
+      }
+
+      const pay = await res.json();
+      if (!pay?.id) {
+        return { found: false };
+      }
+
+      return {
+        found: true,
+        paymentId: String(pay.id),
+        status: typeof pay.status === 'string' ? pay.status : undefined,
+        billingType: typeof pay.billingType === 'string' ? pay.billingType : undefined,
+        amountCents: typeof pay.value === 'number' ? Math.round(pay.value * 100) : undefined,
+        confirmedDate: typeof pay.confirmedDate === 'string' ? pay.confirmedDate : null,
+        paymentDate: typeof pay.paymentDate === 'string' ? pay.paymentDate : null,
+      };
+    } catch {
+      return { found: false };
+    }
+  }
+
   // 0. Reconciliação Externa: Busca cobrança no Asaas por externalReference exata
   async findPaymentByExternalReference(externalReference: string): Promise<{
     found: boolean;
