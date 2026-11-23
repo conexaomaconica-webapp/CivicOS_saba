@@ -2928,20 +2928,26 @@ button, input { font: inherit; }
   bottom: 84px;
   left: 50%;
   transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 32px);
   background: #4b161b;
   color: #ffffff;
-  padding: 10px 20px;
-  border-radius: 999px;
+  padding: 10px 18px;
+  border-radius: 16px;
   font-size: 0.84rem;
   font-weight: 750;
+  line-height: 1.35;
+  text-align: center;
   border: 1px solid #c9a227;
   box-shadow: 0 8px 24px rgba(43, 6, 13, 0.4);
   z-index: 6000;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   animation: toastPop 240ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
   pointer-events: none;
 }
 
