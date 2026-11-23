@@ -715,14 +715,15 @@ export async function loadBusinessDetailFromDirectSupabase(
       ).catch(() => null),
     ]);
 
-    if (!res.ok) return null;
-    const list = await res.json();
-    if (!Array.isArray(list) || !list[0]) return null;
     const bffJson = bffRes && bffRes.ok ? await bffRes.json().catch(() => null) : null;
+    const list = res.ok ? await res.json().catch(() => null) : null;
+    const supabaseRow = Array.isArray(list) && list[0] ? list[0] : null;
+    const bffDetail = bffJson?.detail && typeof bffJson.detail === 'object' ? bffJson.detail : null;
+    if (!supabaseRow && !bffDetail) return null;
     const recsJson = recsRes && recsRes.ok ? await recsRes.json().catch(() => null) : null;
     const b = {
-      ...list[0],
-      ...(bffJson?.detail && typeof bffJson.detail === 'object' ? bffJson.detail : {}),
+      ...(supabaseRow || {}),
+      ...(bffDetail || {}),
     };
     const rawServices = Array.isArray(b.services) ? b.services : [];
     const normalizedServices = rawServices.map((s: Record<string, unknown>) => ({
@@ -1322,6 +1323,60 @@ export function createMobileGuideService(
 
     async loadBenefitsForBusinesses(businessIds: string[]) {
       return await loadBenefitsForBusinessesFromDirectSupabase(fetchImpl, businessIds);
+    },
+
+    async loadBenefitsForBusinessEntries(
+      businesses: Array<{ id: string; slug: string }>,
+    ): Promise<Record<string, MobileBusinessBenefit[]>> {
+      const unique = Array.from(
+        new Map(
+          businesses
+            .filter((b) => Boolean(b?.id && b?.slug))
+            .map((b) => [b.id.trim(), { id: b.id.trim(), slug: b.slug.trim() }]),
+        ).values(),
+      );
+      if (unique.length === 0) return {};
+
+      const grouped: Record<string, MobileBusinessBenefit[]> = {};
+      const missingIds: string[] = [];
+      const MAX_CONCURRENCY = 4;
+      let cursor = 0;
+
+      const worker = async () => {
+        while (cursor < unique.length) {
+          const idx = cursor++;
+          const entry = unique[idx]!;
+          try {
+            const detail = await this.loadBusinessDetail(entry.slug);
+            if (detail) {
+              const activeBenefits = (Array.isArray(detail.benefits) ? detail.benefits : []).filter(
+                (b) => Boolean(b && b.title),
+              );
+              if (activeBenefits.length > 0) {
+                grouped[entry.id] = activeBenefits;
+              }
+            } else {
+              missingIds.push(entry.id);
+            }
+          } catch {
+            missingIds.push(entry.id);
+          }
+        }
+      };
+
+      const workerCount = Math.min(MAX_CONCURRENCY, unique.length);
+      await Promise.all(Array.from({ length: workerCount }, () => worker()));
+
+      if (missingIds.length > 0) {
+        const fallback = await loadBenefitsForBusinessesFromDirectSupabase(fetchImpl, missingIds);
+        for (const [bizId, list] of Object.entries(fallback)) {
+          if (list.length > 0 && !grouped[bizId]) {
+            grouped[bizId] = list;
+          }
+        }
+      }
+
+      return grouped;
     },
   };
 }

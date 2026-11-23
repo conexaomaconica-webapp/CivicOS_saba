@@ -2603,7 +2603,7 @@ function BusinessCard({
   const [coverError, setCoverError] = useState(false);
   const location = [business.city, business.state].filter(Boolean).join(', ');
   const coverSrc = (!coverError && business.cover_url) ? business.cover_url : '/capafallback.png';
-  const coverOffsetY = typeof business.cover_offset_y === 'number' ? business.cover_offset_y : 50;
+  const coverOffsetY = typeof business.cover_offset_y === 'number' ? business.cover_offset_y : 0;
   const coverZoom = typeof business.cover_zoom === 'number' && business.cover_zoom >= 100 ? business.cover_zoom : 100;
   const coverFitMode = business.cover_fit_mode === 'contain' ? 'contain' : 'cover';
 
@@ -5054,9 +5054,11 @@ function BeneficiosScreen({
       .then(async (data) => {
         setGuideData(data);
         onLoadedData?.(data);
-        const ids = (data.businesses ?? []).map((b) => b.id).filter(Boolean);
-        if (ids.length > 0) {
-          const grouped = await guideServiceRef.current.loadBenefitsForBusinesses(ids);
+        const entries = (data.businesses ?? [])
+          .filter((b) => Boolean(b.id && b.slug))
+          .map((b) => ({ id: b.id, slug: b.slug }));
+        if (entries.length > 0) {
+          const grouped = await guideServiceRef.current.loadBenefitsForBusinessEntries(entries);
           setBenefitsByBusiness(grouped);
         } else {
           setBenefitsByBusiness({});
@@ -5317,6 +5319,12 @@ function BeneficiosScreen({
                     {bizBenefits.map((b) => {
                       const voucher = getRedeemedBenefit(b.id);
                       const isRedeemed = Boolean(voucher);
+                      const isExpired = Boolean(
+                        b.valid_until &&
+                          !Number.isNaN(Date.parse(b.valid_until)) &&
+                          Date.parse(b.valid_until) < Date.now()
+                      );
+                      const isUnavailable = !b.id || isExpired;
                       return (
                         <div key={b.id || b.title} className="mobile-benefit-card benefit-directory-inline-card">
                           <div className="mobile-benefit-header">
@@ -5343,6 +5351,10 @@ function BeneficiosScreen({
                                 <span className="benefit-code-badge">
                                   ✓ Código: <b>{voucher?.code}</b>
                                 </span>
+                              ) : isExpired ? (
+                                <span className="benefit-hint-text">
+                                  Validade encerrada
+                                </span>
                               ) : (
                                 <span className="benefit-hint-text">
                                   Código pessoal gerado no resgate
@@ -5353,11 +5365,14 @@ function BeneficiosScreen({
                             <button
                               type="button"
                               className={`benefit-redeem-btn ${isRedeemed ? 'redeemed' : ''}`}
-                              onClick={() => {
+                              disabled={isUnavailable && !isRedeemed}
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 if (isRedeemed && voucher) {
                                   onOpenVoucherModal?.(voucher);
                                   return;
                                 }
+                                if (isUnavailable) return;
                                 if (!memberUser) {
                                   if (onRequestRedeemWithLogin) {
                                     onRequestRedeemWithLogin(
@@ -5384,8 +5399,14 @@ function BeneficiosScreen({
                                 onOpenVoucherModal?.(newVoucher);
                               }}
                             >
-                              <span>{isRedeemed ? 'Ver Comprovante' : 'Resgatar Benefício'}</span>
-                              <span>{isRedeemed ? '🎫' : '⚡'}</span>
+                              <span>
+                                {isRedeemed
+                                  ? 'Ver Comprovante'
+                                  : isExpired
+                                    ? 'Oferta Expirada'
+                                    : 'Resgatar Benefício'}
+                              </span>
+                              <span>{isRedeemed ? '🎫' : isExpired ? '⏱️' : '⚡'}</span>
                             </button>
                           </div>
                         </div>
@@ -5527,6 +5548,15 @@ function EmptyScreen({
           onExploreCatalog={() => {
             window.location.hash = routeHref('empresas');
           }}
+          renderFavoriteCard={(biz) => (
+            <BusinessCard
+              key={biz.id || biz.slug}
+              business={biz}
+              onSelect={(slug) => onSelectBusiness?.(slug)}
+              isFavorited={true}
+              onToggleFavorite={(slug, name) => onToggleFavorite?.(slug, name)}
+            />
+          )}
         />
       );
     }
