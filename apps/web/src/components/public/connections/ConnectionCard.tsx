@@ -6,6 +6,7 @@ import { ArrowRight, BadgeCheck, Handshake, MapPin, ShoppingBag, Wrench } from '
 import type { ConnectionType, PublicConnectionListItem } from '@/app/actions/connections';
 import { ConnectionLikeButton } from '@/components/public/business/sections/ConnectionLikeButton';
 import { ReportConnectionButton } from '@/components/public/business/sections/ReportConnectionButton';
+import { ConnectionPhotoPreview } from '@/components/public/connections/ConnectionPhotoPreview';
 import { connectionPath, isConnectionId } from '@/lib/directory/connections-share';
 
 const TYPE_INFO: Record<ConnectionType, { label: string; verb: string; preposition: string; Icon: typeof ShoppingBag }> = {
@@ -32,8 +33,11 @@ export function ConnectionCard({ item, loginRedirect = '/conexoes' }: { item: Pu
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-2xs transition hover:border-[#C9A227]/60 hover:shadow-md">
       {item.photo_url && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={item.photo_url} alt={`Registro de ${item.member_first_name} em ${item.business_name}`} className="h-44 w-full object-cover" loading="lazy" />
+        <ConnectionPhotoPreview
+          src={item.photo_url}
+          alt={`Registro de ${item.member_first_name} em ${item.business_name}`}
+          imgClassName="h-48 w-full object-contain"
+        />
       )}
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-center justify-between gap-2">

@@ -144,7 +144,24 @@ export async function POST(request: Request) {
     }
   }
 
-  // 2. Remove definitivamente o registro de autenticação do Supabase Auth (auth.users)
+  // 2. Remove dependências que referenciam auth.users sem ON DELETE CASCADE (ex: resgates de benefícios e conexões)
+  const adminAny = adminClient as unknown as {
+    from?: (table: string) => { delete: () => { eq: (col: string, val: string) => Promise<unknown> } };
+  };
+  if (typeof adminAny.from === 'function') {
+    const cleanupTables: Array<[string, string]> = [
+      ['benefit_redemptions', 'user_id'],
+      ['connection_likes', 'user_id'],
+      ['connection_reports', 'reporter_user_id'],
+      ['business_connections', 'member_user_id'],
+      ['mobile_device_tokens', 'member_id'],
+    ];
+    await Promise.allSettled(
+      cleanupTables.map(([table, column]) => adminAny.from!(table).delete().eq(column, user.id)),
+    );
+  }
+
+  // 3. Remove definitivamente o registro de autenticação do Supabase Auth (auth.users)
   // Isso impede que a mesma conta volte a fazer login com o mesmo e-mail e senha.
   const { error: deleteAuthError } = await adminClient.auth.admin.deleteUser(user.id);
   if (deleteAuthError) {
