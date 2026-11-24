@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
-import { Handshake, ImageIcon, Loader2, Pencil, RotateCcw, Search, Trash2, X } from 'lucide-react';
+import { Check, Handshake, ImageIcon, Loader2, Pencil, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { systemConfirm } from '@/components/system/SystemFeedback';
 import {
   deleteAdminConnectionAction,
@@ -77,6 +77,14 @@ export function AllConnectionsClient({ initial, loadError }: { initial: AdminCon
     const res = await setAdminConnectionStatusAction(item.id, 'restaurar');
     setBusyId(null);
     if (res.success) { report(true, 'Conexão restaurada: voltou a aparecer no mural.'); await reloadCurrent(); } else report(false, res.error);
+  };
+
+  const approve = async (item: AdminConnectionListItem) => {
+    if (!(await systemConfirm({ message: `Autorizar e publicar no mural a conexão de ${item.business.name} sem aguardar confirmação da empresa?`, confirmLabel: 'Autorizar e publicar' }))) return;
+    setBusyId(item.id);
+    const res = await setAdminConnectionStatusAction(item.id, 'aprovar');
+    setBusyId(null);
+    if (res.success) { report(true, 'Conexão autorizada e publicada no mural.'); await reloadCurrent(); } else report(false, res.error);
   };
 
   const destroy = async (item: AdminConnectionListItem) => {
@@ -187,6 +195,9 @@ export function AllConnectionsClient({ initial, loadError }: { initial: AdminCon
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <button type="button" disabled={busy} onClick={() => setEdit({ id: item.id, connectionType: item.connectionType, itemDescription: item.itemDescription ?? '', message: item.message ?? '' })} className="flex items-center gap-1 rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50"><Pencil className="h-3.5 w-3.5" /> Editar</button>
+                    {item.status === 'pendente' && (
+                      <button type="button" disabled={busy} onClick={() => void approve(item)} className="flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"><Check className="h-3.5 w-3.5" /> Autorizar e publicar no mural</button>
+                    )}
                     {item.status === 'removida' ? (
                       <button type="button" disabled={busy || !item.confirmedAt} title={item.confirmedAt ? undefined : 'Nunca foi confirmada pela empresa'} onClick={() => void restore(item)} className="flex items-center gap-1 rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50"><RotateCcw className="h-3.5 w-3.5" /> Restaurar</button>
                     ) : (

@@ -213,10 +213,10 @@ export async function updateAdminConnectionAction(
   }
 }
 
-/** Remove do mural (some para o público e dos números; a foto é retirada) ou restaura uma conexão que já foi confirmada. */
+/** Remove do mural (some para o público e dos números; a foto é retirada), restaura uma conexão confirmada ou aprova/publica uma pendente. */
 export async function setAdminConnectionStatusAction(
   id: string,
-  action: 'remover' | 'restaurar',
+  action: 'remover' | 'restaurar' | 'aprovar',
   note?: string | null,
 ): Promise<{ success: true; status: AdminConnectionStatus } | ActionError> {
   try {
@@ -249,6 +249,21 @@ export async function setAdminConnectionStatusAction(
         .eq('tenant_id', actor.tenantId);
       if (error) throw new Error('Não foi possível restaurar a conexão.');
       await audit(actor, current.id, 'CONNECTION_RESTORED', { from: 'removida', to: 'confirmada' }, cleanNote);
+      refresh();
+      return { success: true, status: 'confirmada' };
+    }
+
+    if (action === 'aprovar') {
+      if (current.status === 'confirmada') throw new Error('Esta conexão já está confirmada.');
+      if (current.status === 'removida') throw new Error('Esta conexão foi removida; use "Restaurar" para republicar.');
+      const confirmedAt = current.confirmed_at ?? now;
+      const { error } = await actor.admin
+        .from('business_connections')
+        .update({ status: 'confirmada', confirmed_at: confirmedAt, share_on_mural: true, updated_at: now })
+        .eq('id', current.id)
+        .eq('tenant_id', actor.tenantId);
+      if (error) throw new Error('Não foi possível autorizar e publicar a conexão.');
+      await audit(actor, current.id, 'CONNECTION_APPROVED_BY_ADMIN', { from: current.status, to: 'confirmada', share_on_mural: true }, cleanNote);
       refresh();
       return { success: true, status: 'confirmada' };
     }
