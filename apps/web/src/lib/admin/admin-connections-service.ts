@@ -76,14 +76,15 @@ async function loadConnection(actor: Actor, id: string) {
   if (!id || typeof id !== 'string') throw new Error('Conexão inválida.');
   const { data } = await actor.admin
     .from('business_connections')
-    .select('id, business_id, member_user_id, connection_type, item_description, message, status, confirmed_at, created_at')
+    .select('id, business_id, member_user_id, connection_type, item_description, message, photo_url, photo_moderation_status, status, confirmed_at, created_at')
     .eq('id', id)
     .eq('tenant_id', actor.tenantId)
     .maybeSingle();
   if (!data) throw new Error('Conexão não encontrada.');
   return data as {
     id: string; business_id: string; member_user_id: string; connection_type: string;
-    item_description: string | null; message: string | null; status: AdminConnectionStatus; confirmed_at: string | null; created_at: string;
+    item_description: string | null; message: string | null; photo_url: string | null; photo_moderation_status: string | null;
+    status: AdminConnectionStatus; confirmed_at: string | null; created_at: string;
   };
 }
 
@@ -257,13 +258,23 @@ export async function setAdminConnectionStatusAction(
       if (current.status === 'confirmada') throw new Error('Esta conexão já está confirmada.');
       if (current.status === 'removida') throw new Error('Esta conexão foi removida; use "Restaurar" para republicar.');
       const confirmedAt = current.confirmed_at ?? now;
+      const approvePhoto = Boolean(current.photo_url) && current.photo_moderation_status !== 'rejeitada';
+      const patch: Record<string, unknown> = {
+        status: 'confirmada',
+        confirmed_at: confirmedAt,
+        share_on_mural: true,
+        updated_at: now,
+        ...(approvePhoto
+          ? { photo_moderation_status: 'aprovada', photo_moderated_by: actor.id, photo_moderated_at: now }
+          : {}),
+      };
       const { error } = await actor.admin
         .from('business_connections')
-        .update({ status: 'confirmada', confirmed_at: confirmedAt, share_on_mural: true, updated_at: now })
+        .update(patch)
         .eq('id', current.id)
         .eq('tenant_id', actor.tenantId);
       if (error) throw new Error('Não foi possível autorizar e publicar a conexão.');
-      await audit(actor, current.id, 'CONNECTION_APPROVED_BY_ADMIN', { from: current.status, to: 'confirmada', share_on_mural: true }, cleanNote);
+      await audit(actor, current.id, 'CONNECTION_APPROVED_BY_ADMIN', { from: current.status, to: 'confirmada', share_on_mural: true, photo_approved: approvePhoto }, cleanNote);
       refresh();
       return { success: true, status: 'confirmada' };
     }

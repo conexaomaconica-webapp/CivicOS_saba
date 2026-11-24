@@ -158,12 +158,13 @@ describe('remover do mural e restaurar', () => {
     expect(audits()[0]).toMatchObject({ action: 'CONNECTION_RESTORED' });
   });
 
-  it('aprovar: publica conexão pendente com confirmed_at e share_on_mural = true e registra auditoria', async () => {
-    connection = row({ status: 'pendente', confirmed_at: null, share_on_mural: false });
+  it('aprovar: publica conexão pendente com confirmed_at, share_on_mural = true e aprova foto pendente', async () => {
+    connection = row({ status: 'pendente', confirmed_at: null, share_on_mural: false, photo_url: 'https://cdn.test/foto.jpg', photo_moderation_status: 'pendente' });
     expect(await setAdminConnectionStatusAction(CONN, 'aprovar')).toEqual({ success: true, status: 'confirmada' });
     expect(writes()[0]!.values).toMatchObject({
       status: 'confirmada',
       share_on_mural: true,
+      photo_moderation_status: 'aprovada',
     });
     expect(typeof writes()[0]!.values.confirmed_at).toBe('string');
     expect(audits()[0]).toMatchObject({ action: 'CONNECTION_APPROVED_BY_ADMIN' });
