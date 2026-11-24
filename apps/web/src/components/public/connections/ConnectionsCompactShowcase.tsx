@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowUpRight, BadgeCheck, ChevronLeft, ChevronRight, Handshake, MapPin, ShoppingBag, Wrench } from 'lucide-react';
 import type { ConnectionFeedItem, ConnectionType } from '@/app/actions/connections';
 import { ConnectionLikeButton } from '@/components/public/business/sections/ConnectionLikeButton';
+import { ConnectionPhotoPreview } from '@/components/public/connections/ConnectionPhotoPreview';
 import { ReportConnectionButton } from '@/components/public/business/sections/ReportConnectionButton';
 import { connectionPath, isConnectionId } from '@/lib/directory/connections-share';
 
@@ -76,9 +77,12 @@ export function ConnectionsCompactShowcase({ items, loginRedirect = '/guia#mural
             >
               <article className="flex h-full flex-col gap-3 overflow-hidden rounded-2xl border border-stone-200 bg-white p-4 shadow-2xs transition hover:border-[#C9A227]/60">
                 {item.photo_url && (
-                  // Foto SOMENTE quando aprovada na moderação (o banco já entrega vazio nos demais casos).
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.photo_url} alt={`Registro de ${item.member_first_name} em ${item.business_name}`} className="-mx-4 -mt-4 mb-1 h-40 w-[calc(100%+2rem)] max-w-none object-cover" loading="lazy" />
+                  <ConnectionPhotoPreview
+                    src={item.photo_url}
+                    alt={`Registro de ${item.member_first_name} em ${item.business_name}`}
+                    containerClassName="relative -mx-4 -mt-4 mb-1 w-[calc(100%+2rem)] max-w-none overflow-hidden bg-stone-100"
+                    imgClassName="h-44 w-full object-contain"
+                  />
                 )}
                 <div className="flex items-start gap-3">
                   <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#4B161B] text-[#C9A227]" aria-hidden="true">

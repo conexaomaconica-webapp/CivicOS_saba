@@ -8,6 +8,7 @@ import { gaNameForConnection } from '@/lib/analytics/events';
 import { trackGa } from '@/lib/analytics/ga';
 import { optimizeImageForUpload } from '@/lib/media/optimize-image';
 import { ConnectionLikeButton } from './ConnectionLikeButton';
+import { ConnectionPhotoPreview } from '@/components/public/connections/ConnectionPhotoPreview';
 import { getPublicReferralCountAction } from '@/app/actions/referrals';
 import { ReportConnectionButton } from './ReportConnectionButton';
 import { CONNECTION_ORIGIN_LABELS, CONNECTION_VALUE_LABELS } from '@/lib/connections/labels';
@@ -115,8 +116,12 @@ export function BusinessConnectionsCard({ businessSlug }: Props) {
             return (
               <li key={item.id} className="rounded-xl border border-[#E8E5DF] bg-[#FDFBF7] p-3.5 space-y-2">
                 {item.photo_url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.photo_url} alt={`Registro de ${item.member_first_name}`} className="h-32 w-full rounded-lg object-cover" loading="lazy" />
+                  <ConnectionPhotoPreview
+                    src={item.photo_url}
+                    alt={`Registro de ${item.member_first_name}`}
+                    containerClassName="relative w-full overflow-hidden rounded-lg bg-stone-100"
+                    imgClassName="h-40 w-full object-contain"
+                  />
                 )}
                 <p className="text-xs text-stone-800 leading-relaxed">
                   <strong>{item.member_first_name}</strong> {info.short}

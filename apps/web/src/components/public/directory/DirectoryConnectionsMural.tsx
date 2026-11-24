@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { BadgeCheck, Camera, Handshake, MapPin, ShoppingBag, Wrench } from 'lucide-react';
 import type { ConnectionFeedItem, ConnectionType } from '@/app/actions/connections';
 import { ConnectionLikeButton } from '@/components/public/business/sections/ConnectionLikeButton';
+import { ConnectionPhotoPreview } from '@/components/public/connections/ConnectionPhotoPreview';
 import { ReportConnectionButton } from '@/components/public/business/sections/ReportConnectionButton';
 import { ConnectionStartFlow } from './ConnectionStartFlow';
 
@@ -47,8 +48,11 @@ export function DirectoryConnectionsMural({ items, confirmedTotal }: Props) {
           return (
             <article key={item.id} className="flex flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-2xs">
               {item.photo_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={item.photo_url} alt={`Registro de ${item.member_first_name} em ${item.business_name}`} className="h-44 w-full object-cover" loading="lazy" />
+                <ConnectionPhotoPreview
+                  src={item.photo_url}
+                  alt={`Registro de ${item.member_first_name} em ${item.business_name}`}
+                  imgClassName="h-48 w-full object-contain"
+                />
               ) : (
                 <div className="flex h-24 items-center justify-center bg-gradient-to-br from-[#4B161B] to-[#3B0B14] text-[#C9A227]">
                   <info.Icon className="h-8 w-8" />

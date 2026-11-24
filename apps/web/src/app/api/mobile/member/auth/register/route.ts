@@ -3,6 +3,7 @@ import {
   hasErrors,
   type RegistrationFields,
 } from '@/lib/auth/validation';
+import { sendSignupConfirmationEmail } from '@/lib/auth/signup-confirmation-email';
 import {
   createMobileSupabaseClients,
   mobileCorsOptionsResponse,
@@ -65,19 +66,69 @@ export async function POST(request: Request) {
 
   const tenantId = await resolveMobileTenantId(clients.adminClient || clients.anonClient);
   const nowIso = new Date().toISOString();
+  const userMetadata = {
+    name: fields.name.trim(),
+    city: fields.city,
+    state: fields.state,
+    terms_accepted_at: nowIso,
+    privacy_accepted_at: nowIso,
+    tenant_id: tenantId,
+  };
+
+  // Tenta enviar confirmação com e-mail próprio da Conexão Maçônica; se não estiver configurado, cai no Supabase padrão.
+  const ownSignup = await sendSignupConfirmationEmail(fields.email, fields.password, userMetadata);
+  if (ownSignup.ok) {
+    if (ownSignup.userId && clients.adminClient) {
+      try {
+        await (clients.adminClient as any)
+          .from('profiles')
+          .upsert(
+            {
+              id: ownSignup.userId,
+              email: fields.email,
+              name: fields.name.trim(),
+              city: fields.city,
+              state: fields.state,
+              status: 'active',
+            },
+            { onConflict: 'id' }
+          );
+      } catch {
+        // Trigger on auth.users handles fallback
+      }
+    }
+
+    return mobileJsonResponse(
+      {
+        success: true,
+        needsEmailConfirmation: true,
+        message: 'Conta criada! Enviamos um e-mail de confirmação para ativar seu acesso.',
+        user: {
+          id: ownSignup.userId || '',
+          name: fields.name.trim(),
+          email: fields.email,
+          city: fields.city,
+          state: fields.state,
+          phone: '',
+        },
+        session: null,
+      },
+      201
+    );
+  }
+
+  if (ownSignup.reason === 'already_exists') {
+    return mobileJsonResponse(
+      { success: false, error: 'Este e-mail já está cadastrado. Faça login ou recupere sua senha.' },
+      409
+    );
+  }
 
   const { data, error } = await clients.anonClient.auth.signUp({
     email: fields.email,
     password: fields.password,
     options: {
-      data: {
-        name: fields.name.trim(),
-        city: fields.city,
-        state: fields.state,
-        terms_accepted_at: nowIso,
-        privacy_accepted_at: nowIso,
-        tenant_id: tenantId,
-      },
+      data: userMetadata,
     },
   });
 

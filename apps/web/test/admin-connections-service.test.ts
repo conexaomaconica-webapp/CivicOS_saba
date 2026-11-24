@@ -157,6 +157,26 @@ describe('remover do mural e restaurar', () => {
     expect(writes()[0]!.values).toMatchObject({ status: 'confirmada' });
     expect(audits()[0]).toMatchObject({ action: 'CONNECTION_RESTORED' });
   });
+
+  it('aprovar: publica conexão pendente com confirmed_at, share_on_mural = true e aprova foto pendente', async () => {
+    connection = row({ status: 'pendente', confirmed_at: null, share_on_mural: false, photo_url: 'https://cdn.test/foto.jpg', photo_moderation_status: 'pendente' });
+    expect(await setAdminConnectionStatusAction(CONN, 'aprovar')).toEqual({ success: true, status: 'confirmada' });
+    expect(writes()[0]!.values).toMatchObject({
+      status: 'confirmada',
+      share_on_mural: true,
+      photo_moderation_status: 'aprovada',
+    });
+    expect(typeof writes()[0]!.values.confirmed_at).toBe('string');
+    expect(audits()[0]).toMatchObject({ action: 'CONNECTION_APPROVED_BY_ADMIN' });
+  });
+
+  it('aprovar: recusa se já confirmada ou removida', async () => {
+    connection = row({ status: 'confirmada' });
+    expect((await setAdminConnectionStatusAction(CONN, 'aprovar')).success).toBe(false);
+    connection = row({ status: 'removida' });
+    expect((await setAdminConnectionStatusAction(CONN, 'aprovar')).success).toBe(false);
+    expect(writes()).toHaveLength(0);
+  });
 });
 
 describe('excluir definitivamente e remover todas da empresa', () => {

@@ -1220,6 +1220,10 @@ function MuralDeConexoesSection({
   const [alsoBlockAuthor, setAlsoBlockAuthor] = useState(true);
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [moderationNotice, setModerationNotice] = useState<string | null>(null);
+  const [enlargedPhoto, setEnlargedPhoto] = useState<{ src: string; alt: string } | null>(null);
+  const [allConnectionsOpen, setAllConnectionsOpen] = useState(false);
+  const [allRawFeedItems, setAllRawFeedItems] = useState<MobileConnectionFeedItem[]>([]);
+  const [loadingAllConnections, setLoadingAllConnections] = useState(false);
   const guideServiceRef = useRef(createMobileGuideService());
 
   useEffect(() => {
@@ -1310,6 +1314,150 @@ function MuralDeConexoesSection({
     if (type === 'parceria') return 'firmou parceria com';
     if (type === 'visita') return 'visitou';
     return 'comprou em';
+  };
+
+  const openAllConnections = () => {
+    setAllConnectionsOpen(true);
+    setLoadingAllConnections(true);
+    guideServiceRef.current
+      .loadConnectionsFeed(50)
+      .then((res) => {
+        const items = res.items || [];
+        setAllRawFeedItems(items);
+        setLikes((prev) => {
+          const next = { ...prev };
+          for (const item of items) {
+            if (!next[item.id]) {
+              next[item.id] = { count: item.like_count ?? 0, liked: Boolean(item.liked_by_me) };
+            }
+          }
+          return next;
+        });
+      })
+      .catch(() => { })
+      .finally(() => setLoadingAllConnections(false));
+  };
+
+  const allFeedItems = useMemo(
+    () => filterModeratedConnections(allRawFeedItems),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allRawFeedItems, moderationVersion],
+  );
+
+  const renderFeedCard = (item: MobileConnectionFeedItem) => {
+    const likeState = likes[item.id] || { count: item.like_count ?? 0, liked: false };
+    return (
+      <article key={item.id} className="mural-feed-card">
+        {item.photo_url && (
+          <button
+            type="button"
+            onClick={() =>
+              setEnlargedPhoto({
+                src: item.photo_url!,
+                alt: `Registro de ${item.member_first_name} em ${item.business_name}`,
+              })
+            }
+            aria-label={`Ampliar foto de ${item.member_first_name} em ${item.business_name}`}
+            style={{
+              position: 'relative',
+              display: 'block',
+              width: '100%',
+              padding: 0,
+              marginBottom: 10,
+              border: '1px solid #eadfce',
+              borderRadius: 12,
+              overflow: 'hidden',
+              background: '#f5f0e8',
+              cursor: 'zoom-in',
+            }}
+          >
+            <img
+              src={item.photo_url}
+              alt={`Registro de ${item.member_first_name} em ${item.business_name}`}
+              style={{
+                display: 'block',
+                width: '100%',
+                maxHeight: 220,
+                objectFit: 'contain',
+              }}
+              loading="lazy"
+            />
+            <span
+              style={{
+                position: 'absolute',
+                right: 8,
+                bottom: 8,
+                background: 'rgba(0, 0, 0, 0.65)',
+                color: '#ffffff',
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                padding: '3px 8px',
+                borderRadius: 999,
+              }}
+            >
+              Ampliar
+            </span>
+          </button>
+        )}
+
+        <div className="mural-feed-card-header">
+          <span className="mural-feed-member-info">
+            <strong>{item.member_first_name}</strong> {verbForType(item.connection_type)}{' '}
+            <a
+              href="#/empresas"
+              onClick={(e) => {
+                e.preventDefault();
+                setAllConnectionsOpen(false);
+                if (onSelectBusiness) onSelectBusiness(item.business_slug);
+              }}
+            >
+              {item.business_name}
+            </a>
+            {item.item_description && <span style={{ color: '#6b7280' }}> ({item.item_description})</span>}
+          </span>
+          <button
+            type="button"
+            className="mural-feed-more-btn"
+            onClick={() => openReportDialog(item)}
+            title="Denunciar conteúdo ou bloquear autor"
+            aria-label={`Opções de moderação para publicação de ${item.member_first_name}`}
+          >
+            ⋯
+          </button>
+        </div>
+
+        {item.message && (
+          <div className="mural-feed-body">
+            <p className="mural-feed-quote">&ldquo;{item.message}&rdquo;</p>
+          </div>
+        )}
+
+        <div className="mural-feed-card-footer">
+          <span className="mural-feed-verified-badge">
+            <span>✓</span> Confirmado pela empresa
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              type="button"
+              className="mural-feed-report-link-btn"
+              onClick={() => openReportDialog(item)}
+              title="Denunciar publicação ou bloquear autor"
+            >
+              Denunciar
+            </button>
+            <button
+              type="button"
+              className={'mural-feed-like-btn ' + (likeState.liked ? 'liked' : '')}
+              onClick={() => toggleLike(item.id)}
+              title={likeState.liked ? 'Descurtir' : 'Apoiar e curtir'}
+            >
+              <span>{likeState.liked ? '❤️' : '🤍'}</span>
+              <span>{likeState.count}</span>
+            </button>
+          </div>
+        </div>
+      </article>
+    );
   };
 
   return (
@@ -1416,70 +1564,30 @@ function MuralDeConexoesSection({
 
       {/* Feed com registros confirmados pela comunidade */}
       {feedItems.length > 0 && (
-        <div className="mural-feed-list" aria-label="Depoimentos recentes do Mural">
-          {feedItems.map((item) => {
-            const likeState = likes[item.id] || { count: item.like_count ?? 0, liked: false };
-            return (
-              <article key={item.id} className="mural-feed-card">
-                <div className="mural-feed-card-header">
-                  <span className="mural-feed-member-info">
-                    <strong>{item.member_first_name}</strong> {verbForType(item.connection_type)}{' '}
-                    <a
-                      href="#/empresas"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (onSelectBusiness) onSelectBusiness(item.business_slug);
-                      }}
-                    >
-                      {item.business_name}
-                    </a>
-                    {item.item_description && <span style={{ color: '#6b7280' }}> ({item.item_description})</span>}
-                  </span>
-                  <button
-                    type="button"
-                    className="mural-feed-more-btn"
-                    onClick={() => openReportDialog(item)}
-                    title="Denunciar conteúdo ou bloquear autor"
-                    aria-label={`Opções de moderação para publicação de ${item.member_first_name}`}
-                  >
-                    ⋯
-                  </button>
-                </div>
-
-                {item.message && (
-                  <div className="mural-feed-body">
-                    <p className="mural-feed-quote">&ldquo;{item.message}&rdquo;</p>
-                  </div>
-                )}
-
-                <div className="mural-feed-card-footer">
-                  <span className="mural-feed-verified-badge">
-                    <span>✓</span> Confirmado pela empresa
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <button
-                      type="button"
-                      className="mural-feed-report-link-btn"
-                      onClick={() => openReportDialog(item)}
-                      title="Denunciar publicação ou bloquear autor"
-                    >
-                      Denunciar
-                    </button>
-                    <button
-                      type="button"
-                      className={'mural-feed-like-btn ' + (likeState.liked ? 'liked' : '')}
-                      onClick={() => toggleLike(item.id)}
-                      title={likeState.liked ? 'Descurtir' : 'Apoiar e curtir'}
-                    >
-                      <span>{likeState.liked ? '❤️' : '🤍'}</span>
-                      <span>{likeState.count}</span>
-                    </button>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+        <>
+          <div className="mural-feed-list" aria-label="Depoimentos recentes do Mural">
+            {feedItems.map((item) => renderFeedCard(item))}
+          </div>
+          <div style={{ marginTop: 12, display: 'flex', justifyContent: 'center' }}>
+            <button
+              type="button"
+              onClick={openAllConnections}
+              style={{
+                width: '100%',
+                padding: '11px 16px',
+                borderRadius: 12,
+                border: '1.5px solid #4b161b',
+                background: '#fffdfa',
+                color: '#4b161b',
+                fontSize: '0.86rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Ver todas as conexões
+            </button>
+          </div>
+        </>
       )}
 
       {hasHiddenModerationItems && (
@@ -1496,6 +1604,196 @@ function MuralDeConexoesSection({
           >
             Restaurar ocultos
           </button>
+        </div>
+      )}
+
+      {allConnectionsOpen && (
+        <div
+          className="experience-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Todas as conexões"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setAllConnectionsOpen(false);
+          }}
+        >
+          <div className="experience-modal-card" style={{ maxWidth: 460, maxHeight: '86vh', overflowY: 'auto' }}>
+            <button
+              type="button"
+              className="modal-close-btn"
+              style={{ position: 'absolute', top: 14, right: 14 }}
+              onClick={() => setAllConnectionsOpen(false)}
+              aria-label="Fechar todas as conexões"
+            >
+              ✕
+            </button>
+            <h3 style={{ margin: '0 0 4px', fontSize: '1.08rem', color: '#4b161b', fontFamily: 'Georgia, serif' }}>
+              Mural de Conexões
+            </h3>
+            <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: '#6b7280' }}>
+              Todas as experiências confirmadas pela comunidade
+            </p>
+            {loadingAllConnections ? (
+              <p style={{ textAlign: 'center', padding: '24px 0', color: '#6b7280', fontSize: '0.85rem' }}>
+                Carregando conexões…
+              </p>
+            ) : allFeedItems.length === 0 ? (
+              <p style={{ textAlign: 'center', padding: '24px 0', color: '#6b7280', fontSize: '0.85rem' }}>
+                Nenhuma conexão publicada no momento.
+              </p>
+            ) : (
+              <div className="mural-feed-list">
+                {allFeedItems.map((item) => renderFeedCard(item))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {enlargedPhoto && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={enlargedPhoto.alt}
+          onClick={() => setEnlargedPhoto(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10050,
+            background: 'rgba(0, 0, 0, 0.88)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setEnlargedPhoto(null)}
+            aria-label="Fechar foto ampliada"
+            style={{
+              position: 'absolute',
+              top: 'calc(16px + env(safe-area-inset-top))',
+              right: 16,
+              width: 38,
+              height: 38,
+              borderRadius: '50%',
+              border: 'none',
+              background: 'rgba(255,255,255,0.2)',
+              color: '#ffffff',
+              fontSize: '1.1rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            ✕
+          </button>
+          <img
+            src={enlargedPhoto.src}
+            alt={enlargedPhoto.alt}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '94vw',
+              maxHeight: '86vh',
+              objectFit: 'contain',
+              borderRadius: 12,
+            }}
+          />
+        </div>
+      )}
+
+      {allConnectionsOpen && (
+        <div
+          className="experience-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Todas as conexões"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setAllConnectionsOpen(false);
+          }}
+        >
+          <div className="experience-modal-card" style={{ maxWidth: 460, maxHeight: '86vh', overflowY: 'auto' }}>
+            <button
+              type="button"
+              className="modal-close-btn"
+              style={{ position: 'absolute', top: 14, right: 14 }}
+              onClick={() => setAllConnectionsOpen(false)}
+              aria-label="Fechar todas as conexões"
+            >
+              ✕
+            </button>
+            <h3 style={{ margin: '0 0 4px', fontSize: '1.08rem', color: '#4b161b', fontFamily: 'Georgia, serif' }}>
+              Mural de Conexões
+            </h3>
+            <p style={{ margin: '0 0 14px', fontSize: '0.8rem', color: '#6b7280' }}>
+              Todas as experiências confirmadas pela comunidade
+            </p>
+            {loadingAllConnections ? (
+              <p style={{ textAlign: 'center', padding: '24px 0', color: '#6b7280', fontSize: '0.85rem' }}>
+                Carregando conexões…
+              </p>
+            ) : allFeedItems.length === 0 ? (
+              <p style={{ textAlign: 'center', padding: '24px 0', color: '#6b7280', fontSize: '0.85rem' }}>
+                Nenhuma conexão publicada no momento.
+              </p>
+            ) : (
+              <div className="mural-feed-list">
+                {allFeedItems.map((item) => renderFeedCard(item))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {enlargedPhoto && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={enlargedPhoto.alt}
+          onClick={() => setEnlargedPhoto(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10050,
+            background: 'rgba(0, 0, 0, 0.88)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setEnlargedPhoto(null)}
+            aria-label="Fechar foto ampliada"
+            style={{
+              position: 'absolute',
+              top: 'calc(16px + env(safe-area-inset-top))',
+              right: 16,
+              width: 38,
+              height: 38,
+              borderRadius: '50%',
+              border: 'none',
+              background: 'rgba(255,255,255,0.2)',
+              color: '#ffffff',
+              fontSize: '1.1rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            ✕
+          </button>
+          <img
+            src={enlargedPhoto.src}
+            alt={enlargedPhoto.alt}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '94vw',
+              maxHeight: '86vh',
+              objectFit: 'contain',
+              borderRadius: 12,
+            }}
+          />
         </div>
       )}
 
@@ -2522,19 +2820,36 @@ function ShareExperienceModal({
                       </button>
                     </div>
                   ) : (
-                    <label className="experience-photo-add-btn">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                        <circle cx="12" cy="13" r="4" />
-                      </svg>
-                      <span>Tirar ou anexar foto</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        onChange={handlePhotoUpload}
-                      />
-                    </label>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <label className="experience-photo-add-btn" style={{ flex: '1 1 140px', justifyContent: 'center' }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                          <circle cx="12" cy="13" r="4" />
+                        </svg>
+                        <span>Tirar foto</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          style={{ display: 'none' }}
+                          onChange={handlePhotoUpload}
+                        />
+                      </label>
+                      <label className="experience-photo-add-btn" style={{ flex: '1 1 140px', justifyContent: 'center' }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                          <circle cx="8.5" cy="8.5" r="1.5" />
+                          <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                        <span>Enviar da galeria</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={handlePhotoUpload}
+                        />
+                      </label>
+                    </div>
                   )}
                 </div>
 
@@ -9567,6 +9882,7 @@ export function App() {
   const [viewsOverrides, setViewsOverrides] = useState<Record<string, number>>({});
   const [isMemberLoginModalOpen, setIsMemberLoginModalOpen] = useState(false);
   const [isShareExperienceModalOpen, setIsShareExperienceModalOpen] = useState(false);
+  const [accountDeletedMessage, setAccountDeletedMessage] = useState<string | null>(null);
   const [openShareAfterLogin, setOpenShareAfterLogin] = useState(false);
   const [pendingExperienceCompanySlug, setPendingExperienceCompanySlug] = useState<string | null>(null);
   const [activeVoucherModal, setActiveVoucherModal] = useState<MobileBenefitRedemption | null>(null);
@@ -9681,9 +9997,7 @@ export function App() {
       clearFavorites();
       setMemberSession(null);
       setMemberUser(null);
-      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-      setToastMsg(`✓ ${res.message}`);
-      toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 3500);
+      setAccountDeletedMessage(res.message || 'Conta excluída com sucesso.');
       return true;
     }
 
@@ -9701,9 +10015,7 @@ export function App() {
       clearFavorites();
       setMemberSession(null);
       setMemberUser(null);
-      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-      setToastMsg(`✓ ${res.message}`);
-      toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 3000);
+      setAccountDeletedMessage(res.message || 'Conta excluída com sucesso.');
       return true;
     }
 
@@ -10301,6 +10613,61 @@ export function App() {
           toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 3000);
         }}
       />
+
+      {accountDeletedMessage && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Conta excluída com sucesso"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(20, 6, 9, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 380,
+              background: '#ffffff',
+              borderRadius: 18,
+              padding: 22,
+              boxShadow: '0 20px 45px rgba(0,0,0,0.35)',
+              border: '1px solid #d1fae5',
+              textAlign: 'center',
+            }}
+          >
+            <h3 style={{ margin: '0 0 8px', fontSize: '1.05rem', color: '#065f46', fontWeight: 800 }}>
+              Conta excluída com sucesso
+            </h3>
+            <p style={{ margin: '0 0 16px', fontSize: '0.88rem', color: '#4b5563', lineHeight: 1.45 }}>
+              {accountDeletedMessage}
+            </p>
+            <button
+              type="button"
+              onClick={() => setAccountDeletedMessage(null)}
+              style={{
+                width: '100%',
+                padding: '10px 16px',
+                borderRadius: 10,
+                border: 'none',
+                background: '#4b161b',
+                color: '#f3eedd',
+                fontSize: '0.9rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
 
       {toastMsg && (
         <div className="favorite-toast-bar" role="status" aria-live="polite">

@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { signUp } from '@/lib/auth/auth-service';
+import { registerMemberAction } from './actions';
 import {
   validateRegistration,
   hasErrors,
@@ -114,19 +114,13 @@ export default function RegisterPage() {
     }
 
     try {
-      const result = await signUp(supabase, fields.email.trim(), fields.password, {
-        name: fields.name.trim(),
-        city: fields.city.trim(),
-        state: fields.state.trim().toUpperCase(),
-        terms_accepted_at: new Date().toISOString(),
-        privacy_accepted_at: new Date().toISOString(),
-        tenant_id: tenantId,
-      });
+      const result = await registerMemberAction(fields, tenantId);
 
-      if (result.error) {
-        setErrorMsg(result.error.message);
+      if (!result.success) {
+        if (result.fieldErrors) setErrors(result.fieldErrors);
+        setErrorMsg(result.error);
       } else {
-        systemNotify({ type: 'success', message: 'Cadastro realizado com sucesso! Verifique seu e-mail para confirmação se necessário.' });
+        systemNotify({ type: 'success', message: 'Cadastro realizado com sucesso! Verifique seu e-mail para confirmar seu acesso.' });
         if (redirectTarget) {
           router.push(`/login?redirect=${encodeURIComponent(redirectTarget)}&registered=true`);
         } else {

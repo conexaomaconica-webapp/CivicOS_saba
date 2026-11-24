@@ -283,12 +283,18 @@ export function MobileMemberPortalScreen({
     onToast('🤍 Lista de favoritos limpa.');
   };
 
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const handleConfirmDeleteAccount = async () => {
+    setDeleteError(null);
     setDeletingAccount(true);
     const ok = await onDeleteAccount();
     setDeletingAccount(false);
     if (ok) {
+      setConfirmDeleteOpen(false);
       onBack();
+    } else {
+      setDeleteError('Não foi possível excluir sua conta agora. Tente novamente em instantes.');
     }
   };
 
@@ -802,34 +808,78 @@ export function MobileMemberPortalScreen({
                 do sistema e não será mais possível entrar com o mesmo e-mail e senha.
               </p>
 
-              {!confirmDeleteOpen ? (
-                <button
-                  type="button"
-                  className="mobile-member-danger-btn"
-                  onClick={() => setConfirmDeleteOpen(true)}
+              <button
+                type="button"
+                className="mobile-member-danger-btn"
+                onClick={() => {
+                  setDeleteError(null);
+                  setConfirmDeleteOpen(true);
+                }}
+              >
+                Excluir minha conta definitivamente
+              </button>
+
+              {confirmDeleteOpen && (
+                <div
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Confirmar exclusão da conta"
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    background: 'rgba(20, 6, 9, 0.65)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 20,
+                  }}
                 >
-                  Excluir minha conta definitivamente
-                </button>
-              ) : (
-                <div className="mobile-member-danger-confirm">
-                  <strong>Confirma a exclusão irreversível da sua conta?</strong>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                    <button
-                      type="button"
-                      disabled={deletingAccount}
-                      className="mobile-member-danger-confirm-btn"
-                      onClick={() => void handleConfirmDeleteAccount()}
-                    >
-                      {deletingAccount ? 'Excluindo...' : 'Sim, excluir conta'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={deletingAccount}
-                      className="mobile-member-danger-cancel-btn"
-                      onClick={() => setConfirmDeleteOpen(false)}
-                    >
-                      Cancelar
-                    </button>
+                  <div
+                    style={{
+                      width: '100%',
+                      maxWidth: 380,
+                      background: '#ffffff',
+                      borderRadius: 18,
+                      padding: 20,
+                      boxShadow: '0 20px 45px rgba(0,0,0,0.35)',
+                      border: '1px solid #fecaca',
+                    }}
+                  >
+                    <h4 style={{ margin: '0 0 8px', fontSize: '1.02rem', color: '#7f1d1d', fontWeight: 800 }}>
+                      Excluir conta permanentemente?
+                    </h4>
+                    <p style={{ margin: '0 0 14px', fontSize: '0.86rem', color: '#4b5563', lineHeight: 1.45 }}>
+                      Tem certeza que deseja excluir sua conta? Suas credenciais de acesso e dados serão removidos definitivamente e não será possível entrar novamente com este login.
+                    </p>
+                    {deleteError && (
+                      <p style={{ margin: '0 0 12px', fontSize: '0.8rem', color: '#b91c1c', fontWeight: 600 }}>
+                        {deleteError}
+                      </p>
+                    )}
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button
+                        type="button"
+                        disabled={deletingAccount}
+                        className="mobile-member-danger-cancel-btn"
+                        style={{ flex: 1 }}
+                        onClick={() => {
+                          setConfirmDeleteOpen(false);
+                          setDeleteError(null);
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={deletingAccount}
+                        className="mobile-member-danger-confirm-btn"
+                        style={{ flex: 1 }}
+                        onClick={() => void handleConfirmDeleteAccount()}
+                      >
+                        {deletingAccount ? 'Excluindo...' : 'Sim, excluir conta'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
