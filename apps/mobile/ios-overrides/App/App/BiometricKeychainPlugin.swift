@@ -174,7 +174,7 @@ public class BiometricKeychainPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func mapOSStatusCode(_ status: OSStatus) -> String {
         switch status {
-        case errSecUserCancel:
+        case errSecUserCanceled:
             return "USER_CANCEL"
         case errSecAuthFailed:
             return "AUTH_FAILED"
