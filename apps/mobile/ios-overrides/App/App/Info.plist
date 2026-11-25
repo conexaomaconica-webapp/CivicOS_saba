@@ -28,6 +28,8 @@
 	<string>Precisamos de acesso à câmera para captura de fotos de perfil e publicações no mural.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Precisamos de acesso às fotos para seleção de imagens de perfil e publicações no mural.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Utilizamos o Face ID, com sua autorização, para permitir acesso seguro à sua conta na Conexão Maçônica.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

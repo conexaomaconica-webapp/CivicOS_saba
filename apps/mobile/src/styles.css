@@ -6,7 +6,7 @@
 }
 
 * { box-sizing: border-box; }
-html, body, #root { min-height: 100%; width: 100%; max-width: 100%; margin: 0; overflow-x: hidden; }
+html, body, #root { min-height: 100%; margin: 0; }
 body { min-width: 320px; background: #f7f3ec; }
 button, a, input { -webkit-tap-highlight-color: transparent; }
 button, input { font: inherit; }
@@ -36,7 +36,7 @@ button, input { font: inherit; }
 .launch-fallback-continue-btn { width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .launch-fallback img { width: 100%; height: 100%; object-fit: contain; }
 
-.app-shell { min-height: 100vh; min-height: 100dvh; width: 100%; max-width: 100%; overflow-x: hidden; padding-bottom: calc(76px + env(safe-area-inset-bottom)); background: #f7f3ec; }
+.app-shell { min-height: 100vh; min-height: 100dvh; padding-bottom: calc(76px + env(safe-area-inset-bottom)); background: #f7f3ec; }
 .pull-refresh-overlay,
 .pull-refresh-bar {
   position: fixed;
@@ -74,7 +74,8 @@ button, input { font: inherit; }
 .location-pill-btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border: 1px solid rgb(201 162 39 / .45); border-radius: 999px; background: rgb(255 255 255 / .08); color: #f3eedd; font-size: .76rem; font-weight: 700; cursor: pointer; white-space: nowrap; max-width: 48vw; transition: all 160ms ease; }
 .location-pill-btn:active { background: rgb(201 162 39 / .2); transform: scale(0.97); }
 .location-pill-btn svg { width: 15px; height: 15px; color: #c9a227; flex-shrink: 0; }
-.location-pill-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.location-pill-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.directory-controls .location-pill-btn { max-width: 100%; min-width: 0; }
 .location-pill-chevron { color: #dfbd58; font-size: .75rem; flex-shrink: 0; }
 .topbar-tools { display: grid; gap: 8px; width: 100%; }
 .topbar-tools .search-form { width: 100%; max-width: none; min-height: 48px; }
@@ -512,7 +513,7 @@ button, input { font: inherit; }
   border-radius: 12px;
   background: #fffdfa;
   color: #2b060d;
-  font-size: .84rem;
+  font-size: 1rem;
   outline: none;
 }
 .city-search-input:focus {
@@ -1919,20 +1920,31 @@ button, input { font: inherit; }
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
   animation: fadeIn 200ms ease;
 }
 .gallery-lightbox-header {
+  position: relative;
+  z-index: 2;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   color: #fff;
   font-size: .88rem;
   font-weight: 750;
 }
+.gallery-lightbox-close {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+}
 .gallery-lightbox-stage {
   flex: 1;
+  min-height: 0;
   width: 100%;
   display: flex;
   align-items: center;
@@ -1942,7 +1954,8 @@ button, input { font: inherit; }
 }
 .gallery-lightbox-img {
   max-width: 100%;
-  max-height: 72vh;
+  max-height: 70vh;
+  max-height: 70dvh;
   object-fit: contain;
   border-radius: 12px;
   box-shadow: 0 10px 40px rgb(0 0 0 / .6);
@@ -3488,7 +3501,7 @@ button, input { font: inherit; }
   padding: 11px 12px 11px 38px;
   border-radius: 14px;
   border: 1.5px solid #d1d5db;
-  font-size: 0.88rem;
+  font-size: 1rem;
   background: #ffffff;
   outline: none;
   transition: border-color 140ms ease;
@@ -3640,7 +3653,7 @@ button, input { font: inherit; }
   padding: 9px 12px;
   border-radius: 12px;
   border: 1.5px solid #d1d5db;
-  font-size: 0.85rem;
+  font-size: 1rem;
   margin-bottom: 12px;
   outline: none;
 }
@@ -3654,7 +3667,7 @@ button, input { font: inherit; }
   padding: 10px 12px;
   border-radius: 12px;
   border: 1.5px solid #d1d5db;
-  font-size: 0.85rem;
+  font-size: 1rem;
   min-height: 80px;
   margin-bottom: 12px;
   outline: none;
@@ -4379,7 +4392,7 @@ button, input { font: inherit; }
   flex: 1;
   border: none;
   background: transparent;
-  font-size: 0.82rem;
+  font-size: 1rem;
   color: #1e293b;
   outline: none;
 }
@@ -4651,7 +4664,7 @@ button, input { font: inherit; }
   border: 1.5px solid #ddcfbd;
   background: #ffffff;
   color: #292524;
-  font-size: 0.84rem;
+  font-size: 1rem;
   box-shadow: 0 2px 8px rgba(75, 22, 27, 0.04);
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -6064,7 +6077,7 @@ button, input { font: inherit; }
   border: 1px solid #d6d3d1;
   background: #ffffff;
   color: #1c1917;
-  font-size: 0.86rem;
+  font-size: 1rem;
   outline: none;
 }
 

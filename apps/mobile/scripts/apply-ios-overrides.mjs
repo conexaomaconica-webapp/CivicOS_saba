@@ -57,6 +57,42 @@ try {
       }
     } catch {}
 
+    // Registra arquivos Swift customizados no target App de forma idempotente
+    const customSwiftFiles = [
+      {
+        name: 'BiometricKeychainPlugin.swift',
+        buildId: 'A1B2C3D42F99000100000011',
+        fileId: 'A1B2C3D42F99000100000012',
+      },
+      {
+        name: 'AppBridgeViewController.swift',
+        buildId: 'A1B2C3D42F99000100000021',
+        fileId: 'A1B2C3D42F99000100000022',
+      },
+    ];
+
+    for (const file of customSwiftFiles) {
+      if (!pbxproj.includes(file.name)) {
+        pbxproj = pbxproj.replace(
+          '504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };',
+          `504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };\n\t\t${file.buildId} /* ${file.name} in Sources */ = {isa = PBXBuildFile; fileRef = ${file.fileId} /* ${file.name} */; };`
+        );
+        pbxproj = pbxproj.replace(
+          '504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };',
+          `504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };\n\t\t${file.fileId} /* ${file.name} */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ${file.name}; sourceTree = "<group>"; };`
+        );
+        pbxproj = pbxproj.replace(
+          '504EC3071FED79650016851F /* AppDelegate.swift */,',
+          `504EC3071FED79650016851F /* AppDelegate.swift */,\n\t\t\t\t${file.fileId} /* ${file.name} */,`
+        );
+        pbxproj = pbxproj.replace(
+          '504EC3081FED79650016851F /* AppDelegate.swift in Sources */,',
+          `504EC3081FED79650016851F /* AppDelegate.swift in Sources */,\n\t\t\t\t${file.buildId} /* ${file.name} in Sources */,`
+        );
+        changed = true;
+      }
+    }
+
     if (changed) {
       await writeFile(pbxprojPath, pbxproj, 'utf8');
       console.log('project.pbxproj atualizado com entitlements e versionamento.');

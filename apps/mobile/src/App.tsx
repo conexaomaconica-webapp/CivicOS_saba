@@ -3,14 +3,17 @@ import { Capacitor } from '@capacitor/core';
 import { Button } from '@saas/ui';
 import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type ReactNode, type TouchEvent } from 'react';
 import 'leaflet/dist/leaflet.css';
+import { fetchCitiesByUf } from './br-cities';
 import { LaunchExperience } from './LaunchExperience';
 import { MobileEventDetailScreen } from './MobileEventDetailScreen';
 import { MobileMemberPortalScreen, type MemberPortalTab } from './MobileMemberPortalScreen';
 import {
   clearMobileFavoritesRemote,
   deleteMobileMemberAccountRemote,
+  fetchMobileMemberOverview,
   loginMobileMember,
   readStoredMobileSession,
+  refreshMobileMemberSession,
   registerMobileMember,
   requestMobilePasswordReset,
   syncMobileFavoritesRemote,
@@ -20,6 +23,16 @@ import {
   type MobileAuthSessionTokens,
   type MobileMemberUser,
 } from './mobile-member-client';
+import {
+  clearBiometricAuthState,
+  enableBiometricAuth,
+  getBiometricAvailability,
+  hasBiometricProtectedSession,
+  markBiometricPromptDeclined,
+  readBiometricMeta,
+  unlockSessionWithBiometry,
+  type BiometricAvailability,
+} from './biometric-auth';
 import {
   type MobileBenefitItem,
   type MobileBenefitRedemption,
@@ -689,7 +702,7 @@ function LogoZoomModal({
   );
 }
 
-function PhotoGalleryLightbox({
+export function PhotoGalleryLightbox({
   photos,
   currentIndex,
   onClose,
@@ -700,10 +713,45 @@ function PhotoGalleryLightbox({
   onClose: () => void;
   onChangeIndex: (index: number) => void;
 }) {
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number; multiTouch: boolean } | null>(null);
+  const didGestureRef = useRef(false);
+  const isOpen = currentIndex !== null && Boolean(photos[currentIndex]);
 
-  if (currentIndex === null || !photos[currentIndex]) return null;
-  const currentPhoto = photos[currentIndex];
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    let removed = false;
+    let backHandle: { remove: () => Promise<void> } | null = null;
+    if (Capacitor.isNativePlatform()) {
+      void CapacitorApp.addListener('backButton', () => {
+        onClose();
+      }).then((handle) => {
+        if (removed) {
+          void handle.remove();
+        } else {
+          backHandle = handle;
+        }
+      });
+    }
+
+    return () => {
+      removed = true;
+      window.removeEventListener('keydown', handleKeyDown);
+      if (backHandle) {
+        void backHandle.remove();
+      }
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen || currentIndex === null) return null;
+  const currentPhoto = photos[currentIndex]!;
 
   const handlePrev = () => {
     onChangeIndex((currentIndex - 1 + photos.length) % photos.length);
@@ -714,22 +762,44 @@ function PhotoGalleryLightbox({
   };
 
   const onTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+    const multiTouch = e.touches.length > 1;
+    didGestureRef.current = multiTouch;
     touchStartRef.current = {
       x: e.touches[0]?.clientX ?? 0,
       y: e.touches[0]?.clientY ?? 0,
+      multiTouch,
     };
   };
 
   const onTouchEnd = (e: TouchEvent<HTMLDivElement>) => {
     if (!touchStartRef.current) return;
     const endX = e.changedTouches[0]?.clientX ?? 0;
-    const diff = endX - touchStartRef.current.x;
+    const endY = e.changedTouches[0]?.clientY ?? 0;
+    const diffX = endX - touchStartRef.current.x;
+    const diffY = endY - touchStartRef.current.y;
+    const wasMultiTouch = touchStartRef.current.multiTouch;
     touchStartRef.current = null;
-    if (diff > 45) {
-      handlePrev();
-    } else if (diff < -45) {
-      handleNext();
+
+    if (wasMultiTouch || Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
+      didGestureRef.current = true;
     }
+
+    if (!wasMultiTouch) {
+      if (diffX > 45) {
+        handlePrev();
+      } else if (diffX < -45) {
+        handleNext();
+      }
+    }
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (didGestureRef.current) {
+      didGestureRef.current = false;
+      return;
+    }
+    onClose();
   };
 
   return (
@@ -738,14 +808,15 @@ function PhotoGalleryLightbox({
       role="dialog"
       aria-modal="true"
       aria-label="Galeria de Fotos"
+      onClick={handleBackdropClick}
     >
-      <div className="gallery-lightbox-header">
+      <div className="gallery-lightbox-header" onClick={(e) => e.stopPropagation()}>
         <span>
           Foto {currentIndex + 1} de {photos.length}
         </span>
         <button
           type="button"
-          className="modal-close-btn"
+          className="modal-close-btn gallery-lightbox-close"
           onClick={onClose}
           aria-label="Fechar Galeria"
         >
@@ -757,12 +828,16 @@ function PhotoGalleryLightbox({
         className="gallery-lightbox-stage"
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
+        onClick={handleBackdropClick}
       >
         {photos.length > 1 && (
           <button
             type="button"
             className="gallery-nav-arrow left"
-            onClick={handlePrev}
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePrev();
+            }}
             aria-label="Foto anterior"
           >
             ‹
@@ -773,13 +848,17 @@ function PhotoGalleryLightbox({
           src={currentPhoto.url}
           alt={currentPhoto.title || `Foto ${currentIndex + 1}`}
           className="gallery-lightbox-img"
+          onClick={(e) => e.stopPropagation()}
         />
 
         {photos.length > 1 && (
           <button
             type="button"
             className="gallery-nav-arrow right"
-            onClick={handleNext}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleNext();
+            }}
             aria-label="Próxima foto"
           >
             ›
@@ -787,7 +866,10 @@ function PhotoGalleryLightbox({
         )}
       </div>
 
-      <div style={{ textAlign: 'center', color: '#f3eedd', fontSize: '.84rem', minHeight: 24 }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ textAlign: 'center', color: '#f3eedd', fontSize: '.84rem', minHeight: 24 }}
+      >
         {currentPhoto.title || 'Arraste para os lados para navegar pelas fotos'}
       </div>
     </div>
@@ -2007,7 +2089,11 @@ function MemberLoginModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onLoginSuccess: (user: MobileMemberUser, session: MobileAuthSessionTokens) => void;
+  onLoginSuccess: (
+    user: MobileMemberUser,
+    session: MobileAuthSessionTokens,
+    meta?: { viaBiometric?: boolean },
+  ) => void;
 }) {
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [name, setName] = useState('');
@@ -2023,8 +2109,58 @@ function MemberLoginModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [ufCities, setUfCities] = useState<string[]>([]);
+  const [loadingCities, setLoadingCities] = useState(false);
+  const [biometricAvailability, setBiometricAvailability] = useState<BiometricAvailability>({
+    available: false,
+    biometryType: 'none',
+    label: 'Biometria',
+  });
+  const [hasSavedBiometric, setHasSavedBiometric] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+  const modalCardRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen || mode !== 'login') return;
+    let cancelled = false;
+    void Promise.all([getBiometricAvailability(), hasBiometricProtectedSession()]).then(([avail, hasSaved]) => {
+      if (cancelled) return;
+      setBiometricAvailability(avail);
+      setHasSavedBiometric(avail.available && hasSaved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, mode]);
+
+  useEffect(() => {
+    if (!isOpen || mode !== 'register') return;
+    let cancelled = false;
+    setLoadingCities(true);
+    void fetchCitiesByUf(stateUf).then((list) => {
+      if (cancelled) return;
+      setUfCities(list);
+      setLoadingCities(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, mode, stateUf]);
 
   if (!isOpen) return null;
+
+  const blurModalInputs = () => {
+    if (typeof document === 'undefined') return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && modalCardRef.current?.contains(active)) {
+      active.blur();
+    }
+  };
+
+  const handleClose = () => {
+    blurModalInputs();
+    onClose();
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -2106,6 +2242,7 @@ function MemberLoginModal({
         return;
       }
 
+      blurModalInputs();
       onLoginSuccess(regRes.user, regRes.session);
       return;
     }
@@ -2115,6 +2252,7 @@ function MemberLoginModal({
       return;
     }
 
+    blurModalInputs();
     setLoading(true);
     const loginRes = await loginMobileMember(cleanEmail, password);
     setLoading(false);
@@ -2124,7 +2262,47 @@ function MemberLoginModal({
       return;
     }
 
+    blurModalInputs();
     onLoginSuccess(loginRes.user, loginRes.session);
+  };
+
+  const handleBiometricLogin = async () => {
+    setError(null);
+    setInfoMessage(null);
+    setBiometricLoading(true);
+    const result = await unlockSessionWithBiometry({
+      refreshSession: (token) => refreshMobileMemberSession(token),
+      fetchProfile: async (sess) => {
+        const res = await fetchMobileMemberOverview(sess);
+        return res.success && res.overview?.user ? { user: res.overview.user } : null;
+      },
+      readStoredUser: () => {
+        try {
+          const raw = localStorage.getItem('cm_mobile_member_user');
+          return raw ? (JSON.parse(raw) as MobileMemberUser) : null;
+        } catch {
+          return null;
+        }
+      },
+    });
+    setBiometricLoading(false);
+
+    if (!result.success) {
+      if (result.code === 'INVALIDATED' || result.code === 'EXPIRED') {
+        setHasSavedBiometric(false);
+      }
+      setError(result.error);
+      return;
+    }
+
+    const fallbackMeta = readBiometricMeta();
+    const resolvedUser: MobileMemberUser = result.user ?? {
+      id: fallbackMeta?.userId || '',
+      email: fallbackMeta?.email || '',
+      name: (fallbackMeta?.email || 'Membro').split('@')[0] || 'Membro',
+    };
+    blurModalInputs();
+    onLoginSuccess(resolvedUser, result.session, { viaBiometric: true });
   };
 
   return (
@@ -2134,15 +2312,15 @@ function MemberLoginModal({
       aria-modal="true"
       aria-label="Acesso de Membro"
       onClick={(e) => {
-        if (e.target === e.currentTarget && !loading) onClose();
+        if (e.target === e.currentTarget && !loading) handleClose();
       }}
     >
-      <div className="member-login-card" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+      <div ref={modalCardRef} className="member-login-card" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
         <button
           type="button"
           className="modal-close-btn"
           style={{ position: 'absolute', top: 14, right: 14 }}
-          onClick={onClose}
+          onClick={handleClose}
           disabled={loading}
           aria-label="Fechar"
         >
@@ -2243,6 +2421,36 @@ function MemberLoginModal({
           </div>
         )}
 
+        {mode === 'login' && biometricAvailability.available && hasSavedBiometric && (
+          <div style={{ marginBottom: 14 }}>
+            <button
+              type="button"
+              disabled={loading || biometricLoading}
+              onClick={() => void handleBiometricLogin()}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                padding: '12px 14px',
+                borderRadius: 12,
+                border: '1.5px solid #c9a227',
+                background: '#fbf5e6',
+                color: '#4b161b',
+                fontSize: '0.9rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              <span>{biometricLoading ? `Validando ${biometricAvailability.label}...` : `Entrar com ${biometricAvailability.label}`}</span>
+            </button>
+            <div style={{ textAlign: 'center', fontSize: '0.72rem', color: '#78716c', marginTop: 8 }}>
+              ou entre com seu e-mail e senha abaixo
+            </div>
+          </div>
+        )}
+
         <form onSubmit={(e) => { void handleSubmit(e); }}>
           {mode === 'register' && (
             <>
@@ -2276,22 +2484,46 @@ function MemberLoginModal({
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 86px', gap: 8 }}>
               <div>
                 <label className="experience-field-label">Cidade *</label>
-                <input
-                  type="text"
-                  className="member-login-input"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="Sua cidade"
-                  disabled={loading}
-                  required
-                />
+                {loadingCities ? (
+                  <select className="member-login-input" value="" disabled>
+                    <option value="">Carregando cidades…</option>
+                  </select>
+                ) : ufCities.length > 0 ? (
+                  <select
+                    className="member-login-input"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    disabled={loading}
+                    required
+                  >
+                    <option value="">Selecione a cidade</option>
+                    {ufCities.map((cityName) => (
+                      <option key={cityName} value={cityName}>
+                        {cityName}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    className="member-login-input"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="Sua cidade"
+                    disabled={loading}
+                    required
+                  />
+                )}
               </div>
               <div>
                 <label className="experience-field-label">UF *</label>
                 <select
                   className="member-login-input"
                   value={stateUf}
-                  onChange={(e) => setStateUf(e.target.value)}
+                  onChange={(e) => {
+                    setStateUf(e.target.value);
+                    setCity('');
+                  }}
                   disabled={loading}
                   style={{ paddingLeft: 8, paddingRight: 6 }}
                 >
@@ -5505,8 +5737,8 @@ function BeneficiosScreen({
             aria-label={`Localização: ${city || 'Brasil'}`}
           >
             <FeatureIcon name="map" />
-            <span>{city ? `Cidade: ${city}` : 'Brasil (Todas as cidades)'}</span>
-            <span style={{ fontSize: '.75rem', color: '#8c671d' }}>▾</span>
+            <span className="location-pill-text">{city ? `Cidade: ${city}` : 'Brasil (Todas as cidades)'}</span>
+            <span className="location-pill-chevron" style={{ color: '#8c671d' }}>▾</span>
           </button>
           {city && (
             <button
@@ -8593,8 +8825,8 @@ function EmpresasScreen({
             aria-label={`Localização: ${city || 'Brasil'}`}
           >
             <FeatureIcon name="map" />
-            <span>{city ? `Cidade: ${city}` : 'Brasil (Todas as cidades)'}</span>
-            <span style={{ fontSize: '.75rem', color: '#8c671d' }}>▾</span>
+            <span className="location-pill-text">{city ? `Cidade: ${city}` : 'Brasil (Todas as cidades)'}</span>
+            <span className="location-pill-chevron" style={{ color: '#8c671d' }}>▾</span>
           </button>
           {city && (
             <button
@@ -9883,6 +10115,11 @@ export function App() {
   const [isMemberLoginModalOpen, setIsMemberLoginModalOpen] = useState(false);
   const [isShareExperienceModalOpen, setIsShareExperienceModalOpen] = useState(false);
   const [accountDeletedMessage, setAccountDeletedMessage] = useState<string | null>(null);
+  const [biometricPromptState, setBiometricPromptState] = useState<{
+    user: MobileMemberUser;
+    session: MobileAuthSessionTokens;
+    availability: BiometricAvailability;
+  } | null>(null);
   const [openShareAfterLogin, setOpenShareAfterLogin] = useState(false);
   const [pendingExperienceCompanySlug, setPendingExperienceCompanySlug] = useState<string | null>(null);
   const [activeVoucherModal, setActiveVoucherModal] = useState<MobileBenefitRedemption | null>(null);
@@ -9932,7 +10169,16 @@ export function App() {
     }
   };
 
-  const handleMemberLoginSuccess = (user: MobileMemberUser, session: MobileAuthSessionTokens) => {
+  const handleMemberLoginSuccess = (
+    user: MobileMemberUser,
+    session: MobileAuthSessionTokens,
+    loginMeta?: { viaBiometric?: boolean },
+  ) => {
+    const existingBiometricMeta = readBiometricMeta();
+    if (existingBiometricMeta && existingBiometricMeta.userId !== user.id) {
+      void clearBiometricAuthState();
+    }
+
     setMemberUser(user);
     setMemberSession(session);
     writeStoredMobileSession(session);
@@ -9975,6 +10221,20 @@ export function App() {
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
       setToastMsg(`✓ Bem-vindo(a), ${user.name.split(' ')[0]}!`);
       toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 2500);
+
+      const shouldOfferBiometry =
+        !loginMeta?.viaBiometric &&
+        (!existingBiometricMeta ||
+          existingBiometricMeta.userId !== user.id ||
+          (!existingBiometricMeta.enabled && !existingBiometricMeta.declined));
+
+      if (shouldOfferBiometry && session.refreshToken) {
+        void getBiometricAvailability().then((avail) => {
+          if (avail.available) {
+            setBiometricPromptState({ user, session, availability: avail });
+          }
+        });
+      }
     }
   };
 
@@ -9992,6 +10252,7 @@ export function App() {
       }
 
       purgeLocalAccountState({ userEmail: emailToDelete });
+      void clearBiometricAuthState();
       writeStoredMobileSession(null);
       writeStoredMobileUser(null);
       clearFavorites();
@@ -10010,6 +10271,7 @@ export function App() {
 
     if (res.success) {
       purgeLocalAccountState({ userEmail: emailToDelete });
+      void clearBiometricAuthState();
       writeStoredMobileSession(null);
       writeStoredMobileUser(null);
       clearFavorites();
@@ -10448,6 +10710,7 @@ export function App() {
             onLogoutMember={() => {
               setMemberUser(null);
               setMemberSession(null);
+              void clearBiometricAuthState();
               writeStoredMobileSession(null);
               writeStoredMobileUser(null);
               clearFavorites();
@@ -10613,6 +10876,98 @@ export function App() {
           toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 3000);
         }}
       />
+
+      {biometricPromptState && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Ativar ${biometricPromptState.availability.label}`}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(20, 6, 9, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 380,
+              background: '#ffffff',
+              borderRadius: 18,
+              padding: 22,
+              boxShadow: '0 20px 45px rgba(0,0,0,0.35)',
+              border: '1px solid #ebd9c8',
+              textAlign: 'center',
+            }}
+          >
+            <h3 style={{ margin: '0 0 8px', fontSize: '1.05rem', color: '#4b161b', fontWeight: 800 }}>
+              Ativar {biometricPromptState.availability.label}?
+            </h3>
+            <p style={{ margin: '0 0 16px', fontSize: '0.86rem', color: '#4b5563', lineHeight: 1.45 }}>
+              Use o {biometricPromptState.availability.label} nos próximos acessos para entrar com rapidez e segurança usando o Keychain deste iPhone.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  markBiometricPromptDeclined(biometricPromptState.user.id, biometricPromptState.user.email);
+                  setBiometricPromptState(null);
+                }}
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  borderRadius: 10,
+                  border: '1px solid #d6d3d1',
+                  background: '#ffffff',
+                  color: '#44403c',
+                  fontSize: '0.88rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Agora não
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const { user, session, availability } = biometricPromptState;
+                  const res = await enableBiometricAuth({
+                    userId: user.id,
+                    email: user.email,
+                    refreshToken: session.refreshToken,
+                  });
+                  setBiometricPromptState(null);
+                  if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+                  setToastMsg(
+                    res.ok
+                      ? `✓ ${availability.label} ativado com sucesso!`
+                      : `⚠️ ${res.error || `Não foi possível ativar o ${availability.label}.`}`,
+                  );
+                  toastTimeoutRef.current = setTimeout(() => setToastMsg(null), 3000);
+                }}
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: '#4b161b',
+                  color: '#f3eedd',
+                  fontSize: '0.88rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Ativar {biometricPromptState.availability.label}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {accountDeletedMessage && (
         <div

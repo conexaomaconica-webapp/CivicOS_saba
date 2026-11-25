@@ -1,13 +1,55 @@
 import { useEffect, useRef, useState } from 'react';
 
+const BRAND_CACHE_KEY = 'cm_mobile_brand_cache_v1';
+
+type CachedMobileBrand = {
+  launchVideoMobileUrl?: string | null;
+  launchAnimationEnabled?: boolean;
+};
+
+function readCachedMobileBrand(): CachedMobileBrand {
+  try {
+    const raw = localStorage.getItem(BRAND_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as CachedMobileBrand;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 type LaunchExperienceProps = {
   onComplete: () => void;
 };
 
 export function LaunchExperience({ onComplete }: LaunchExperienceProps) {
+  const cachedBrand = readCachedMobileBrand();
+  const [remoteVideoFailed, setRemoteVideoFailed] = useState(false);
   const [failed, setFailed] = useState(false);
   const [playing, setPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    if (cachedBrand.launchAnimationEnabled === false) {
+      onComplete();
+    }
+  }, [cachedBrand.launchAnimationEnabled, onComplete]);
+
+  // Atualiza cache de marca/campanha em segundo plano para o próximo acesso
+  useEffect(() => {
+    fetch('https://www.conexaomaconica.com.br/api/mobile/brand', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.success && data.brand) {
+          try {
+            localStorage.setItem(BRAND_CACHE_KEY, JSON.stringify(data.brand));
+          } catch {
+            // Ignore storage errors
+          }
+        }
+      })
+      .catch(() => { });
+  }, []);
 
   useEffect(() => {
     // Timeout de segurança: nunca trava o app na abertura sob nenhuma hipótese
@@ -92,8 +134,20 @@ export function LaunchExperience({ onComplete }: LaunchExperienceProps) {
         poster="./splash.svg"
         onPlay={() => setPlaying(true)}
         onEnded={onComplete}
-        onError={() => setFailed(true)}
+        onError={() => {
+          if (cachedBrand.launchVideoMobileUrl && !remoteVideoFailed) {
+            setRemoteVideoFailed(true);
+          } else {
+            setFailed(true);
+          }
+        }}
       >
+        {cachedBrand.launchVideoMobileUrl && !remoteVideoFailed ? (
+          <source
+            src={cachedBrand.launchVideoMobileUrl}
+            type={cachedBrand.launchVideoMobileUrl.toLowerCase().includes('.webm') ? 'video/webm' : 'video/mp4'}
+          />
+        ) : null}
         <source src="./splash_conexao1.mp4" type="video/mp4" />
         <source src="./splash_conexao1.webm" type="video/webm" />
       </video>

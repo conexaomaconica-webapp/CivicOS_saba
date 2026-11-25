@@ -13,10 +13,18 @@ import {
   fetchMobileMemberOverview,
   requestMobilePasswordReset,
   updateMobileMemberProfile,
+  writeStoredMobileSession,
   type MobileAuthSessionTokens,
   type MobileMemberOverview,
   type MobileMemberUser,
 } from './mobile-member-client';
+import {
+  disableBiometricAuth,
+  enableBiometricAuth,
+  getBiometricAvailability,
+  isBiometricEnabledInStorage,
+  type BiometricAvailability,
+} from './biometric-auth';
 
 export type MemberPortalTab = 'visao-geral' | 'favoritos' | 'beneficios' | 'indicacoes' | 'perfil' | 'senha';
 
@@ -89,6 +97,25 @@ export function MobileMemberPortalScreen({
   // Account deletion state
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+
+  // Biometric preferences state (iOS only)
+  const [biometricAvailability, setBiometricAvailability] = useState<BiometricAvailability>({
+    available: false,
+    biometryType: 'none',
+    label: 'Biometria',
+  });
+  const [biometricEnabled, setBiometricEnabled] = useState<boolean>(() => isBiometricEnabledInStorage());
+  const [biometricBusy, setBiometricBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getBiometricAvailability().then((avail) => {
+      if (!cancelled) setBiometricAvailability(avail);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const guideServiceRef = useRef(createMobileGuideService());
 
@@ -799,6 +826,56 @@ export function MobileMemberPortalScreen({
                 {sendingReset ? 'Enviando link...' : 'Esqueceu a senha atual? Receba um link por e-mail'}
               </button>
             </form>
+
+            {biometricAvailability.available && (
+              <div className="mobile-member-form-card">
+                <h3 className="mobile-member-form-title">
+                  Acesso rápido com {biometricAvailability.label}
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#57534e', lineHeight: 1.45 }}>
+                  {biometricEnabled
+                    ? `Seu acesso biométrico com ${biometricAvailability.label} está ativo e protegido pelo Keychain deste iPhone.`
+                    : `Ative o ${biometricAvailability.label} para entrar rapidamente nos próximos acessos sem precisar digitar sua senha.`}
+                </p>
+                <button
+                  type="button"
+                  disabled={biometricBusy}
+                  className={biometricEnabled ? 'mobile-member-danger-cancel-btn' : 'mobile-member-submit-btn'}
+                  onClick={async () => {
+                    setBiometricBusy(true);
+                    if (biometricEnabled) {
+                      await disableBiometricAuth({
+                        restoreSession: session,
+                        writeSessionToLocalStorage: writeStoredMobileSession,
+                      });
+                      setBiometricEnabled(false);
+                      onToast(`${biometricAvailability.label} desativado.`);
+                    } else if (session?.refreshToken) {
+                      const res = await enableBiometricAuth({
+                        userId: memberUser.id,
+                        email: memberUser.email,
+                        refreshToken: session.refreshToken,
+                      });
+                      if (res.ok) {
+                        setBiometricEnabled(true);
+                        onToast(`${biometricAvailability.label} ativado com sucesso!`);
+                      } else {
+                        onToast(res.error || `Não foi possível ativar o ${biometricAvailability.label}.`);
+                      }
+                    } else {
+                      onToast('Entre novamente com e-mail e senha para ativar a biometria.');
+                    }
+                    setBiometricBusy(false);
+                  }}
+                >
+                  {biometricBusy
+                    ? 'Atualizando...'
+                    : biometricEnabled
+                      ? `Desativar ${biometricAvailability.label}`
+                      : `Ativar ${biometricAvailability.label}`}
+                </button>
+              </div>
+            )}
 
             {/* Zona de Exclusão Definitiva */}
             <div className="mobile-member-danger-card">

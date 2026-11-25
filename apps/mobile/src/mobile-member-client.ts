@@ -1,3 +1,8 @@
+import {
+  isBiometricEnabledInStorage,
+  syncRotatedRefreshTokenIfBiometricEnabled,
+} from './biometric-auth';
+
 export type MobileMemberUser = {
   id: string;
   email: string;
@@ -96,7 +101,7 @@ export function readStoredMobileSession(): MobileAuthSessionTokens | null {
 
 export function writeStoredMobileSession(session: MobileAuthSessionTokens | null) {
   try {
-    if (!session) {
+    if (!session || isBiometricEnabledInStorage()) {
       localStorage.removeItem(MOBILE_SESSION_STORAGE_KEY);
     } else {
       localStorage.setItem(MOBILE_SESSION_STORAGE_KEY, JSON.stringify(session));
@@ -154,6 +159,7 @@ export async function refreshMobileMemberSession(
     if (status === 200 && data?.success && data.session) {
       const next = data.session as MobileAuthSessionTokens;
       writeStoredMobileSession(next);
+      await syncRotatedRefreshTokenIfBiometricEnabled(next.refreshToken);
       return next;
     }
     return null;
