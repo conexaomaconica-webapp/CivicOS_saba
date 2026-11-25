@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { registerMemberAction } from './actions';
+import { BR_STATES, fetchCitiesByUf } from '@/lib/geo/br-cities';
 import {
   validateRegistration,
   hasErrors,
@@ -46,6 +47,27 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [fetchingTenant, setFetchingTenant] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [ufCities, setUfCities] = useState<string[]>([]);
+  const [loadingCities, setLoadingCities] = useState(false);
+
+  useEffect(() => {
+    const cleanUf = fields.state.trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(cleanUf)) {
+      setUfCities([]);
+      setLoadingCities(false);
+      return;
+    }
+    let cancelled = false;
+    setLoadingCities(true);
+    void fetchCitiesByUf(cleanUf).then((list) => {
+      if (cancelled) return;
+      setUfCities(list);
+      setLoadingCities(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fields.state]);
 
   useEffect(() => {
     const resolveTenant = async () => {
@@ -243,16 +265,56 @@ export default function RegisterPage() {
         <FieldError message={errors.email} />
       </div>
 
-      {/* Password Input */}
+      {/* Cidade e UF */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 90px', gap: 'var(--space-3)' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
           <label htmlFor="city" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-secondary)' }}>Cidade</label>
-          <input id="city" required value={fields.city} onChange={(e) => updateField('city', e.target.value)} placeholder="Sua cidade" style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }} />
+          {loadingCities ? (
+            <select id="city" disabled value="" style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}>
+              <option value="">Carregando cidades…</option>
+            </select>
+          ) : ufCities.length > 0 ? (
+            <select
+              id="city"
+              required
+              value={fields.city}
+              onChange={(e) => updateField('city', e.target.value)}
+              style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
+            >
+              <option value="">Selecione a cidade</option>
+              {ufCities.map((cityName) => (
+                <option key={cityName} value={cityName}>
+                  {cityName}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input id="city" required value={fields.city} onChange={(e) => updateField('city', e.target.value)} placeholder={fields.state ? 'Sua cidade' : 'Selecione a UF'} style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }} />
+          )}
           <FieldError message={errors.city} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
           <label htmlFor="state" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--text-secondary)' }}>UF</label>
-          <input id="state" required maxLength={2} value={fields.state} onChange={(e) => updateField('state', e.target.value.toUpperCase())} placeholder="BA" style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', textTransform: 'uppercase' }} />
+          <select
+            id="state"
+            required
+            value={fields.state}
+            onChange={(e) => {
+              const nextUf = e.target.value;
+              const nextFields = { ...fields, state: nextUf, city: '' };
+              setFields(nextFields);
+              const nextErrors = validateRegistration(nextFields);
+              setErrors({ ...errors, state: nextErrors.state, city: undefined });
+            }}
+            style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
+          >
+            <option value="">UF</option>
+            {BR_STATES.map((uf) => (
+              <option key={uf} value={uf}>
+                {uf}
+              </option>
+            ))}
+          </select>
           <FieldError message={errors.state} />
         </div>
       </div>

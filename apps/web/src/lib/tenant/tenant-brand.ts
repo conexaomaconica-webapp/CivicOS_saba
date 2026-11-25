@@ -6,6 +6,7 @@ import 'server-only';
 import { cache } from 'react';
 import { headers } from 'next/headers';
 import { createServerSideClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import type { Database } from '@/types/database.types';
 import {
   APPROVED_FONT_STACKS,
@@ -22,6 +23,10 @@ export interface TenantBrandContext {
   readonly logoUrl: string | null;
   readonly faviconUrl: string | null;
   readonly primaryColor: string | null;
+  readonly accentColor: string | null;
+  readonly launchVideoMobileUrl: string | null;
+  readonly launchVideoDesktopUrl: string | null;
+  readonly launchAnimationEnabled: boolean;
   readonly colorMode: 'light' | 'dark';
   readonly followsSystem: boolean;
   readonly hasBranding: boolean;
@@ -83,6 +88,11 @@ function contextFromRow(row: PublicBrandingRow): TenantBrandContext {
     faviconUrl: stringOrNull(row.favicon_url, 512),
     primaryColor:
       primaryColor && HEX_RE.test(primaryColor) ? primaryColor : null,
+    accentColor:
+      accentColor && HEX_RE.test(accentColor) ? accentColor : null,
+    launchVideoMobileUrl: null,
+    launchVideoDesktopUrl: null,
+    launchAnimationEnabled: true,
     colorMode: row.color_mode === 'dark' ? 'dark' : 'light',
     followsSystem: row.color_mode === 'auto',
     hasBranding: Object.keys(cssOutput.root).length > 0,
@@ -97,6 +107,10 @@ function emptyContext(): TenantBrandContext {
     logoUrl: null,
     faviconUrl: null,
     primaryColor: null,
+    accentColor: null,
+    launchVideoMobileUrl: null,
+    launchVideoDesktopUrl: null,
+    launchAnimationEnabled: true,
     colorMode: 'light',
     followsSystem: false,
     hasBranding: false,
@@ -116,7 +130,42 @@ async function resolveForRequest(): Promise<TenantBrandContext> {
     });
     const first = Array.isArray(data) ? data[0] : null;
     if (error || !isPublicBrandingRow(first)) return emptyContext();
-    return contextFromRow(first);
+    const base = contextFromRow(first);
+
+    // Enriquecimento direto de tenants.settings.branding para campos recentes (vídeos de abertura/campanhas)
+    // sem exigir alteração imediata da assinatura da RPC no banco.
+    const admin = createServiceRoleClient();
+    if (admin && base.tenantSlug) {
+      try {
+        const { data: tenantRow } = await admin
+          .from('tenants')
+          .select('settings')
+          .eq('slug', base.tenantSlug)
+          .maybeSingle();
+        const settings =
+          tenantRow && typeof tenantRow.settings === 'object' && tenantRow.settings !== null
+            ? (tenantRow.settings as Record<string, unknown>)
+            : null;
+        const branding =
+          settings && typeof settings.branding === 'object' && settings.branding !== null
+            ? (settings.branding as Record<string, unknown>)
+            : null;
+        if (branding) {
+          return {
+            ...base,
+            logoUrl: stringOrNull(branding.logoUrl, 512) ?? base.logoUrl,
+            faviconUrl: stringOrNull(branding.faviconUrl, 512) ?? base.faviconUrl,
+            launchVideoMobileUrl: stringOrNull(branding.launchVideoMobileUrl, 512),
+            launchVideoDesktopUrl: stringOrNull(branding.launchVideoDesktopUrl, 512),
+            launchAnimationEnabled: branding.launchAnimationEnabled !== false,
+          };
+        }
+      } catch {
+        // Fallback silencioso para base RPC
+      }
+    }
+
+    return base;
   } catch {
     return emptyContext();
   }

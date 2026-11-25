@@ -5,7 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { isPlatformAdminRole } from '@/lib/auth/admin-roles';
-import { uploadBrandAssetAction } from '@/app/actions/admin-brand-upload';
+import {
+  loadTenantBrandingAction,
+  saveTenantBrandingAction,
+  uploadBrandAssetAction,
+  type BrandAssetType,
+} from '@/app/actions/admin-brand-upload';
 import type { Database, Json } from '@/types/database.types';
 import {
   APPROVED_FONT_STACKS,
@@ -71,6 +76,9 @@ interface BrandForm {
   appName: string;
   logoUrl: string;
   faviconUrl: string;
+  launchVideoMobileUrl: string;
+  launchVideoDesktopUrl: string;
+  launchAnimationEnabled: boolean;
   primaryColor: string;
   accentColor: string;
   fontFamily: string;
@@ -83,6 +91,9 @@ const EMPTY_FORM: BrandForm = {
   appName: '',
   logoUrl: '',
   faviconUrl: '',
+  launchVideoMobileUrl: '',
+  launchVideoDesktopUrl: '',
+  launchAnimationEnabled: true,
   primaryColor: '',
   accentColor: '',
   fontFamily: '',
@@ -106,6 +117,13 @@ function normalizeBranding(form: BrandForm): Record<string, unknown> | null {
   if (form.faviconUrl.trim() && isSafeAssetUrl(form.faviconUrl.trim())) {
     branding.faviconUrl = form.faviconUrl.trim().slice(0, 512);
   }
+  if (form.launchVideoMobileUrl.trim() && isSafeAssetUrl(form.launchVideoMobileUrl.trim())) {
+    branding.launchVideoMobileUrl = form.launchVideoMobileUrl.trim().slice(0, 512);
+  }
+  if (form.launchVideoDesktopUrl.trim() && isSafeAssetUrl(form.launchVideoDesktopUrl.trim())) {
+    branding.launchVideoDesktopUrl = form.launchVideoDesktopUrl.trim().slice(0, 512);
+  }
+  branding.launchAnimationEnabled = form.launchAnimationEnabled;
   if (form.primaryColor && HEX_RE.test(form.primaryColor)) {
     branding.primaryColor = form.primaryColor.toLowerCase();
   }
@@ -172,24 +190,22 @@ export default function BrandStudioPage() {
         return;
       }
 
-      const { data: dbTenant, error } = await supabase
-        .from('tenants')
-        .select('id, name, slug, settings')
-        .eq('id', tenantId)
-        .single();
-
-      if (error || !dbTenant) {
-        setErrorMsg('Não foi possível carregar os dados do inquilino.');
+      const res = await loadTenantBrandingAction();
+      if (!res.success) {
+        setErrorMsg(res.error);
         setLoading(false);
         return;
       }
 
-      setTenant(dbTenant);
+      const dbTenant = res.tenant;
+      setTenant({
+        id: dbTenant.id,
+        name: dbTenant.name,
+        slug: dbTenant.slug,
+        settings: dbTenant.settings as unknown as Json,
+      });
 
-      const settings =
-        typeof dbTenant.settings === 'object' && dbTenant.settings !== null
-          ? (dbTenant.settings as Record<string, unknown>)
-          : {};
+      const settings = dbTenant.settings;
       const branding =
         typeof settings.branding === 'object' && settings.branding !== null
           ? (settings.branding as Record<string, unknown>)
@@ -199,6 +215,11 @@ export default function BrandStudioPage() {
         appName: typeof branding.appName === 'string' ? branding.appName : '',
         logoUrl: typeof branding.logoUrl === 'string' ? branding.logoUrl : '',
         faviconUrl: typeof branding.faviconUrl === 'string' ? branding.faviconUrl : '',
+        launchVideoMobileUrl:
+          typeof branding.launchVideoMobileUrl === 'string' ? branding.launchVideoMobileUrl : '',
+        launchVideoDesktopUrl:
+          typeof branding.launchVideoDesktopUrl === 'string' ? branding.launchVideoDesktopUrl : '',
+        launchAnimationEnabled: branding.launchAnimationEnabled !== false,
         primaryColor: typeof branding.primaryColor === 'string' ? branding.primaryColor : '',
         accentColor: typeof branding.accentColor === 'string' ? branding.accentColor : '',
         fontFamily:
@@ -330,37 +351,30 @@ export default function BrandStudioPage() {
       setErrorMsg('O favicon deve usar HTTPS ou um caminho seguro do próprio portal.');
       return;
     }
+    if (form.launchVideoMobileUrl && !isSafeAssetUrl(form.launchVideoMobileUrl)) {
+      setErrorMsg('A animação mobile deve usar HTTPS ou um caminho seguro do próprio portal.');
+      return;
+    }
+    if (form.launchVideoDesktopUrl && !isSafeAssetUrl(form.launchVideoDesktopUrl)) {
+      setErrorMsg('A animação desktop deve usar HTTPS ou um caminho seguro do próprio portal.');
+      return;
+    }
 
     setSaving(true);
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    const settings =
-      typeof tenant.settings === 'object' && tenant.settings !== null
-        ? (tenant.settings as Record<string, unknown>)
-        : {};
-
     const branding = normalizeBranding(form);
-    const nextSettings = { ...settings };
-    if (branding) {
-      nextSettings.branding = branding;
-    } else {
-      delete nextSettings.branding;
-    }
-
-    const payload = nextSettings as unknown as Json;
 
     try {
-      const { error } = await supabase
-        .from('tenants')
-        .update({ settings: payload })
-        .eq('id', tenant.id);
+      const res = await saveTenantBrandingAction(branding);
+      if (!res.success) {
+        throw new Error(res.error);
+      }
 
-      if (error) throw error;
-
-      setTenant({ ...tenant, settings: payload });
+      setTenant({ ...tenant, settings: res.settings as unknown as Json });
       setDirty(false);
-      setSuccessMsg('Identidade salva. Os visitantes verão as novas cores e detalhes no próximo carregamento.');
+      setSuccessMsg('Identidade salva. Os visitantes verão as novas cores, logo, favicon e animações no próximo carregamento.');
       router.refresh();
     } catch (err) {
       setErrorMsg(
@@ -377,22 +391,14 @@ export default function BrandStudioPage() {
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    const settings =
-      typeof tenant.settings === 'object' && tenant.settings !== null
-        ? (tenant.settings as Record<string, unknown>)
-        : {};
-    const nextSettings = { ...settings };
-    delete nextSettings.branding;
-
     try {
-      const { error } = await supabase
-        .from('tenants')
-        .update({ settings: nextSettings as unknown as Json })
-        .eq('id', tenant.id);
-      if (error) throw error;
+      const res = await saveTenantBrandingAction(null);
+      if (!res.success) {
+        throw new Error(res.error);
+      }
 
       setForm(EMPTY_FORM);
-      setTenant({ ...tenant, settings: nextSettings as unknown as Json });
+      setTenant({ ...tenant, settings: res.settings as unknown as Json });
       setDirty(false);
       setSuccessMsg('Identidade restaurada para o padrão da plataforma.');
       router.refresh();
@@ -512,6 +518,40 @@ export default function BrandStudioPage() {
                 accept="image/x-icon,image/vnd.microsoft.icon,image/png,image/svg+xml"
                 hint="Ícone exibido na aba do navegador e atalhos de celular. Recomendado: ICO ou PNG quadrado (32×32 ou 64×64)."
                 onChange={(url) => setField('faviconUrl', url)}
+              />
+            </section>
+
+            {/* Animação de abertura & Campanhas */}
+            <section style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <h2 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-bold)', paddingBottom: 'var(--space-2)', borderBottom: '1px solid var(--border-default)' }}>
+                Animação de abertura e campanhas
+              </h2>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semibold)', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={form.launchAnimationEnabled}
+                  onChange={(e) => setField('launchAnimationEnabled', e.target.checked)}
+                />
+                <span>Exibir animação de abertura na entrada do portal e aplicativos</span>
+              </label>
+
+              <BrandAssetUploadField
+                label="Animação Mobile (iOS, Android e Web Mobile)"
+                value={form.launchVideoMobileUrl}
+                assetType="launch_video_mobile"
+                accept="video/mp4,video/webm,video/quicktime"
+                hint="Formato vertical (9:16), MP4 ou WebM até 20 MB. Também atualiza campanhas no app iOS e Android (a partir da v1.0.1 / 1.0.15) sem precisar subir nova versão nas lojas."
+                onChange={(url) => setField('launchVideoMobileUrl', url)}
+              />
+
+              <BrandAssetUploadField
+                label="Animação Desktop (Computadores)"
+                value={form.launchVideoDesktopUrl}
+                assetType="launch_video_desktop"
+                accept="video/mp4,video/webm,video/quicktime"
+                hint="Formato horizontal/widescreen (16:9), MP4 ou WebM até 20 MB, exibido exclusivamente em telas Desktop."
+                onChange={(url) => setField('launchVideoDesktopUrl', url)}
               />
             </section>
 
@@ -972,7 +1012,7 @@ function BrandAssetUploadField({
 }: {
   label: string;
   value: string;
-  assetType: 'logo' | 'favicon';
+  assetType: BrandAssetType;
   hint: string;
   accept: string;
   onChange: (url: string) => void;
@@ -980,6 +1020,15 @@ function BrandAssetUploadField({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isVideo = assetType === 'launch_video_mobile' || assetType === 'launch_video_desktop';
+  const itemLabel =
+    assetType === 'logo'
+      ? 'Logotipo'
+      : assetType === 'favicon'
+        ? 'Favicon'
+        : assetType === 'launch_video_mobile'
+          ? 'Animação Mobile'
+          : 'Animação Desktop';
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1027,16 +1076,30 @@ function BrandAssetUploadField({
             boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3)',
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={value}
-            alt={label}
-            style={{
-              maxHeight: assetType === 'logo' ? '60px' : '36px',
-              maxWidth: '100%',
-              objectFit: 'contain',
-            }}
-          />
+          {isVideo ? (
+            <video
+              src={value}
+              controls
+              muted
+              playsInline
+              style={{
+                maxHeight: '140px',
+                maxWidth: '100%',
+                borderRadius: 'var(--radius-md)',
+              }}
+            />
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={value}
+              alt={label}
+              style={{
+                maxHeight: assetType === 'logo' ? '60px' : '36px',
+                maxWidth: '100%',
+                objectFit: 'contain',
+              }}
+            />
+          )}
           <button
             type="button"
             onClick={() => onChange('')}
@@ -1090,11 +1153,11 @@ function BrandAssetUploadField({
           {uploading
             ? 'Enviando…'
             : value
-            ? `Trocar ${assetType === 'logo' ? 'Logotipo' : 'Favicon'}`
-            : `Fazer upload do ${assetType === 'logo' ? 'Logotipo' : 'Favicon'}`}
+            ? `Trocar ${itemLabel}`
+            : `Fazer upload de ${itemLabel}`}
         </button>
         <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-          {assetType === 'logo' ? 'PNG, JPG, WebP ou SVG (máx. 2,5 MB)' : 'ICO, PNG ou SVG'}
+          {isVideo ? 'MP4 ou WebM (máx. 20 MB)' : assetType === 'logo' ? 'PNG, JPG, WebP ou SVG (máx. 2,5 MB)' : 'ICO, PNG ou SVG'}
         </span>
       </div>
 
@@ -1102,7 +1165,7 @@ function BrandAssetUploadField({
       <input
         type="url"
         value={value}
-        placeholder={assetType === 'logo' ? '…ou cole o link (URL) do logotipo' : '…ou cole o link (URL) do favicon'}
+        placeholder={`…ou cole o link (URL) de ${itemLabel}`}
         onChange={(e) => onChange(e.target.value)}
         style={inputStyle}
       />

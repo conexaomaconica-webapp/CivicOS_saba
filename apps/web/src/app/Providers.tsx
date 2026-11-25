@@ -9,6 +9,34 @@ interface ThemeContextType {
   toggleTheme: () => void;
 }
 
+export interface ClientBrandInfo {
+  appName: string | null;
+  logoUrl: string | null;
+  faviconUrl: string | null;
+  primaryColor: string | null;
+  accentColor: string | null;
+  launchVideoMobileUrl: string | null;
+  launchVideoDesktopUrl: string | null;
+  launchAnimationEnabled: boolean;
+}
+
+const DEFAULT_CLIENT_BRAND: ClientBrandInfo = {
+  appName: null,
+  logoUrl: null,
+  faviconUrl: null,
+  primaryColor: null,
+  accentColor: null,
+  launchVideoMobileUrl: null,
+  launchVideoDesktopUrl: null,
+  launchAnimationEnabled: true,
+};
+
+const BrandContext = createContext<ClientBrandInfo>(DEFAULT_CLIENT_BRAND);
+
+export function useTenantBrand(): ClientBrandInfo {
+  return useContext(BrandContext);
+}
+
 const ThemeContext = createContext<ThemeContextType>({
   theme: 'light',
   toggleTheme: () => {},
@@ -31,9 +59,11 @@ export function useBoot(): BootData | null {
 export function Providers({
   children,
   bootData,
+  brand = DEFAULT_CLIENT_BRAND,
 }: {
   children: ReactNode;
   bootData: BootData;
+  brand?: ClientBrandInfo;
 }) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
@@ -56,9 +86,11 @@ export function Providers({
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      <BootContext.Provider value={bootData}>
-        <SystemFeedbackProvider>{children}</SystemFeedbackProvider>
-      </BootContext.Provider>
+      <BrandContext.Provider value={brand}>
+        <BootContext.Provider value={bootData}>
+          <SystemFeedbackProvider>{children}</SystemFeedbackProvider>
+        </BootContext.Provider>
+      </BrandContext.Provider>
     </ThemeContext.Provider>
   );
 }

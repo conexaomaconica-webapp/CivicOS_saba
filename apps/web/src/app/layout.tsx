@@ -43,9 +43,9 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <meta name="theme-color" content="#4B161B" />
-        <link rel="icon" href="/icone.png" type="image/png" />
-        <link rel="apple-touch-icon" href="/icone.png" />
+        <meta name="theme-color" content={brand.primaryColor || '#4B161B'} />
+        <link rel="icon" href={brand.faviconUrl || '/icone.png'} />
+        <link rel="apple-touch-icon" href={brand.faviconUrl || '/icone.png'} />
         {supabaseOrigin ? (
           <>
             <link rel="preconnect" href={supabaseOrigin} />
@@ -66,7 +66,19 @@ export default async function RootLayout({
         ) : null}
       </head>
       <body className="min-h-screen font-sans antialiased" suppressHydrationWarning>
-        <Providers bootData={bootData}>
+        <Providers
+          bootData={bootData}
+          brand={{
+            appName: brand.appName,
+            logoUrl: brand.logoUrl,
+            faviconUrl: brand.faviconUrl,
+            primaryColor: brand.primaryColor,
+            accentColor: brand.accentColor,
+            launchVideoMobileUrl: brand.launchVideoMobileUrl,
+            launchVideoDesktopUrl: brand.launchVideoDesktopUrl,
+            launchAnimationEnabled: brand.launchAnimationEnabled,
+          }}
+        >
           <PwaRegister />
           {children}
         </Providers>

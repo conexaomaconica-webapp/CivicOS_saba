@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
+import { useTenantBrand } from '@/app/Providers';
 
 const STORAGE_KEY_SESSION = 'cm_launch_shown_session';
 const STORAGE_KEY_PERMANENT = 'cm_launch_last_seen_ts';
@@ -37,12 +38,19 @@ type LaunchExperienceProps = {
 
 export function LaunchExperience({ forceShow = false }: LaunchExperienceProps) {
   const pathname = usePathname();
+  const brand = useTenantBrand();
   const [visible, setVisible] = useState(false);
   const [fading, setFading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [isDesktopViewport, setIsDesktopViewport] = useState(false);
 
   useEffect(() => {
+    if (!brand.launchAnimationEnabled && !forceShow) return;
+
+    const desktopMedia = window.matchMedia?.('(min-width: 768px)');
+    setIsDesktopViewport(Boolean(desktopMedia?.matches));
+
     // Verifica se o usuário prefere redução de movimento
     const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
     if (prefersReducedMotion && !forceShow) return;
@@ -62,7 +70,7 @@ export function LaunchExperience({ forceShow = false }: LaunchExperienceProps) {
     // Marca imediatamente para não disparar em requisições paralelas ou re-renders
     markLaunchAsShown();
     setVisible(true);
-  }, [forceShow, pathname]);
+  }, [forceShow, pathname, brand.launchAnimationEnabled]);
 
   const handleComplete = useCallback(() => {
     setFading(true);
@@ -93,6 +101,10 @@ export function LaunchExperience({ forceShow = false }: LaunchExperienceProps) {
   if (!visible) return null;
 
   const bgColor = playing ? '#321511' : '#491519';
+  const activeVideoSrc = isDesktopViewport
+    ? brand.launchVideoDesktopUrl || brand.launchVideoMobileUrl || '/splash_conexao1.webm'
+    : brand.launchVideoMobileUrl || '/splash_conexao1.webm';
+  const videoMimeType = activeVideoSrc.toLowerCase().includes('.mp4') ? 'video/mp4' : 'video/webm';
 
   return (
     <div
@@ -144,7 +156,7 @@ export function LaunchExperience({ forceShow = false }: LaunchExperienceProps) {
           className="h-full w-full object-contain"
           style={{ backgroundColor: bgColor }}
         >
-          <source src="/splash_conexao1.webm" type="video/webm" />
+          <source src={activeVideoSrc} type={videoMimeType} />
         </video>
       )}
     </div>

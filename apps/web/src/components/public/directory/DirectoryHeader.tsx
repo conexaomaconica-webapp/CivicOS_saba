@@ -12,6 +12,7 @@ import { useFavorites } from '@/lib/directory/favorites-context';
 import { CategoryIcon, APP_CATEGORIES } from '@/components/landing/LandingMobileTopBar';
 import { DirectoryLiveSearchBox } from './DirectoryLiveSearchBox';
 import { canonicalPotencyCode } from '@/lib/lodges/potency';
+import { useTenantBrand } from '@/app/Providers';
 
 type DirectoryHeaderProps = {
   appName?: string;
@@ -118,9 +119,10 @@ export function DirectoryHeader({
   const loginHref = `/login?redirect=${encodeURIComponent(returnTo)}`;
   const registerHref = `/register?redirect=${encodeURIComponent(returnTo)}`;
 
+  const brand = useTenantBrand();
   const currentParamCity = searchParams ? (searchParams.get('city') || searchParams.get('cidade') || '') : '';
   const activeCity = selectedCity !== undefined && selectedCity !== null ? selectedCity : currentParamCity;
-  const logoSrc = logoUrl || '/logoconexao_red_vert.png';
+  const logoSrc = logoUrl || brand.logoUrl || '/logoconexao_red_vert.png';
 
   const handleCityChange = (city: string) => {
     if (onCityChange) {
