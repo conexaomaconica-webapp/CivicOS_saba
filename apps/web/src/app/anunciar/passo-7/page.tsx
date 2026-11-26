@@ -6,6 +6,7 @@ import ContractStepClient from './contract-step-client';
 
 export const metadata = {
   title: 'Onboarding Anunciante · Passo 7 de 7 — Contrato & Formalização',
+  robots: { index: false, follow: true },
 };
 
 export default async function OnboardingStep7Page() {

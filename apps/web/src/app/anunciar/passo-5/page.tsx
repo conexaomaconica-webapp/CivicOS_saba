@@ -7,6 +7,7 @@ import { getOwnProfileDTO } from '@/lib/member/profile-access-service';
 
 export const metadata = {
   title: 'Onboarding Anunciante · Passo 5 de 6 — Revise e Assine',
+  robots: { index: false, follow: true },
 };
 
 export default async function OnboardingStep5Page() {

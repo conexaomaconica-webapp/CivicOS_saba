@@ -9,6 +9,7 @@ import BusinessForm from './business-form';
 
 export const metadata = {
   title: 'Onboarding Anunciante · Passo 2 de 6 — Sua Empresa',
+  robots: { index: false, follow: true },
 };
 
 export default async function OnboardingStep2Page() {

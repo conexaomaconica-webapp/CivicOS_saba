@@ -84,10 +84,18 @@ describe('rotas noindex (funil de cadastro e pesquisas)', () => {
     }
   });
 
-  it('o layout do /anunciar declara noindex, follow e não altera o conteúdo', async () => {
-    const mod = await import('../src/app/anunciar/layout');
-    expect(mod.metadata.robots).toEqual({ index: false, follow: true });
-    expect(mod.default({ children: 'conteudo' })).toBe('conteudo');
+  it('os passos do /anunciar declaram noindex, follow e o layout não altera o conteúdo', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const layoutMod = await import('../src/app/anunciar/layout');
+    expect(layoutMod.default({ children: 'conteudo' })).toBe('conteudo');
+    for (const step of ['passo-1', 'passo-2', 'passo-3', 'passo-4', 'passo-5', 'passo-6', 'passo-7']) {
+      const content = fs.readFileSync(
+        path.resolve(__dirname, `../src/app/anunciar/${step}/page.tsx`),
+        'utf8',
+      );
+      expect(content).toContain('robots: { index: false, follow: true }');
+    }
   });
 
   it('/pesquisa continua redirecionando e declara noindex, follow', async () => {
