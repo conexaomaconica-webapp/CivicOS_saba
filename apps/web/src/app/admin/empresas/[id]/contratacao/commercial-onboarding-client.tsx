@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-misused-promises, @typescript-eslint/no-non-null-asserted-optional-chain, @typescript-eslint/no-floating-promises, @typescript-eslint/no-unused-vars, no-empty */
 'use client';
 
-import React, { useState, useTransition, useMemo, useEffect } from 'react';
+import React, { useState, useTransition, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -164,6 +164,19 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
       ? (paymentMethod === 'avista' ? 120000 : 130000)
       : (paymentMethod === 'avista' ? PLAN_PRESETS[initialPlanTier].payInFullCents : PLAN_PRESETS[initialPlanTier].installmentTotalCents))
   );
+  const [amountInputText, setAmountInputText] = useState<string>(() =>
+    ((savedTerms?.amount_cents ||
+      (isPedraFundamental
+        ? (paymentMethod === 'avista' ? 120000 : 130000)
+        : (paymentMethod === 'avista' ? PLAN_PRESETS[initialPlanTier].payInFullCents : PLAN_PRESETS[initialPlanTier].installmentTotalCents))) / 100).toFixed(2),
+  );
+  const isEditingAmountRef = useRef(false);
+
+  useEffect(() => {
+    if (!isEditingAmountRef.current) {
+      setAmountInputText((amountCents / 100).toFixed(2));
+    }
+  }, [amountCents]);
   const [notes, setNotes] = useState<string>(savedTerms?.notes || '');
   const [commercialStatus, setCommercialStatus] = useState<string>(
     masonic_link_detail?.status === 'verified' &&
@@ -2040,15 +2053,24 @@ export default function CommercialOnboardingClient({ dto, initialResponsibleCpf 
                 R$
               </span>
               <input
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 disabled={paymentMethod === 'permuta_100' || paymentMethod === 'parceria'}
-                value={(amountCents / 100).toFixed(2)}
+                value={amountInputText}
+                onFocus={() => {
+                  isEditingAmountRef.current = true;
+                }}
                 onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  setAmountCents(isNaN(val) ? 0 : Math.round(val * 100));
+                  const raw = e.target.value.replace(/[^\d.,]/g, '');
+                  setAmountInputText(raw);
+                  const normalized = raw.replace(',', '.');
+                  const val = parseFloat(normalized);
+                  setAmountCents(isNaN(val) ? 0 : Math.max(0, Math.round(val * 100)));
                   setFeedback(null);
+                }}
+                onBlur={() => {
+                  isEditingAmountRef.current = false;
+                  setAmountInputText((amountCents / 100).toFixed(2));
                 }}
                 className={`w-full rounded-xl border border-stone-300 bg-white pl-9 pr-3 py-2.5 text-xs font-mono font-bold text-stone-900 focus:border-[#3B0B14] focus:ring-[#3B0B14] ${
                   (paymentMethod === 'permuta_100' || paymentMethod === 'parceria') ? 'bg-stone-100 cursor-not-allowed opacity-80' : ''

@@ -336,6 +336,29 @@ describe('Microetapa 6.1 — Criação Segura de Cobrança Asaas e Hardenings', 
       });
       expect(pixFromParceladoDb.finalAmountCents).toBe(120000);
 
+      // 6b. Contrato Pedra Fundamental com desconto negociado (ex.: R$ 800,00 em 4x) respeita os R$ 800,00 no PIX e no Cartão
+      const discountedPedraPix = getCheckoutCalculatedAmount({
+        amountCents: 80000,
+        paymentMethod: 'pix',
+        installmentsCount: 1,
+        isPedraFundamental: true,
+        planCode: 'ouro',
+        planName: 'Plano Acácia (Pedra Fundamental)',
+      });
+      expect(discountedPedraPix.finalAmountCents).toBe(80000);
+      expect(discountedPedraPix.installmentValueCents).toBe(80000);
+
+      const discountedPedraCard4x = getCheckoutCalculatedAmount({
+        amountCents: 80000,
+        paymentMethod: 'credit_card',
+        installmentsCount: 4,
+        isPedraFundamental: true,
+        planCode: 'ouro',
+        planName: 'Plano Acácia (Pedra Fundamental)',
+      });
+      expect(discountedPedraCard4x.finalAmountCents).toBe(80000);
+      expect(discountedPedraCard4x.installmentValueCents).toBe(20000); // 4x de R$ 200,00
+
       // 7. Planos regulares respeitam valores específicos para PIX e Cartão de Crédito (mesmo 1x):
       // A) Plano Compasso: PIX = R$ 800,00 | Cartão 1x = R$ 855,00 | Cartão 3x = 3x de R$ 285,00 (Total R$ 855,00)
       const compassoPix = getCheckoutCalculatedAmount({

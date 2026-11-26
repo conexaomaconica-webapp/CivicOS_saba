@@ -505,6 +505,7 @@ export default function BrandStudioPage() {
               <BrandAssetUploadField
                 label="Logotipo do portal"
                 value={form.logoUrl}
+                defaultPreviewUrl="/logoconexao_red_vert.png"
                 assetType="logo"
                 accept="image/png,image/jpeg,image/webp,image/svg+xml"
                 hint="Exibido no cabeçalho e navegação. Recomendado: PNG com fundo transparente ou SVG vetorial."
@@ -514,6 +515,7 @@ export default function BrandStudioPage() {
               <BrandAssetUploadField
                 label="Favicon do portal"
                 value={form.faviconUrl}
+                defaultPreviewUrl="/icone.png"
                 assetType="favicon"
                 accept="image/x-icon,image/vnd.microsoft.icon,image/png,image/svg+xml"
                 hint="Ícone exibido na aba do navegador e atalhos de celular. Recomendado: ICO ou PNG quadrado (32×32 ou 64×64)."
@@ -766,12 +768,14 @@ export default function BrandStudioPage() {
                     maxWidth: '220px',
                   }}
                 >
-                  {form.faviconUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={form.faviconUrl} alt="Favicon" width={14} height={14} style={{ objectFit: 'contain', flexShrink: 0 }} />
-                  ) : (
-                    <span style={{ width: 12, height: 12, borderRadius: '2px', backgroundColor: 'var(--accent)', flexShrink: 0 }} />
-                  )}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={form.faviconUrl || '/icone.png'}
+                    alt="Favicon"
+                    width={14}
+                    height={14}
+                    style={{ objectFit: 'contain', flexShrink: 0 }}
+                  />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '500' }}>
                     {form.appName || tenant?.name || 'Conexão Maçônica'}
                   </span>
@@ -782,12 +786,12 @@ export default function BrandStudioPage() {
               <div style={{ display: 'flex', minHeight: 340 }}>
                 <aside style={{ width: 175, backgroundColor: 'var(--bg-secondary)', borderRight: '1px solid var(--border-default)', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border-default)' }}>
-                    {form.logoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={form.logoUrl} alt="Logo" style={{ maxHeight: 26, maxWidth: 44, objectFit: 'contain' }} />
-                    ) : (
-                      <span style={{ width: 20, height: 20, borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--accent)', display: 'block', flexShrink: 0 }} />
-                    )}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={form.logoUrl || '/logoconexao_red_vert.png'}
+                      alt="Logo"
+                      style={{ maxHeight: 26, maxWidth: 44, objectFit: 'contain', flexShrink: 0 }}
+                    />
                     <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-bold)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {form.appName || tenant?.name || 'Portal'}
                     </span>
@@ -1005,6 +1009,7 @@ function ColorField({
 function BrandAssetUploadField({
   label,
   value,
+  defaultPreviewUrl,
   assetType,
   hint,
   accept,
@@ -1012,6 +1017,7 @@ function BrandAssetUploadField({
 }: {
   label: string;
   value: string;
+  defaultPreviewUrl?: string;
   assetType: BrandAssetType;
   hint: string;
   accept: string;
@@ -1020,6 +1026,8 @@ function BrandAssetUploadField({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const previewUrl = value || defaultPreviewUrl || '';
+  const isDefaultPreview = !value && Boolean(defaultPreviewUrl);
   const isVideo = assetType === 'launch_video_mobile' || assetType === 'launch_video_desktop';
   const itemLabel =
     assetType === 'logo'
@@ -1060,8 +1068,8 @@ function BrandAssetUploadField({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
       <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-bold)' }}>{label}</label>
 
-      {/* Miniatura do item atual salvo */}
-      {value ? (
+      {/* Miniatura do item atual salvo ou padrão ativo */}
+      {previewUrl ? (
         <div
           style={{
             position: 'relative',
@@ -1078,7 +1086,7 @@ function BrandAssetUploadField({
         >
           {isVideo ? (
             <video
-              src={value}
+              src={previewUrl}
               controls
               muted
               playsInline
@@ -1091,8 +1099,9 @@ function BrandAssetUploadField({
           ) : (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
-              src={value}
+              src={previewUrl}
               alt={label}
+              onError={() => setError(`Não foi possível carregar a imagem (${previewUrl}). Verifique a URL ou envie um novo arquivo.`)}
               style={{
                 maxHeight: assetType === 'logo' ? '60px' : '36px',
                 maxWidth: '100%',
@@ -1100,26 +1109,45 @@ function BrandAssetUploadField({
               }}
             />
           )}
-          <button
-            type="button"
-            onClick={() => onChange('')}
-            title="Remover"
-            style={{
-              position: 'absolute',
-              top: '6px',
-              right: '6px',
-              padding: '2px 8px',
-              fontSize: '11px',
-              fontWeight: '600',
-              color: '#ef4444',
-              backgroundColor: 'rgba(0, 0, 0, 0.6)',
-              border: '1px solid rgba(239, 68, 68, 0.4)',
-              borderRadius: 'var(--radius-sm)',
-              cursor: 'pointer',
-            }}
-          >
-            Remover
-          </button>
+          {isDefaultPreview ? (
+            <span
+              style={{
+                position: 'absolute',
+                top: '6px',
+                right: '6px',
+                padding: '2px 8px',
+                fontSize: '10px',
+                fontWeight: '600',
+                color: '#dfbd58',
+                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                border: '1px solid rgba(223, 189, 88, 0.35)',
+                borderRadius: 'var(--radius-sm)',
+              }}
+            >
+              Padrão em uso
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onChange('')}
+              title="Remover"
+              style={{
+                position: 'absolute',
+                top: '6px',
+                right: '6px',
+                padding: '2px 8px',
+                fontSize: '11px',
+                fontWeight: '600',
+                color: '#ef4444',
+                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                borderRadius: 'var(--radius-sm)',
+                cursor: 'pointer',
+              }}
+            >
+              Remover
+            </button>
+          )}
         </div>
       ) : null}
 

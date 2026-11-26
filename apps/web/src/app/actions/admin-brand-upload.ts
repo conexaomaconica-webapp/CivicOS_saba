@@ -26,6 +26,34 @@ const ALLOWED_VIDEO_MIME: Record<string, string> = {
 const MAX_IMAGE_BYTES = 2.5 * 1024 * 1024; // 2.5 MB
 const MAX_VIDEO_BYTES = 20 * 1024 * 1024; // 20 MB
 const BUCKET = 'business-assets';
+const BRAND_VIDEO_BUCKET = 'brand-assets';
+
+const ALL_BRAND_ALLOWED_MIME = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/svg+xml',
+  'image/x-icon',
+  'image/vnd.microsoft.icon',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+];
+
+async function ensureVideoBucketReady(admin: NonNullable<ReturnType<typeof createServiceRoleClient>>, bucketName: string) {
+  const options = {
+    public: true,
+    allowedMimeTypes: ALL_BRAND_ALLOWED_MIME,
+    fileSizeLimit: 25 * 1024 * 1024,
+  };
+  const { data: existing } = await admin.storage.getBucket(bucketName);
+  if (existing) {
+    await admin.storage.updateBucket(bucketName, options);
+  } else {
+    await admin.storage.createBucket(bucketName, options);
+  }
+}
 
 function isVideoAsset(assetType: BrandAssetType): boolean {
   return assetType === 'launch_video_mobile' || assetType === 'launch_video_desktop';
@@ -94,16 +122,37 @@ export async function uploadBrandAssetAction(
         ? 'image/x-icon'
         : 'image/png';
 
-    const { error } = await admin.storage.from(BUCKET).upload(path, bytes, {
-      contentType: file.type || fallbackMime,
+    const contentType = file.type || fallbackMime;
+    let targetBucket = BUCKET;
+
+    if (video) {
+      await ensureVideoBucketReady(admin, BUCKET).catch(() => {});
+    }
+
+    let { error } = await admin.storage.from(targetBucket).upload(path, bytes, {
+      contentType,
       upsert: false,
     });
+
+    if (error && video) {
+      await ensureVideoBucketReady(admin, BRAND_VIDEO_BUCKET).catch(() => {});
+      const retry = await admin.storage.from(BRAND_VIDEO_BUCKET).upload(path, bytes, {
+        contentType,
+        upsert: false,
+      });
+      if (!retry.error) {
+        error = null;
+        targetBucket = BRAND_VIDEO_BUCKET;
+      } else {
+        error = retry.error;
+      }
+    }
 
     if (error) {
       return { success: false, error: `Falha ao salvar no armazenamento: ${error.message}` };
     }
 
-    const { data } = admin.storage.from(BUCKET).getPublicUrl(path);
+    const { data } = admin.storage.from(targetBucket).getPublicUrl(path);
     return { success: true, url: data.publicUrl };
   } catch (err) {
     return {

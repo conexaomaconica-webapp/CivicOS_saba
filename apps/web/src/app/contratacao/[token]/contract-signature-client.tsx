@@ -960,7 +960,7 @@ export function ContractSignatureClient({
                     })}
                   </select>
                   <p className="text-[11px] text-stone-500">
-                    {isPedra
+                    {isPedra && (totalCents === 0 || totalCents === 120000 || totalCents === 130000)
                       ? `Promoção de Lançamento Pedra Fundamental: R$ 1.200,00 no PIX ou R$ 1.300,00 no Cartão (em até 4x sem juros de R$ 325,00).`
                       : `Condição de parcelamento permitida para o plano (máximo de ${maxAllowedInstallments}x sem juros no Cartão).`}
                   </p>

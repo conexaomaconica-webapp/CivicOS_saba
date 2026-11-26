@@ -146,6 +146,7 @@ export function getCheckoutCalculatedAmount(params: {
     planName = '',
   } = params;
 
+  const base = Number(amountCents) || 0;
   const count = Math.max(1, Number(installmentsCount) || 1);
   const isPedra = Boolean(
     isPedraFundamental ||
@@ -155,6 +156,19 @@ export function getCheckoutCalculatedAmount(params: {
 
   // 1. Promoção de Lançamento: Acácia com Pedra Fundamental
   if (isPedra) {
+    // Se houver valor negociado/desconto específico no contrato (ex.: R$ 800,00), respeita o valor acordado no PIX e no Cartão
+    if (
+      base > 0 &&
+      base !== PEDRA_FUNDAMENTAL_PRICING.payInFullCents &&
+      base !== PEDRA_FUNDAMENTAL_PRICING.installmentTotalCents
+    ) {
+      return {
+        finalAmountCents: base,
+        installmentValueCents: Math.round(base / count),
+        isDiscountedAvista: paymentMethod === 'pix' || count === 1,
+      };
+    }
+
     if (paymentMethod === 'pix') {
       return {
         finalAmountCents: PEDRA_FUNDAMENTAL_PRICING.payInFullCents, // R$ 1.200,00
@@ -186,6 +200,15 @@ export function getCheckoutCalculatedAmount(params: {
   }
 
   if (preset) {
+    // Se houver valor negociado/desconto específico no contrato, respeita o valor acordado no PIX e no Cartão
+    if (base > 0 && base !== preset.payInFullCents && base !== preset.installmentTotalCents) {
+      return {
+        finalAmountCents: base,
+        installmentValueCents: Math.round(base / count),
+        isDiscountedAvista: paymentMethod === 'pix' || count === 1,
+      };
+    }
+
     if (paymentMethod === 'pix') {
       return {
         finalAmountCents: preset.payInFullCents,
@@ -204,7 +227,6 @@ export function getCheckoutCalculatedAmount(params: {
   }
 
   // Fallback: mantém baseAmount configurado
-  const base = Number(amountCents) || 0;
   return {
     finalAmountCents: base,
     installmentValueCents: Math.round(base / count),
