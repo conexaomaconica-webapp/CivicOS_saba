@@ -994,7 +994,7 @@ export async function invalidateAdminContractSnapshotAction(
     // 1. Busca dados da empresa
     const { data: biz, error: bizErr } = await (dbClient as any)
       .from('businesses')
-      .select('id, tenant_id, name, commercial_status')
+      .select('id, tenant_id, name, commercial_status, publication_status')
       .eq('id', businessId)
       .single();
 
@@ -1055,11 +1055,13 @@ export async function invalidateAdminContractSnapshotAction(
     if (activeContract.status !== 'signed') {
       assertAdministrativeCommercialRollback(biz.commercial_status as CommercialStatus, 'dados_comerciais_conferidos');
     }
+    const preservedPublicationStatus =
+      biz.publication_status === 'published' ? 'published' : 'draft';
     const { error: updateBizErr } = await (dbClient as any)
       .from('businesses')
       .update({
         commercial_status: 'dados_comerciais_conferidos',
-        publication_status: 'draft',
+        publication_status: preservedPublicationStatus,
         updated_at: supersededAt,
       })
       .eq('id', businessId);

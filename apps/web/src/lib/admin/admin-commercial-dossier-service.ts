@@ -181,14 +181,15 @@ export async function unlockAdminCommercialDossierAction(businessId: string): Pr
 
     // 6. Atualização atômica:
     // is_active = true (cliente ativo no sistema)
-    // publication_status = 'draft' (NUNCA publica automaticamente no Guia)
+    // publication_status: se já estiver publicado, preserva 'published' (nunca despublica por pendência/reabertura)
     // commercial_status = 'prontuario_em_configuracao'
+    const preservedPublicationStatus = biz.publication_status === 'published' ? 'published' : 'draft';
     const { error: updateErr } = await (adminClient as any)
       .from('businesses')
       .update({
         commercial_status: COMMERCIAL_STATUS.PRONTUARIO_EM_CONFIGURACAO,
         is_active: true,
-        publication_status: 'draft',
+        publication_status: preservedPublicationStatus,
         updated_at: new Date().toISOString(),
       })
       .eq('id', businessId);

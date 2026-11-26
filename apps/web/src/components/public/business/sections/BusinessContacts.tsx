@@ -159,12 +159,29 @@ export function BusinessContacts({
     }
   }
 
+function formatDisplayWebsite(rawUrl: string): string {
+  try {
+    const withProto = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+    const url = new URL(withProto);
+    for (const key of Array.from(url.searchParams.keys())) {
+      if (key.toLowerCase().startsWith('utm_')) {
+        url.searchParams.delete(key);
+      }
+    }
+    const cleanPath = url.pathname === '/' ? '' : url.pathname.replace(/\/+$/, '');
+    const cleanSearch = url.searchParams.toString();
+    return `${url.host}${cleanPath}${cleanSearch ? `?${cleanSearch}` : ''}`;
+  } catch {
+    return rawUrl.replace(/^https?:\/\//, '').replace(/[?&]utm_[^&]*/gi, '').replace(/[/?]+$/, '');
+  }
+}
+
   if (contacts.website) {
     const parsed = toSafeUrl(contacts.website, 'website');
     if (parsed) {
       items.push({
         label: 'Website',
-        value: contacts.website.replace(/^https?:\/\//, ''),
+        value: formatDisplayWebsite(contacts.website),
         href: parsed.url,
         icon: Globe,
         color: 'text-[#4B161B]',

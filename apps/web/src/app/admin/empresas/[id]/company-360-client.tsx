@@ -174,6 +174,7 @@ export default function Company360Client({ initialData }: Props) {
   const [categoryOptions, setCategoryOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [categoryCreateTarget, setCategoryCreateTarget] = useState<'primary' | 'secondary'>('primary');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [savingCategory, setSavingCategory] = useState(false);
   const [email, setEmail] = useState(data.business.email || '');
@@ -560,12 +561,18 @@ export default function Company360Client({ initialData }: Props) {
     setSavingCategory(true);
     const result = await createAdminBusinessCategoryAction(data.business.tenant_id, newCategoryName);
     if (result.success && result.category) {
-      setCategoryOptions((current) => [...current.filter((item) => item.id !== result.category!.id), result.category!].sort((a, b) => a.name.localeCompare(b.name)));
-      setCategory(result.category.name);
-      setCategoryId(result.category.id);
+      const created = result.category;
+      setCategoryOptions((current) => [...current.filter((item) => item.id !== created.id), created].sort((a, b) => a.name.localeCompare(b.name)));
+      if (categoryCreateTarget === 'secondary') {
+        setSecondaryCategoryIds((prev) => (prev.includes(created.id) ? prev : [...prev, created.id]));
+        setMessage({ type: 'success', text: 'Categoria criada e adicionada às categorias secundárias. Salve o cadastro para vinculá-la à empresa.' });
+      } else {
+        setCategory(created.name);
+        setCategoryId(created.id);
+        setMessage({ type: 'success', text: 'Categoria criada e selecionada. Salve o cadastro para vinculá-la à empresa.' });
+      }
       setNewCategoryName('');
       setShowCategoryModal(false);
-      setMessage({ type: 'success', text: 'Categoria criada e selecionada. Salve o cadastro para vinculá-la à empresa.' });
     } else {
       setMessage({ type: 'error', text: result.error || 'Falha ao criar categoria.' });
     }
@@ -2977,7 +2984,7 @@ export default function Company360Client({ initialData }: Props) {
                     {category && !categoryId && <option value="">{category} (categoria atual)</option>}
                     {categoryOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                   </select>
-                  <button type="button" onClick={() => setShowCategoryModal(true)} className="inline-flex items-center gap-1.5 rounded-xl border border-[#3B0B14] px-3 py-2 text-xs font-bold text-[#3B0B14] hover:bg-[#3B0B14] hover:text-[#C9A227]">
+                  <button type="button" onClick={() => { setCategoryCreateTarget('primary'); setShowCategoryModal(true); }} className="inline-flex items-center gap-1.5 rounded-xl border border-[#3B0B14] px-3 py-2 text-xs font-bold text-[#3B0B14] hover:bg-[#3B0B14] hover:text-[#C9A227]">
                     <Plus className="h-4 w-4" /> Nova
                   </button>
                 </div>
@@ -3026,6 +3033,9 @@ export default function Company360Client({ initialData }: Props) {
                         </option>
                       ))}
                   </select>
+                  <button type="button" onClick={() => { setCategoryCreateTarget('secondary'); setShowCategoryModal(true); }} className="inline-flex items-center gap-1.5 rounded-xl border border-[#3B0B14] px-3 py-2 text-xs font-bold text-[#3B0B14] hover:bg-[#3B0B14] hover:text-[#C9A227] shrink-0">
+                    <Plus className="h-4 w-4" /> Nova
+                  </button>
                 </div>
 
                 {secondaryCategoryIds.length > 0 ? (
@@ -6200,12 +6210,23 @@ export default function Company360Client({ initialData }: Props) {
 
                     {mediaMode !== 'update_logo' && (
                       <div>
-                        <label className="block font-bold text-stone-800 mb-1.5">Legenda / Título da Foto (Opcional)</label>
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <label className="block font-bold text-stone-800">Legenda / Título da Foto (Opcional)</label>
+                          {mediaTitleInput && (
+                            <button
+                              type="button"
+                              onClick={() => setMediaTitleInput('')}
+                              className="text-[11px] font-semibold text-stone-500 hover:text-red-700 underline cursor-pointer"
+                            >
+                              Ocultar / limpar legenda
+                            </button>
+                          )}
+                        </div>
                         <input
                           type="text"
                           value={mediaTitleInput}
                           onChange={(e) => setMediaTitleInput(e.target.value)}
-                          placeholder="Ex: Fachada principal da loja"
+                          placeholder="Deixe em branco para exibir sem legenda"
                           className="w-full px-3.5 py-2.5 border border-stone-300 rounded-2xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
                         />
                       </div>
@@ -6215,12 +6236,23 @@ export default function Company360Client({ initialData }: Props) {
               ) : (
                 /* Edição apenas de Legenda */
                 <div className="space-y-3">
-                  <label className="block font-bold text-stone-800 mb-1">Legenda / Título da Foto</label>
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="block font-bold text-stone-800">Legenda / Título da Foto (Opcional)</label>
+                    {mediaTitleInput && (
+                      <button
+                        type="button"
+                        onClick={() => setMediaTitleInput('')}
+                        className="text-[11px] font-semibold text-stone-500 hover:text-red-700 underline cursor-pointer"
+                      >
+                        Ocultar / limpar legenda
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={mediaTitleInput}
                     onChange={(e) => setMediaTitleInput(e.target.value)}
-                    placeholder="Ex: Fachada principal da loja"
+                    placeholder="Deixe em branco para exibir sem legenda"
                     className="w-full px-3.5 py-2.5 border border-stone-300 rounded-2xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
                   />
                 </div>

@@ -12,6 +12,7 @@ export type PublicProfileSectionKey = 'about' | 'services' | 'video' | 'gallery'
 export type PublicMediaAsset = {
   url: string;
   alt: string;
+  caption?: string | null;
   type: 'image' | 'video';
   focalPosition?: {
     x: number;
@@ -447,10 +448,12 @@ export function toPublicBusinessPresentation(
       if (!url) return null;
       const focal = (item as any).focal_position || (item as any).focalPosition;
       const objPos = text((item as any).object_position || (item as any).objectPosition, 60);
+      const caption = text(item.title, 180);
       return {
         url,
         type,
-        alt: text(item.title, 180) ?? `${row.business_name} — mídia pública`,
+        alt: caption ?? `${row.business_name} — mídia pública`,
+        caption,
         focalPosition: typeof focal === 'object' && focal !== null
           ? { x: Number(focal.x) || 50, y: Number(focal.y) || 50 }
           : undefined,

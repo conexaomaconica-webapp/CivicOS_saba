@@ -136,11 +136,13 @@ export function BusinessGallery({
               />
             </div>
 
-            {/* Rodapé do Modal com Contador e Descrição */}
-            <div className="p-3 bg-[#4B161B] border-t border-[#C9A227]/40 flex items-center justify-between text-xs text-[#F3EEDD]">
-              <span className="font-semibold">
-                {selectedImage.alt || `Foto de ${gallery.length > 0 ? 'galeria' : ''}`}
-              </span>
+            {/* Rodapé do Modal com Contador e Legenda (oculta legenda quando vazia) */}
+            <div className="p-3 bg-[#4B161B] border-t border-[#C9A227]/40 flex items-center justify-between gap-3 text-xs text-[#F3EEDD]">
+              {selectedImage.caption ? (
+                <span className="font-semibold">{selectedImage.caption}</span>
+              ) : (
+                <span />
+              )}
               <span className="px-2.5 py-0.5 rounded-full bg-black/40 border border-[#C9A227]/40 text-[#C9A227] font-bold">
                 {selectedIndex + 1} / {gallery.length}
               </span>
