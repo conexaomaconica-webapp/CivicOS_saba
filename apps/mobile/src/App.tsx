@@ -5688,7 +5688,8 @@ function BeneficiosScreen({
   });
 
   const rawList = guideData?.businesses ?? [];
-  const sorted = sortBusinessesByTier(rawList).map((b) =>
+  const baseList = search.trim() ? rawList : sortBusinessesByTier(rawList);
+  const sorted = baseList.map((b) =>
     viewsOverrides?.[b.id] !== undefined
       ? { ...b, views_count: Math.max(viewsOverrides[b.id]!, b.views_count ?? 0) }
       : b
@@ -8777,7 +8778,8 @@ function EmpresasScreen({
   });
 
   const businesses = guideData?.businesses ?? [];
-  const sorted = sortBusinessesByTier(businesses).map((b) =>
+  const baseList = search.trim() ? businesses : sortBusinessesByTier(businesses);
+  const sorted = baseList.map((b) =>
     viewsOverrides?.[b.id] !== undefined
       ? { ...b, views_count: Math.max(viewsOverrides[b.id]!, b.views_count ?? 0) }
       : b

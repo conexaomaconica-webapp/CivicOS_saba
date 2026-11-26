@@ -2,20 +2,34 @@ name: iOS Build
 
 on:
   workflow_dispatch:
+    inputs:
+      enable_signed_ipa:
+        description: 'Gerar e assinar IPA para App Store Connect (requer aprovação manual)'
+        required: true
+        type: boolean
+        default: false
+      upload_to_testflight:
+        description: 'Enviar IPA ao TestFlight (App Store Connect)'
+        required: true
+        type: boolean
+        default: false
   push:
     branches:
-      - main
-      - release/ios-first-build
       - release/ios-1.0.1
     paths:
       - 'apps/mobile/**'
       - '.github/workflows/mobile-ios.yml'
 
+permissions:
+  contents: read
+
 jobs:
   build-ios:
-    name: Build iOS Project (macOS)
+    name: Build iOS Project (Unsigned Validation)
     runs-on: macos-latest
     timeout-minutes: 40
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
@@ -78,26 +92,344 @@ jobs:
         with:
           name: ios-xcodebuild-log
           path: apps/mobile/ios/App/xcodebuild.log
+          retention-days: 5
           if-no-files-found: warn
 
-      # -----------------------------------------------------------------------
-      # Gate iOS 02B.1 (Estrutura futura de assinatura e exportação do IPA)
-      # Inativa até o provisionamento das secrets da Apple Developer Account.
-      # Preserva integralmente o Gate 01 sem executar chamadas externas ou builds assinados.
-      # -----------------------------------------------------------------------
-      # - name: Build and Sign IPA for TestFlight
-      #   if: false # Ativar somente no Gate iOS 02B com secrets configuradas
-      #   run: |
-      #     cd apps/mobile/ios/App
-      #     xcodebuild -workspace App.xcworkspace \
-      #       -scheme App \
-      #       -configuration Release \
-      #       -destination 'generic/platform=iOS' \
-      #       -archivePath build/App.xcarchive \
-      #       MARKETING_VERSION="1.0.0" \
-      #       CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
-      #       archive
-      #     xcodebuild -exportArchive \
-      #       -archivePath build/App.xcarchive \
-      #       -exportPath build/App-IPA \
-      #       -exportOptionsPlist ExportOptions.plist
+  package-signed-ipa:
+    name: Build Signed IPA (App Store Distribution)
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/release/ios-1.0.1' && inputs.enable_signed_ipa == true }}
+    runs-on: macos-latest
+    timeout-minutes: 45
+    environment: ios-distribution
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Web Assets and Monorepo Dependencies
+        run: pnpm turbo run build --filter=@saas/mobile...
+
+      - name: Setup and Sync Capacitor iOS
+        run: |
+          cd apps/mobile
+          if [ ! -d "ios" ]; then
+            npx cap add ios
+          else
+            npx cap sync ios
+          fi
+          node scripts/apply-ios-overrides.mjs
+
+      - name: Ensure CocoaPods Dependencies
+        run: |
+          cd apps/mobile/ios/App
+          pod install --repo-update
+
+      - name: Import Apple Distribution Certificate & Provisioning Profile (Temporary)
+        id: apple_signing
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IOS_BUILD_CERTIFICATE_BASE64: ${{ secrets.IOS_BUILD_CERTIFICATE_BASE64 }}
+          IOS_P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+          IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$IOS_TEAM_ID" ] || [ -z "$IOS_BUILD_CERTIFICATE_BASE64" ] || [ -z "$IOS_P12_PASSWORD" ] || [ -z "$IOS_PROVISION_PROFILE_BASE64" ]; then
+            echo "::error::Secrets obrigatorios de assinatura Apple ausentes."
+            exit 1
+          fi
+
+          CERT_PATH="$RUNNER_TEMP/build_certificate.p12"
+          PROFILE_PATH="$RUNNER_TEMP/app_store.mobileprovision"
+          PROFILE_PLIST="$RUNNER_TEMP/profile_decoded.plist"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+
+          printf '%s' "$IOS_BUILD_CERTIFICATE_BASE64" | tr -d '[:space:]' | base64 --decode > "$CERT_PATH"
+          printf '%s' "$IOS_PROVISION_PROFILE_BASE64" | tr -d '[:space:]' | base64 --decode > "$PROFILE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$IOS_P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+          # Valida identidade Apple Distribution no keychain temporario
+          if ! security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -q "Apple Distribution"; then
+            echo "::error::Nenhuma identidade 'Apple Distribution' valida encontrada no certificado importado."
+            exit 1
+          fi
+
+          # Decodifica o Provisioning Profile e valida Team ID e App ID
+          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
+          PROFILE_UUID="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$PROFILE_PLIST")"
+          PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$PROFILE_PLIST")"
+          PROFILE_TEAM="$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$PROFILE_PLIST")"
+          PROFILE_APP_ID="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$PROFILE_PLIST")"
+          PROFILE_PREFIX="$(/usr/libexec/PlistBuddy -c 'Print :ApplicationIdentifierPrefix:0' "$PROFILE_PLIST" 2>/dev/null || echo 'ABSENT')"
+          PROFILE_APS="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:aps-environment' "$PROFILE_PLIST" 2>/dev/null || echo 'ABSENT')"
+          PROFILE_GET_TASK="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:get-task-allow' "$PROFILE_PLIST" 2>/dev/null || echo 'ABSENT')"
+          PROFILE_EXP="$(/usr/libexec/PlistBuddy -c 'Print :ExpirationDate' "$PROFILE_PLIST" 2>/dev/null || echo 'ABSENT')"
+
+          echo "Provisioning Profile -> UUID=$PROFILE_UUID | Team=$PROFILE_TEAM | Prefix=$PROFILE_PREFIX | Exp=$PROFILE_EXP"
+          echo "Profile Entitlements -> app-id=$PROFILE_APP_ID | aps-environment=$PROFILE_APS | get-task-allow=$PROFILE_GET_TASK"
+
+          if [ "$PROFILE_APS" != "production" ]; then
+            echo "::error::Provisioning Profile nao autoriza aps-environment=production (valor='$PROFILE_APS'). Regenere o Provisioning Profile App Store com a capability Push Notifications ativa no Apple Developer Portal."
+            exit 1
+          fi
+
+          if [ "$PROFILE_TEAM" != "$IOS_TEAM_ID" ]; then
+            echo "::error::Team ID do Provisioning Profile ($PROFILE_TEAM) difere de IOS_TEAM_ID."
+            exit 1
+          fi
+
+          if [ "$PROFILE_APP_ID" != "${IOS_TEAM_ID}.com.conexaomaconica.app" ]; then
+            echo "::error::Application Identifier do perfil ($PROFILE_APP_ID) nao corresponde a ${IOS_TEAM_ID}.com.conexaomaconica.app."
+            exit 1
+          fi
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
+
+          echo "profile_uuid=$PROFILE_UUID" >> "$GITHUB_OUTPUT"
+          echo "profile_name=$PROFILE_NAME" >> "$GITHUB_OUTPUT"
+          echo "keychain_path=$KEYCHAIN_PATH" >> "$GITHUB_OUTPUT"
+          echo "✅ Certificado Apple Distribution e Provisioning Profile ($PROFILE_UUID) validados."
+
+      - name: Archive and Export Signed IPA
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          PROFILE_UUID: ${{ steps.apple_signing.outputs.profile_uuid }}
+          PROFILE_NAME: ${{ steps.apple_signing.outputs.profile_name }}
+        run: |
+          set -euo pipefail
+          cd apps/mobile/ios/App
+
+          EXPORT_PLIST="$RUNNER_TEMP/ExportOptions.plist"
+          cat > "$EXPORT_PLIST" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+          	<key>destination</key>
+          	<string>export</string>
+          	<key>manageAppVersionAndBuildNumber</key>
+          	<false/>
+          	<key>method</key>
+          	<string>app-store-connect</string>
+          	<key>provisioningProfiles</key>
+          	<dict>
+          		<key>com.conexaomaconica.app</key>
+          		<string>${PROFILE_UUID}</string>
+          	</dict>
+          	<key>signingCertificate</key>
+          	<string>Apple Distribution</string>
+          	<key>signingStyle</key>
+          	<string>manual</string>
+          	<key>stripSwiftSymbols</key>
+          	<true/>
+          	<key>teamID</key>
+          	<string>${IOS_TEAM_ID}</string>
+          	<key>uploadSymbols</key>
+          	<true/>
+          </dict>
+          </plist>
+          EOF
+          plutil -lint "$EXPORT_PLIST"
+
+          # Aplica assinatura manual, CODE_SIGN_ENTITLEMENTS e Provisioning Profile exclusivamente no target App (Release),
+          # evitando impor PROVISIONING_PROFILE_SPECIFIER globalmente aos targets CocoaPods.
+          IOS_TEAM_ID="$IOS_TEAM_ID" \
+          IOS_PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
+          node ../../scripts/apply-ios-overrides.mjs
+
+          echo "=== Build Settings efetivas (target App / Release) ==="
+          xcodebuild -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -showBuildSettings | grep -E "PRODUCT_BUNDLE_IDENTIFIER|CODE_SIGN_ENTITLEMENTS|CODE_SIGN_STYLE|DEVELOPMENT_TEAM|PROVISIONING_PROFILE_SPECIFIER" || true
+
+          xcodebuild -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            MARKETING_VERSION="1.0.1" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            clean archive 2>&1 | tee "$RUNNER_TEMP/xcodebuild-archive.log"
+
+          echo "=== Entitlements assinados no App.xcarchive ==="
+          ARCHIVE_APP="$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
+          codesign -d --entitlements - --xml "$ARCHIVE_APP" > "$RUNNER_TEMP/archive-entitlements.plist"
+          plutil -lint "$RUNNER_TEMP/archive-entitlements.plist"
+          ARCHIVE_APS="$(/usr/libexec/PlistBuddy -c 'Print :aps-environment' "$RUNNER_TEMP/archive-entitlements.plist" 2>/dev/null || echo 'ABSENT')"
+          ARCHIVE_APP_ID="$(/usr/libexec/PlistBuddy -c 'Print :application-identifier' "$RUNNER_TEMP/archive-entitlements.plist" 2>/dev/null || echo 'ABSENT')"
+          ARCHIVE_GET_TASK="$(/usr/libexec/PlistBuddy -c 'Print :get-task-allow' "$RUNNER_TEMP/archive-entitlements.plist" 2>/dev/null || echo 'ABSENT')"
+          echo "Archive Entitlements -> aps-environment=$ARCHIVE_APS | application-identifier=$ARCHIVE_APP_ID | get-task-allow=$ARCHIVE_GET_TASK"
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportPath "$RUNNER_TEMP/App-IPA" \
+            -exportOptionsPlist "$EXPORT_PLIST" 2>&1 | tee "$RUNNER_TEMP/xcodebuild-export.log"
+
+      - name: Validate Exported IPA, Privacy Manifest & Entitlements
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          IPA_FILE="$(find "$RUNNER_TEMP/App-IPA" -maxdepth 1 -name '*.ipa' | head -n 1)"
+          if [ -z "$IPA_FILE" ] || [ ! -f "$IPA_FILE" ]; then
+            echo "::error::Arquivo .ipa nao foi gerado em $RUNNER_TEMP/App-IPA."
+            exit 1
+          fi
+
+          UNZIP_DIR="$RUNNER_TEMP/ipa-verify"
+          rm -rf "$UNZIP_DIR"
+          unzip -q "$IPA_FILE" -d "$UNZIP_DIR"
+          APP_BUNDLE="$(find "$UNZIP_DIR/Payload" -maxdepth 1 -name '*.app' | head -n 1)"
+
+          if [ ! -f "$APP_BUNDLE/PrivacyInfo.xcprivacy" ]; then
+            echo "::error::PrivacyInfo.xcprivacy ausente no bundle App.app!"
+            exit 1
+          fi
+
+          BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_BUNDLE/Info.plist")"
+          SHORT_VER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_BUNDLE/Info.plist")"
+          BUILD_NUM="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP_BUNDLE/Info.plist")"
+          echo "Bundle ID: $BUNDLE_ID | Versao: $SHORT_VER | Build: $BUILD_NUM"
+
+          if [ "$BUNDLE_ID" != "com.conexaomaconica.app" ]; then
+            echo "::error::CFBundleIdentifier invalido: '$BUNDLE_ID' (esperado 'com.conexaomaconica.app')."
+            exit 1
+          fi
+
+          if [ "$SHORT_VER" != "1.0.1" ]; then
+            echo "::error::CFBundleShortVersionString invalido: '$SHORT_VER' (esperado '1.0.1')."
+            exit 1
+          fi
+
+          if ! [[ "$BUILD_NUM" =~ ^[0-9]+$ ]] || [ "$BUILD_NUM" -lt 1 ]; then
+            echo "::error::CFBundleVersion invalido: '$BUILD_NUM' (esperado inteiro positivo)."
+            exit 1
+          fi
+
+          codesign -v --strict "$APP_BUNDLE"
+
+          ENTITLEMENTS_PLIST="$RUNNER_TEMP/entitlements.plist"
+          codesign -d --entitlements - --xml "$APP_BUNDLE" > "$ENTITLEMENTS_PLIST"
+          plutil -lint "$ENTITLEMENTS_PLIST"
+
+          APS_ENV="$(/usr/libexec/PlistBuddy -c 'Print :aps-environment' "$ENTITLEMENTS_PLIST")"
+          APP_ID_ENT="$(/usr/libexec/PlistBuddy -c 'Print :application-identifier' "$ENTITLEMENTS_PLIST")"
+          GET_TASK_ALLOW="$(/usr/libexec/PlistBuddy -c 'Print :get-task-allow' "$ENTITLEMENTS_PLIST" 2>/dev/null || echo 'ABSENT')"
+
+          echo "Entitlements validados -> aps-environment=$APS_ENV | application-identifier=$APP_ID_ENT | get-task-allow=$GET_TASK_ALLOW"
+
+          if [ "$APS_ENV" != "production" ]; then
+            echo "::error::aps-environment esperado 'production', encontrado '$APS_ENV'."
+            exit 1
+          fi
+
+          if [ "$APP_ID_ENT" != "${IOS_TEAM_ID}.com.conexaomaconica.app" ]; then
+            echo "::error::application-identifier esperado '${IOS_TEAM_ID}.com.conexaomaconica.app', encontrado '$APP_ID_ENT'."
+            exit 1
+          fi
+
+          if [ "$GET_TASK_ALLOW" != "ABSENT" ] && [ "$GET_TASK_ALLOW" != "false" ]; then
+            echo "::error::get-task-allow deve ser 'false' em build de distribuicao, encontrado '$GET_TASK_ALLOW'."
+            exit 1
+          fi
+          rm -rf "$UNZIP_DIR"
+
+      - name: Upload Signed IPA Artifact (Private CI Retention)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-signed-ipa
+          path: ${{ runner.temp }}/App-IPA/*.ipa
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Upload IPA to TestFlight (App Store Connect API)
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/release/ios-1.0.1' && inputs.upload_to_testflight == true }}
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$APP_STORE_CONNECT_KEY_ID" ] || [ -z "$APP_STORE_CONNECT_ISSUER_ID" ] || [ -z "$APP_STORE_CONNECT_API_KEY_BASE64" ]; then
+            echo "::error::Secrets da App Store Connect API ausentes no Environment ios-distribution."
+            exit 1
+          fi
+
+          IPA_FILE="$(find "$RUNNER_TEMP/App-IPA" -maxdepth 1 -name '*.ipa' | head -n 1)"
+          if [ -z "$IPA_FILE" ] || [ ! -f "$IPA_FILE" ]; then
+            echo "::error::Arquivo .ipa nao encontrado para upload."
+            exit 1
+          fi
+
+          KEY_DIR="$RUNNER_TEMP/asc-private-keys"
+          mkdir -p "$KEY_DIR"
+          chmod 700 "$KEY_DIR"
+          KEY_FILE="$KEY_DIR/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          printf '%s' "$APP_STORE_CONNECT_API_KEY_BASE64" | tr -d '[:space:]' | base64 --decode > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+
+          if ! grep -q "BEGIN PRIVATE KEY" "$KEY_FILE"; then
+            echo "::error::Arquivo .p8 decodificado invalido (cabecalho PEM ausente)."
+            exit 1
+          fi
+
+          export API_PRIVATE_KEYS_DIR="$KEY_DIR"
+
+          echo "🔎 Validando IPA junto ao App Store Connect..."
+          xcrun altool --validate-app \
+            -f "$IPA_FILE" \
+            -t ios \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+
+          echo "🚀 Enviando IPA para o TestFlight (App Store Connect)..."
+          xcrun altool --upload-app \
+            -f "$IPA_FILE" \
+            -t ios \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+
+          echo "✅ IPA enviado ao App Store Connect (TestFlight) com sucesso."
+
+      - name: Cleanup Temporary Signing Credentials & Keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/build_certificate.p12" \
+                "$RUNNER_TEMP/app_store.mobileprovision" \
+                "$RUNNER_TEMP/profile_decoded.plist" \
+                "$RUNNER_TEMP/ExportOptions.plist" \
+                "$RUNNER_TEMP/entitlements.txt" \
+                "$RUNNER_TEMP/entitlements.plist" \
+                "$RUNNER_TEMP/archive-entitlements.plist"
+          rm -rf "$HOME/Library/MobileDevice/Provisioning Profiles" \
+                 "$HOME/.appstoreconnect/private_keys" \
+                 "$RUNNER_TEMP/asc-private-keys"
+          echo "🧹 Credenciais temporarias e keychain removidos do runner."
