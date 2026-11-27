@@ -43,6 +43,8 @@ type Props = {
   brandName: string;
   primaryColor: string;
   logoSrc?: string | null;
+  /** Condição Pedra Fundamental disponível (campanha ativa ou exceção vinculada). Pausada/encerrada: não aparece. */
+  pedraFundamentalAvailable?: boolean;
 };
 
 const inputClass =
@@ -58,7 +60,10 @@ function Field({ label, children, hint }: { label: string; children: React.React
   );
 }
 
-export default function SignupInviteForm({ token, invitedName, invitedEmail, categories, brandName, primaryColor, logoSrc = null }: Props) {
+export default function SignupInviteForm({ token, invitedName, invitedEmail, categories, brandName, primaryColor, logoSrc = null, pedraFundamentalAvailable = false }: Props) {
+  const planOptions = INVITE_PLAN_OPTIONS.filter(
+    (plan) => plan.code !== 'acacia_pedra_fundamental' || pedraFundamentalAvailable,
+  );
   const [values, setValues] = useState({
     responsibleName: invitedName || '',
     responsibleEmail: invitedEmail || '',
@@ -86,7 +91,7 @@ export default function SignupInviteForm({ token, invitedName, invitedEmail, cat
     potency: '',
     consent: false,
     website2: '', // isca anti-robô: fica invisível
-    planInterest: 'acacia_pedra_fundamental',
+    planInterest: pedraFundamentalAvailable ? 'acacia_pedra_fundamental' : 'acacia',
     paymentPreference: 'pix',
   });
   const [otherCategory, setOtherCategory] = useState(false);
@@ -484,7 +489,7 @@ export default function SignupInviteForm({ token, invitedName, invitedEmail, cat
           </div>
 
           <div className="space-y-3">
-            {INVITE_PLAN_OPTIONS.map((plan) => (
+            {planOptions.map((plan) => (
               <label
                 key={plan.code}
                 className={`flex items-start gap-3 p-3.5 rounded-2xl border-2 transition cursor-pointer ${values.planInterest === plan.code

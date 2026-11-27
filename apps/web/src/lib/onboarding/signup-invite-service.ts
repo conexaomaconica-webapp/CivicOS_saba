@@ -12,6 +12,10 @@ import { brandedEmailHtml, sendEmail } from '@/lib/email/send-email';
 import { decryptSecret, encryptSecret } from '@/lib/payment/asaas-secrets';
 import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import {
+  PEDRA_FUNDAMENTAL_CAMPAIGN_CODE,
+  validateCampaignEnrollment,
+} from '@/lib/commercial/campaign-availability-service';
+import {
   INVITE_TTL_DAYS_DEFAULT,
   INVITE_TTL_DAYS_MAX,
   generateInviteToken,
@@ -207,6 +211,7 @@ export async function listSignupInvitesAction(): Promise<{ success: boolean; ite
 export async function getSignupInviteForReviewAction(inviteId: string): Promise<{
   success: boolean;
   invite?: InviteListItem & { submitted_data: SignupSubmission | null };
+  pedraFundamentalAvailable?: boolean;
   error?: string;
 }> {
   try {
@@ -220,9 +225,17 @@ export async function getSignupInviteForReviewAction(inviteId: string): Promise<
       .eq('tenant_id', tenantId)
       .maybeSingle();
     if (!data) return { success: false, error: 'Convite não encontrado.' };
+    const sub = data.submitted_data && typeof data.submitted_data === 'object' ? data.submitted_data : null;
+    const pedraFundamentalAvailable = await isPedraFundamentalAvailableForInvite(
+      db,
+      tenantId,
+      sub?.responsibleEmail || data.invited_email,
+      sub?.document || null,
+    );
     return {
       success: true,
       invite: { ...data, has_link: false, expired: data.status === 'sent' && new Date(data.expires_at).getTime() <= Date.now() },
+      pedraFundamentalAvailable,
     };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Erro ao abrir o convite.' };
@@ -542,6 +555,8 @@ export async function getSignupInviteByTokenAction(token: string): Promise<{
   invitedName?: string;
   invitedEmail?: string;
   categories?: Array<{ id: string; name: string }>;
+  /** Campanha Pedra Fundamental disponível para este convite (ativa ou exceção vinculada ao e-mail). */
+  pedraFundamentalAvailable?: boolean;
 }> {
   const invite = await findInviteByToken(token);
   if (!invite || invite.status === 'revoked') return { state: 'invalid' };
@@ -549,20 +564,44 @@ export async function getSignupInviteByTokenAction(token: string): Promise<{
   if (!isInviteUsable(invite)) return { state: 'expired' };
 
   const db = service();
-  const { data: categories } = await db
-    .from('categories')
-    .select('id, name')
-    .eq('is_active', true)
-    .or(`tenant_id.is.null,tenant_id.eq.${invite.tenant_id}`)
-    .order('name')
-    .limit(500);
+  const [{ data: categories }, pedraFundamentalAvailable] = await Promise.all([
+    db
+      .from('categories')
+      .select('id, name')
+      .eq('is_active', true)
+      .or(`tenant_id.is.null,tenant_id.eq.${invite.tenant_id}`)
+      .order('name')
+      .limit(500),
+    isPedraFundamentalAvailableForInvite(db, invite.tenant_id, invite.invited_email),
+  ]);
 
   return {
     state: 'valid',
     invitedName: invite.invited_name || undefined,
     invitedEmail: invite.invited_email || undefined,
     categories: categories || [],
+    pedraFundamentalAvailable,
   };
+}
+
+/** Gate de backend: a condição Pedra Fundamental só aparece/é aceita se a campanha estiver ativa ou houver exceção vinculada. */
+async function isPedraFundamentalAvailableForInvite(
+  db: any,
+  tenantId: string,
+  email?: string | null,
+  document?: string | null,
+): Promise<boolean> {
+  try {
+    const check = await validateCampaignEnrollment(db, {
+      tenantId,
+      campaignCode: PEDRA_FUNDAMENTAL_CAMPAIGN_CODE,
+      targetEmail: email ?? null,
+      targetDocument: document ?? null,
+    });
+    return check.allowed;
+  } catch {
+    return false;
+  }
 }
 
 export async function submitSignupInviteAction(
@@ -583,6 +622,20 @@ export async function submitSignupInviteAction(
     if (invalid) return { success: false, error: invalid };
 
     const db = service();
+    if (data.planInterest === 'acacia_pedra_fundamental') {
+      const allowed = await isPedraFundamentalAvailableForInvite(
+        db,
+        invite.tenant_id,
+        data.responsibleEmail || invite.invited_email,
+        data.document,
+      );
+      if (!allowed) {
+        return {
+          success: false,
+          error: 'A condição especial Pedra Fundamental não está disponível no momento. Escolha outro plano para continuar.',
+        };
+      }
+    }
     // A condição status = 'sent' garante uso único mesmo com envios simultâneos.
     const { data: updated, error } = await db
       .from('business_signup_invites')

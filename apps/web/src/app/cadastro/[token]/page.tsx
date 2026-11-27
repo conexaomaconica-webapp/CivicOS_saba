@@ -58,6 +58,7 @@ export default async function SignupInvitePage({ params }: PageProps) {
       invitedName={invite.invitedName}
       invitedEmail={invite.invitedEmail}
       categories={invite.categories ?? []}
+      pedraFundamentalAvailable={Boolean(invite.pedraFundamentalAvailable)}
       brandName={brand.brandName}
       primaryColor={brand.primaryColor}
       logoSrc={brand.logoSrc}

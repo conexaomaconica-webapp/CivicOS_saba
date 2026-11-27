@@ -44,20 +44,28 @@ export default function ReviewClient({
   tenantId,
   invite,
   categories: initialCategories,
+  pedraFundamentalAvailable = false,
 }: {
   tenantId: string;
   invite: InviteListItem & { submitted_data: SignupSubmission | null };
   categories: Array<{ id: string; name: string }>;
+  pedraFundamentalAvailable?: boolean;
 }) {
   const router = useRouter();
   const submitted = invite.submitted_data;
+  const availablePlans = PLANS.filter((p) => p.code !== 'acacia_pedra_fundamental' || pedraFundamentalAvailable);
+  const requestedPedra = submitted?.planInterest === 'acacia_pedra_fundamental';
   const [data, setData] = useState<SignupSubmission | null>(submitted);
   const [categories, setCategories] = useState(initialCategories);
   const [categoryId, setCategoryId] = useState(submitted?.categoryId || '');
   const [creatingCategory, setCreatingCategory] = useState(false);
   // Se o cliente escolheu a Loja na lista, já vem identificada (a equipe pode trocar abaixo).
   const [organizationId, setOrganizationId] = useState<string | undefined>(submitted?.lodgeOrganizationId || undefined);
-  const [planCode, setPlanCode] = useState(submitted?.planInterest || 'acacia_pedra_fundamental');
+  const [planCode, setPlanCode] = useState(
+    submitted?.planInterest && availablePlans.some((p) => p.code === submitted.planInterest)
+      ? submitted.planInterest
+      : 'acacia',
+  );
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -231,9 +239,15 @@ export default function ReviewClient({
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
+          {requestedPedra && !pedraFundamentalAvailable && (
+            <p className="sm:col-span-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+              O cliente indicou a Pedra Fundamental, mas a campanha está pausada/encerrada. Para conceder a condição, registre
+              uma exceção vinculada em /admin/campanhas; caso contrário, siga com o Plano Acácia regular.
+            </p>
+          )}
           <Field label="Plano">
             <select className={inputClass} value={planCode} onChange={(e) => setPlanCode(e.target.value)}>
-              {PLANS.map((p) => <option key={p.code} value={p.code}>{p.label}</option>)}
+              {availablePlans.map((p) => <option key={p.code} value={p.code}>{p.label}</option>)}
             </select>
           </Field>
           <Field label="Senha temporária do responsável" hint="Mínimo exigido pela plataforma. Ele troca no primeiro acesso.">

@@ -116,7 +116,7 @@ export function normalizeSubmission(raw: Record<string, unknown>): SignupSubmiss
     lodgeOrganizationId: /^[0-9a-f-]{36}$/i.test(String(raw.lodgeOrganizationId ?? '')) ? String(raw.lodgeOrganizationId) : '',
     potency: clean(raw.potency, 80),
     consent: raw.consent === true || raw.consent === 'true' || raw.consent === 'on',
-    planInterest: clean(raw.planInterest, 60) || 'acacia_pedra_fundamental',
+    planInterest: clean(raw.planInterest, 60) || 'acacia',
     paymentPreference: clean(raw.paymentPreference, 40) || 'pix',
   };
 }

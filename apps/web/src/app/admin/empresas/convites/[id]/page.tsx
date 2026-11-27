@@ -36,6 +36,7 @@ export default async function ReviewSignupInvitePage({ params }: PageProps) {
         tenantId={tenantId}
         invite={result.invite}
         categories={categories.categories}
+        pedraFundamentalAvailable={Boolean(result.pedraFundamentalAvailable)}
       />
     </main>
   );
