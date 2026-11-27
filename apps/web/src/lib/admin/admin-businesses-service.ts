@@ -5036,9 +5036,11 @@ export async function adminCorrectBusinessBillingAction(
       }
     }
 
-    // 2. Sincroniza assinatura (plan_version_id e status escolhido pelo admin)
+    // 2. Sincroniza assinatura (plan_version_id e status escolhido pelo admin; permuta_100/parceria ativam automaticamente)
+    const autoActivateFreeModality = modality === 'permuta_100' || modality === 'parceria';
     await syncAdminBusinessSubscription(supabase, biz.tenant_id, biz.id, canonicalPlan, {
       overrideStatus: input.subscription_status,
+      forceActiveStatus: !input.subscription_status && autoActivateFreeModality,
     });
 
     // 3. Sincroniza business_commercial_terms
