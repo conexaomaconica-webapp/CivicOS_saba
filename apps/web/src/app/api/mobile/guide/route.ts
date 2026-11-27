@@ -68,7 +68,7 @@ export async function GET(request: Request) {
       }
       const bizId = detail.business_id || detail.id;
       if (bizId) {
-        const [{ count: vCount }, { data: attrRows }, { data: recRows }, { data: certRows }, { data: svcRows }, { data: benRows }] = await Promise.all([
+        const [{ count: vCount }, { data: attrRows }, { data: recRows }, { data: certRows }, { data: svcRows }, { data: benRows }, { data: eventsRows }, { data: postsRows }] = await Promise.all([
           adminDb
             .from('analytics_events')
             .select('id', { count: 'exact', head: true })
@@ -105,7 +105,30 @@ export async function GET(request: Request) {
             .eq('business_id', bizId)
             .eq('is_active', true)
             .then((r: any) => r, () => ({ data: [] })),
+          adminDb
+            .from('business_events')
+            .select('id, title, description, starts_at, ends_at, location_name, address, cover_image_url, external_ticket_url, publication_status, is_active')
+            .eq('business_id', bizId)
+            .eq('is_active', true)
+            .eq('publication_status', 'published')
+            .order('starts_at', { ascending: false })
+            .then((r: any) => r, () => ({ data: [] })),
+          adminDb
+            .from('business_posts')
+            .select('id, title, summary, content, cover_image_url, published_at, created_at, publication_status, is_active')
+            .eq('business_id', bizId)
+            .eq('is_active', true)
+            .eq('publication_status', 'published')
+            .order('published_at', { ascending: false })
+            .order('created_at', { ascending: false })
+            .then((r: any) => r, () => ({ data: [] })),
         ]);
+        if (Array.isArray(eventsRows)) {
+          detail.events = eventsRows;
+        }
+        if (Array.isArray(postsRows)) {
+          detail.posts = postsRows;
+        }
         if (Array.isArray(detail.services)) {
           const svcImgMap = new Map(
             (Array.isArray(svcRows) ? svcRows : []).map((s: any) => [String(s.id), s.image_url || null])

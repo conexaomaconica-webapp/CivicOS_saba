@@ -4935,22 +4935,53 @@ function BusinessDetailModal({
                               <MobileFormattedText content={svc.description} className="service-card-desc" />
                             )}
                             {svc.image_url && (
-                              <div
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setZoomedPerson({
+                                    url: svc.image_url!,
+                                    name: serviceTitle,
+                                    subtitle: priceLabel,
+                                  })
+                                }
                                 style={{
                                   marginTop: 8,
+                                  width: '100%',
+                                  padding: 4,
                                   borderRadius: 12,
                                   overflow: 'hidden',
                                   border: '1px solid #e1d5c5',
-                                  background: '#f5f0e6',
+                                  background: '#faf7f2',
+                                  cursor: 'pointer',
+                                  position: 'relative',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
                                 }}
+                                title="Toque para ampliar a imagem do serviço"
                               >
                                 <img
                                   src={svc.image_url}
                                   alt={serviceTitle}
                                   loading="lazy"
-                                  style={{ width: '100%', maxHeight: 220, objectFit: 'cover', display: 'block' }}
+                                  style={{ width: '100%', height: 'auto', maxHeight: 340, objectFit: 'contain', display: 'block', borderRadius: 8 }}
                                 />
-                              </div>
+                                <span
+                                  style={{
+                                    position: 'absolute',
+                                    bottom: 10,
+                                    right: 10,
+                                    background: 'rgba(20, 10, 12, 0.78)',
+                                    color: '#fff',
+                                    fontSize: '.68rem',
+                                    fontWeight: 700,
+                                    padding: '3px 8px',
+                                    borderRadius: 8,
+                                  }}
+                                >
+                                  🔍 Ampliar
+                                </span>
+                              </button>
                             )}
                             {waUrl && (
                               <a
@@ -5214,6 +5245,111 @@ function BusinessDetailModal({
                     </div>
                   );
                 })()}
+
+                {/* 7B. EVENTOS DA EMPRESA */}
+                {(detail.events || []).length > 0 && (
+                  <div id="section-eventos-empresa" className="detail-section-block">
+                    <h3 className="detail-section-title">Eventos da Empresa</h3>
+                    <div className="services-grid-enhanced">
+                      {(detail.events || []).map((ev, idx) => {
+                        const startDate = ev.starts_at ? new Date(ev.starts_at) : null;
+                        const startLabel =
+                          startDate && !Number.isNaN(startDate.getTime())
+                            ? startDate.toLocaleString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : ev.starts_at || null;
+                        return (
+                          <div className="service-card-enhanced" key={ev.id || `ev-${idx}`}>
+                            {ev.cover_image_url && (
+                              <div
+                                style={{
+                                  marginBottom: 8,
+                                  borderRadius: 10,
+                                  overflow: 'hidden',
+                                  border: '1px solid #e1d5c5',
+                                  background: '#faf7f2',
+                                }}
+                              >
+                                <img
+                                  src={ev.cover_image_url}
+                                  alt={ev.title}
+                                  loading="lazy"
+                                  style={{ width: '100%', height: 'auto', maxHeight: 240, objectFit: 'contain', display: 'block' }}
+                                />
+                              </div>
+                            )}
+                            <h4 className="service-card-title">{ev.title}</h4>
+                            {startLabel && (
+                              <div style={{ fontSize: '.76rem', fontWeight: 700, color: '#4b161b', marginTop: 4 }}>
+                                📅 {startLabel}
+                              </div>
+                            )}
+                            {ev.location_name && (
+                              <div style={{ fontSize: '.76rem', color: '#685950', marginTop: 2 }}>
+                                📍 {ev.location_name}
+                              </div>
+                            )}
+                            {ev.description && (
+                              <p className="service-card-desc" style={{ whiteSpace: 'pre-line', marginTop: 6 }}>
+                                {ev.description}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 7C. PUBLICAÇÕES & NOVIDADES DA EMPRESA */}
+                {(detail.posts || []).length > 0 && (
+                  <div id="section-publicacoes-empresa" className="detail-section-block">
+                    <h3 className="detail-section-title">Publicações &amp; Novidades</h3>
+                    <div className="services-grid-enhanced">
+                      {(detail.posts || []).map((post, idx) => {
+                        const pubDate = post.published_at ? new Date(post.published_at) : null;
+                        const pubLabel =
+                          pubDate && !Number.isNaN(pubDate.getTime())
+                            ? pubDate.toLocaleDateString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              })
+                            : post.published_at || null;
+                        return (
+                          <div className="service-card-enhanced" key={post.id || `post-${idx}`}>
+                            <div className="service-header-row">
+                              <h4 className="service-card-title">{post.title}</h4>
+                              {pubLabel && (
+                                <span
+                                  className="service-card-price"
+                                  style={{ background: '#f5f0e6', borderColor: '#e1d5c5', color: '#685950' }}
+                                >
+                                  {pubLabel}
+                                </span>
+                              )}
+                            </div>
+                            {post.summary && (
+                              <p style={{ margin: '6px 0 0', fontSize: '.82rem', fontWeight: 700, color: '#3b241d' }}>
+                                {post.summary}
+                              </p>
+                            )}
+                            {post.content && (
+                              <p className="service-card-desc" style={{ whiteSpace: 'pre-line', marginTop: 6 }}>
+                                {post.content}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* 8. COMENTÁRIOS E AVALIAÇÕES DA REDE */}
                 <div id="section-comentarios" className="detail-section-block">

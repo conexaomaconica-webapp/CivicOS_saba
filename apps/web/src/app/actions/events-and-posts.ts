@@ -1,12 +1,93 @@
 'use server';
 
+import { revalidatePath, revalidateTag } from 'next/cache';
+import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { getCanonicalDefaultLimit } from '@/lib/billing/plans-service';
+import type { Database } from '@/types/database.types';
 
 export interface ActionResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+async function resolveEventsPostsWriteContext(businessId: string) {
+  const supabase = await createServerSideClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { error: 'Usuário não autenticado.' };
+  }
+
+  let isPlatformAdmin = false;
+  try {
+    const { data: rpcIsAdmin } = await (supabase as any).rpc('has_platform_admin_access');
+    isPlatformAdmin = Boolean(rpcIsAdmin);
+  } catch {
+    isPlatformAdmin = false;
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const dbClient: any =
+    isPlatformAdmin && supabaseUrl && serviceRoleKey
+      ? createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false },
+        })
+      : supabase;
+
+  const { data: biz, error: bizError } = await dbClient
+    .from('businesses')
+    .select('id, slug, owner_id, tenant_id, plan_tier')
+    .eq('id', businessId)
+    .maybeSingle();
+
+  if (bizError || !biz) {
+    return { error: 'Empresa não encontrada.' };
+  }
+
+  let planCode: string | null = null;
+  try {
+    const { data: effPlan } = await dbClient.rpc('_effective_business_plan', {
+      p_tenant_id: biz.tenant_id,
+      p_business_id: biz.id,
+    });
+    planCode = Array.isArray(effPlan) && effPlan[0]?.plan_code ? String(effPlan[0].plan_code) : null;
+  } catch {
+    planCode = null;
+  }
+
+  if (!planCode || planCode === 'none') {
+    const rawTier = String(biz.plan_tier || 'acacia').toLowerCase().trim();
+    planCode =
+      rawTier === 'acacia' || rawTier === 'acácia' || rawTier === 'ouro' || rawTier === 'ouro_founder'
+        ? 'acacia'
+        : rawTier === 'compasso' || rawTier === 'prata'
+          ? 'compasso'
+          : 'esquadro';
+  }
+
+  return {
+    dbClient,
+    user,
+    biz,
+    planCode,
+    isPlatformAdmin,
+  };
+}
+
+function revalidateBusinessEventsAndPostsPaths(businessId: string, slug?: string | null) {
+  revalidatePath(`/admin/empresas/${businessId}`);
+  if (slug) {
+    revalidatePath(`/guia/${slug}`);
+  }
+  revalidatePath('/guia/[slug]', 'page');
+  revalidatePath('/guia', 'layout');
+  revalidateTag('public-business-detail');
 }
 
 export async function getBusinessEntitlementQuotaAction(
@@ -89,51 +170,16 @@ export async function createBusinessEventAction(input: {
   publicationStatus?: 'draft' | 'published' | 'canceled' | 'archived';
 }): Promise<ActionResponse> {
   try {
-    const supabase = await createServerSideClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return { success: false, error: 'Usuário não autenticado.' };
+    const ctx = await resolveEventsPostsWriteContext(input.businessId);
+    if ('error' in ctx) {
+      return { success: false, error: ctx.error };
     }
-
-    // 1. Valida existência da empresa em businesses (tabela canônica)
-    const { data: biz, error: bizError } = await supabase
-      .from('businesses')
-      .select('id, owner_id, tenant_id')
-      .eq('id', input.businessId)
-      .single();
-
-    if (bizError || !biz) {
-      return { success: false, error: 'Empresa não encontrada.' };
-    }
-
-    // 2. Resolve plano efetivo sem fallback silencioso para bronze
-    const { data: effPlan, error: effErr } = await supabase.rpc('_effective_business_plan', {
-      p_tenant_id: input.tenantId,
-      p_business_id: input.businessId,
-    });
-
-    if (effErr || !effPlan || effPlan.length === 0) {
-      return {
-        success: false,
-        error: 'Empresa sem plano comercial ativo. Não é possível publicar eventos.',
-      };
-    }
-
-    const planCode = effPlan[0]?.plan_code;
-    if (!planCode) {
-      return {
-        success: false,
-        error: 'Empresa sem plano comercial ativo. Não é possível publicar eventos.',
-      };
-    }
+    const { dbClient, biz, planCode } = ctx;
+    const tenantId = biz.tenant_id || input.tenantId;
 
     // Se for alteração (update) de evento existente
     if (input.id) {
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from('business_events')
         .update({
           title: input.title,
@@ -156,14 +202,15 @@ export async function createBusinessEventAction(input: {
       if (error) {
         return { success: false, error: error.message };
       }
+      revalidateBusinessEventsAndPostsPaths(input.businessId, biz.slug);
       return { success: true, data };
     }
 
     // 3. Busca limite dinâmico em plan_entitlements
-    const { data: entitlement } = await supabase
+    const { data: entitlement } = await dbClient
       .from('plan_entitlements')
       .select('max_limit')
-      .eq('tenant_id', input.tenantId)
+      .eq('tenant_id', tenantId)
       .eq('plan_code', planCode)
       .eq('feature_code', 'events_limit')
       .maybeSingle();
@@ -180,10 +227,10 @@ export async function createBusinessEventAction(input: {
     // 4. Conta eventos publicados ativos para esta empresa (mesma semântica do trigger Postgres)
     const targetStatus = input.publicationStatus || 'published';
     if (targetStatus === 'published') {
-      const { count } = await supabase
+      const { count } = await dbClient
         .from('business_events')
         .select('id', { count: 'exact', head: true })
-        .eq('tenant_id', input.tenantId)
+        .eq('tenant_id', tenantId)
         .eq('business_id', input.businessId)
         .eq('is_active', true)
         .eq('publication_status', 'published');
@@ -205,10 +252,10 @@ export async function createBusinessEventAction(input: {
     }
 
     // 6. Insere registro do evento no Postgres
-    const { data, error } = await supabase
+    const { data, error } = await dbClient
       .from('business_events')
       .insert({
-        tenant_id: input.tenantId,
+        tenant_id: tenantId,
         business_id: input.businessId,
         title: input.title,
         description: input.description || null,
@@ -229,6 +276,7 @@ export async function createBusinessEventAction(input: {
       return { success: false, error: error.message };
     }
 
+    revalidateBusinessEventsAndPostsPaths(input.businessId, biz.slug);
     return { success: true, data };
   } catch (err) {
     return {
@@ -279,51 +327,16 @@ export async function createBusinessPostAction(input: {
   publicationStatus?: 'draft' | 'scheduled' | 'published' | 'archived';
 }): Promise<ActionResponse> {
   try {
-    const supabase = await createServerSideClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return { success: false, error: 'Usuário não autenticado.' };
+    const ctx = await resolveEventsPostsWriteContext(input.businessId);
+    if ('error' in ctx) {
+      return { success: false, error: ctx.error };
     }
-
-    // 1. Valida existência da empresa em businesses (tabela canônica)
-    const { data: biz, error: bizError } = await supabase
-      .from('businesses')
-      .select('id, owner_id, tenant_id')
-      .eq('id', input.businessId)
-      .single();
-
-    if (bizError || !biz) {
-      return { success: false, error: 'Empresa não encontrada.' };
-    }
-
-    // 2. Resolve plano efetivo sem fallback silencioso para bronze
-    const { data: effPlan, error: effErr } = await supabase.rpc('_effective_business_plan', {
-      p_tenant_id: input.tenantId,
-      p_business_id: input.businessId,
-    });
-
-    if (effErr || !effPlan || effPlan.length === 0) {
-      return {
-        success: false,
-        error: 'Empresa sem plano comercial ativo. Não é possível publicar novidades.',
-      };
-    }
-
-    const planCode = effPlan[0]?.plan_code;
-    if (!planCode) {
-      return {
-        success: false,
-        error: 'Empresa sem plano comercial ativo. Não é possível publicar novidades.',
-      };
-    }
+    const { dbClient, biz, planCode } = ctx;
+    const tenantId = biz.tenant_id || input.tenantId;
 
     // Se for alteração (update) de post existente
     if (input.id) {
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from('business_posts')
         .update({
           title: input.title,
@@ -342,14 +355,15 @@ export async function createBusinessPostAction(input: {
       if (error) {
         return { success: false, error: error.message };
       }
+      revalidateBusinessEventsAndPostsPaths(input.businessId, biz.slug);
       return { success: true, data };
     }
 
     // 3. Busca limite dinâmico em plan_entitlements
-    const { data: entitlement } = await supabase
+    const { data: entitlement } = await dbClient
       .from('plan_entitlements')
       .select('max_limit')
-      .eq('tenant_id', input.tenantId)
+      .eq('tenant_id', tenantId)
       .eq('plan_code', planCode)
       .eq('feature_code', 'posts_limit')
       .maybeSingle();
@@ -366,10 +380,10 @@ export async function createBusinessPostAction(input: {
     // 4. Conta posts publicados ativos para esta empresa (mesma semântica do trigger Postgres)
     const targetStatus = input.publicationStatus || 'published';
     if (targetStatus === 'published') {
-      const { count } = await supabase
+      const { count } = await dbClient
         .from('business_posts')
         .select('id', { count: 'exact', head: true })
-        .eq('tenant_id', input.tenantId)
+        .eq('tenant_id', tenantId)
         .eq('business_id', input.businessId)
         .eq('is_active', true)
         .eq('publication_status', 'published');
@@ -382,10 +396,10 @@ export async function createBusinessPostAction(input: {
       }
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await dbClient
       .from('business_posts')
       .insert({
-        tenant_id: input.tenantId,
+        tenant_id: tenantId,
         business_id: input.businessId,
         title: input.title,
         summary: input.summary || null,
@@ -402,6 +416,7 @@ export async function createBusinessPostAction(input: {
       return { success: false, error: error.message };
     }
 
+    revalidateBusinessEventsAndPostsPaths(input.businessId, biz.slug);
     return { success: true, data };
   } catch (err) {
     return {
@@ -445,8 +460,12 @@ export const upsertBusinessPostAction = createBusinessPostAction;
 
 export async function deleteBusinessEventAction(input: { eventId: string; businessId: string }): Promise<ActionResponse> {
   try {
-    const supabase = await createServerSideClient();
-    const { error } = await supabase
+    const ctx = await resolveEventsPostsWriteContext(input.businessId);
+    if ('error' in ctx) {
+      return { success: false, error: ctx.error };
+    }
+    const { dbClient, biz } = ctx;
+    const { error } = await dbClient
       .from('business_events')
       .delete()
       .eq('id', input.eventId)
@@ -455,6 +474,7 @@ export async function deleteBusinessEventAction(input: { eventId: string; busine
     if (error) {
       return { success: false, error: error.message };
     }
+    revalidateBusinessEventsAndPostsPaths(input.businessId, biz.slug);
     return { success: true };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Erro ao excluir evento.' };
@@ -463,8 +483,12 @@ export async function deleteBusinessEventAction(input: { eventId: string; busine
 
 export async function deleteBusinessPostAction(input: { postId: string; businessId: string }): Promise<ActionResponse> {
   try {
-    const supabase = await createServerSideClient();
-    const { error } = await supabase
+    const ctx = await resolveEventsPostsWriteContext(input.businessId);
+    if ('error' in ctx) {
+      return { success: false, error: ctx.error };
+    }
+    const { dbClient, biz } = ctx;
+    const { error } = await dbClient
       .from('business_posts')
       .delete()
       .eq('id', input.postId)
@@ -473,6 +497,7 @@ export async function deleteBusinessPostAction(input: { postId: string; business
     if (error) {
       return { success: false, error: error.message };
     }
+    revalidateBusinessEventsAndPostsPaths(input.businessId, biz.slug);
     return { success: true };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Erro ao excluir publicação.' };

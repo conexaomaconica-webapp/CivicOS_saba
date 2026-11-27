@@ -570,11 +570,11 @@ export function toPublicBusinessPresentation(
             id: text(item.id, 64) ?? `evt-${Math.random()}`,
             title,
             description: text(item.description, 2000),
-            startDate: text(item.start_date, 64),
-            endDate: text(item.end_date, 64),
-            location: text(item.location, 180),
-            imageUrl: text(item.image_url, 512),
-            externalUrl: text(item.external_url, 512),
+            startDate: text(item.start_date ?? item.starts_at, 64),
+            endDate: text(item.end_date ?? item.ends_at, 64),
+            location: text(item.location ?? item.location_name ?? item.address, 180),
+            imageUrl: text(item.image_url ?? item.cover_image_url, 1000),
+            externalUrl: text(item.external_url ?? item.external_ticket_url, 1000),
           };
         })
         .filter((item): item is PublicBusinessEvent => item !== null)
@@ -592,8 +592,8 @@ export function toPublicBusinessPresentation(
             title,
             content: text(item.content, 4000),
             summary: text(item.summary, 500),
-            publishedAt: text(item.published_at, 64),
-            imageUrl: text(item.image_url, 512),
+            publishedAt: text(item.published_at ?? item.created_at, 64),
+            imageUrl: text(item.image_url ?? item.cover_image_url, 1000),
           };
         })
         .filter((item): item is PublicBusinessPost => item !== null)

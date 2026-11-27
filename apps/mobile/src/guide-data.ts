@@ -479,6 +479,26 @@ export type MobileInstitutionalRecognition = {
   priority_order?: number;
 };
 
+export type MobileBusinessEvent = {
+  id: string;
+  title: string;
+  description?: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  location_name?: string | null;
+  cover_image_url?: string | null;
+  external_ticket_url?: string | null;
+};
+
+export type MobileBusinessPost = {
+  id: string;
+  title: string;
+  summary?: string | null;
+  content?: string | null;
+  published_at?: string | null;
+  cover_image_url?: string | null;
+};
+
 export type MobileBusinessDetail = {
   business_id: string;
   business_name: string;
@@ -532,6 +552,8 @@ export type MobileBusinessDetail = {
     image_url?: string | null;
   }>;
   benefits: MobileBusinessBenefit[];
+  events?: MobileBusinessEvent[];
+  posts?: MobileBusinessPost[];
   recognitions?: MobileInstitutionalRecognition[];
   certifications?: Array<{ id: string; url: string; zoom_percent?: number }>;
 };
@@ -822,6 +844,69 @@ export async function loadBusinessDetailFromDirectSupabase(
                   : null,
             } as MobileBusinessBenefit;
           })
+        : [],
+      events: Array.isArray(b.events)
+        ? b.events
+            .filter((ev: Record<string, unknown>) => Boolean(ev && (ev.title || ev.name)))
+            .map((ev: Record<string, unknown>) => ({
+              id: String(ev?.id || ''),
+              title: String(ev?.title || ev?.name || 'Evento'),
+              description: typeof ev?.description === 'string' ? ev.description : null,
+              starts_at:
+                typeof ev?.starts_at === 'string'
+                  ? ev.starts_at
+                  : typeof ev?.start_date === 'string'
+                    ? ev.start_date
+                    : null,
+              ends_at:
+                typeof ev?.ends_at === 'string'
+                  ? ev.ends_at
+                  : typeof ev?.end_date === 'string'
+                    ? ev.end_date
+                    : null,
+              location_name:
+                typeof ev?.location_name === 'string'
+                  ? ev.location_name
+                  : typeof ev?.location === 'string'
+                    ? ev.location
+                    : typeof ev?.address === 'string'
+                      ? ev.address
+                      : null,
+              cover_image_url:
+                typeof ev?.cover_image_url === 'string'
+                  ? ev.cover_image_url
+                  : typeof ev?.image_url === 'string'
+                    ? ev.image_url
+                    : null,
+              external_ticket_url:
+                typeof ev?.external_ticket_url === 'string'
+                  ? ev.external_ticket_url
+                  : typeof ev?.external_url === 'string'
+                    ? ev.external_url
+                    : null,
+            }))
+        : [],
+      posts: Array.isArray(b.posts)
+        ? b.posts
+            .filter((p: Record<string, unknown>) => Boolean(p && p.title))
+            .map((p: Record<string, unknown>) => ({
+              id: String(p?.id || ''),
+              title: String(p?.title || 'Publicação'),
+              summary: typeof p?.summary === 'string' ? p.summary : null,
+              content: typeof p?.content === 'string' ? p.content : null,
+              published_at:
+                typeof p?.published_at === 'string'
+                  ? p.published_at
+                  : typeof p?.created_at === 'string'
+                    ? p.created_at
+                    : null,
+              cover_image_url:
+                typeof p?.cover_image_url === 'string'
+                  ? p.cover_image_url
+                  : typeof p?.image_url === 'string'
+                    ? p.image_url
+                    : null,
+            }))
         : [],
       certifications: Array.isArray(b.certifications)
         ? b.certifications.filter((c: Record<string, unknown>) => typeof c?.url === 'string' && c.url)

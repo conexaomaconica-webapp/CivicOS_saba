@@ -43,7 +43,9 @@ import {
   Copy,
   Rocket,
   X,
+  ZoomIn,
 } from 'lucide-react';
+import { ImageZoomModal } from '@/components/public/business/shared/ImageZoomModal';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { FormattedText } from '@/components/ui/formatted-text';
 import {
@@ -1003,6 +1005,7 @@ export default function Company360Client({ initialData }: Props) {
   const [servicePrice, setServicePrice] = useState('');
   const [serviceImageUrl, setServiceImageUrl] = useState('');
   const [uploadingServiceImage, setUploadingServiceImage] = useState(false);
+  const [previewServiceImage, setPreviewServiceImage] = useState<{ url: string; title: string } | null>(null);
 
   // Modal de Benefício Fraterno
   const [showBenefitModal, setShowBenefitModal] = useState(false);
@@ -4340,7 +4343,7 @@ export default function Company360Client({ initialData }: Props) {
                 Nenhum serviço cadastrado para este anunciante.
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                 {data.services_items.map((svc, svcIndex) => (
                   <div
                     key={svc.id}
@@ -4373,13 +4376,21 @@ export default function Company360Client({ initialData }: Props) {
                     )}
 
                     {svc.image_url && (
-                      <div className="w-full overflow-hidden rounded-xl border border-stone-200 bg-stone-100">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewServiceImage({ url: svc.image_url!, title: svc.name })}
+                        className="group relative w-full overflow-hidden rounded-xl border border-stone-200 bg-stone-50 cursor-pointer flex items-center justify-center p-1"
+                        title="Clique para ampliar a imagem do serviço"
+                      >
                         <img
                           src={svc.image_url}
                           alt={svc.name}
-                          className="w-full max-h-44 object-cover"
+                          className="w-full h-auto max-h-80 object-contain rounded-lg transition-transform duration-300 group-hover:scale-[1.01]"
                         />
-                      </div>
+                        <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-lg bg-black/70 px-2 py-1 text-[10px] font-bold text-white shadow-sm opacity-90 group-hover:opacity-100">
+                          <ZoomIn className="w-3 h-3" /> Ampliar
+                        </span>
+                      </button>
                     )}
 
                     <div className="flex items-center justify-between pt-2 border-t border-stone-200">
@@ -5895,9 +5906,17 @@ export default function Company360Client({ initialData }: Props) {
                     )}
                   </div>
                   {serviceImageUrl && (
-                    <div className="w-full max-h-44 overflow-hidden rounded-xl border border-stone-200 bg-stone-100">
-                      <img src={serviceImageUrl} alt="Preview do serviço" className="w-full max-h-44 object-cover" />
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewServiceImage({ url: serviceImageUrl, title: serviceName || 'Imagem do Serviço' })}
+                      className="group relative w-full overflow-hidden rounded-xl border border-stone-200 bg-stone-50 cursor-pointer flex items-center justify-center p-1"
+                      title="Clique para ampliar a imagem"
+                    >
+                      <img src={serviceImageUrl} alt="Preview do serviço" className="w-full h-auto max-h-72 object-contain rounded-lg" />
+                      <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-lg bg-black/70 px-2 py-1 text-[10px] font-bold text-white shadow-sm">
+                        <ZoomIn className="w-3 h-3" /> Ampliar
+                      </span>
+                    </button>
                   )}
                 </div>
               </div>
@@ -6888,6 +6907,15 @@ export default function Company360Client({ initialData }: Props) {
           </div>
         </div>
       )}
+
+      <ImageZoomModal
+        isOpen={Boolean(previewServiceImage)}
+        onClose={() => setPreviewServiceImage(null)}
+        imageUrl={previewServiceImage?.url || ''}
+        altText={previewServiceImage?.title || 'Imagem do serviço'}
+        title={previewServiceImage?.title || 'Serviço'}
+        badge="Banner / Imagem do Serviço"
+      />
     </div>
   );
 }

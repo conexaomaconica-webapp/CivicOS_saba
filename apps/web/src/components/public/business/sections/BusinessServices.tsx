@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Briefcase, CheckCircle2, X, ZoomIn } from 'lucide-react';
+import { Briefcase, CheckCircle2, ZoomIn } from 'lucide-react';
 import type { PublicBusinessService } from '@/lib/business/public-business-presentation';
 import { FormattedText } from '@/components/ui/formatted-text';
+import { ImageZoomModal } from '../shared/ImageZoomModal';
 
 type BusinessServicesProps = {
   services: PublicBusinessService[];
@@ -27,7 +28,7 @@ export function BusinessServices({
         </h2>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
         {services.map((service, index) => (
           <div
             key={service.id || index}
@@ -65,16 +66,16 @@ export function BusinessServices({
               <button
                 type="button"
                 onClick={() => setPreviewImage({ url: service.imageUrl!, title: service.name })}
-                className="group relative w-full overflow-hidden rounded-xl border border-stone-200 bg-stone-100 cursor-pointer text-left"
+                className="group relative w-full overflow-hidden rounded-xl border border-stone-200 bg-stone-50 cursor-pointer flex items-center justify-center p-1"
                 title="Clique para ampliar a imagem do serviço"
               >
                 <img
                   src={service.imageUrl}
                   alt={service.name}
                   loading="lazy"
-                  className="w-full max-h-56 object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                  className="w-full h-auto max-h-96 object-contain rounded-lg transition-transform duration-300 group-hover:scale-[1.01]"
                 />
-                <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-lg bg-black/65 px-2 py-1 text-[10px] font-bold text-white opacity-90 group-hover:opacity-100">
+                <span className="absolute bottom-2.5 right-2.5 inline-flex items-center gap-1 rounded-lg bg-black/70 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm opacity-90 group-hover:opacity-100">
                   <ZoomIn className="w-3 h-3" /> Ampliar
                 </span>
               </button>
@@ -83,33 +84,14 @@ export function BusinessServices({
         ))}
       </div>
 
-      {previewImage && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={previewImage.title}
-          onClick={() => setPreviewImage(null)}
-        >
-          <div
-            className="relative max-w-3xl w-full max-h-[90vh] flex flex-col items-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => setPreviewImage(null)}
-              className="self-end mb-2 inline-flex items-center gap-1 rounded-full bg-white/15 hover:bg-white/25 px-3 py-1.5 text-xs font-bold text-white cursor-pointer"
-            >
-              <X className="w-4 h-4" /> Fechar
-            </button>
-            <img
-              src={previewImage.url}
-              alt={previewImage.title}
-              className="max-h-[82vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl bg-stone-950"
-            />
-          </div>
-        </div>
-      )}
+      <ImageZoomModal
+        isOpen={Boolean(previewImage)}
+        onClose={() => setPreviewImage(null)}
+        imageUrl={previewImage?.url || ''}
+        altText={previewImage?.title || 'Imagem do serviço'}
+        title={previewImage?.title || 'Serviço'}
+        badge="Banner / Imagem do Serviço"
+      />
     </section>
   );
 }

@@ -50,10 +50,11 @@ export function ImageZoomModal({
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-stone-900/90 hover:bg-[#3B0B14] text-stone-300 hover:text-[#C9A227] flex items-center justify-center transition-all cursor-pointer shadow-lg border border-[#C9A227]/30"
+          className="absolute top-3 right-3 z-20 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#3B0B14] hover:bg-[#C9A227] text-[#F3EEDD] hover:text-stone-950 font-bold text-xs transition-all cursor-pointer shadow-xl border border-[#C9A227]/60"
           aria-label="Fechar"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
+          <span>Fechar</span>
         </button>
 
         {/* Container da Imagem */}
@@ -69,15 +70,26 @@ export function ImageZoomModal({
         </div>
 
         {/* Rodapé Informativo */}
-        {!imageOnly && <div className="mt-4 text-center space-y-1">
-          {title && (
-            <h4 className="font-serif font-bold text-base text-[#F3EEDD] tracking-tight">{title}</h4>
-          )}
-          <div className="flex items-center justify-center gap-1.5 text-xs text-[#C9A227] font-medium">
-            <ShieldCheck className="w-4 h-4 shrink-0 text-[#C9A227]" />
-            <span>{badge} — Plataforma Conexão Maçônica</span>
+        {!imageOnly && (
+          <div className="mt-4 w-full flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="text-center sm:text-left space-y-0.5">
+              {title && (
+                <h4 className="font-serif font-bold text-base text-[#F3EEDD] tracking-tight">{title}</h4>
+              )}
+              <div className="flex items-center justify-center sm:justify-start gap-1.5 text-xs text-[#C9A227] font-medium">
+                <ShieldCheck className="w-4 h-4 shrink-0 text-[#C9A227]" />
+                <span>{badge} — Plataforma Conexão Maçônica</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-[#F3EEDD] border border-[#C9A227]/40 font-bold text-xs cursor-pointer transition-colors shrink-0"
+            >
+              Fechar visualização
+            </button>
           </div>
-        </div>}
+        )}
       </div>
     </div>,
     document.body,

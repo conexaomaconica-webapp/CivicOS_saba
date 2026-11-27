@@ -17,7 +17,9 @@ import {
   X,
   ArrowUp,
   ArrowDown,
+  ZoomIn,
 } from 'lucide-react';
+import { ImageZoomModal } from '@/components/public/business/shared/ImageZoomModal';
 import {
   AdvertiserContentDTO,
   AdvertiserServiceItem,
@@ -40,6 +42,7 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -250,7 +253,7 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
         </div>
       ) : (
         /* LISTA DE SERVIÇOS EM CARDS */
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           {services.map((srv, srvIndex) => (
             <div
               key={srv.id}
@@ -287,9 +290,17 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
                 )}
 
                 {srv.image_url && (
-                  <div className="w-full overflow-hidden rounded-xl border border-stone-200 bg-stone-100 mt-2">
-                    <img src={srv.image_url} alt={srv.title} className="w-full max-h-44 object-cover" />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewImage({ url: srv.image_url!, title: srv.title })}
+                    className="group relative w-full overflow-hidden rounded-xl border border-stone-200 bg-stone-50 mt-2 cursor-pointer flex items-center justify-center p-1"
+                    title="Clique para ampliar a imagem do serviço"
+                  >
+                    <img src={srv.image_url} alt={srv.title} className="w-full h-auto max-h-80 object-contain rounded-lg" />
+                    <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-lg bg-black/70 px-2 py-1 text-[10px] font-bold text-white shadow-sm">
+                      <ZoomIn className="w-3 h-3" /> Ampliar
+                    </span>
+                  </button>
                 )}
               </div>
 
@@ -448,6 +459,14 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
           </div>
         </div>
       )}
+      <ImageZoomModal
+        isOpen={Boolean(previewImage)}
+        onClose={() => setPreviewImage(null)}
+        imageUrl={previewImage?.url || ''}
+        altText={previewImage?.title || 'Imagem do serviço'}
+        title={previewImage?.title || 'Serviço'}
+        badge="Banner / Imagem do Serviço"
+      />
     </div>
   );
 }

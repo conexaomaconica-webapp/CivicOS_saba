@@ -98,7 +98,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
         }
 
         if (bizId) {
-          const [{ data: resp }, { data: link }, { data: attrRows }, { data: svcExtra }, { data: benExtra }] = await Promise.all([
+          const [{ data: resp }, { data: link }, { data: attrRows }, { data: svcExtra }, { data: benExtra }, { data: eventsExtra }, { data: postsExtra }] = await Promise.all([
             (dbReader as any)
               .from('business_responsibles')
               .select('name, business_role, community_label, organization, whatsapp, avatar_url')
@@ -123,7 +123,29 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
               .select('id, external_url, discount_percentage')
               .eq('business_id', bizId)
               .eq('is_active', true),
+            (dbReader as any)
+              .from('business_events')
+              .select('id, title, description, starts_at, ends_at, location_name, address, cover_image_url, external_ticket_url, publication_status, is_active')
+              .eq('business_id', bizId)
+              .eq('is_active', true)
+              .eq('publication_status', 'published')
+              .order('starts_at', { ascending: false }),
+            (dbReader as any)
+              .from('business_posts')
+              .select('id, title, summary, content, cover_image_url, published_at, created_at, publication_status, is_active')
+              .eq('business_id', bizId)
+              .eq('is_active', true)
+              .eq('publication_status', 'published')
+              .order('published_at', { ascending: false })
+              .order('created_at', { ascending: false }),
           ]);
+
+          if (Array.isArray(eventsExtra)) {
+            detailObj.events = eventsExtra;
+          }
+          if (Array.isArray(postsExtra)) {
+            detailObj.posts = postsExtra;
+          }
 
           if (Array.isArray(detailObj.services) && Array.isArray(svcExtra)) {
             const svcImgById = new Map(svcExtra.map((s: any) => [String(s.id), s.image_url || null]));
@@ -400,6 +422,8 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
       { data: hoursRows },
       { data: attrRows },
       { data: certRows },
+      { data: eventsRows },
+      { data: postsRows },
     ] = await Promise.all([
       (dbReader as any).from('business_media').select('*').eq('business_id', bizId).order('display_order', { ascending: true }),
       (dbReader as any).from('business_services').select('*').eq('business_id', bizId).eq('is_active', true).order('display_order', { ascending: true }).order('created_at', { ascending: true }).order('id', { ascending: true }),
@@ -414,6 +438,8 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
       (dbReader as any).from('business_hours').select('*').eq('business_id', bizId),
       (dbReader as any).from('business_attributes').select('attribute_key, attribute_value').eq('business_id', bizId),
       (dbReader as any).from('business_certifications').select('id, image_url, display_order, zoom_percent').eq('business_id', bizId).order('display_order', { ascending: true }).order('created_at', { ascending: true }),
+      (dbReader as any).from('business_events').select('id, title, description, starts_at, ends_at, location_name, address, cover_image_url, external_ticket_url, publication_status, is_active').eq('business_id', bizId).eq('is_active', true).eq('publication_status', 'published').order('starts_at', { ascending: false }),
+      (dbReader as any).from('business_posts').select('id, title, summary, content, cover_image_url, published_at, created_at, publication_status, is_active').eq('business_id', bizId).eq('is_active', true).eq('publication_status', 'published').order('published_at', { ascending: false }).order('created_at', { ascending: false }),
     ]);
 
     let shortDescription: string | null = null;
@@ -543,6 +569,8 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
         badge_text: b.badge_text || b.benefit_type || 'Oferta Fraterna',
         external_url: b.external_url || null,
       })) as any,
+      events: (eventsRows || []) as any,
+      posts: (postsRows || []) as any,
       business_hours: (hoursRows || []) as any,
       responsible: responsibleObj as any,
       rating_average: null,
