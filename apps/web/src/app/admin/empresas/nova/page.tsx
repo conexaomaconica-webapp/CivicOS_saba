@@ -3,6 +3,11 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { resolveCanonicalAdminTenant } from '@/lib/admin/admin-tenant-context';
 import { getPedraFundamentalQuotaAction } from '@/app/actions/institutional-recognitions';
+import {
+  getCommercialCampaignByCode,
+  isCampaignWindowOpen,
+  PEDRA_FUNDAMENTAL_CAMPAIGN_CODE,
+} from '@/lib/commercial/campaign-availability-service';
 import AdvertiserCreateForm from './advertiser-create-form';
 
 export const metadata: Metadata = { title: 'Cadastrar anunciante', robots: { index: false, follow: false } };
@@ -10,7 +15,7 @@ export const metadata: Metadata = { title: 'Cadastrar anunciante', robots: { ind
 export default async function NewAdminAdvertiserPage() {
   const { supabase, tenantId: currentTenantId } = await resolveCanonicalAdminTenant();
 
-  const [{ data: categories }, { data: planRows }, { count: pedraCount }, quotaRes] = await Promise.all([
+  const [{ data: categories }, { data: planRows }, { count: pedraCount }, quotaRes, pedraCampaign] = await Promise.all([
     (supabase as any).from('categories').select('id, name').eq('is_active', true).order('display_order'),
     (supabase as any).from('plan_payment_rules').select('plan_code, title, amount_cents').order('amount_cents'),
     (supabase as any)
@@ -19,7 +24,9 @@ export default async function NewAdminAdvertiserPage() {
       .eq('recognition_key', 'pedra_fundamental')
       .eq('is_active', true),
     getPedraFundamentalQuotaAction(),
+    getCommercialCampaignByCode(supabase, currentTenantId, PEDRA_FUNDAMENTAL_CAMPAIGN_CODE),
   ]);
+  const pedraCampaignOpen = isCampaignWindowOpen(pedraCampaign);
 
   // Lista canônica oficial dos 3 planos vigentes no Conexão Maçônica
   const CANONICAL_PLANS = [
@@ -53,6 +60,8 @@ export default async function NewAdminAdvertiserPage() {
         plans={plans}
         pedraFundamentalCount={pedraCount ?? 0}
         pedraFundamentalQuota={quotaRes?.quota || 50}
+        pedraCampaignStatus={pedraCampaign.status}
+        pedraCampaignOpen={pedraCampaignOpen}
       />
     </main>
   );

@@ -68,7 +68,7 @@ export function LandingHowItWorksSection() {
             <p className="text-xs text-stone-600">Cadastro rápido, seguro e sem burocracia.</p>
           </div>
           <Link
-            href="/anunciar/passo-1"
+            href="/anunciar"
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#5d1523] px-6 py-3 text-sm font-bold text-white shadow-md shadow-[#5d1523]/20 transition hover:bg-[#4B161B]"
           >
             <span>Iniciar cadastro da minha empresa</span>

@@ -462,6 +462,7 @@ export type MobileBusinessBenefit = {
   benefit_type?: string | null;
   badge_text?: string | null;
   valid_until?: string | null;
+  external_url?: string | null;
   rules?: string | null;
 };
 
@@ -528,6 +529,7 @@ export type MobileBusinessDetail = {
     description?: string;
     price?: number;
     price_info?: string | null;
+    image_url?: string | null;
   }>;
   benefits: MobileBusinessBenefit[];
   recognitions?: MobileInstitutionalRecognition[];
@@ -733,6 +735,10 @@ export async function loadBusinessDetailFromDirectSupabase(
       description: typeof s?.description === 'string' ? s.description : undefined,
       price: typeof s?.price === 'number' ? s.price : undefined,
       price_info: typeof s?.price_info === 'string' ? s.price_info : null,
+      image_url:
+        typeof s?.image_url === 'string' && s.image_url.trim()
+          ? s.image_url.trim()
+          : null,
     }));
 
     const rawMediaList = Array.isArray(b.media) ? b.media : [];
@@ -802,7 +808,21 @@ export async function loadBusinessDetailFromDirectSupabase(
       contacts: Array.isArray(b.contacts) ? b.contacts : [],
       media: Array.isArray(b.media) ? b.media : [],
       services: normalizedServices,
-      benefits: Array.isArray(b.benefits) ? b.benefits : [],
+      benefits: Array.isArray(b.benefits)
+        ? b.benefits.map((ben: Record<string, unknown>) => {
+            const rawPct = ben?.discount_percentage != null ? Number(ben.discount_percentage) : null;
+            return {
+              ...ben,
+              id: String(ben?.id || ''),
+              title: String(ben?.title || 'Benefício Exclusivo'),
+              discount_percentage: rawPct !== null && !Number.isNaN(rawPct) && rawPct > 0 ? rawPct : null,
+              external_url:
+                typeof ben?.external_url === 'string' && ben.external_url.trim()
+                  ? ben.external_url.trim()
+                  : null,
+            } as MobileBusinessBenefit;
+          })
+        : [],
       certifications: Array.isArray(b.certifications)
         ? b.certifications.filter((c: Record<string, unknown>) => typeof c?.url === 'string' && c.url)
         : [],
@@ -1207,7 +1227,8 @@ export async function loadBenefitsForBusinessesFromDirectSupabase(
             ? String((row as Record<string, unknown>).benefit_type)
             : null,
         discount_percentage:
-          (row as Record<string, unknown>).discount_percentage != null
+          (row as Record<string, unknown>).discount_percentage != null &&
+          Number((row as Record<string, unknown>).discount_percentage) > 0
             ? Number((row as Record<string, unknown>).discount_percentage)
             : null,
         badge_text:
@@ -1217,6 +1238,11 @@ export async function loadBenefitsForBusinessesFromDirectSupabase(
         valid_until:
           typeof (row as Record<string, unknown>).valid_until === 'string'
             ? String((row as Record<string, unknown>).valid_until)
+            : null,
+        external_url:
+          typeof (row as Record<string, unknown>).external_url === 'string' &&
+          String((row as Record<string, unknown>).external_url).trim()
+            ? String((row as Record<string, unknown>).external_url).trim()
             : null,
       });
     }
@@ -1379,4 +1405,74 @@ export function createMobileGuideService(
       return grouped;
     },
   };
+}
+
+function normalizeRelevanceText(value: string | null | undefined): string {
+  if (!value) return '';
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function getMobilePlanTieBreaker(item: MobileGuideSponsoredBusiness): number {
+  if (item.is_pedra_fundamental) return 0;
+  const raw = (item.plan_tier || '').toLowerCase().trim();
+  if (raw === 'acacia' || raw === 'ouro') return 1;
+  if (raw === 'compasso' || raw === 'prata') return 2;
+  if (raw === 'esquadro' || raw === 'bronze') return 3;
+  return 4;
+}
+
+export function getMobileSearchRelevanceScore(
+  item: MobileGuideSponsoredBusiness,
+  rawQuery: string,
+): number {
+  const normQ = normalizeRelevanceText(rawQuery);
+  if (!normQ) return 0;
+
+  const splitWords = (text: string) => text.split(/[\s\-_/.,;:()]+/).filter(Boolean);
+  const normName = normalizeRelevanceText(item.name);
+  if (normName) {
+    if (normName === normQ) return 0;
+    if (normName.startsWith(normQ)) return 1;
+    if (splitWords(normName).some((w) => w.startsWith(normQ))) return 2;
+    if (normName.includes(normQ)) return 3;
+  }
+
+  const normCat = normalizeRelevanceText(item.category_name);
+  if (normCat) {
+    if (normCat === normQ || normCat.startsWith(normQ)) return 4;
+    if (splitWords(normCat).some((w) => w.startsWith(normQ))) return 4.2;
+    if (normCat.includes(normQ)) return 4.4;
+  }
+
+  const secondary = [normalizeRelevanceText(item.description), normalizeRelevanceText(item.city)]
+    .filter(Boolean)
+    .join(' ');
+  if (secondary) {
+    if (splitWords(secondary).some((w) => w.startsWith(normQ))) return 5;
+    if (secondary.includes(normQ)) return 5.5;
+  }
+
+  return 6;
+}
+
+export function sortBusinessesBySearchRelevance(
+  list: MobileGuideSponsoredBusiness[],
+  rawQuery: string,
+): MobileGuideSponsoredBusiness[] {
+  const normQ = normalizeRelevanceText(rawQuery);
+  if (!normQ) return [...list];
+
+  return [...list].sort((a, b) => {
+    const scoreDiff = getMobileSearchRelevanceScore(a, normQ) - getMobileSearchRelevanceScore(b, normQ);
+    if (scoreDiff !== 0) return scoreDiff;
+
+    const planDiff = getMobilePlanTieBreaker(a) - getMobilePlanTieBreaker(b);
+    if (planDiff !== 0) return planDiff;
+
+    return a.name.localeCompare(b.name, 'pt-BR');
+  });
 }

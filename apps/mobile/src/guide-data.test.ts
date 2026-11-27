@@ -6,6 +6,7 @@ import {
   loadEventsFromDirectSupabase,
   mergeBusinessRecords,
   pickMainCategories,
+  sortBusinessesBySearchRelevance,
   MOBILE_MAIN_CATEGORIES_MAX,
   submitMobileEventRSVP,
 } from './guide-data';
@@ -334,5 +335,19 @@ describe('categorias principais da home do app', () => {
     }), { status: 200 }), 'https://isolated.test/api/mobile/guide');
     const data = await service.loadHome();
     expect(data.main_categories).toHaveLength(10);
+  });
+
+  it('ordena busca por relevância priorizando nome da empresa começando com o termo', () => {
+    const businesses = [
+      { id: '1', name: 'Comandos', slug: 'comandos', city: null, state: null, logo_url: null, cover_url: null, category_name: null, category_slug: null, is_featured: false, is_pedra_fundamental: true, plan_tier: 'acacia', description: 'Atendimento Douglas Ramos' },
+      { id: '2', name: 'DeltaPrev', slug: 'deltaprev', city: null, state: null, logo_url: null, cover_url: null, category_name: null, category_slug: null, is_featured: false, plan_tier: 'compasso', description: 'Douglas Ramos' },
+      { id: '3', name: 'AMO Clínica Veterinária', slug: 'amo-clinica', city: null, state: null, logo_url: null, cover_url: null, category_name: 'Serviços Veterinários', category_slug: 'servicos-veterinarios', is_featured: false, plan_tier: 'esquadro', description: null },
+    ];
+    const sorted = sortBusinessesBySearchRelevance(businesses, 'AMO');
+    expect(sorted.map((b) => b.name)).toEqual([
+      'AMO Clínica Veterinária',
+      'Comandos',
+      'DeltaPrev',
+    ]);
   });
 });

@@ -2,6 +2,7 @@
 
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 import { assertPlatformAdminAccess } from '@/lib/admin/admin-auth-helper';
+import { normalizeCategoryKey } from '@/lib/directory/category-dedup';
 import type { Database } from '@/types/database.types';
 
 export type AdminGuideCategory = {
@@ -117,6 +118,19 @@ export async function updateAdminGuideCategoryAction(
 
     const adminClient = createCategoryAdminClient();
     if (!adminClient) return { success: false, error: 'Configuração segura do Supabase indisponível.' };
+    const targetKey = normalizeCategoryKey(name);
+    const { data: existingList } = await adminClient
+      .from('categories')
+      .select('id, name')
+      .is('tenant_id', null)
+      .neq('id', input.id);
+    const duplicate = (existingList || []).find((c) => normalizeCategoryKey(c.name) === targetKey);
+    if (duplicate) {
+      return {
+        success: false,
+        error: `Já existe a categoria "${duplicate.name}" (com ou sem acento). Unifique na existente para evitar duplicidade.`,
+      };
+    }
     const { data, error } = await adminClient
       .from('categories')
       .update({ name, slug, icon: input.icon, is_active: input.isActive, updated_at: new Date().toISOString() })

@@ -1,6 +1,8 @@
 import React from 'react';
 import { getPlanEntitlementsAction } from '@/app/actions/plan-entitlements';
+import { getPedraFundamentalCampaignAdminStateAction } from '@/app/actions/commercial-campaigns';
 import { PlanEntitlementsManager } from '@/components/admin/PlanEntitlementsManager';
+import { PedraCampaignControlCard } from '@/components/admin/PedraCampaignControlCard';
 import { redirect } from 'next/navigation';
 
 export const metadata = {
@@ -8,7 +10,10 @@ export const metadata = {
 };
 
 export default async function AdminPlanosPage() {
-  const result = await getPlanEntitlementsAction();
+  const [result, campaignState] = await Promise.all([
+    getPlanEntitlementsAction(),
+    getPedraFundamentalCampaignAdminStateAction(),
+  ]);
 
   if (!result.success || !result.data) {
     if (result.error?.includes('não autenticado')) {
@@ -44,6 +49,13 @@ export default async function AdminPlanosPage() {
           Configure identidade, preços, desconto à vista, parcelamento, cotas e diferenciais dos planos <strong>Esquadro, Compasso e Acácia</strong>. As alterações alimentam diretamente o onboarding dos novos anunciantes.
         </p>
       </div>
+
+      {campaignState.success && campaignState.campaign && (
+        <PedraCampaignControlCard
+          initialCampaign={campaignState.campaign}
+          initialExceptions={campaignState.exceptions || []}
+        />
+      )}
 
       <PlanEntitlementsManager initialData={result.data} />
     </div>

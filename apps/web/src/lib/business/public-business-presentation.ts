@@ -84,6 +84,7 @@ export type PublicBusinessService = {
   description?: string | null;
   iconName?: string | null;
   priceInfo?: string | null;
+  imageUrl?: string | null;
 };
 
 export type PublicBusinessBenefit = {
@@ -97,6 +98,7 @@ export type PublicBusinessBenefit = {
   badgeText?: string | null;
   redeemInstructions?: string | null;
   validUntil?: string | null;
+  externalUrl?: string | null;
 };
 
 const BENEFIT_TYPE_LABELS: Record<string, string> = {
@@ -509,17 +511,19 @@ export function toPublicBusinessPresentation(
           const title = text(item.title, 140);
           const description = text(item.description, 2000);
           if (!title || !description) return null;
+          const rawDiscountPct = numeric(item.discount_percentage);
           return {
             id: text(item.id, 64) ?? undefined,
             title,
             description,
             benefitType: text(item.benefit_type, 40),
-            discountPercentage: numeric(item.discount_percentage),
+            discountPercentage: rawDiscountPct !== null && rawDiscountPct > 0 ? rawDiscountPct : null,
             discountAmount: numeric(item.discount_amount),
             discountCode: text(item.discount_code, 50),
             badgeText: text(item.badge_text, 40),
             redeemInstructions: text(item.redeem_instructions, 1000),
             validUntil: text(item.valid_until, 64),
+            externalUrl: text(item.external_url, 1000),
           };
         })
         .filter((item): item is PublicBusinessBenefit => item !== null)
@@ -538,6 +542,7 @@ export function toPublicBusinessPresentation(
         description: typeof item.description === 'string' && item.description.trim() ? cleanRichTextHtml(item.description).slice(0, 30000) || null : null,
         iconName: text(item.icon_name, 50),
         priceInfo: text(item.price_info, 80),
+        imageUrl: text(item.image_url, 1000),
       };
     })
     .filter((item): item is PublicBusinessService => item !== null)

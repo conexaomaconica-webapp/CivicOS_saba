@@ -347,7 +347,7 @@ export function DirectoryHeader({
 
           {/* Botão Anunciar Empresa */}
           <Link
-            href="/anunciar/passo-1"
+            href="/anunciar"
             className="hidden lg:flex items-center gap-1.5 bg-[#C9A227]/15 hover:bg-[#C9A227]/25 text-[#f3cf68] hover:text-white text-xs font-semibold px-3.5 py-1.5 rounded-full border border-[#C9A227]/50 shadow-sm transition-all"
           >
             <PlusCircle className="w-3.5 h-3.5" />
@@ -522,7 +522,7 @@ export function DirectoryHeader({
 
           <div className="pt-3 border-t border-white/10 flex flex-col gap-2.5">
             <Link
-              href="/anunciar/passo-1"
+              href="/anunciar"
               onClick={() => setMobileMenuOpen(false)}
               className="flex items-center justify-center gap-2 bg-[#C9A227]/15 hover:bg-[#C9A227]/25 text-[#f3cf68] text-xs font-semibold py-2.5 rounded-xl border border-[#C9A227]/50 w-full shadow-sm transition-all"
             >

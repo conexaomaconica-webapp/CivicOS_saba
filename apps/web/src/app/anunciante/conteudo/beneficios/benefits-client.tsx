@@ -39,6 +39,7 @@ export default function AdvertiserBenefitsClient({
   const [description, setDescription] = useState('');
   const [discountCondition, setDiscountCondition] = useState('');
   const [promoCode, setPromoCode] = useState('');
+  const [externalUrl, setExternalUrl] = useState('');
   const [expirationDate, setExpirationDate] = useState('31/12/2026');
 
   const [saving, setSaving] = useState(false);
@@ -50,8 +51,9 @@ export default function AdvertiserBenefitsClient({
     setEditingBenefit({});
     setTitle('');
     setDescription('');
-    setDiscountCondition('15% de Desconto Fraterno');
-    setPromoCode('FRATERNO15');
+    setDiscountCondition('');
+    setPromoCode('');
+    setExternalUrl('');
     setExpirationDate('31/12/2026');
     setIsModalOpen(true);
   };
@@ -62,6 +64,7 @@ export default function AdvertiserBenefitsClient({
     setDescription(ben.description);
     setDiscountCondition(ben.discount_condition || '');
     setPromoCode(ben.promo_code || '');
+    setExternalUrl(ben.external_url || '');
     setExpirationDate(ben.expiration_date || '31/12/2026');
     setIsModalOpen(true);
   };
@@ -76,8 +79,9 @@ export default function AdvertiserBenefitsClient({
       business_id: business.id,
       title,
       description,
-      discount_condition: discountCondition,
+      discount_condition: discountCondition || 'Condição Especial',
       promo_code: promoCode,
+      external_url: externalUrl,
       expiration_date: expirationDate,
     });
 
@@ -92,8 +96,9 @@ export default function AdvertiserBenefitsClient({
                   ...b,
                   title,
                   description,
-                  discount_condition: discountCondition,
+                  discount_condition: discountCondition || 'Condição Especial',
                   promo_code: promoCode,
+                  external_url: externalUrl,
                   status: 'published',
                   status_label: 'Publicado',
                 }
@@ -105,8 +110,9 @@ export default function AdvertiserBenefitsClient({
           id: `ben-${Date.now()}`,
           title,
           description,
-          discount_condition: discountCondition,
+          discount_condition: discountCondition || 'Condição Especial',
           promo_code: promoCode,
+          external_url: externalUrl,
           expiration_date: expirationDate,
           is_active: true,
           status: 'published',
@@ -294,27 +300,37 @@ export default function AdvertiserBenefitsClient({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="font-bold text-stone-800">Condição / Desconto</label>
+                  <label className="font-bold text-stone-800">Condição / Desconto (Opcional)</label>
                   <input
                     type="text"
                     value={discountCondition}
                     onChange={(e) => setDiscountCondition(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
-                    placeholder="Ex: 15% de desconto ou 1ª mensalidade grátis"
-                    required
+                    placeholder="Ex: Condição especial ou deixe em branco"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-bold text-stone-800">Código Promocional</label>
+                  <label className="font-bold text-stone-800">Código Promocional (Opcional)</label>
                   <input
                     type="text"
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium uppercase font-mono"
-                    placeholder="FRATERNO15"
+                    placeholder="Ex: FRATERNO"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-stone-800">Link clicável do benefício (Opcional)</label>
+                <input
+                  type="url"
+                  value={externalUrl}
+                  onChange={(e) => setExternalUrl(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium"
+                  placeholder="https://suaempresa.com.br/beneficio"
+                />
               </div>
 
               <div className="space-y-1">

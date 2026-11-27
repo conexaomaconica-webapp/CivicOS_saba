@@ -30,6 +30,7 @@ import { DirectoryConnectionsCta } from '@/components/public/directory/Directory
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
 import { resolveSearchQuery } from '@/lib/directory/normalize-search';
+import { sortBusinessesBySearchRelevance } from '@/lib/directory/search-relevance';
 
 export type GuiaHomeProps = {
   searchParams: Promise<{
@@ -273,6 +274,11 @@ export default async function GuiaHomePage({ searchParams }: Props) {
       total_pages: 1,
       has_next_page: false,
       has_previous_page: false,
+    };
+  } else if (q.trim() && sort === 'relevance' && Array.isArray(searchData.items)) {
+    searchData = {
+      ...searchData,
+      items: sortBusinessesBySearchRelevance(searchData.items, q),
     };
   }
 

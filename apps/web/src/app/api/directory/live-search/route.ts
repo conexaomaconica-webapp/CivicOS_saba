@@ -3,6 +3,7 @@ import { createServerSideClient } from '@/lib/supabase/server';
 import { resolveStrictDomainTenantId, getRequestHost } from '@/lib/tenant/tenant-policy';
 import { resolveSearchQuery } from '@/lib/directory/normalize-search';
 import { findBusinessesByMasonicMember } from '@/lib/directory/masonic-member-search';
+import { sortBusinessesBySearchRelevance } from '@/lib/directory/search-relevance';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -21,7 +22,8 @@ export async function GET(request: Request) {
 
     const resolvedQ = resolveSearchQuery(rawQ);
 
-    // 1. Executa busca padrão via RPC
+    // 1. Executa busca padrão via RPC (amplia janela quando há termo textual para ranquear relevância antes de cortar)
+    const rpcFetchLimit = rawQ ? Math.max(limit * 4, 24) : limit;
     let rpcItems: any[] = [];
     if (resolvedQ || city || cat) {
       const { data: rpcData } = await (supabase as any).rpc('public_businesses_search', {
@@ -30,7 +32,7 @@ export async function GET(request: Request) {
         p_city: city,
         p_category_slug: cat,
         p_page: 1,
-        p_page_size: limit,
+        p_page_size: rpcFetchLimit,
       });
 
       if (rpcData?.items && Array.isArray(rpcData.items)) {
@@ -106,9 +108,11 @@ export async function GET(request: Request) {
       }
     }
 
+    const ordered = rawQ ? sortBusinessesBySearchRelevance(merged, rawQ) : merged;
+
     return NextResponse.json({
-      items: merged.slice(0, limit),
-      total: merged.length,
+      items: ordered.slice(0, limit),
+      total: ordered.length,
     });
   } catch (error) {
     console.error('Erro no endpoint de live search:', error);

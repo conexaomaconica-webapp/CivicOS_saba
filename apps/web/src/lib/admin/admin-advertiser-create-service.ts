@@ -11,6 +11,11 @@ import {
   provisionAuthorizedMembership,
   type AuthorizedMembershipSource,
 } from './authorized-membership-provisioning';
+import {
+  PEDRA_FUNDAMENTAL_CAMPAIGN_CODE,
+  validateCampaignEnrollment,
+  type EnrollmentCheckResult,
+} from '@/lib/commercial/campaign-availability-service';
 
 function validateAdminDocument(document: string): string | null {
   const digits = sanitizeCnpj(document);
@@ -119,6 +124,25 @@ export async function createAdminAdvertiserAction(
     const adminClient = createClient<Database>(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+
+    let promoEnrollment: EnrollmentCheckResult | null = null;
+    if (isLaunchPromo) {
+      promoEnrollment = await validateCampaignEnrollment(adminClient, {
+        tenantId,
+        campaignCode: PEDRA_FUNDAMENTAL_CAMPAIGN_CODE,
+        targetDocument: cnpj,
+        targetEmail: responsibleEmail,
+        consumeSlot: true,
+      });
+      if (!promoEnrollment.allowed) {
+        return {
+          success: false,
+          error:
+            promoEnrollment.error ||
+            'A campanha Pedra Fundamental está encerrada para novas adesões sem exceção vinculada.',
+        };
+      }
+    }
 
     const existingProfile = await findInternalProfileByEmail(adminClient, responsibleEmail);
 
@@ -249,6 +273,10 @@ export async function createAdminAdvertiserAction(
           installments_count: promoInstallmentsCount,
           installment_amount_cents: promoInstallmentAmountCents,
           is_pedra_fundamental: true,
+          campaign_id: promoEnrollment?.campaign.id ?? null,
+          campaign_code: PEDRA_FUNDAMENTAL_CAMPAIGN_CODE,
+          contract_duration_months: promoEnrollment?.campaign.contractDurationMonths ?? 24,
+          campaign_exception_id: promoEnrollment?.exceptionId ?? null,
           notes: input.closingNotes?.trim() || null,
           status: 'conferido',
           conferred_at: new Date().toISOString(),

@@ -78,6 +78,7 @@ export async function createBusinessServiceAction(
     description?: string | null;
     iconName?: string | null;
     priceInfo?: string | null;
+    imageUrl?: string | null;
     isActive?: boolean;
     displayOrder?: number;
   }
@@ -93,6 +94,7 @@ export async function createBusinessServiceAction(
         description: payload.description?.trim() || null,
         icon_name: payload.iconName?.trim() || null,
         price_info: payload.priceInfo?.trim() || null,
+        image_url: payload.imageUrl?.trim() || null,
         is_active: payload.isActive ?? true,
         display_order: payload.displayOrder ?? 0,
       })
@@ -124,6 +126,7 @@ export async function updateBusinessServiceAction(
     description?: string | null;
     iconName?: string | null;
     priceInfo?: string | null;
+    imageUrl?: string | null;
     isActive?: boolean;
     displayOrder?: number;
   }
@@ -136,6 +139,7 @@ export async function updateBusinessServiceAction(
     if (payload.description !== undefined) updateData.description = payload.description?.trim() || null;
     if (payload.iconName !== undefined) updateData.icon_name = payload.iconName?.trim() || null;
     if (payload.priceInfo !== undefined) updateData.price_info = payload.priceInfo?.trim() || null;
+    if (payload.imageUrl !== undefined) updateData.image_url = payload.imageUrl?.trim() || null;
     if (payload.isActive !== undefined) updateData.is_active = payload.isActive;
     if (payload.displayOrder !== undefined) updateData.display_order = payload.displayOrder;
 
@@ -240,6 +244,7 @@ export async function createBusinessBenefitAction(
     discountCode?: string | null;
     badgeText?: string | null;
     redeemInstructions?: string | null;
+    externalUrl?: string | null;
     validFrom?: string | null;
     validUntil?: string | null;
     isActive?: boolean;
@@ -248,6 +253,10 @@ export async function createBusinessBenefitAction(
 ): Promise<ActionResult> {
   try {
     const { supabase } = await authorizeBusinessAccess(businessId);
+    const normalizedPct =
+      payload.discountPercentage != null && Number(payload.discountPercentage) > 0
+        ? Number(payload.discountPercentage)
+        : null;
 
     const { data, error } = await supabase
       .from('business_benefits')
@@ -255,12 +264,13 @@ export async function createBusinessBenefitAction(
         business_id: businessId,
         title: payload.title.trim(),
         description: payload.description.trim(),
-        benefit_type: payload.benefitType?.trim() || 'discount',
-        discount_percentage: payload.discountPercentage ?? null,
+        benefit_type: payload.benefitType?.trim() || 'special_condition',
+        discount_percentage: normalizedPct,
         discount_amount: payload.discountAmount ?? null,
         discount_code: payload.discountCode?.trim() || null,
         badge_text: payload.badgeText?.trim() || null,
         redeem_instructions: payload.redeemInstructions?.trim() || null,
+        external_url: payload.externalUrl?.trim() || null,
         valid_from: payload.validFrom || new Date().toISOString(),
         valid_until: payload.validUntil || null,
         is_active: payload.isActive ?? true,
@@ -298,6 +308,7 @@ export async function updateBusinessBenefitAction(
     discountCode?: string | null;
     badgeText?: string | null;
     redeemInstructions?: string | null;
+    externalUrl?: string | null;
     validFrom?: string | null;
     validUntil?: string | null;
     isActive?: boolean;
@@ -311,11 +322,17 @@ export async function updateBusinessBenefitAction(
     if (payload.title !== undefined) updateData.title = payload.title.trim();
     if (payload.description !== undefined) updateData.description = payload.description.trim();
     if (payload.benefitType !== undefined) updateData.benefit_type = payload.benefitType;
-    if (payload.discountPercentage !== undefined) updateData.discount_percentage = payload.discountPercentage;
+    if (payload.discountPercentage !== undefined) {
+      updateData.discount_percentage =
+        payload.discountPercentage != null && Number(payload.discountPercentage) > 0
+          ? Number(payload.discountPercentage)
+          : null;
+    }
     if (payload.discountAmount !== undefined) updateData.discount_amount = payload.discountAmount;
     if (payload.discountCode !== undefined) updateData.discount_code = payload.discountCode?.trim() || null;
     if (payload.badgeText !== undefined) updateData.badge_text = payload.badgeText?.trim() || null;
     if (payload.redeemInstructions !== undefined) updateData.redeem_instructions = payload.redeemInstructions?.trim() || null;
+    if (payload.externalUrl !== undefined) updateData.external_url = payload.externalUrl?.trim() || null;
     if (payload.validFrom !== undefined) updateData.valid_from = payload.validFrom;
     if (payload.validUntil !== undefined) updateData.valid_until = payload.validUntil;
     if (payload.isActive !== undefined) updateData.is_active = payload.isActive;

@@ -54,7 +54,7 @@ export default async function PublicBenefitsDirectoryPage({ searchParams }: Prop
   if (businessIds.length > 0) {
     const { data: benefitRows } = await (supabase as any)
       .from('business_benefits')
-      .select('id, business_id, title, description, benefit_type, discount_percentage, badge_text, valid_until')
+      .select('id, business_id, title, description, benefit_type, discount_percentage, badge_text, valid_until, external_url')
       .in('business_id', businessIds)
       .eq('status', 'active')
       .order('display_order', { ascending: true });
@@ -63,14 +63,16 @@ export default async function PublicBenefitsDirectoryPage({ searchParams }: Prop
       const bizId = String(row.business_id || '');
       if (!bizId) continue;
       const list = benefitsByBusiness.get(bizId) || [];
+      const pct = row.discount_percentage != null ? Number(row.discount_percentage) : null;
       list.push({
         id: String(row.id),
         title: String(row.title || 'Benefício Exclusivo'),
         description: String(row.description || ''),
         benefitType: row.benefit_type ? String(row.benefit_type) : 'special_condition',
-        discountPercentage: row.discount_percentage != null ? Number(row.discount_percentage) : null,
+        discountPercentage: pct !== null && pct > 0 ? pct : null,
         badgeText: row.badge_text ? String(row.badge_text) : null,
         validUntil: row.valid_until ? String(row.valid_until) : null,
+        externalUrl: row.external_url ? String(row.external_url) : null,
       });
       benefitsByBusiness.set(bizId, list);
     }

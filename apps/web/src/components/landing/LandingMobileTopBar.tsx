@@ -175,7 +175,7 @@ export function LandingMobileTopBar() {
         </Link>
         <div className="flex items-center gap-1.5">
           <Link
-            href="/anunciar/passo-1"
+            href="/anunciar"
             className="rounded-lg border border-[#c9a227]/50 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-[#f3eedd] transition active:scale-95"
           >
             ANUNCIAR

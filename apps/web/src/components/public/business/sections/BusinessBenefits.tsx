@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CalendarDays, Check, Download, Loader2, Sparkles, Tag, X } from 'lucide-react';
+import { CalendarDays, Check, Download, ExternalLink, Loader2, Sparkles, Tag, X } from 'lucide-react';
 import { formatBenefitBadgeLabel, type PublicBusinessBenefit } from '@/lib/business/public-business-presentation';
 import { redeemBenefitAction } from '@/lib/business/benefit-redemption-service';
 import { useBusinessAnalytics } from '@/components/public/business/BusinessContactTracker';
@@ -161,6 +161,18 @@ export function BusinessBenefits({ benefits, businessName, className = '' }: Bus
                 <p className="text-xs text-stone-200 leading-relaxed break-words">
                   {inPortuguese(benefit.description)}
                 </p>
+
+                {benefit.externalUrl && (
+                  <a
+                    href={/^https?:\/\//i.test(benefit.externalUrl) ? benefit.externalUrl : `https://${benefit.externalUrl}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[#E7C65D] hover:text-white underline underline-offset-4 transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                    <span>Acessar link do benefício</span>
+                  </a>
+                )}
               </div>
 
               {/* RODA PÉ DO CARD: BOTÃO RESGATAR & CÓDIGO */}

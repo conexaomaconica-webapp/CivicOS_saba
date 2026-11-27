@@ -98,7 +98,7 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
         }
 
         if (bizId) {
-          const [{ data: resp }, { data: link }, { data: attrRows }] = await Promise.all([
+          const [{ data: resp }, { data: link }, { data: attrRows }, { data: svcExtra }, { data: benExtra }] = await Promise.all([
             (dbReader as any)
               .from('business_responsibles')
               .select('name, business_role, community_label, organization, whatsapp, avatar_url')
@@ -113,7 +113,41 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
               .from('business_attributes')
               .select('attribute_key, attribute_value')
               .eq('business_id', bizId),
+            (dbReader as any)
+              .from('business_services')
+              .select('id, image_url')
+              .eq('business_id', bizId)
+              .eq('is_active', true),
+            (dbReader as any)
+              .from('business_benefits')
+              .select('id, external_url, discount_percentage')
+              .eq('business_id', bizId)
+              .eq('is_active', true),
           ]);
+
+          if (Array.isArray(detailObj.services) && Array.isArray(svcExtra)) {
+            const svcImgById = new Map(svcExtra.map((s: any) => [String(s.id), s.image_url || null]));
+            detailObj.services = detailObj.services.map((s: any) => ({
+              ...s,
+              image_url: s.image_url ?? svcImgById.get(String(s.id)) ?? null,
+            }));
+          }
+
+          if (Array.isArray(detailObj.benefits)) {
+            const benById = new Map<string, any>(
+              (Array.isArray(benExtra) ? benExtra : []).map((b: any) => [String(b.id), b])
+            );
+            detailObj.benefits = detailObj.benefits.map((b: any) => {
+              const extra: any = benById.get(String(b.id));
+              const rawPct = b.discount_percentage ?? extra?.discount_percentage ?? null;
+              const numPct = rawPct != null ? Number(rawPct) : null;
+              return {
+                ...b,
+                discount_percentage: numPct !== null && numPct > 0 ? numPct : null,
+                external_url: b.external_url ?? extra?.external_url ?? null,
+              };
+            });
+          }
 
           if (attrRows && Array.isArray(attrRows)) {
             for (const attr of attrRows) {
@@ -495,14 +529,19 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
         description: s.description,
         icon_name: s.icon_name || 'briefcase',
         price_info: s.price_info ? s.price_info.trim() : null,
+        image_url: s.image_url || null,
       })) as any,
       benefits: (benefitsRows || []).map((b: any) => ({
         id: b.id,
         title: b.title,
         description: b.description,
-        benefit_type: b.benefit_type || 'Desconto exclusivo',
-        discount_percentage: b.discount_percentage || 15,
-        badge_text: b.benefit_type || 'Oferta Fraterna',
+        benefit_type: b.benefit_type || 'special_condition',
+        discount_percentage:
+          b.discount_percentage != null && Number(b.discount_percentage) > 0
+            ? Number(b.discount_percentage)
+            : null,
+        badge_text: b.badge_text || b.benefit_type || 'Oferta Fraterna',
+        external_url: b.external_url || null,
       })) as any,
       business_hours: (hoursRows || []) as any,
       responsible: responsibleObj as any,

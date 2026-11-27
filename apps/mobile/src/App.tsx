@@ -40,6 +40,7 @@ import {
   type MobileGuideBanner,
   type MobileGuideHomeData,
   pickMainCategories,
+  sortBusinessesBySearchRelevance,
   type MobileGuideSponsoredBusiness,
   type MobileInstitutionalRecognition,
   type MobileLodgeCardData,
@@ -787,9 +788,11 @@ function PhotoGalleryLightbox({
         )}
       </div>
 
-      <div style={{ textAlign: 'center', color: '#f3eedd', fontSize: '.84rem', minHeight: 24 }}>
-        {currentPhoto.title || 'Arraste para os lados para navegar pelas fotos'}
-      </div>
+      {currentPhoto.title ? (
+        <div style={{ textAlign: 'center', color: '#f3eedd', fontSize: '.84rem', minHeight: 24 }}>
+          {currentPhoto.title}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -4931,6 +4934,24 @@ function BusinessDetailModal({
                             {svc.description && (
                               <MobileFormattedText content={svc.description} className="service-card-desc" />
                             )}
+                            {svc.image_url && (
+                              <div
+                                style={{
+                                  marginTop: 8,
+                                  borderRadius: 12,
+                                  overflow: 'hidden',
+                                  border: '1px solid #e1d5c5',
+                                  background: '#f5f0e6',
+                                }}
+                              >
+                                <img
+                                  src={svc.image_url}
+                                  alt={serviceTitle}
+                                  loading="lazy"
+                                  style={{ width: '100%', maxHeight: 220, objectFit: 'cover', display: 'block' }}
+                                />
+                              </div>
+                            )}
                             {waUrl && (
                               <a
                                 href={`${waUrl}&text=${encodeURIComponent(`Olá! Gostaria de um orçamento para o serviço "${serviceTitle}".`)}`}
@@ -5020,6 +5041,26 @@ function BusinessDetailModal({
                               <h4 className="mobile-benefit-title">{b.title}</h4>
                               {b.description && (
                                 <p className="mobile-benefit-desc">{b.description}</p>
+                              )}
+                              {b.external_url && (
+                                <a
+                                  href={/^https?:\/\//i.test(b.external_url) ? b.external_url : `https://${b.external_url}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    marginTop: 6,
+                                    fontSize: '.78rem',
+                                    fontWeight: 700,
+                                    color: '#E7C65D',
+                                    textDecoration: 'underline',
+                                  }}
+                                >
+                                  <span>🔗</span>
+                                  <span>Acessar link do benefício</span>
+                                </a>
                               )}
 
                               <div className="mobile-benefit-footer">
@@ -5456,7 +5497,10 @@ function BeneficiosScreen({
   });
 
   const rawList = guideData?.businesses ?? [];
-  const sorted = sortBusinessesByTier(rawList).map((b) =>
+  const baseSorted = search.trim()
+    ? sortBusinessesBySearchRelevance(rawList, search)
+    : sortBusinessesByTier(rawList);
+  const sorted = baseSorted.map((b) =>
     viewsOverrides?.[b.id] !== undefined
       ? { ...b, views_count: Math.max(viewsOverrides[b.id]!, b.views_count ?? 0) }
       : b
@@ -5702,6 +5746,27 @@ function BeneficiosScreen({
                           <h4 className="mobile-benefit-title">{b.title}</h4>
                           {b.description && (
                             <p className="mobile-benefit-desc">{b.description}</p>
+                          )}
+                          {b.external_url && (
+                            <a
+                              href={/^https?:\/\//i.test(b.external_url) ? b.external_url : `https://${b.external_url}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                marginTop: 6,
+                                fontSize: '.78rem',
+                                fontWeight: 700,
+                                color: '#E7C65D',
+                                textDecoration: 'underline',
+                              }}
+                            >
+                              <span>🔗</span>
+                              <span>Acessar link do benefício</span>
+                            </a>
                           )}
 
                           <div className="mobile-benefit-footer">
@@ -8545,7 +8610,10 @@ function EmpresasScreen({
   });
 
   const businesses = guideData?.businesses ?? [];
-  const sorted = sortBusinessesByTier(businesses).map((b) =>
+  const baseSorted = search.trim()
+    ? sortBusinessesBySearchRelevance(businesses, search)
+    : sortBusinessesByTier(businesses);
+  const sorted = baseSorted.map((b) =>
     viewsOverrides?.[b.id] !== undefined
       ? { ...b, views_count: Math.max(viewsOverrides[b.id]!, b.views_count ?? 0) }
       : b

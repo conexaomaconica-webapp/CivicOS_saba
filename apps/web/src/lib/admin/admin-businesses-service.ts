@@ -1,6 +1,11 @@
 'use server';
 
 import { revalidatePublicSeo } from '@/lib/seo/revalidate-public-seo';
+import {
+  deduplicateCategoriesByName,
+  hasAccentedChars,
+  normalizeCategoryKey,
+} from '@/lib/directory/category-dedup';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { parseLegacyAddress } from '@/lib/admin/legacy-address';
 import { pickResponsibleName } from '@/lib/contracts/responsible-name';
@@ -110,7 +115,7 @@ export async function listAdminBusinessCategoriesAction(tenantId: string): Promi
       .or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
       .order('name');
     if (error) return { success: false, categories: [], error: error.message };
-    return { success: true, categories: data ?? [] };
+    return { success: true, categories: deduplicateCategoriesByName(data ?? []) };
   } catch (error) {
     return { success: false, categories: [], error: error instanceof Error ? error.message : 'Erro ao carregar categorias.' };
   }
@@ -130,13 +135,19 @@ export async function createAdminBusinessCategoryAction(tenantId: string, rawNam
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !serviceRoleKey) return { success: false, error: 'Configuração segura do Supabase indisponível.' };
     const adminClient = createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
-    const { data: existing } = await adminClient
+    const targetKey = normalizeCategoryKey(name);
+    const { data: allCategories } = await adminClient
       .from('categories')
       .select('id, name')
-      .is('tenant_id', null)
-      .ilike('name', name)
-      .maybeSingle();
-    if (existing) return { success: true, category: existing };
+      .or(`tenant_id.is.null,tenant_id.eq.${tenantId}`);
+    const existing = (allCategories || []).find((c) => normalizeCategoryKey(c.name) === targetKey);
+    if (existing) {
+      if (!hasAccentedChars(existing.name) && hasAccentedChars(name)) {
+        await adminClient.from('categories').update({ name }).eq('id', existing.id);
+        return { success: true, category: { id: existing.id, name } };
+      }
+      return { success: true, category: existing };
+    }
     const baseSlug = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'categoria';
     const slug = `${baseSlug}-${crypto.randomUUID().slice(0, 8)}`;
     const { data: created, error } = await adminClient
@@ -197,6 +208,54 @@ export async function listAdminCanonicalLocationsAction(_tenantId: string): Prom
     return { success: true, locations: Array.from(unique.values()) };
   } catch (error) {
     return { success: false, locations: [], error: error instanceof Error ? error.message : 'Erro ao carregar localidades.' };
+  }
+}
+
+export async function uploadAdminServiceImageAction(formData: FormData): Promise<{
+  success: boolean;
+  url?: string;
+  error?: string;
+}> {
+  try {
+    await assertPlatformAdminAccess();
+    const businessId = String(formData.get('businessId') ?? '').trim();
+    const file = formData.get('file');
+    if (!businessId || !(file instanceof File)) {
+      return { success: false, error: 'Empresa e imagem são obrigatórios.' };
+    }
+    if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
+      return { success: false, error: 'A imagem deve possuir no máximo 10 MB.' };
+    }
+    const fileBytes = new Uint8Array(await file.arrayBuffer());
+    if (!isSupportedImage(fileBytes)) {
+      return { success: false, error: 'Envie uma imagem JPG, PNG ou WebP válida.' };
+    }
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) {
+      return { success: false, error: 'Configuração segura do Storage indisponível no servidor.' };
+    }
+    const adminClient = createSupabaseAdminClient<Database>(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: business, error: businessError } = await (adminClient as any)
+      .from('businesses')
+      .select('id, tenant_id')
+      .eq('id', businessId)
+      .maybeSingle();
+    if (businessError || !business) {
+      return { success: false, error: 'Empresa não localizada.' };
+    }
+    const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+    const storagePath = `${business.tenant_id}/${businessId}/services/${crypto.randomUUID()}.${extension}`;
+    const { error: uploadError } = await adminClient.storage
+      .from('business-assets')
+      .upload(storagePath, fileBytes, { contentType: file.type || `image/${extension}`, upsert: false });
+    if (uploadError) return { success: false, error: `Falha no upload: ${uploadError.message}` };
+    const { data: publicUrlData } = adminClient.storage.from('business-assets').getPublicUrl(storagePath);
+    return { success: true, url: publicUrlData.publicUrl };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Erro ao enviar imagem do serviço.' };
   }
 }
 
@@ -711,6 +770,7 @@ export interface AdminBusiness360DTO {
     name: string;
     description: string | null;
     price_info: string | null;
+    image_url?: string | null;
     is_active: boolean;
     display_order: number;
     created_at: string;
@@ -723,6 +783,7 @@ export interface AdminBusiness360DTO {
     discount_percentage: number | null;
     discount_amount: number | null;
     discount_code: string | null;
+    external_url?: string | null;
     is_active: boolean;
     display_order: number;
     created_at: string;
@@ -1320,7 +1381,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
     try {
       const res = await (supabase as any)
         .from('business_services')
-        .select('id, name, description, price_info, is_active, display_order, created_at')
+        .select('*')
         .eq('business_id', businessId)
         .order('display_order', { ascending: true })
         .order('created_at', { ascending: true })
@@ -1335,6 +1396,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       name: s.name || 'Serviço Sem Nome',
       description: s.description || null,
       price_info: s.price_info || null,
+      image_url: s.image_url || null,
       is_active: Boolean(s.is_active),
       display_order: s.display_order || 0,
       created_at: s.created_at || new Date().toISOString(),
@@ -1345,7 +1407,7 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
     try {
       const res = await (supabase as any)
         .from('business_benefits')
-        .select('id, title, description, benefit_type, discount_percentage, discount_amount, discount_code, is_active, display_order, created_at')
+        .select('*')
         .eq('business_id', businessId)
         .order('display_order', { ascending: true });
       benefitsRaw = (res?.data || []) as any[];
@@ -1358,9 +1420,13 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       title: ben.title || 'Benefício Fraterno',
       description: ben.description || '',
       benefit_type: ben.benefit_type || 'special_condition',
-      discount_percentage: ben.discount_percentage ? Number(ben.discount_percentage) : null,
+      discount_percentage:
+        ben.discount_percentage != null && Number(ben.discount_percentage) > 0
+          ? Number(ben.discount_percentage)
+          : null,
       discount_amount: ben.discount_amount ? Number(ben.discount_amount) : null,
       discount_code: ben.discount_code || null,
+      external_url: ben.external_url || null,
       is_active: Boolean(ben.is_active),
       display_order: ben.display_order || 0,
       created_at: ben.created_at || new Date().toISOString(),
@@ -2416,8 +2482,31 @@ export async function updateAdminBusinessDetailsAction(
 
     if (payload.secondary_category_ids !== undefined) {
       const activePrimaryId = selectedCategory?.id || (existing as any).category_id;
-      const cleanSecondaryIds = Array.from(new Set(payload.secondary_category_ids))
-        .filter((id): id is string => Boolean(id) && id !== activePrimaryId);
+      const activePrimaryName = selectedCategory?.name || (existing as any).category || '';
+      const rawSecIds = Array.from(new Set(payload.secondary_category_ids)).filter(
+        (id): id is string => Boolean(id) && id !== activePrimaryId
+      );
+      let cleanSecondaryIds = rawSecIds;
+      if (rawSecIds.length > 0) {
+        const { data: secCatRows } = await (supabase as any)
+          .from('categories')
+          .select('id, name')
+          .in('id', rawSecIds);
+        const catNameById = new Map<string, string>(
+          (secCatRows || []).map((r: any) => [String(r.id), String(r.name || '')])
+        );
+        const seenKeys = new Set<string>();
+        const primaryKey = normalizeCategoryKey(activePrimaryName);
+        if (primaryKey) seenKeys.add(primaryKey);
+        cleanSecondaryIds = rawSecIds.filter((secId) => {
+          const secName = catNameById.get(secId) || '';
+          const key = normalizeCategoryKey(secName);
+          if (!key) return true;
+          if (seenKeys.has(key)) return false;
+          seenKeys.add(key);
+          return true;
+        });
+      }
 
       // Exclui categorias secundárias anteriores deste negócio
       await (supabase as any)
@@ -3998,6 +4087,7 @@ export async function manageAdminServiceAction(
     name?: string;
     description?: string;
     price_info?: string;
+    image_url?: string | null;
     is_active?: boolean;
   }
 ): Promise<{ success: boolean; data?: AdminBusiness360DTO['services_items'][number]; error?: string }> {
@@ -4053,6 +4143,7 @@ export async function manageAdminServiceAction(
           name: (payload.name || 'Novo Serviço').trim(),
           description: payload.description ? cleanRichTextHtml(payload.description) || null : null,
           price_info: payload.price_info ? payload.price_info.trim() : null,
+          image_url: payload.image_url ? payload.image_url.trim() : null,
           is_active: true,
           display_order: await getNextServiceOrder(supabase, businessId),
         })
@@ -4082,8 +4173,9 @@ export async function manageAdminServiceAction(
         .from('business_services')
         .update({
           name: payload.name !== undefined ? payload.name.trim() : existing?.name,
-          description: payload.description !== undefined ? cleanRichTextHtml(payload.description) : existing?.description,
-          price_info: payload.price_info !== undefined ? payload.price_info.trim() : existing?.price_info,
+          description: payload.description !== undefined ? cleanRichTextHtml(payload.description) || null : existing?.description,
+          price_info: payload.price_info !== undefined ? payload.price_info.trim() || null : existing?.price_info,
+          image_url: payload.image_url !== undefined ? (payload.image_url ? payload.image_url.trim() : null) : existing?.image_url,
           updated_at: new Date().toISOString(),
         })
         .eq('id', payload.service_id)
@@ -4177,6 +4269,7 @@ export async function manageAdminBenefitAction(
     title?: string;
     description?: string;
     discount_percentage?: number | null;
+    external_url?: string | null;
     is_active?: boolean;
   }
 ): Promise<{ success: boolean; data?: AdminBusiness360DTO['benefits_items'][number]; error?: string }> {
@@ -4201,14 +4294,19 @@ export async function manageAdminBenefitAction(
     let savedBenefit: AdminBusiness360DTO['benefits_items'][number] | undefined;
 
     if (action === 'create') {
+      const normalizedDiscount =
+        payload.discount_percentage != null && Number(payload.discount_percentage) > 0
+          ? Number(payload.discount_percentage)
+          : null;
       const { data: newBenefit, error } = await (supabase as any)
         .from('business_benefits')
         .insert({
           tenant_id: biz.tenant_id,
           business_id: businessId,
           title: (payload.title || 'Novo Benefício Fraterno').trim(),
-          description: payload.description ? payload.description.trim() : 'Desconto exclusivo para Irmãos.',
-          discount_percentage: payload.discount_percentage || null,
+          description: payload.description ? payload.description.trim() : 'Condição exclusiva para Irmãos.',
+          discount_percentage: normalizedDiscount,
+          external_url: payload.external_url ? payload.external_url.trim() : null,
           status: 'active',
         })
         .select()
@@ -4234,12 +4332,24 @@ export async function manageAdminBenefitAction(
         .eq('id', payload.benefit_id)
         .single();
 
+      const normalizedDiscount =
+        payload.discount_percentage !== undefined
+          ? payload.discount_percentage != null && Number(payload.discount_percentage) > 0
+            ? Number(payload.discount_percentage)
+            : null
+          : existing?.discount_percentage;
       const { data: updated, error } = await (supabase as any)
         .from('business_benefits')
         .update({
           title: payload.title !== undefined ? payload.title.trim() : existing?.title,
           description: payload.description !== undefined ? payload.description.trim() : existing?.description,
-          discount_percentage: payload.discount_percentage !== undefined ? payload.discount_percentage : existing?.discount_percentage,
+          discount_percentage: normalizedDiscount,
+          external_url:
+            payload.external_url !== undefined
+              ? payload.external_url
+                ? payload.external_url.trim()
+                : null
+              : existing?.external_url,
           updated_at: new Date().toISOString(),
         })
         .eq('id', payload.benefit_id)

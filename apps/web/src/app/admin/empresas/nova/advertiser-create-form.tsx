@@ -29,12 +29,16 @@ export default function AdvertiserCreateForm({
   plans,
   pedraFundamentalCount = 0,
   pedraFundamentalQuota = 50,
+  pedraCampaignStatus = 'active',
+  pedraCampaignOpen = true,
 }: {
   tenantId: string;
   categories: Option[];
   plans: PlanOption[];
   pedraFundamentalCount?: number;
   pedraFundamentalQuota?: number;
+  pedraCampaignStatus?: string;
+  pedraCampaignOpen?: boolean;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -281,7 +285,9 @@ export default function AdvertiserCreateForm({
                 </option>
               ))}
               <option value="acacia_pedra_fundamental" className="font-bold text-[#3B0B14]">
-                ⭐ Plano Acácia — Promoção 2 Anos + Pedra Fundamental ({pedraFundamentalQuota} Primeiros Anunciantes)
+                {pedraCampaignOpen
+                  ? `⭐ Plano Acácia — Promoção 2 Anos + Pedra Fundamental (${pedraFundamentalQuota} Primeiros Anunciantes)`
+                  : `🔒 Plano Acácia — Pedra Fundamental (${pedraCampaignStatus === 'paused' ? 'Pausada' : 'Encerrada'} — requer exceção vinculada)`}
               </option>
             </select>
           </label>

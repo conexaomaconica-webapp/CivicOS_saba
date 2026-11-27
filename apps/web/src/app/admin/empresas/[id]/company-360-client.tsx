@@ -69,6 +69,7 @@ import {
   updateAdminBusinessPlanAction,
   adminCorrectBusinessBillingAction,
   uploadAdminResponsibleAvatarAction,
+  uploadAdminServiceImageAction,
   uploadAdminBusinessAssetAction,
   uploadAdminBusinessCertificationAction,
   updateAdminBusinessCertificationZoomAction,
@@ -77,6 +78,11 @@ import {
   createAdminBusinessCategoryAction,
   listAdminCanonicalLocationsAction,
 } from '@/lib/admin/admin-businesses-service';
+import {
+  deduplicateCategoriesByName,
+  isSameCategoryName,
+  normalizeCategoryKey,
+} from '@/lib/directory/category-dedup';
 import { compressImageOnClient } from '@/lib/media/client-image-compressor';
 import { parseAddressLine } from '@/lib/geo/geocode';
 import { parseCoordinatesText } from '@/lib/geo/maps-link';
@@ -562,14 +568,36 @@ export default function Company360Client({ initialData }: Props) {
     const result = await createAdminBusinessCategoryAction(data.business.tenant_id, newCategoryName);
     if (result.success && result.category) {
       const created = result.category;
-      setCategoryOptions((current) => [...current.filter((item) => item.id !== created.id), created].sort((a, b) => a.name.localeCompare(b.name)));
+      setCategoryOptions((current) =>
+        deduplicateCategoriesByName([...current.filter((item) => item.id !== created.id), created])
+      );
       if (categoryCreateTarget === 'secondary') {
-        setSecondaryCategoryIds((prev) => (prev.includes(created.id) ? prev : [...prev, created.id]));
-        setMessage({ type: 'success', text: 'Categoria criada e adicionada às categorias secundárias. Salve o cadastro para vinculá-la à empresa.' });
+        const primaryName = categoryOptions.find((c) => c.id === categoryId)?.name || category;
+        if (created.id === categoryId || isSameCategoryName(created.name, primaryName)) {
+          setMessage({
+            type: 'error',
+            text: `A categoria "${created.name}" já é a Categoria Principal desta empresa.`,
+          });
+        } else {
+          setSecondaryCategoryIds((prev) => {
+            const hasEquivalent = prev.some((secId) => {
+              const secCat = categoryOptions.find((c) => c.id === secId);
+              return secId === created.id || isSameCategoryName(secCat?.name, created.name);
+            });
+            return hasEquivalent ? prev : [...prev, created.id];
+          });
+          setMessage({ type: 'success', text: 'Categoria selecionada nas categorias secundárias. Salve o cadastro para vinculá-la à empresa.' });
+        }
       } else {
         setCategory(created.name);
         setCategoryId(created.id);
-        setMessage({ type: 'success', text: 'Categoria criada e selecionada. Salve o cadastro para vinculá-la à empresa.' });
+        setSecondaryCategoryIds((prev) =>
+          prev.filter((secId) => {
+            const secCat = categoryOptions.find((c) => c.id === secId);
+            return secId !== created.id && !isSameCategoryName(secCat?.name, created.name);
+          })
+        );
+        setMessage({ type: 'success', text: 'Categoria principal selecionada. Salve o cadastro para vinculá-la à empresa.' });
       }
       setNewCategoryName('');
       setShowCategoryModal(false);
@@ -973,6 +1001,8 @@ export default function Company360Client({ initialData }: Props) {
   const [serviceName, setServiceName] = useState('');
   const [serviceDesc, setServiceDesc] = useState('');
   const [servicePrice, setServicePrice] = useState('');
+  const [serviceImageUrl, setServiceImageUrl] = useState('');
+  const [uploadingServiceImage, setUploadingServiceImage] = useState(false);
 
   // Modal de Benefício Fraterno
   const [showBenefitModal, setShowBenefitModal] = useState(false);
@@ -981,6 +1011,7 @@ export default function Company360Client({ initialData }: Props) {
   const [benefitTitle, setBenefitTitle] = useState('');
   const [benefitDesc, setBenefitDesc] = useState('');
   const [benefitDiscount, setBenefitDiscount] = useState<number | ''>('');
+  const [benefitExternalUrl, setBenefitExternalUrl] = useState('');
 
   // Modal de Mídia (Logo, Capa, Galeria)
   const [showMediaModal, setShowMediaModal] = useState(false);
@@ -1310,6 +1341,7 @@ export default function Company360Client({ initialData }: Props) {
         name: serviceName,
         description: serviceDesc,
         price_info: servicePrice,
+        image_url: serviceImageUrl || null,
       });
       if (res.success && res.data) {
         setData((prev) => {
@@ -1469,7 +1501,9 @@ export default function Company360Client({ initialData }: Props) {
         benefit_id: editingBenefitId,
         title: benefitTitle,
         description: benefitDesc,
-        discount_percentage: benefitDiscount === '' ? null : Number(benefitDiscount),
+        discount_percentage:
+          benefitDiscount === '' || Number(benefitDiscount) <= 0 ? null : Number(benefitDiscount),
+        external_url: benefitExternalUrl.trim() || null,
       });
       if (res.success && res.data) {
         setData((prev) => {
@@ -2974,8 +3008,17 @@ export default function Company360Client({ initialData }: Props) {
                     value={categoryId}
                     onChange={(e) => {
                       const nextCategory = categoryOptions.find((item) => item.id === e.target.value);
+                      const nextName = nextCategory?.name || '';
                       setCategoryId(e.target.value);
-                      setCategory(nextCategory?.name || '');
+                      setCategory(nextName);
+                      if (e.target.value || nextName) {
+                        setSecondaryCategoryIds((prev) =>
+                          prev.filter((secId) => {
+                            const secCat = categoryOptions.find((c) => c.id === secId);
+                            return secId !== e.target.value && !isSameCategoryName(secCat?.name, nextName);
+                          })
+                        );
+                      }
                     }}
                     disabled={loadingCategories}
                     className="min-w-0 flex-1 px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14] disabled:opacity-60"
@@ -3026,7 +3069,17 @@ export default function Company360Client({ initialData }: Props) {
                   >
                     <option value="">+ Selecionar categoria complementar para adicionar...</option>
                     {categoryOptions
-                      .filter((item) => item.id !== categoryId && !secondaryCategoryIds.includes(item.id))
+                      .filter((item) => {
+                        const primaryName = categoryOptions.find((c) => c.id === categoryId)?.name || category;
+                        if (item.id === categoryId || isSameCategoryName(item.name, primaryName)) return false;
+                        if (secondaryCategoryIds.includes(item.id)) return false;
+                        const itemKey = normalizeCategoryKey(item.name);
+                        const alreadyInSec = secondaryCategoryIds.some((secId) => {
+                          const secCat = categoryOptions.find((c) => c.id === secId);
+                          return normalizeCategoryKey(secCat?.name) === itemKey;
+                        });
+                        return !alreadyInSec;
+                      })
                       .map((item) => (
                         <option key={item.id} value={item.id}>
                           {item.name}
@@ -4272,6 +4325,7 @@ export default function Company360Client({ initialData }: Props) {
                   setServiceName('');
                   setServiceDesc('');
                   setServicePrice('');
+                  setServiceImageUrl('');
                   setShowServiceModal(true);
                 }}
                 disabled={data.services_items.length >= data.content_summary.services_limit}
@@ -4318,6 +4372,16 @@ export default function Company360Client({ initialData }: Props) {
                       />
                     )}
 
+                    {svc.image_url && (
+                      <div className="w-full overflow-hidden rounded-xl border border-stone-200 bg-stone-100">
+                        <img
+                          src={svc.image_url}
+                          alt={svc.name}
+                          className="w-full max-h-44 object-cover"
+                        />
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between pt-2 border-t border-stone-200">
                       <div className="flex items-center gap-2">
                         <button
@@ -4356,6 +4420,7 @@ export default function Company360Client({ initialData }: Props) {
                             setServiceName(svc.name);
                             setServiceDesc(svc.description || '');
                             setServicePrice(svc.price_info || '');
+                            setServiceImageUrl(svc.image_url || '');
                             setShowServiceModal(true);
                           }}
                           className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-lg flex items-center gap-1 text-[11px] cursor-pointer"
@@ -4398,6 +4463,7 @@ export default function Company360Client({ initialData }: Props) {
                   setBenefitTitle('');
                   setBenefitDesc('');
                   setBenefitDiscount('');
+                  setBenefitExternalUrl('');
                   setShowBenefitModal(true);
                 }}
                 disabled={data.benefits_items.length >= data.content_summary.benefits_limit}
@@ -4438,6 +4504,16 @@ export default function Company360Client({ initialData }: Props) {
                     </div>
 
                     <p className="text-stone-600 text-[11px] leading-relaxed">{ben.description}</p>
+                    {ben.external_url && (
+                      <a
+                        href={/^https?:\/\//i.test(ben.external_url) ? ben.external_url : `https://${ben.external_url}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] font-bold text-[#3B0B14] underline underline-offset-2 inline-block truncate max-w-full"
+                      >
+                        🔗 {ben.external_url}
+                      </a>
+                    )}
 
                     <div className="flex items-center justify-between pt-2 border-t border-stone-200">
                       <div className="flex items-center gap-2">
@@ -4456,7 +4532,8 @@ export default function Company360Client({ initialData }: Props) {
                             setEditingBenefitId(ben.id);
                             setBenefitTitle(ben.title);
                             setBenefitDesc(ben.description || '');
-                            setBenefitDiscount(ben.discount_percentage || '');
+                            setBenefitDiscount(ben.discount_percentage && ben.discount_percentage > 0 ? ben.discount_percentage : '');
+                            setBenefitExternalUrl(ben.external_url || '');
                             setShowBenefitModal(true);
                           }}
                           className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-lg flex items-center gap-1 text-[11px] cursor-pointer"
@@ -5762,7 +5839,71 @@ export default function Company360Client({ initialData }: Props) {
               </div>
 
               <div>
-                <label className="block font-bold text-stone-800 mb-1">Descrição</label>
+                <label className="block font-bold text-stone-800 mb-1">
+                  Banner ou Imagem do Serviço (Opcional — pode substituir ou complementar o texto)
+                </label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="inline-flex items-center gap-1.5 rounded-xl border border-[#3B0B14] px-3 py-2 text-xs font-bold text-[#3B0B14] hover:bg-[#3B0B14] hover:text-[#C9A227] cursor-pointer shrink-0">
+                      {uploadingServiceImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                      <span>{uploadingServiceImage ? 'Enviando...' : 'Enviar Imagem'}</span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        disabled={uploadingServiceImage}
+                        onChange={async (e) => {
+                          const rawFile = e.target.files?.[0];
+                          e.target.value = '';
+                          if (!rawFile) return;
+                          setUploadingServiceImage(true);
+                          setMessage(null);
+                          try {
+                            const optimized = await compressImageOnClient(rawFile, 1400, 0.86);
+                            const fd = new FormData();
+                            fd.append('businessId', data.business.id);
+                            fd.append('file', optimized);
+                            const res = await uploadAdminServiceImageAction(fd);
+                            if (res.success && res.url) {
+                              setServiceImageUrl(res.url);
+                            } else {
+                              setMessage({ type: 'error', text: res.error || 'Falha ao enviar imagem do serviço.' });
+                            }
+                          } catch (err: any) {
+                            setMessage({ type: 'error', text: err?.message || 'Erro ao processar imagem.' });
+                          } finally {
+                            setUploadingServiceImage(false);
+                          }
+                        }}
+                      />
+                    </label>
+                    <input
+                      type="url"
+                      value={serviceImageUrl}
+                      onChange={(e) => setServiceImageUrl(e.target.value)}
+                      placeholder="Ou cole a URL da imagem/banner (https://...)"
+                      className="min-w-0 flex-1 px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                    />
+                    {serviceImageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setServiceImageUrl('')}
+                        className="px-2.5 py-2 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold text-xs cursor-pointer"
+                      >
+                        Remover
+                      </button>
+                    )}
+                  </div>
+                  {serviceImageUrl && (
+                    <div className="w-full max-h-44 overflow-hidden rounded-xl border border-stone-200 bg-stone-100">
+                      <img src={serviceImageUrl} alt="Preview do serviço" className="w-full max-h-44 object-cover" />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-stone-800 mb-1">Descrição em Texto (Opcional se enviar banner/imagem)</label>
                 <RichTextEditor
                   value={serviceDesc}
                   onChange={setServiceDesc}
@@ -5824,15 +5965,26 @@ export default function Company360Client({ initialData }: Props) {
               </div>
 
               <div>
-                <label className="block font-bold text-stone-800 mb-1">% de Desconto (Opcional)</label>
+                <label className="block font-bold text-stone-800 mb-1">% de Desconto (Opcional — deixe em branco quando não houver % de desconto)</label>
                 <input
                   type="number"
-                  min="0"
+                  min="1"
                   max="100"
                   value={benefitDiscount}
                   onChange={(e) => setBenefitDiscount(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="Ex: 15"
+                  placeholder="Deixe vazio se for condição especial, brinde ou palestra"
                   className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 font-mono outline-none focus:ring-2 focus:ring-[#3B0B14]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-stone-800 mb-1">Link Clicável do Benefício (Opcional)</label>
+                <input
+                  type="url"
+                  value={benefitExternalUrl}
+                  onChange={(e) => setBenefitExternalUrl(e.target.value)}
+                  placeholder="https://suaempresa.com.br/oferta-ou-agendamento"
+                  className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50 text-stone-900 outline-none focus:ring-2 focus:ring-[#3B0B14]"
                 />
               </div>
 

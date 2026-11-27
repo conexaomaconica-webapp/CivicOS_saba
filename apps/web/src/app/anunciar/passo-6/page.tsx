@@ -6,6 +6,7 @@ import CheckoutPaymentClient from './checkout-payment-client';
 
 export const metadata = {
   title: 'Onboarding Anunciante · Passo 6 de 6 — Pagamento & Transição',
+  robots: { index: false, follow: true },
 };
 
 export default async function OnboardingStep6Page() {

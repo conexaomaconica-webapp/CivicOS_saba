@@ -22,7 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'diferenciais', label: 'Diferenciais', icon: Sparkles },
   { id: 'mural', label: 'Mural', icon: Handshake },
   { id: 'planos', label: 'Planos', icon: Award },
-  { id: 'anunciar', label: 'Anunciar', icon: ArrowUpRight, isPrimary: true, href: '/anunciar/passo-1' },
+  { id: 'anunciar', label: 'Anunciar', icon: ArrowUpRight, isPrimary: true, href: '/anunciar' },
 ];
 
 export function LandingMobileBottomNav() {
@@ -76,7 +76,7 @@ export function LandingMobileBottomNav() {
             return (
               <Link
                 key={item.id}
-                href={item.href || '/anunciar/passo-1'}
+                href={item.href || '/anunciar'}
                 className="flex items-center gap-1 rounded-xl bg-gradient-to-r from-[#C9A227] to-[#e6bd3b] px-3.5 py-1.5 text-xs font-bold text-[#240509] shadow-md transition-all active:scale-95"
                 aria-label="Anunciar negócio"
               >

@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Check,
   Download,
+  ExternalLink,
   Loader2,
   Tag,
   X,
@@ -206,6 +207,18 @@ export function BenefitsDirectoryCards({ items }: { items: BenefitDirectoryBusin
                             <p className="text-xs leading-relaxed text-stone-200 line-clamp-3">
                               {inPortuguese(benefit.description)}
                             </p>
+                          )}
+
+                          {benefit.externalUrl && (
+                            <a
+                              href={/^https?:\/\//i.test(benefit.externalUrl) ? benefit.externalUrl : `https://${benefit.externalUrl}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#E7C65D] hover:text-white underline underline-offset-4 transition-colors"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                              <span>Acessar link do benefício</span>
+                            </a>
                           )}
                         </div>
 

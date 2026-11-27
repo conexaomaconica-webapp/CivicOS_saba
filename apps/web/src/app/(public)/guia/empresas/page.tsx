@@ -28,6 +28,7 @@ import {
 } from '@/lib/directory/business-filters';
 import { resolveSearchQuery } from '@/lib/directory/normalize-search';
 import { findBusinessesByMasonicMember } from '@/lib/directory/masonic-member-search';
+import { sortBusinessesBySearchRelevance } from '@/lib/directory/search-relevance';
 import { TrackEvent } from '@/components/analytics/TrackEvent';
 import { sanitizeSearchTerm } from '@/lib/analytics/events';
 import '@/styles/directory-home.css';
@@ -83,12 +84,12 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
   const city = params.city || params.cidade || '';
   const cat = params.cat || '';
   const subcat = params.subcat || '';
-  
+
   // Array parameters parsing
   const relArr = Array.isArray(params.rel) ? params.rel : params.rel ? [params.rel] : [];
   const recArr = Array.isArray(params.rec) ? params.rec : params.rec ? [params.rec] : [];
   const planArr = Array.isArray(params.plan) ? params.plan : params.plan ? [params.plan] : [];
-  
+
   const verified = params.verified === 'true';
   const maxDist = params.dist ? Number(params.dist) : undefined;
   const sort = params.sort || 'relevance';
@@ -141,7 +142,7 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
         });
         availableCities = Array.from(citySet).sort();
       }
-    } catch (_e) {}
+    } catch (_e) { }
   }
 
   // Filtro: todas as categorias que têm empresas (as "em destaque" da home eram só uma parte).
@@ -224,7 +225,11 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
           }
         }
 
-        const mergedItems = [...newItems, ...existingItems];
+        const mergedRaw = [...existingItems, ...newItems];
+        const mergedItems =
+          sort === 'relevance'
+            ? sortBusinessesBySearchRelevance(mergedRaw, q)
+            : mergedRaw;
         searchDataRaw = {
           items: mergedItems,
           total: (searchDataRaw?.total || 0) + newItems.length,
@@ -289,7 +294,7 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
           total_pages: 1,
         };
       }
-    } catch (_fallbackErr) {}
+    } catch (_fallbackErr) { }
   }
 
 

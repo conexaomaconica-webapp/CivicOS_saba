@@ -5,16 +5,18 @@ import { useRouter } from 'next/navigation';
 import { Check, ArrowRight, Loader2 } from 'lucide-react';
 import { saveStepDataAction } from '@/lib/onboarding/onboarding-server-state';
 import { CommercialPlan, CANONICAL_PLANS } from '@/lib/billing/plans-service';
+import { ADVERTISE_PLAN_COOKIE_NAME } from '@/lib/billing/advertise-landing';
 
 export interface PlanSelectionFormProps {
   businessId: string;
   plans: CommercialPlan[];
+  initialPlanTier?: 'bronze' | 'prata' | 'ouro';
 }
 
-export default function PlanSelectionForm({ businessId, plans }: PlanSelectionFormProps) {
+export default function PlanSelectionForm({ businessId, plans, initialPlanTier = 'ouro' }: PlanSelectionFormProps) {
   const router = useRouter();
 
-  const [selectedPlanTier, setSelectedPlanTier] = useState<string>('ouro');
+  const [selectedPlanTier, setSelectedPlanTier] = useState<string>(initialPlanTier);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -33,6 +35,7 @@ export default function PlanSelectionForm({ businessId, plans }: PlanSelectionFo
       });
 
       if (res.success) {
+        document.cookie = `${ADVERTISE_PLAN_COOKIE_NAME}=; Path=/anunciar; Max-Age=0; SameSite=Lax`;
         router.push('/anunciar/passo-5');
       } else {
         setErrorMsg(res.message || 'Falha ao selecionar plano.');

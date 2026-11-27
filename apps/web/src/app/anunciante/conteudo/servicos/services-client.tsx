@@ -39,6 +39,7 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
 
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -55,6 +56,7 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
     setEditingService(null);
     setTitle('');
     setDescription('');
+    setImageUrl('');
     setIsModalOpen(true);
   };
 
@@ -63,6 +65,7 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
     setEditingService(srv);
     setTitle(srv.title);
     setDescription(srv.description);
+    setImageUrl(srv.image_url || '');
     setIsModalOpen(true);
   };
 
@@ -81,8 +84,8 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
       setModalError('Informe o título do serviço (mínimo de 3 caracteres).');
       return;
     }
-    if (description.trim().length < 10) {
-      setModalError('Descreva o serviço com pelo menos 10 caracteres.');
+    if (!imageUrl.trim() && description.trim().length < 10) {
+      setModalError('Descreva o serviço com pelo menos 10 caracteres ou informe uma imagem/banner.');
       return;
     }
 
@@ -93,6 +96,7 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
         business_id: business.id,
         title,
         description,
+        image_url: imageUrl.trim() || undefined,
       });
 
       if (res.success) {
@@ -273,12 +277,20 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
                   {srv.title}
                 </h3>
 
-                <FormattedText
-                  content={srv.description}
-                  className="text-xs text-stone-600 leading-relaxed"
-                  collapsible
-                  maxCollapsedLength={160}
-                />
+                {srv.description && (
+                  <FormattedText
+                    content={srv.description}
+                    className="text-xs text-stone-600 leading-relaxed"
+                    collapsible
+                    maxCollapsedLength={160}
+                  />
+                )}
+
+                {srv.image_url && (
+                  <div className="w-full overflow-hidden rounded-xl border border-stone-200 bg-stone-100 mt-2">
+                    <img src={srv.image_url} alt={srv.title} className="w-full max-h-44 object-cover" />
+                  </div>
+                )}
               </div>
 
               <div className="pt-3 border-t border-stone-100 flex items-center justify-between text-xs">
@@ -382,7 +394,18 @@ export default function AdvertiserServicesClient({ data }: { data: AdvertiserCon
               </div>
 
               <div className="space-y-1">
-                <label className="font-bold text-stone-800">Descrição Detalhada</label>
+                <label className="font-bold text-stone-800">Banner ou Imagem do Serviço (URL opcional — pode substituir o texto)</label>
+                <input
+                  type="url"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#C9A227] font-medium text-xs"
+                  placeholder="https://..."
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-stone-800">Descrição Detalhada (Opcional se informar banner/imagem)</label>
                 <RichTextEditor
                   value={description}
                   onChange={setDescription}

@@ -1,17 +1,28 @@
 import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import { createServerSideClient } from '@/lib/supabase/server';
+import { resolveRequestTenantId } from '@/lib/tenant/tenant-resolver';
 import OnboardingHeader from '@/components/onboarding/OnboardingHeader';
 import ResponsibleForm from './responsible-form';
 import { TrackEvent } from '@/components/analytics/TrackEvent';
+import { PersistPlanSelection } from '@/components/anunciar/PersistPlanSelection';
+import { isAdvertiseLandingEnabled } from '@/lib/billing/advertise-landing';
 import { getOwnProfileDTO } from '@/lib/member/profile-access-service';
 
 export const metadata = {
   title: 'Onboarding Anunciante · Passo 1 de 6 — Sua Conta',
+  robots: { index: false, follow: true },
 };
 
-export default async function OnboardingStep1Page() {
+type Step1Props = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function OnboardingStep1Page({ searchParams }: Step1Props) {
+  const params = searchParams ? await searchParams : {};
+  const rawPlan = Array.isArray(params.plan) ? params.plan[0] : params.plan;
   const brand = await resolveTenantBrandContext().catch(() => null);
   const supabase = await createServerSideClient();
+  const tenantId = await resolveRequestTenantId(supabase).catch(() => null);
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -36,7 +47,10 @@ export default async function OnboardingStep1Page() {
         />
 
         {/* Início do cadastro do anunciante (uma vez por sessão, qualquer que seja a porta de entrada). */}
-        <TrackEvent name="start_advertiser_signup" onceKey="advertiser_signup_start" params={{ source_page: 'anunciar_passo_1' }} />
+        {isAdvertiseLandingEnabled() && (
+          <PersistPlanSelection planParam={rawPlan ?? null} tenantId={tenantId} />
+        )}
+        <TrackEvent name="start_advertiser_signup" onceKey="advertiser_signup_start" params={{ source_page: 'anunciar_passo_1', ...(isAdvertiseLandingEnabled() && rawPlan ? { plan_interest: rawPlan } : {}) }} />
 
         <div className="bg-[#2b060d]/90 border border-[#C9A227]/30 rounded-3xl p-6 shadow-2xl backdrop-blur-md">
           <ResponsibleForm

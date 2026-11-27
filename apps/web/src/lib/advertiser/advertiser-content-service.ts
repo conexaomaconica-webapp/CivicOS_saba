@@ -17,6 +17,7 @@ export interface AdvertiserServiceItem {
   description: string;
   icon_name?: string;
   price_info?: string;
+  image_url?: string;
   is_active: boolean;
   status: ContentStatus;
   status_label: string;
@@ -31,6 +32,7 @@ export interface AdvertiserBenefitItem {
   expiration_date?: string;
   rules?: string;
   promo_code?: string;
+  external_url?: string;
   is_active: boolean;
   status: ContentStatus;
   status_label: string;
@@ -67,6 +69,7 @@ export interface DbServiceRow {
   description: string | null;
   icon_name: string | null;
   price_info: string | null;
+  image_url?: string | null;
   is_active: boolean | null;
 }
 
@@ -80,6 +83,7 @@ export interface DbBenefitRow {
   discount_code: string | null;
   redeem_instructions: string | null;
   valid_until: string | null;
+  external_url?: string | null;
   is_active: boolean | null;
   status: string | null;
   archived_at: string | null;
@@ -180,7 +184,7 @@ export async function getAdvertiserContentDataAction(): Promise<AdvertiserConten
   // 4. Carrega serviços reais do Postgres
   const { data: dbServices, error: errServices } = await reader
     .from('business_services')
-    .select('id, name, description, icon_name, price_info, is_active')
+    .select('*')
     .eq('tenant_id', tenantId)
     .eq('business_id', businessId)
     .order('display_order', { ascending: true })
@@ -194,7 +198,7 @@ export async function getAdvertiserContentDataAction(): Promise<AdvertiserConten
   // 5. Carrega benefícios reais do Postgres (excluindo arquivados)
   const { data: rawDbBenefits, error: errBenefits } = await reader
     .from('business_benefits')
-    .select('id, title, description, benefit_type, discount_percentage, discount_amount, discount_code, redeem_instructions, valid_until, is_active, status, archived_at')
+    .select('*')
     .eq('tenant_id', tenantId)
     .eq('business_id', businessId)
     .order('created_at', { ascending: false });
@@ -236,6 +240,7 @@ export async function getAdvertiserContentDataAction(): Promise<AdvertiserConten
     description: s.description || '',
     icon_name: s.icon_name || undefined,
     price_info: s.price_info || undefined,
+    image_url: s.image_url || undefined,
     is_active: Boolean(s.is_active),
     status: s.is_active ? 'published' : 'inactive',
     status_label: s.is_active ? 'Publicado' : 'Inativo',
@@ -253,15 +258,17 @@ export async function getAdvertiserContentDataAction(): Promise<AdvertiserConten
 
   const benefits: AdvertiserBenefitItem[] = ((dbBenefits as DbBenefitRow[]) || []).map((ben: DbBenefitRow) => {
     const canonicalStatus = ben.status || (ben.is_active ? 'active' : 'draft');
+    const hasValidPct = ben.discount_percentage != null && Number(ben.discount_percentage) > 0;
     return {
       id: ben.id,
       title: ben.title,
       description: ben.description || '',
       benefit_type: ben.benefit_type || undefined,
-      discount_condition: ben.discount_percentage ? `${ben.discount_percentage}% Desconto` : ben.benefit_type || 'Benefício Exclusivo',
+      discount_condition: hasValidPct ? `${ben.discount_percentage}% Desconto` : 'Condição Especial',
       expiration_date: ben.valid_until ? new Date(ben.valid_until).toLocaleDateString('pt-BR') : undefined,
       rules: ben.redeem_instructions || undefined,
       promo_code: ben.discount_code || undefined,
+      external_url: ben.external_url || undefined,
       is_active: canonicalStatus === 'active',
       status: canonicalStatus === 'active' ? 'published' : 'inactive' as ContentStatus,
       status_label: BENEFIT_STATUS_LABELS[canonicalStatus] || canonicalStatus,
@@ -361,6 +368,7 @@ export async function saveAdvertiserServiceAction(
           description: cleanRichTextHtml(service.description) || null,
           icon_name: service.icon_name || null,
           price_info: service.price_info || null,
+          image_url: service.image_url?.trim() || null,
           is_active: true,
           display_order: await getNextServiceOrder(writer, service.business_id),
         })
@@ -384,6 +392,7 @@ export async function saveAdvertiserServiceAction(
         description: cleanRichTextHtml(service.description) || null,
         icon_name: service.icon_name || null,
         price_info: service.price_info || null,
+        image_url: service.image_url !== undefined ? (service.image_url?.trim() || null) : undefined,
         updated_at: new Date().toISOString(),
       })
       .eq('id', service.id)
@@ -503,6 +512,7 @@ export async function saveAdvertiserBenefitAction(
       benefit_type: benefit.benefit_type || 'special_condition',
       discount_code: (benefit.promo_code || '').trim() || null,
       redeem_instructions: (benefit.rules || '').trim() || null,
+      external_url: (benefit.external_url || '').trim() || null,
     };
 
     let previous: Record<string, unknown> | null = null;

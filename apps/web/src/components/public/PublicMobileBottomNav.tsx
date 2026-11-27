@@ -275,7 +275,7 @@ export function PublicMobileBottomNav() {
 
               {/* Anunciar Empresa */}
               <Link
-                href="/anunciar/passo-1"
+                href="/anunciar"
                 onClick={() => setMenuOpen(false)}
                 className="flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium text-stone-200 hover:bg-white/5 hover:text-[#F3CE61] transition-colors"
               >

@@ -6,6 +6,7 @@ import MasonicBondForm from './masonic-bond-form';
 
 export const metadata = {
   title: 'Onboarding Anunciante · Passo 3 de 6 — Seu Vínculo',
+  robots: { index: false, follow: true },
 };
 
 export default async function OnboardingStep3Page() {

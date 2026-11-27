@@ -47,7 +47,7 @@ export function LandingHeader({ primaryColor: _primaryColor }: { primaryColor?: 
             <a href="#faq" className="text-white transition hover:text-[#C9A227]">Dúvidas</a>
           </nav>
           <div className="flex items-center gap-2">
-            <Link href="/anunciar/passo-1" className="rounded-xl px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-bold text-white transition hover:text-[#C9A227]">
+            <Link href="/anunciar" className="rounded-xl px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-bold text-white transition hover:text-[#C9A227]">
               ANUNCIAR
             </Link>
             <Link href="/login" className="inline-flex rounded-xl bg-[#C9A227] px-3.5 py-1.5 sm:px-5 sm:py-2 text-xs sm:text-sm font-bold text-[#2a0a10] transition hover:bg-[#e0b92f]">
@@ -82,7 +82,7 @@ export function LandingHero() {
             <Link href="/guia" className={CTA_PRIMARY}>
               Quero encontrar empresas
             </Link>
-            <Link href="/anunciar/passo-1" className={CTA_GHOST}>
+            <Link href="/anunciar" className={CTA_GHOST}>
               Quero divulgar meu negócio
             </Link>
           </div>
@@ -179,7 +179,7 @@ export function LandingAudienceSection() {
           ))}
         </div>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Link href="/anunciar/passo-1" className={CTA_PRIMARY}>
+          <Link href="/anunciar" className={CTA_PRIMARY}>
             Cadastrar minha empresa
           </Link>
           <Link href="/guia" className={CTA_GHOST}>
@@ -315,7 +315,7 @@ export function LandingPlansSection({ plans }: { plans: CommercialPlan[] }) {
                     <span>Painel de desempenho e métricas</span>
                   </li>
                 </ul>
-                <Link href="/anunciar/passo-1" className={`${highlight ? CTA_PRIMARY : CTA_GHOST} mt-8`}>
+                <Link href="/anunciar" className={`${highlight ? CTA_PRIMARY : CTA_GHOST} mt-8`}>
                   Escolher {plan.name.replace(/^Plano\s+/i, '')}
                 </Link>
               </article>
@@ -351,7 +351,7 @@ export function LandingPedraSection() {
             Vagas limitadas
           </p>
           <Link
-            href="/anunciar/passo-1"
+            href="/anunciar"
             className="mt-8 inline-flex items-center justify-center rounded-xl bg-[#C9A227] px-6 py-3 text-sm font-extrabold text-[#2a0a10] transition hover:bg-[#e0b92f]"
           >
             Quero ser dos primeiros

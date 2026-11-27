@@ -1,16 +1,31 @@
 import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createServerSideClient } from '@/lib/supabase/server';
 import { fetchTenantPlans } from '@/lib/billing/plans-service';
+import {
+  ADVERTISE_PLAN_COOKIE_NAME,
+  isAdvertiseLandingEnabled,
+  resolveStep4InitialPlanTier,
+} from '@/lib/billing/advertise-landing';
 import { resolveRequestTenantId } from '@/lib/tenant/tenant-resolver';
 import OnboardingHeader from '@/components/onboarding/OnboardingHeader';
 import PlanSelectionForm from './plan-selection-form';
 
 export const metadata = {
   title: 'Onboarding Anunciante · Passo 4 de 6 — Escolha do Plano',
+  robots: { index: false, follow: true },
 };
 
-export default async function OnboardingStep4Page() {
+type Step4Props = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function OnboardingStep4Page({ searchParams }: Step4Props) {
+  const params = searchParams ? await searchParams : {};
+  const rawQueryPlan = Array.isArray(params.plan) ? params.plan[0] : params.plan;
+  const cookieStore = await cookies();
+  const rawCookiePlan = cookieStore.get(ADVERTISE_PLAN_COOKIE_NAME)?.value ?? null;
   const brand = await resolveTenantBrandContext().catch(() => null);
   const supabase = await createServerSideClient();
   const {
@@ -36,6 +51,14 @@ export default async function OnboardingStep4Page() {
   }
 
   const plans = await fetchTenantPlans(supabase, tenantId);
+  const initialPlanTier = isAdvertiseLandingEnabled()
+    ? resolveStep4InitialPlanTier({
+        queryPlan: rawQueryPlan ?? null,
+        cookieValue: rawCookiePlan,
+        tenantId,
+        draftPlanTier: draftBiz.plan_tier ?? null,
+      })
+    : 'ouro';
 
   return (
     <main className="min-h-screen w-full bg-[#1f0509] text-white flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">
@@ -53,7 +76,7 @@ export default async function OnboardingStep4Page() {
         />
 
         <div className="bg-[#2b060d]/90 border border-[#C9A227]/30 rounded-3xl p-6 shadow-2xl backdrop-blur-md space-y-4">
-          <PlanSelectionForm businessId={draftBiz.id} plans={plans} />
+          <PlanSelectionForm businessId={draftBiz.id} plans={plans} initialPlanTier={initialPlanTier} />
         </div>
       </div>
     </main>

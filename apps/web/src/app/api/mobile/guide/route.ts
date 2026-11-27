@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { MAX_BUSINESS_CERTIFICATIONS, normalizeCertificationZoom, planAllowsCertifications } from '@/lib/business/certifications';
 import { fetchMainHomeCategories } from '@/lib/directory/home-main-categories';
 import { isSafeImageCoverUrl, resolveCoverUrlFromMediaList, sortMediaImagesFirst } from '@/lib/business/cover-url-guard';
+import { sortBusinessesBySearchRelevance } from '@/lib/directory/search-relevance';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -67,7 +68,7 @@ export async function GET(request: Request) {
       }
       const bizId = detail.business_id || detail.id;
       if (bizId) {
-        const [{ count: vCount }, { data: attrRows }, { data: recRows }, { data: certRows }] = await Promise.all([
+        const [{ count: vCount }, { data: attrRows }, { data: recRows }, { data: certRows }, { data: svcRows }, { data: benRows }] = await Promise.all([
           adminDb
             .from('analytics_events')
             .select('id', { count: 'exact', head: true })
@@ -92,7 +93,43 @@ export async function GET(request: Request) {
             .order('display_order', { ascending: true })
             .order('created_at', { ascending: true })
             .then((r: any) => r, () => ({ data: [] })),
+          adminDb
+            .from('business_services')
+            .select('id, image_url')
+            .eq('business_id', bizId)
+            .eq('is_active', true)
+            .then((r: any) => r, () => ({ data: [] })),
+          adminDb
+            .from('business_benefits')
+            .select('id, external_url, discount_percentage')
+            .eq('business_id', bizId)
+            .eq('is_active', true)
+            .then((r: any) => r, () => ({ data: [] })),
         ]);
+        if (Array.isArray(detail.services)) {
+          const svcImgMap = new Map(
+            (Array.isArray(svcRows) ? svcRows : []).map((s: any) => [String(s.id), s.image_url || null])
+          );
+          detail.services = detail.services.map((s: any) => ({
+            ...s,
+            image_url: s.image_url ?? svcImgMap.get(String(s.id)) ?? null,
+          }));
+        }
+        if (Array.isArray(detail.benefits)) {
+          const benMap = new Map<string, any>(
+            (Array.isArray(benRows) ? benRows : []).map((b: any) => [String(b.id), b])
+          );
+          detail.benefits = detail.benefits.map((b: any) => {
+            const extra: any = benMap.get(String(b.id));
+            const rawPct = b.discount_percentage ?? extra?.discount_percentage ?? null;
+            const numPct = rawPct != null ? Number(rawPct) : null;
+            return {
+              ...b,
+              discount_percentage: numPct !== null && numPct > 0 ? numPct : null,
+              external_url: b.external_url ?? extra?.external_url ?? null,
+            };
+          });
+        }
         detail.views_count = typeof vCount === 'number' ? vCount : 0;
         // Certificações de mercado (ISO etc.): exclusivas do Plano Acácia.
         detail.certifications = planAllowsCertifications(detail.effective_plan_code || detail.plan_code || detail.plan_tier)
@@ -171,7 +208,8 @@ export async function GET(request: Request) {
       );
     }
 
-    const rawBusinesses: any[] = Array.isArray(searchData?.items) ? searchData.items : [];
+    const rawBusinessesList: any[] = Array.isArray(searchData?.items) ? searchData.items : [];
+    const rawBusinesses: any[] = query ? sortBusinessesBySearchRelevance(rawBusinessesList, query) : rawBusinessesList;
     const rawSponsored: any[] = Array.isArray(payload.sponsored) ? payload.sponsored : [];
     const allBizIds = Array.from(
       new Set(

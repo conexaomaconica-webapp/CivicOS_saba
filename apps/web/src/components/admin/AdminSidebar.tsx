@@ -102,6 +102,12 @@ export const adminNavSections: NavSection[] = [
         icon: Layers,
       },
       {
+        id: 'campanhas',
+        label: 'Campanhas Promocionais',
+        path: '/admin/campanhas',
+        icon: Sparkles,
+      },
+      {
         id: 'pagamentos',
         label: 'Pagamentos & Asaas',
         path: '/admin/pagamentos',
