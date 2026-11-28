@@ -3,13 +3,22 @@
 import { createClient } from '@supabase/supabase-js';
 import { headers } from 'next/headers';
 import { readVisitorKey } from '@/lib/referrals/attribution';
-import { generatePseudonymousSubjectId, generateSearchSessionHash } from '@/lib/analytics/privacy-hash';
+import {
+  extractTrustedClientIp,
+  generateCooldownSubjectId,
+  generatePseudonymousSubjectId,
+  generateSearchSessionHash,
+} from '@/lib/analytics/privacy-hash';
 import { assertBusinessAnalyticsAccess } from '@/lib/analytics/analytics-auth';
 import { classifyTraffic, shouldExcludeFromMetrics } from '@/lib/analytics/internal-traffic';
 import {
   normalizeAcquisitionSource,
   normalizeDiscoverySource,
 } from '@/lib/analytics/traffic-sources';
+import {
+  getCachedAnalyticsViewsPolicy,
+  type ViewsCountingMode,
+} from '@/lib/analytics/views-policy-service';
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -26,13 +35,40 @@ export type { AllowedEventType };
 
 const CYCLE_ID_REGEX = /^[a-zA-Z0-9_-]{10,120}$/;
 
+export type TrackDirectoryEventResult = {
+  ok: boolean;
+  deduplicated?: boolean;
+  skipped?: boolean;
+  policyFiltered?: boolean;
+  policyMode?: ViewsCountingMode;
+  viewsCount?: number;
+  error?: string;
+};
+
 // Cache em memória para deduplicação concorrente e de curto prazo por processo
 const recentViewCycles = new Map<string, number>();
-const inFlightViewCycles = new Map<string, Promise<{ ok: boolean; deduplicated?: boolean; skipped?: boolean; error?: string }>>();
+const inFlightViewCycles = new Map<string, Promise<TrackDirectoryEventResult>>();
+const inFlightSubjectLocks = new Map<string, Promise<unknown>>();
+const recentSubjectViews = new Map<string, number[]>();
 
 export async function resetServerCycleCacheForTesting(): Promise<void> {
   recentViewCycles.clear();
   inFlightViewCycles.clear();
+  inFlightSubjectLocks.clear();
+  recentSubjectViews.clear();
+}
+
+function formatDateInTimezone(date: Date, timeZone = 'America/Sao_Paulo'): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  } catch {
+    return date.toISOString().slice(0, 10);
+  }
 }
 
 export interface AnalyticsSummary {
@@ -88,22 +124,31 @@ export async function trackDirectoryEventAction(payload: {
     validCycleId = payload.cycleId;
   }
 
+  const activePolicy = await getCachedAnalyticsViewsPolicy();
+
   // Política das estatísticas: dono/equipe da própria empresa, administrador e tráfego automatizado NÃO geram evento comercial.
   // Decidido aqui, no servidor, pela sessão e pelo User-Agent da requisição (nada enviado pelo navegador é confiado).
-  if (!(process.env.NODE_ENV === 'test' && !process.env.SUPABASE_SERVICE_ROLE_KEY)) {
+  if (
+    activePolicy.ignore_internal_traffic &&
+    !(process.env.NODE_ENV === 'test' && !process.env.SUPABASE_SERVICE_ROLE_KEY)
+  ) {
     const traffic = await classifyTraffic([payload.businessId]);
     if (shouldExcludeFromMetrics(traffic, payload.businessId)) return { ok: true, skipped: true };
   }
 
   let subjectId = '';
+  let cooldownSubjectId = '';
   try {
     const visitorKey = await readVisitorKey();
     const reqHeaders = await headers();
-    const ip = reqHeaders.get('x-forwarded-for') || reqHeaders.get('x-real-ip') || '127.0.0.1';
+    const ip = extractTrustedClientIp(reqHeaders);
     const ua = reqHeaders.get('user-agent') || 'Browser';
-    subjectId = generatePseudonymousSubjectId({ visitorKey, ip, userAgent: ua });
+    const dateStr = formatDateInTimezone(new Date(), activePolicy.daily_timezone || 'America/Sao_Paulo');
+    subjectId = generatePseudonymousSubjectId({ visitorKey, ip, userAgent: ua, dateStr });
+    cooldownSubjectId = generateCooldownSubjectId({ visitorKey, ip, userAgent: ua });
   } catch (_e) {
     subjectId = 'anon_session';
+    cooldownSubjectId = 'anon_session';
   }
 
   const cycleKey = validCycleId ? `${payload.businessId}:${validCycleId}` : null;
@@ -121,7 +166,7 @@ export async function trackDirectoryEventAction(payload: {
     }
   }
 
-  const execute = async (): Promise<{ ok: boolean; deduplicated?: boolean; skipped?: boolean; error?: string }> => {
+  const execute = async (): Promise<TrackDirectoryEventResult> => {
     // A suíte unitária não possui conexão com o Supabase. Mantém o evento
     // não bloqueante apenas nesse ambiente; produção nunca mascara falha de gravação.
     if (process.env.NODE_ENV === 'test' && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -161,6 +206,110 @@ export async function trackDirectoryEventAction(payload: {
         }
       }
 
+      // Avaliação centralizada da Política Configurável (ALL_VIEWS / COOLDOWN / UNIQUE_DAILY) + Anti-Burst
+      let eligibleView = true;
+      let ineligibleReason: string | null = null;
+      const policyMode: ViewsCountingMode = activePolicy.counting_mode || 'ALL_VIEWS';
+      const effectiveVisitorKey = cooldownSubjectId && cooldownSubjectId !== 'anon_session' ? cooldownSubjectId : subjectId;
+
+      if (normalizedType === 'view' && effectiveVisitorKey && effectiveVisitorKey !== 'anon_session') {
+        const subjectKey = `${payload.businessId}:${effectiveVisitorKey}`;
+        const nowMs = Date.now();
+        const prevTimestamps = (recentSubjectViews.get(subjectKey) || []).filter((ts) => nowMs - ts < 86_400_000);
+
+        // 1. Proteção contra abuso automatizado (flood não-humano: >= 25 views em 3s pelo mesmo visitante na mesma empresa)
+        if (activePolicy.bot_abuse_protection_enabled) {
+          const recent3s = prevTimestamps.filter((ts) => nowMs - ts <= 3000);
+          if (recent3s.length >= 25) {
+            eligibleView = false;
+            ineligibleReason = 'automated_burst_rate_limit';
+          }
+        }
+
+        // 2. Modo COOLDOWN (5, 15, 30 ou 60 minutos, respeitando continuidade na virada da meia-noite)
+        if (eligibleView && policyMode === 'COOLDOWN') {
+          const cooldownMs = (activePolicy.cooldown_minutes || 15) * 60_000;
+          const hasInMemoryRecent = prevTimestamps.some((ts) => nowMs - ts < cooldownMs);
+          if (hasInMemoryRecent) {
+            eligibleView = false;
+            ineligibleReason = 'cooldown_window_active';
+          } else {
+            try {
+              const sinceIso = new Date(nowMs - cooldownMs).toISOString();
+              const { data: recentDbView } = await (supabase as any)
+                .from('analytics_events')
+                .select('id, pseudonymous_subject_id, metadata')
+                .eq('business_id', payload.businessId)
+                .eq('event_name', 'view')
+                .gte('created_at', sinceIso)
+                .order('created_at', { ascending: false })
+                .limit(20);
+
+              if (
+                Array.isArray(recentDbView) &&
+                recentDbView.some(
+                  (r: any) =>
+                    r?.metadata?.eligible_view !== false &&
+                    (r?.pseudonymous_subject_id === subjectId ||
+                      (cooldownSubjectId && r?.metadata?.cooldown_subject_id === cooldownSubjectId))
+                )
+              ) {
+                eligibleView = false;
+                ineligibleReason = 'cooldown_window_active';
+              }
+            } catch {
+              // Prossegue caso a checagem complementar falhe
+            }
+          }
+        }
+
+        // 3. Modo UNIQUE_DAILY (1 visualização elegível por visitante e empresa por dia em America/Sao_Paulo)
+        if (eligibleView && policyMode === 'UNIQUE_DAILY') {
+          const todayBrt = formatDateInTimezone(new Date(nowMs), activePolicy.daily_timezone || 'America/Sao_Paulo');
+          const hasInMemoryToday = prevTimestamps.some(
+            (ts) => formatDateInTimezone(new Date(ts), activePolicy.daily_timezone || 'America/Sao_Paulo') === todayBrt
+          );
+          if (hasInMemoryToday) {
+            eligibleView = false;
+            ineligibleReason = 'unique_daily_already_counted';
+          } else {
+            try {
+              const since24hIso = new Date(nowMs - 24 * 3600_000).toISOString();
+              const { data: todayDbViews } = await (supabase as any)
+                .from('analytics_events')
+                .select('id, created_at, metadata')
+                .eq('business_id', payload.businessId)
+                .eq('event_name', 'view')
+                .eq('pseudonymous_subject_id', subjectId)
+                .gte('created_at', since24hIso)
+                .limit(10);
+
+              if (
+                Array.isArray(todayDbViews) &&
+                todayDbViews.some(
+                  (r: any) =>
+                    r?.metadata?.eligible_view !== false &&
+                    formatDateInTimezone(
+                      new Date(r.created_at),
+                      activePolicy.daily_timezone || 'America/Sao_Paulo'
+                    ) === todayBrt
+                )
+              ) {
+                eligibleView = false;
+                ineligibleReason = 'unique_daily_already_counted';
+              }
+            } catch {
+              // Prossegue se houver erro transitório
+            }
+          }
+        }
+
+        if (eligibleView) {
+          prevTimestamps.push(nowMs);
+          recentSubjectViews.set(subjectKey, prevTimestamps);
+        }
+      }
+
       const resolvedAcquisition = payload.acquisitionSource
         ? normalizeAcquisitionSource(payload.acquisitionSource)
         : payload.origin
@@ -173,7 +322,7 @@ export async function trackDirectoryEventAction(payload: {
         ? normalizeDiscoverySource(payload.source)
         : 'unidentified';
 
-      const { error } = await (supabase as any).from('analytics_events').insert({
+      const insertPayload = {
         tenant_id: business.tenant_id,
         business_id: payload.businessId,
         event_name: normalizedType,
@@ -189,15 +338,25 @@ export async function trackDirectoryEventAction(payload: {
           discovery_source: resolvedDiscovery,
           cycle_id: validCycleId || null,
           device: payload.device || 'web',
+          ...(normalizedType === 'view'
+            ? {
+                eligible_view: eligibleView,
+                policy_mode: policyMode,
+                ...(cooldownSubjectId && cooldownSubjectId !== 'anon_session'
+                  ? { cooldown_subject_id: cooldownSubjectId }
+                  : {}),
+                ...(ineligibleReason ? { ineligible_reason: ineligibleReason } : {}),
+              }
+            : {}),
         },
-      });
+      };
+
+      const { error } = await (supabase as any).from('analytics_events').insert(insertPayload);
 
       if (error) {
         // Concorrência PostgreSQL: se colidir especificamente com o índice único parcial de
         // idempotência de ciclo de visualização (uq_analytics_events_view_cycle_forward),
         // trata estritamente como deduplicação idempotente de sucesso.
-        // Qualquer outro erro 23505 (colisão de PK id, tenant_id ou índices não relacionados)
-        // é preservado como falha real de integridade e não mascarado.
         const errObj = error as { code?: string; message?: string; details?: string };
         const isCycleIndexConflict =
           (errObj.code === '23505' || Boolean(errObj.message?.includes('duplicate key'))) &&
@@ -223,6 +382,15 @@ export async function trackDirectoryEventAction(payload: {
         }
       }
 
+      if (normalizedType === 'view' && !eligibleView) {
+        return {
+          ok: true,
+          deduplicated: true,
+          policyFiltered: true,
+          policyMode,
+        };
+      }
+
       // Funil de indicações: contato (WhatsApp, telefone, site, rota ou rede social) de quem chegou por um link de indicação.
       if (['whatsapp_click', 'phone_click', 'website_click', 'directions_click', 'social_click'].includes(normalizedType)) {
         try {
@@ -237,14 +405,39 @@ export async function trackDirectoryEventAction(payload: {
         } catch {}
       }
 
-      return { ok: true };
+      return { ok: true, policyMode };
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : 'ANALYTICS_WRITE_FAILED' };
     }
   };
 
+  // Serializa requisições concorrentes do mesmo visitante para a mesma empresa (mesmo com cycleIds distintos ou na virada da meia-noite)
+  const runWithSubjectLock = async (): Promise<TrackDirectoryEventResult> => {
+    const lockVisitorKey =
+      cooldownSubjectId && cooldownSubjectId !== 'anon_session' ? cooldownSubjectId : subjectId;
+    if (normalizedType === 'view' && lockVisitorKey && lockVisitorKey !== 'anon_session') {
+      const subjLockKey = `${payload.businessId}:${lockVisitorKey}`;
+      const prevLock = inFlightSubjectLocks.get(subjLockKey);
+      let releaseLock!: () => void;
+      const currentLock = new Promise<void>((resolve) => {
+        releaseLock = resolve;
+      });
+      inFlightSubjectLocks.set(subjLockKey, currentLock);
+      try {
+        if (prevLock) await prevLock;
+        return await execute();
+      } finally {
+        releaseLock();
+        if (inFlightSubjectLocks.get(subjLockKey) === currentLock) {
+          inFlightSubjectLocks.delete(subjLockKey);
+        }
+      }
+    }
+    return await execute();
+  };
+
   if (normalizedType === 'view' && cycleKey) {
-    const promise = execute();
+    const promise = runWithSubjectLock();
     inFlightViewCycles.set(cycleKey, promise);
     try {
       return await promise;
@@ -253,7 +446,7 @@ export async function trackDirectoryEventAction(payload: {
     }
   }
 
-  return await execute();
+  return await runWithSubjectLock();
 }
 
 // Action 2: Buscar Resumo do Analytics para o Anunciante (7 / 30 / 90 dias)

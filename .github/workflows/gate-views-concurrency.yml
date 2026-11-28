@@ -1,0 +1,70 @@
+name: Gate Business Views - PostgreSQL Concurrency Validation
+
+on:
+  push:
+    branches:
+      - feat/gate-business-views-unification
+  workflow_dispatch:
+
+concurrency:
+  group: gate-views-concurrency-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-concurrency:
+    name: Multi-Connection PostgreSQL 16 Concurrency Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_disposable_ci
+          POSTGRES_DB: civicos_concurrency_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d civicos_concurrency_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Execute Multi-Connection PostgreSQL 16 Concurrency Validation (9 Scenarios)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres_disposable_ci@localhost:5432/civicos_concurrency_test
+        run: node scripts/verify-gate-views-pg-concurrency.mjs
+
+      - name: Execute Gate Business Views Automated Homologation Suite (99 Analytics Tests)
+        run: |
+          pnpm --filter web exec vitest run \
+            test/gate-business-views-homologation.test.ts \
+            test/analytics-persistence-invariants.test.ts \
+            test/analytics-deduplication.test.ts \
+            test/analytics-aggregation.test.ts \
+            test/analytics-service-security.test.ts \
+            test/analytics-security.test.ts \
+            test/analytics-phase1-critical.test.ts \
+            test/advertiser-analytics-history.test.ts \
+            test/advertiser-results-etapa-c.test.tsx \
+            test/admin-analytics-executive.test.ts \
+            test/admin-analytics-export.test.ts

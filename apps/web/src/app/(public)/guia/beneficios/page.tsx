@@ -7,6 +7,7 @@ import { createServerSideClient } from '@/lib/supabase/server';
 import { DirectoryHeader } from '@/components/public/directory/DirectoryHeader';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
 import { BenefitsDirectoryCards, type BenefitDirectoryBusinessItem } from '@/components/public/directory/BenefitsDirectoryCards';
+import { resolveCanonicalViewsCountsMap } from '@/lib/analytics/canonical-views-reader';
 import { StructuredData } from '@/components/seo/StructuredData';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
 import type { PublicBusinessBenefit } from '@/lib/business/public-business-presentation';
@@ -51,13 +52,18 @@ export default async function PublicBenefitsDirectoryPage({ searchParams }: Prop
     .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
 
   const benefitsByBusiness = new Map<string, PublicBusinessBenefit[]>();
+  let canonicalViewsMap: Record<string, number> = {};
   if (businessIds.length > 0) {
-    const { data: benefitRows } = await (supabase as any)
-      .from('business_benefits')
-      .select('id, business_id, title, description, benefit_type, discount_percentage, badge_text, valid_until, external_url')
-      .in('business_id', businessIds)
-      .eq('status', 'active')
-      .order('display_order', { ascending: true });
+    const [{ data: benefitRows }, resolvedViews] = await Promise.all([
+      (supabase as any)
+        .from('business_benefits')
+        .select('id, business_id, title, description, benefit_type, discount_percentage, badge_text, valid_until, external_url')
+        .in('business_id', businessIds)
+        .eq('status', 'active')
+        .order('display_order', { ascending: true }),
+      resolveCanonicalViewsCountsMap(businessIds, supabase),
+    ]);
+    canonicalViewsMap = resolvedViews;
 
     for (const row of benefitRows || []) {
       const bizId = String(row.business_id || '');
@@ -112,7 +118,7 @@ export default async function PublicBenefitsDirectoryPage({ searchParams }: Prop
         effective_plan_code: biz.effective_plan_code || biz.plan_code || null,
         rating_average: biz.rating_average != null ? Number(biz.rating_average) : null,
         reviews_count: biz.reviews_count != null ? Number(biz.reviews_count) : undefined,
-        views_count: biz.views_count != null ? Number(biz.views_count) : null,
+        views_count: canonicalViewsMap[bizId] ?? (biz.views_count != null ? Number(biz.views_count) : 0),
         badge_custom_text: biz.badge_custom_text || null,
         badge_custom_icon_url: biz.badge_custom_icon_url || null,
         has_benefits: true,

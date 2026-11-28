@@ -7,6 +7,7 @@ import {
   captureAcquisitionSource,
   normalizeDiscoverySource,
 } from '@/lib/analytics/traffic-sources';
+import { recordConfirmedServerViewsCount } from '@/lib/analytics/live-views-store';
 
 let currentCycleId: string | null = null;
 let currentBusinessId: string | null = null;
@@ -110,6 +111,27 @@ export async function sendTrackPayloadWithRetry(
         if (cycleId) {
           sentViewCycles.add(cycleId);
         }
+        try {
+          if (typeof response.json === 'function') {
+            const data = (await response.json()) as {
+              ok?: boolean;
+              viewsCount?: number;
+              serverTimestamp?: number;
+            } | null;
+            if (data && typeof data.viewsCount === 'number' && Number.isFinite(data.viewsCount)) {
+              const parsedBody = JSON.parse(body) as { businessId?: string };
+              if (parsedBody?.businessId) {
+                recordConfirmedServerViewsCount(
+                  parsedBody.businessId,
+                  data.viewsCount,
+                  typeof data.serverTimestamp === 'number' ? data.serverTimestamp : Date.now()
+                );
+              }
+            }
+          }
+        } catch {
+          // Resposta sem corpo JSON (ex.: mock simples em testes); prossegue normalmente
+        }
         return true;
       }
       // Status 4xx que não sejam de rede/servidor (ex: 400 Bad Request, 403 Forbidden) não devem sofrer retry
@@ -171,7 +193,14 @@ export function trackEvent(payload: TrackEventPayload): void {
       origin: payload.origin || acquisitionSource,
     });
 
-    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+    // Para visualizações ('view'), utiliza exclusivamente fetch com keepalive para ler a confirmação
+    // oficial do backend ({ ok, viewsCount, serverTimestamp }) e atualizar reativamente a interface.
+    // Para os demais eventos de clique/saída externa, preserva sendBeacon quando disponível.
+    if (
+      payload.eventType !== 'view' &&
+      typeof navigator !== 'undefined' &&
+      typeof navigator.sendBeacon === 'function'
+    ) {
       const queued = navigator.sendBeacon('/api/analytics/track', new Blob([body], { type: 'application/json' }));
       if (queued) return;
     }

@@ -11,6 +11,7 @@ import { InstitutionalBadges } from '../shared/InstitutionalBadges';
 import { QuickActionBar } from '../shared/BusinessActionButtons';
 import { CompanyLogoWithZoom } from '../shared/CompanyLogoWithZoom';
 import { ProfileContentGrid } from '../sections/ProfileContentGrid';
+import { useLiveBusinessViewsCount } from '@/lib/analytics/live-views-store';
 
 type GoldBusinessProfileProps = {
   profile: PublicBusinessPresentation;
@@ -24,6 +25,7 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
 
   const { identity, recognition, location, contacts, owner, media } = profile;
   const isFavorited = isFavorite(identity.slug);
+  const liveViewsCount = useLiveBusinessViewsCount(identity.id, profile.metrics?.views);
 
   const hasCover = Boolean(media.cover?.url);
   const coverUrl = media.cover?.url || '/capafallback.png';
@@ -111,13 +113,13 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
           )}
         </div>
 
-          {/* Botões de ação flutuantes (a partir de md). No celular eles ficam no painel de dados, para não cobrir a pessoa da foto da capa. */}
-          <div className="absolute top-4 right-4 z-30 hidden items-center gap-2 text-xs font-medium sm:top-6 sm:right-8 md:flex">
-            {renderActionButtons(false)}
-          </div>
+        {/* Botões de ação flutuantes (a partir de md). No celular eles ficam no painel de dados, para não cobrir a pessoa da foto da capa. */}
+        <div className="absolute top-4 right-4 z-30 hidden items-center gap-2 text-xs font-medium sm:top-6 sm:right-8 md:flex">
+          {renderActionButtons(false)}
+        </div>
 
-          {/* Conteúdo Institucional do Hero Banner com Altura Ampliada */}
-          <div className="relative z-20 -mt-6 rounded-t-[26px] bg-[#4B161B] shadow-[0_-10px_30px_rgba(29,3,6,0.35)] md:mt-0 md:rounded-none md:bg-transparent md:shadow-none">
+        {/* Conteúdo Institucional do Hero Banner com Altura Ampliada */}
+        <div className="relative z-20 -mt-6 rounded-t-[26px] bg-[#4B161B] shadow-[0_-10px_30px_rgba(29,3,6,0.35)] md:mt-0 md:rounded-none md:bg-transparent md:shadow-none">
           <div className="relative z-20 mx-auto w-full max-w-7xl px-4 pb-16 pt-0 sm:px-6 md:py-20 md:pb-28 lg:px-8">
 
             <div className="flex flex-col items-center gap-6 text-center sm:gap-7 md:flex-row md:items-start md:text-left">
@@ -183,11 +185,11 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
                       {[location.city, location.state].filter(Boolean).join(' • ')}
                     </p>
                   )}
-                  {profile.metrics?.views != null && (
+                  {liveViewsCount != null && (
                     <div className="inline-flex items-center gap-1.5 text-amber-200/90 font-medium" title="Visualizações da página da empresa">
                       {location && (location.city || location.state) && <span className="text-amber-200/40">·</span>}
                       <Eye className="w-3.5 h-3.5 text-[#C9A227] shrink-0" />
-                      <span>{profile.metrics.views.toLocaleString('pt-BR')} {profile.metrics.views === 1 ? 'visualização' : 'visualizações'}</span>
+                      <span>{liveViewsCount.toLocaleString('pt-BR')} {liveViewsCount === 1 ? 'visualização' : 'visualizações'}</span>
                     </div>
                   )}
                 </div>
@@ -202,7 +204,7 @@ export function GoldBusinessProfile({ profile }: GoldBusinessProfileProps) {
             </div>
 
           </div>
-          </div>
+        </div>
       </section>
 
       {/* CONTEÚDO PRINCIPAL (#F8F7F5) - Menu Sobreposto Flutuante com -mt-10 sm:-mt-12 */}

@@ -97,7 +97,7 @@ export function calcGrowthPercent(current: number, prev: number): number {
 }
 
 export const isViewEvent = (e: RawAnalyticsEvent) =>
-  e.event_name === 'view' || e.event_name === 'page_view';
+  e.event_name === 'view' && (e.metadata as Record<string, unknown> | null)?.eligible_view !== false;
 
 export const isWhatsappEvent = (e: RawAnalyticsEvent) =>
   e.event_name === 'whatsapp_click';
@@ -229,8 +229,8 @@ export class StreamingAnalyticsAggregator {
             : (typeof e.metadata?.acquisition_source === 'string'
               ? e.metadata.acquisition_source
               : typeof e.metadata?.origin === 'string'
-              ? e.metadata.origin
-              : (e.source === 'direct' ? 'direct' : null));
+                ? e.metadata.origin
+                : (e.source === 'direct' ? 'direct' : null));
           const acq = normalizeAcquisitionSource(rawAcq);
           this.acquisitionCounts[acq] = (this.acquisitionCounts[acq] || 0) + 1;
 
@@ -239,8 +239,8 @@ export class StreamingAnalyticsAggregator {
             : (typeof e.metadata?.discovery_source === 'string'
               ? e.metadata.discovery_source
               : typeof e.metadata?.source === 'string'
-              ? e.metadata.source
-              : e.source);
+                ? e.metadata.source
+                : e.source);
           const disc = normalizeDiscoverySource(rawDisc);
           this.discoveryCounts[disc] = (this.discoveryCounts[disc] || 0) + 1;
 

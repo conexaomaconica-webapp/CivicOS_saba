@@ -3,8 +3,53 @@
 import React from 'react';
 import Link from 'next/link';
 import { BusinessCard, type BusinessCardData } from './BusinessCard';
+import { useLiveBusinessViewsCount } from '@/lib/analytics/live-views-store';
 
 export type DirectorySponsoredItem = BusinessCardData;
+
+function SponsoredMarqueeLogoItem({ biz }: { biz: DirectorySponsoredItem }) {
+  const liveViews = useLiveBusinessViewsCount(biz.id, biz.views_count);
+  const viewsSuffix =
+    typeof liveViews === 'number'
+      ? ` • ${liveViews.toLocaleString('pt-BR')} ${liveViews === 1 ? 'visualização' : 'visualizações'}`
+      : '';
+  const businessTitle = `${biz.name}${biz.category_name ? ` • ${biz.category_name}` : ''}${viewsSuffix}`;
+  const bgColor = biz.logo_background_color || '#ffffff';
+
+  return (
+    <Link
+      href={`/guia/${biz.slug}?src=featured_sponsored`}
+      title={businessTitle}
+      data-views-count={typeof liveViews === 'number' ? liveViews : undefined}
+      className="group/item flex flex-col items-center gap-1.5 shrink-0 transition-transform duration-200 hover:-translate-y-0.5 focus:outline-none w-[92px] lg:w-[calc((100cqw_-_160px)/5)]"
+    >
+      {/* Container da Logo com Tamanho Aumentado e Fundo Adaptativo */}
+      <div
+        className="relative w-20 h-20 lg:w-28 lg:h-28 rounded-[22px] lg:rounded-[28px] border-2 border-[#e7dacd] group-hover/item:border-[#c9a227] shadow-xs group-hover/item:shadow-md flex items-center justify-center p-2 transition-all overflow-hidden"
+        style={{ backgroundColor: bgColor }}
+      >
+        {biz.logo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={biz.logo_url}
+            alt={biz.name || 'Logo da empresa'}
+            loading="lazy"
+            className="w-full h-full object-contain transition-transform duration-300 group-hover/item:scale-105"
+          />
+        ) : (
+          <span className="font-serif font-bold text-2xl text-[#4b161b]">
+            {biz.name ? biz.name.charAt(0).toUpperCase() : 'M'}
+          </span>
+        )}
+      </div>
+
+      {/* Nome da Marca abaixo do ícone */}
+      <span className="text-[11px] lg:text-sm font-bold text-[#4b161b] text-center w-full truncate px-0.5 group-hover/item:text-[#c9a227] transition-colors">
+        {biz.name}
+      </span>
+    </Link>
+  );
+}
 
 type DirectorySponsoredProps = {
   items?: DirectorySponsoredItem[];
@@ -53,44 +98,9 @@ export function DirectorySponsored({
             className="dh-logo-marquee-track items-start gap-4 sm:gap-5 lg:gap-10"
             style={{ '--marquee-speed': `${Math.max(10, speed)}s`, '--marquee-speed-lg': `${desktopCycleSeconds}s` } as React.CSSProperties}
           >
-            {loopedItems.map((biz, idx) => {
-              const businessTitle = `${biz.name}${biz.category_name ? ` • ${biz.category_name}` : ''}`;
-              const bgColor = biz.logo_background_color || '#ffffff';
-
-              return (
-                <Link
-                  key={`${biz.id}-${idx}`}
-                  href={`/guia/${biz.slug}?src=featured_sponsored`}
-                  title={businessTitle}
-                  className="group/item flex flex-col items-center gap-1.5 shrink-0 transition-transform duration-200 hover:-translate-y-0.5 focus:outline-none w-[92px] lg:w-[calc((100cqw_-_160px)/5)]"
-                >
-                  {/* Container da Logo com Tamanho Aumentado e Fundo Adaptativo */}
-                  <div
-                    className="relative w-20 h-20 lg:w-28 lg:h-28 rounded-[22px] lg:rounded-[28px] border-2 border-[#e7dacd] group-hover/item:border-[#c9a227] shadow-xs group-hover/item:shadow-md flex items-center justify-center p-2 transition-all overflow-hidden"
-                    style={{ backgroundColor: bgColor }}
-                  >
-                    {biz.logo_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={biz.logo_url}
-                        alt={biz.name || 'Logo da empresa'}
-                        loading="lazy"
-                        className="w-full h-full object-contain transition-transform duration-300 group-hover/item:scale-105"
-                      />
-                    ) : (
-                      <span className="font-serif font-bold text-2xl text-[#4b161b]">
-                        {biz.name ? biz.name.charAt(0).toUpperCase() : 'M'}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Nome da Marca abaixo do ícone */}
-                  <span className="text-[11px] lg:text-sm font-bold text-[#4b161b] text-center w-full truncate px-0.5 group-hover/item:text-[#c9a227] transition-colors">
-                    {biz.name}
-                  </span>
-                </Link>
-              );
-            })}
+            {loopedItems.map((biz, idx) => (
+              <SponsoredMarqueeLogoItem key={`${biz.id}-${idx}`} biz={biz} />
+            ))}
           </div>
         </div>
       </section>

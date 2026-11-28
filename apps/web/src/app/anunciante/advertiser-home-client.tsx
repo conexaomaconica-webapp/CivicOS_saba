@@ -146,13 +146,21 @@ export default function AdvertiserHomeClient({ data }: { data: AdvertiserDashboa
         </div>
 
         {/* METRICAS DE INTERAÇÃO COMERCIAL */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="p-4 bg-amber-50/70 border border-amber-300/80 rounded-2xl space-y-1">
+            <span className="text-amber-950 text-xs font-bold block">Visualizações Totais</span>
+            <strong className="text-2xl font-serif font-bold text-[#3B0B14] block">
+              {(results30d.total_views ?? results30d.views).toLocaleString('pt-BR')}
+            </strong>
+            <span className="text-[10px] text-amber-800 font-mono">Acumulado oficial no Guia</span>
+          </div>
+
           <div className="p-4 bg-stone-50 border border-stone-200/80 rounded-2xl space-y-1">
-            <span className="text-stone-500 text-xs font-medium block">Visualizações</span>
+            <span className="text-stone-500 text-xs font-medium block">Visualizações (30 dias)</span>
             <strong className="text-2xl font-serif font-bold text-stone-900 block">
               {results30d.views.toLocaleString('pt-BR')}
             </strong>
-            <span className="text-[10px] text-stone-400 font-mono">Páginas de anúncio exibidas</span>
+            <span className="text-[10px] text-stone-400 font-mono">Acessos nos últimos 30 dias</span>
           </div>
 
           <div className="p-4 bg-stone-50 border border-stone-200/80 rounded-2xl space-y-1">

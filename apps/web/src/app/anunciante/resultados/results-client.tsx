@@ -328,17 +328,39 @@ export default function AdvertiserResultsClient({ initialData }: { initialData: 
                 </span>
               </div>
 
-              {/* Indicadores 1 e 2: Visualizações Totais e Visitantes Únicos */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* 1. Visualizações Totais (por atualização / F5) */}
+              {/* Indicadores: Visualizações Totais (Acumulado Oficial), Visualizações no Período e Visitantes Únicos */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 0. Total Oficial Acumulado (Mesmo contador do Guia, Cards, App iOS e Android) */}
+                <div className="p-5 bg-amber-50/70 border border-amber-300/80 rounded-2xl shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                      <Eye className="w-4 h-4 text-[#C9A227]" />
+                      Visualizações Totais
+                    </span>
+                    <span className="px-2 py-0.5 bg-[#3B0B14] text-[#C9A227] rounded-md text-[10px] font-mono">
+                      Oficial
+                    </span>
+                  </div>
+                  <strong className="text-3xl font-serif font-bold text-[#3B0B14] block">
+                    {(kpis.totalOfficialViews ?? kpis.views).toLocaleString('pt-BR')}
+                  </strong>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] text-amber-900 font-semibold">Acumulado desde a publicação</span>
+                  </div>
+                  <p className="text-[11px] text-amber-950/80 pt-1 border-t border-amber-200/60 leading-tight">
+                    Contador oficial exibido nos cards do Guia, no Perfil Empresarial e nos aplicativos Android e iOS.
+                  </p>
+                </div>
+
+                {/* 1. Visualizações no Período (7d / 30d / 90d) */}
                 <div className="p-5 bg-white border border-stone-200 rounded-2xl shadow-xs space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-stone-600 flex items-center gap-1.5">
                       <Eye className="w-4 h-4 text-stone-400" />
-                      Visualizações Totais
+                      Visualizações ({data.periodLabel})
                     </span>
                     <span className="px-2 py-0.5 bg-stone-100 text-stone-600 rounded-md text-[10px] font-mono">
-                      Por atualização
+                      No período
                     </span>
                   </div>
                   <strong className="text-3xl font-serif font-bold text-stone-900 block">
@@ -665,7 +687,7 @@ export default function AdvertiserResultsClient({ initialData }: { initialData: 
                     Transparência &amp; Diretrizes Comerciais:
                   </p>
                   <p className="text-[11px] leading-relaxed text-stone-600">
-                    Métricas de cliques e interações representam interesse manifesto de contato com a sua empresa. A Taxa de Interações por Visualização indica a proporção entre ações diretas de contato (WhatsApp, telefone, rotas, site, etc.) e visualizações do perfil, não representando conversão em vendas ou faturamento garantido. O fechamento efetivo de negócios depende exclusivamente do atendimento da sua equipe.
+                    Métricas de cliques e interações representam interesse manifesto de contato com a sua empresa. A Taxa de Interações por Visualização indica a proporção entre ações diretas de contato (WhatsApp, telefone, rotas, site, etc.) e visualizações do perfil. Nenhum clique ou visualização garante venda concretizada ou faturamento comercial. O fechamento efetivo de negócios depende exclusivamente do atendimento da sua equipe.
                   </p>
                 </div>
               </div>

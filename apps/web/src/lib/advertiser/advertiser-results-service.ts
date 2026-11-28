@@ -17,6 +17,7 @@ import {
   type AcquisitionSource,
   type DiscoverySource,
 } from '@/lib/analytics/traffic-sources';
+import { resolveSingleBusinessCanonicalViewsCount } from '@/lib/analytics/canonical-views-reader';
 
 export type TimePeriod = '7d' | '30d' | '90d';
 
@@ -29,6 +30,7 @@ export interface AdvertiserResultsDTO {
     slug: string;
   };
   kpis: {
+    totalOfficialViews?: number;
     views: number;
     viewsComparisonPercent: number;
     uniqueVisitors: number;
@@ -351,6 +353,10 @@ export async function getAdvertiserResultsDTOAction(
       });
     }
 
+    const totalOfficialViews = await resolveSingleBusinessCanonicalViewsCount(businessId, supabase).catch(
+      () => agg.kpis.views
+    );
+
     return {
       period,
       periodLabel,
@@ -359,7 +365,10 @@ export async function getAdvertiserResultsDTOAction(
         name: b.name,
         slug: b.slug,
       },
-      kpis: agg.kpis,
+      kpis: {
+        ...agg.kpis,
+        totalOfficialViews,
+      },
       funnel: agg.funnel,
       dailyEvolution: agg.dailyEvolution,
       trafficOrigins: agg.trafficOrigins,

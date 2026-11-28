@@ -10,6 +10,7 @@ import { InstitutionalBadges } from '../shared/InstitutionalBadges';
 import { QuickActionBar } from '../shared/BusinessActionButtons';
 import { CompanyLogoWithZoom } from '../shared/CompanyLogoWithZoom';
 import { ProfileContentGrid } from '../sections/ProfileContentGrid';
+import { useLiveBusinessViewsCount } from '@/lib/analytics/live-views-store';
 
 type SilverBusinessProfileProps = {
   profile: PublicBusinessPresentation;
@@ -22,6 +23,7 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
 
   const { identity, recognition, location, contacts, owner, media } = profile;
   const isFavorited = isFavorite(identity.slug);
+  const liveViewsCount = useLiveBusinessViewsCount(identity.id, profile.metrics?.views);
 
   // 1. Filtrar lista de mídias eliminando duplicatas entre cover e gallery
   const coverAsset = media?.cover ?? null;
@@ -250,11 +252,11 @@ export function SilverBusinessProfile({ profile }: SilverBusinessProfileProps) {
                         {[location.city, location.state].filter(Boolean).join(' • ')}
                       </p>
                     )}
-                    {profile.metrics?.views != null && (
+                    {liveViewsCount != null && (
                       <div className="inline-flex items-center gap-1.5 text-stone-600 font-medium" title="Visualizações da página da empresa">
                         {location && (location.city || location.state) && <span className="text-stone-300">·</span>}
                         <Eye className="w-3.5 h-3.5 text-[#C9A227] shrink-0" />
-                        <span>{profile.metrics.views.toLocaleString('pt-BR')} {profile.metrics.views === 1 ? 'visualização' : 'visualizações'}</span>
+                        <span>{liveViewsCount.toLocaleString('pt-BR')} {liveViewsCount === 1 ? 'visualização' : 'visualizações'}</span>
                       </div>
                     )}
                   </div>

@@ -28,6 +28,7 @@ import { createServerSideClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database.types';
 
 import { getInstitutionalRecognitionsAction } from '@/app/actions/institutional-recognitions';
+import { resolveSingleBusinessCanonicalViewsCount } from '@/lib/analytics/canonical-views-reader';
 import { resolveResponsibleRole, resolveTreatmentLabel } from '@/lib/business/responsible-role-resolver';
 import { BusinessPreviewApprovalBar } from '@/components/public/business/preview/BusinessPreviewApprovalBar';
 
@@ -318,15 +319,11 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
             }
           } catch (_e) {}
 
-          // Contagem de visualizações da página da empresa por atualização (event_name = 'view')
+          // Contagem oficial canônica de visualizações da página da empresa
           try {
-            const { count: vCount } = await (dbReader as any)
-              .from('analytics_events')
-              .select('id', { count: 'exact', head: true })
-              .eq('business_id', bizId)
-              .eq('event_name', 'view');
-            detailObj.views_count = typeof vCount === 'number' ? vCount : 0;
-            detailObj.views = detailObj.views_count;
+            const vCount = await resolveSingleBusinessCanonicalViewsCount(bizId, dbReader);
+            detailObj.views_count = vCount;
+            detailObj.views = vCount;
           } catch (_e) {}
         }
 
@@ -603,15 +600,11 @@ const getPublicBusiness = cache(async (slug: string, isPreview: boolean = false)
       }
     } catch (_e) {}
 
-    // Contagem de visualizações da página da empresa por atualização (event_name = 'view')
+    // Contagem oficial canônica de visualizações da página da empresa
     try {
-      const { count: vCount } = await (dbReader as any)
-        .from('analytics_events')
-        .select('id', { count: 'exact', head: true })
-        .eq('business_id', bizId)
-        .eq('event_name', 'view');
-      detailObj.views_count = typeof vCount === 'number' ? vCount : 0;
-      detailObj.views = detailObj.views_count;
+      const vCount = await resolveSingleBusinessCanonicalViewsCount(bizId, dbReader);
+      detailObj.views_count = vCount;
+      detailObj.views = vCount;
     } catch (_e) {}
 
     const recognitionsResult = await getInstitutionalRecognitionsAction();

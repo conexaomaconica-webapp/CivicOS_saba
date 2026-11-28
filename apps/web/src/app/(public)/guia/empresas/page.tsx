@@ -28,6 +28,7 @@ import {
 } from '@/lib/directory/business-filters';
 import { resolveSearchQuery } from '@/lib/directory/normalize-search';
 import { findBusinessesByMasonicMember } from '@/lib/directory/masonic-member-search';
+import { resolveCanonicalViewsCountsMap } from '@/lib/analytics/canonical-views-reader';
 import { sortBusinessesBySearchRelevance } from '@/lib/directory/search-relevance';
 import { TrackEvent } from '@/components/analytics/TrackEvent';
 import { sanitizeSearchTerm } from '@/lib/analytics/events';
@@ -319,25 +320,14 @@ export default async function BusinessDirectoryPage({ searchParams }: Props) {
           ? createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } })
           : supabase;
 
-        const [{ data: viewEvents }, { data: attrRows }] = await Promise.all([
-          (dbReader as any)
-            .from('analytics_events')
-            .select('business_id')
-            .in('business_id', bizIds)
-            .eq('event_name', 'view'),
+        const [countsMap, { data: attrRows }] = await Promise.all([
+          resolveCanonicalViewsCountsMap(bizIds, dbReader),
           (dbReader as any)
             .from('business_attributes')
             .select('business_id, attribute_key, attribute_value')
             .in('business_id', bizIds)
             .in('attribute_key', ['logo_background_color', 'logo_bg_color']),
         ]);
-
-        const countsMap: Record<string, number> = {};
-        if (viewEvents && viewEvents.length > 0) {
-          for (const ev of viewEvents) {
-            countsMap[ev.business_id] = (countsMap[ev.business_id] || 0) + 1;
-          }
-        }
 
         const logoBgMap: Record<string, string> = {};
         if (attrRows && attrRows.length > 0) {

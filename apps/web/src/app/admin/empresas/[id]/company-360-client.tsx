@@ -5342,10 +5342,16 @@ export default function Company360Client({ initialData }: Props) {
               <BarChart3 className="w-5 h-5 text-[#3B0B14]" /> Performance & Interações (Últimos 30 dias)
             </h3>
 
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-xs">
+              <div className="p-3.5 bg-amber-50/70 border border-amber-300/80 rounded-2xl">
+                <span className="text-amber-950 block font-bold">Visualizações Totais (Oficial):</span>
+                <p className="text-2xl font-serif font-bold text-[#3B0B14] mt-1">
+                  {((data.analytics_summary as any).total_views ?? data.analytics_summary.views_30d).toLocaleString('pt-BR')}
+                </p>
+              </div>
               <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-2xl">
-                <span className="text-stone-500 block font-bold">Visualizações:</span>
-                <p className="text-2xl font-serif font-bold text-stone-900 mt-1">{data.analytics_summary.views_30d}</p>
+                <span className="text-stone-500 block font-bold">Visualizações (30 dias):</span>
+                <p className="text-2xl font-serif font-bold text-stone-900 mt-1">{data.analytics_summary.views_30d.toLocaleString('pt-BR')}</p>
               </div>
               <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-2xl">
                 <span className="text-stone-500 block font-bold">Interações:</span>

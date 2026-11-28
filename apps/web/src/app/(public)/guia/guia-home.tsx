@@ -28,6 +28,7 @@ import { DirectoryConnectionsShowcase } from '@/components/public/directory/Dire
 import { COMPACT_SHOWCASE_LIMIT } from '@/lib/directory/connections-feed';
 import { DirectoryConnectionsCta } from '@/components/public/directory/DirectoryConnectionsCta';
 import { DirectoryFooter } from '@/components/public/directory/DirectoryFooter';
+import { resolveCanonicalViewsCountsMap } from '@/lib/analytics/canonical-views-reader';
 import { FavoritesProvider } from '@/lib/directory/favorites-context';
 import { resolveSearchQuery } from '@/lib/directory/normalize-search';
 import { sortBusinessesBySearchRelevance } from '@/lib/directory/search-relevance';
@@ -583,25 +584,14 @@ export default async function GuiaHomePage({ searchParams }: Props) {
         ? createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } })
         : supabase;
 
-      const [{ data: viewEvents }, { data: attrRows }] = await Promise.all([
-        (dbReader as any)
-          .from('analytics_events')
-          .select('business_id')
-          .in('business_id', allCardBizIds)
-          .eq('event_name', 'view'),
+      const [countsMap, { data: attrRows }] = await Promise.all([
+        resolveCanonicalViewsCountsMap(allCardBizIds, dbReader),
         (dbReader as any)
           .from('business_attributes')
           .select('business_id, attribute_key, attribute_value')
           .in('business_id', allCardBizIds)
           .in('attribute_key', ['logo_background_color', 'logo_bg_color']),
       ]);
-
-      const countsMap: Record<string, number> = {};
-      if (viewEvents && viewEvents.length > 0) {
-        for (const ev of viewEvents) {
-          countsMap[ev.business_id] = (countsMap[ev.business_id] || 0) + 1;
-        }
-      }
 
       const logoBgMap: Record<string, string> = {};
       if (attrRows && attrRows.length > 0) {

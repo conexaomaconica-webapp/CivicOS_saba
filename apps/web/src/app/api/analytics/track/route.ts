@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { createClient } from '@supabase/supabase-js';
 import { isVisitOrigin } from '@/lib/analytics/visit-origin';
 import {
@@ -10,6 +11,11 @@ import {
   trackDirectoryEventAction,
   trackSearchImpressionsAction,
 } from '@/lib/analytics/analytics-service';
+import { resolveSingleBusinessCanonicalViewsCount } from '@/lib/analytics/canonical-views-reader';
+
+// Controle de intervalo de revalidação server-side para escalabilidade (evita thrashing de ISR a cada visita)
+const REVALIDATE_DIRECTORY_INTERVAL_MS = 30_000;
+let lastDirectoryRevalidateAt = 0;
 
 // Endpoint para sendBeacon/fetch keepalive: sobrevive à troca de página (Server Actions não sobrevivem).
 // Reaproveita a mesma gravação e validações de trackDirectoryEventAction.
@@ -216,9 +222,21 @@ export async function POST(request: Request) {
   });
 
   // Telemetria nunca devolve erro detalhado ao navegador.
-  const typedResult = result as { ok?: boolean; deduplicated?: boolean; skipped?: boolean };
-  let viewsCount: number | undefined;
-  if (normalizedType === 'view' && typedResult?.ok && !typedResult?.skipped) {
+  const typedResult = result as {
+    ok?: boolean;
+    deduplicated?: boolean;
+    skipped?: boolean;
+    policyFiltered?: boolean;
+    policyMode?: string;
+    viewsCount?: number;
+  };
+  let viewsCount: number | undefined =
+    typeof typedResult?.viewsCount === 'number' ? typedResult.viewsCount : undefined;
+  const serverTimestamp = Date.now();
+
+  // Condicionante 2.5 e Seção 6: Retorna o contador oficial inclusive em respostas skipped e deduplicated,
+  // utilizando resolveSingleBusinessCanonicalViewsCount (que verifica se o trigger está ativo no Postgres e faz fallback automático pós-rollback)
+  if (normalizedType === 'view' && typedResult?.ok && typeof viewsCount !== 'number') {
     try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -226,25 +244,35 @@ export async function POST(request: Request) {
         const adminDb = createClient(supabaseUrl, serviceRoleKey, {
           auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
         });
-        const { count } = await (adminDb as any)
-          .from('analytics_events')
-          .select('id', { count: 'exact', head: true })
-          .eq('business_id', businessId)
-          .eq('event_name', 'view');
-        if (typeof count === 'number') {
-          viewsCount = count;
-        }
+        viewsCount = await resolveSingleBusinessCanonicalViewsCount(businessId, adminDb);
       }
     } catch {
       // Silencioso para nunca atrasar ou falhar a telemetria
     }
   }
+
+  // Revalidação controlada das páginas do diretório quando uma nova visualização válida é contabilizada
+  if (normalizedType === 'view' && typedResult?.ok && !typedResult?.deduplicated && !typedResult?.skipped) {
+    if (serverTimestamp - lastDirectoryRevalidateAt >= REVALIDATE_DIRECTORY_INTERVAL_MS) {
+      lastDirectoryRevalidateAt = serverTimestamp;
+      try {
+        revalidatePath('/guia');
+        revalidatePath('/guia/empresas');
+        revalidatePath('/guia/beneficios');
+      } catch {
+        // Ignora fora do contexto Next.js Request
+      }
+    }
+  }
+
   return NextResponse.json(
     {
       ok: Boolean(typedResult?.ok),
       ...(typedResult?.deduplicated ? { deduplicated: true } : {}),
       ...(typedResult?.skipped ? { skipped: true } : {}),
-      ...(typeof viewsCount === 'number' ? { viewsCount } : {}),
+      ...(typedResult?.policyFiltered ? { policyFiltered: true } : {}),
+      ...(typedResult?.policyMode ? { policyMode: typedResult.policyMode } : {}),
+      ...(typeof viewsCount === 'number' ? { viewsCount, serverTimestamp } : {}),
     },
     { status: 200, headers: corsHeaders }
   );

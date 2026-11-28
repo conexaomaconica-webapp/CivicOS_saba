@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Heart, Share2, Star, Crown, Award, ShieldCheck, Users, Map, Building2, Eye } from 'lucide-react';
 import { useFavorites } from '@/lib/directory/favorites-context';
 import { useSearchImpression } from '@/lib/analytics/use-search-impression';
+import { useLiveBusinessViewsCount } from '@/lib/analytics/live-views-store';
 import { CardReferModal } from './CardReferModal';
 import { usePedraCardDisplay, usePedraHorizontalSeal, type PedraCardDisplay } from '@/lib/directory/pedra-card-display-context';
 import {
@@ -130,6 +131,7 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discover
   const locationStr = [data.city, data.state].filter(Boolean).join(', ');
   const hasRealRating = data.rating_average != null && data.reviews_count != null && data.reviews_count > 0;
   const masonicConnection = formatMasonicConnection(data);
+  const liveViewsCount = useLiveBusinessViewsCount(data.id, data.views_count);
 
   return (
     <div ref={impressionRef} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-2xs hover:shadow-md transition-all flex flex-col md:flex-row gap-5 items-start md:items-center justify-between group">
@@ -152,15 +154,14 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discover
 
           return (
             <div
-              className={`relative w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 rounded-2xl border-2 flex items-center justify-center overflow-hidden shrink-0 shadow-xs p-2 md:p-3 transition-all duration-300 ease-out group-hover:scale-105 hover:!scale-110 hover:shadow-xl hover:border-amber-400 cursor-pointer ${
-                data.logo_url ? '' : 'bg-amber-950 text-amber-400 font-bold'
-              }`}
+              className={`relative w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 rounded-2xl border-2 flex items-center justify-center overflow-hidden shrink-0 shadow-xs p-2 md:p-3 transition-all duration-300 ease-out group-hover:scale-105 hover:!scale-110 hover:shadow-xl hover:border-amber-400 cursor-pointer ${data.logo_url ? '' : 'bg-amber-950 text-amber-400 font-bold'
+                }`}
               style={
                 data.logo_url
                   ? {
-                      backgroundColor: containerBg,
-                      borderColor: containerBorder,
-                    }
+                    backgroundColor: containerBg,
+                    borderColor: containerBorder,
+                  }
                   : undefined
               }
             >
@@ -185,7 +186,7 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discover
             <h3 className="font-serif font-bold text-gray-900 text-base md:text-lg group-hover:text-amber-900 transition-colors">
               {data.name}
             </h3>
-            
+
             {/* Selo Principal do Plano */}
             <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] md:text-xs font-semibold ${badge.bg}`}>
               <badge.icon className="w-3 h-3 md:w-3.5 md:h-3.5 shrink-0 text-amber-800" />
@@ -201,14 +202,14 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discover
                 · <Star className="w-3 h-3 md:w-3.5 md:h-3.5 fill-amber-400 text-amber-400" /> {data.rating_average} ({data.reviews_count})
               </span>
             )}
-            {data.views_count != null && (
+            {liveViewsCount != null && (
               <span
                 className="inline-flex items-center gap-1 font-medium text-stone-600 bg-stone-100/90 px-2 py-0.5 rounded-md text-[11px] md:text-xs"
                 title="Visualizações da página da empresa"
               >
                 <Eye className="w-3.5 h-3.5 text-stone-500 shrink-0" />
                 <span>
-                  {Number(data.views_count || 0).toLocaleString('pt-BR')} {Number(data.views_count || 0) === 1 ? 'view' : 'views'}
+                  {Number(liveViewsCount || 0).toLocaleString('pt-BR')} {Number(liveViewsCount || 0) === 1 ? 'view' : 'views'}
                 </span>
               </span>
             )}
@@ -310,11 +311,10 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discover
             onClick={handleToggleFavorite}
             aria-pressed={favorited}
             title={favorited ? 'Remover dos favoritos' : 'Favoritar'}
-            className={`inline-flex min-h-9 md:min-h-10 items-center gap-1.5 rounded-xl border px-3 py-1.5 md:px-3.5 md:py-2 text-xs md:text-sm font-semibold transition-colors cursor-pointer ${
-              favorited
-                ? 'border-red-200 bg-red-50 text-red-700 shadow-2xs'
-                : 'border-stone-300 bg-white text-stone-700 hover:border-red-200 hover:bg-red-50 hover:text-red-700 shadow-2xs'
-            }`}
+            className={`inline-flex min-h-9 md:min-h-10 items-center gap-1.5 rounded-xl border px-3 py-1.5 md:px-3.5 md:py-2 text-xs md:text-sm font-semibold transition-colors cursor-pointer ${favorited
+              ? 'border-red-200 bg-red-50 text-red-700 shadow-2xs'
+              : 'border-stone-300 bg-white text-stone-700 hover:border-red-200 hover:bg-red-50 hover:text-red-700 shadow-2xs'
+              }`}
           >
             <Heart className={`h-4 w-4 ${favorited ? 'fill-red-600 text-red-600' : ''}`} />
             <span>{favorited ? 'Favoritado' : 'Favoritar'}</span>

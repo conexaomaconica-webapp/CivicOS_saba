@@ -4,6 +4,10 @@ import { MAX_BUSINESS_CERTIFICATIONS, normalizeCertificationZoom, planAllowsCert
 import { fetchMainHomeCategories } from '@/lib/directory/home-main-categories';
 import { isSafeImageCoverUrl, resolveCoverUrlFromMediaList, sortMediaImagesFirst } from '@/lib/business/cover-url-guard';
 import { sortBusinessesBySearchRelevance } from '@/lib/directory/search-relevance';
+import {
+  resolveCanonicalViewsCountsMap,
+  resolveSingleBusinessCanonicalViewsCount,
+} from '@/lib/analytics/canonical-views-reader';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -68,13 +72,8 @@ export async function GET(request: Request) {
       }
       const bizId = detail.business_id || detail.id;
       if (bizId) {
-        const [{ count: vCount }, { data: attrRows }, { data: recRows }, { data: certRows }, { data: svcRows }, { data: benRows }, { data: eventsRows }, { data: postsRows }] = await Promise.all([
-          adminDb
-            .from('analytics_events')
-            .select('id', { count: 'exact', head: true })
-            .eq('business_id', bizId)
-            .eq('event_name', 'view')
-            .then((r: any) => r, () => ({ count: 0 })),
+        const [vCount, { data: attrRows }, { data: recRows }, { data: certRows }, { data: svcRows }, { data: benRows }, { data: eventsRows }, { data: postsRows }] = await Promise.all([
+          resolveSingleBusinessCanonicalViewsCount(bizId, adminDb).catch(() => 0),
           adminDb
             .from('business_attributes')
             .select('attribute_key, attribute_value')
@@ -252,15 +251,10 @@ export async function GET(request: Request) {
       }
     }
 
-    if (allBizIds.length > 0 && serviceRoleKey) {
+    if (allBizIds.length > 0) {
       const missingCoverBizIds = allBizIds.filter((id) => !validCoverMap.has(id));
-      const [{ data: viewEvents }, { data: attrRows }, { data: coverMediaRows }] = await Promise.all([
-        adminDb
-          .from('analytics_events')
-          .select('business_id')
-          .in('business_id', allBizIds)
-          .eq('event_name', 'view')
-          .then((r: any) => r, () => ({ data: [] })),
+      const [canonicalCountsMap, { data: attrRows }, { data: coverMediaRows }] = await Promise.all([
+        resolveCanonicalViewsCountsMap(allBizIds, adminDb).catch(() => ({} as Record<string, number>)),
         adminDb
           .from('business_attributes')
           .select('business_id, attribute_key, attribute_value')
@@ -287,12 +281,8 @@ export async function GET(request: Request) {
         }
       }
 
-      if (Array.isArray(viewEvents)) {
-        for (const ev of viewEvents) {
-          if (ev?.business_id) {
-            viewsMap.set(ev.business_id, (viewsMap.get(ev.business_id) ?? 0) + 1);
-          }
-        }
+      for (const [bId, cnt] of Object.entries(canonicalCountsMap)) {
+        viewsMap.set(bId, cnt);
       }
 
       if (Array.isArray(attrRows)) {

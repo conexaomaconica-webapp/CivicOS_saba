@@ -241,6 +241,12 @@ export const adminNavSections: NavSection[] = [
         icon: Palette,
       },
       {
+        id: 'analytics-config',
+        label: 'Analytics e Visualizações',
+        path: '/admin/configuracoes/analytics',
+        icon: Sparkles,
+      },
+      {
         id: 'asaas-integracao',
         label: 'Integração Asaas',
         path: '/admin/configuracoes/integracoes/asaas',
@@ -350,11 +356,10 @@ export function AdminSidebar({ isMobileOpen = false, onMobileClose, userRole = '
                     <Link
                       href={item.path}
                       onClick={() => onMobileClose && onMobileClose()}
-                      className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
-                        active
-                          ? 'bg-[#C9A227] text-[#3B0B14] font-bold shadow-md'
-                          : 'text-stone-300 hover:bg-[#4B161B] hover:text-white'
-                      }`}
+                      className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${active
+                        ? 'bg-[#C9A227] text-[#3B0B14] font-bold shadow-md'
+                        : 'text-stone-300 hover:bg-[#4B161B] hover:text-white'
+                        }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-[#3B0B14]' : 'text-[#C9A227]'}`} />
@@ -363,11 +368,10 @@ export function AdminSidebar({ isMobileOpen = false, onMobileClose, userRole = '
 
                       {dynamicBadge && (
                         <span
-                          className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase ${
-                            active
-                              ? 'bg-[#3B0B14] text-[#C9A227]'
-                              : 'bg-amber-500/20 text-[#C9A227] border border-[#C9A227]/30'
-                          }`}
+                          className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase ${active
+                            ? 'bg-[#3B0B14] text-[#C9A227]'
+                            : 'bg-amber-500/20 text-[#C9A227] border border-[#C9A227]/30'
+                            }`}
                         >
                           {dynamicBadge}
                         </span>
@@ -384,11 +388,10 @@ export function AdminSidebar({ isMobileOpen = false, onMobileClose, userRole = '
                               key={sub.path}
                               href={sub.path}
                               onClick={() => onMobileClose && onMobileClose()}
-                              className={`flex items-center justify-between text-[11px] py-1 px-2 rounded-lg transition-colors ${
-                                subActive
-                                  ? 'text-[#C9A227] font-bold bg-[#4B161B]'
-                                  : 'text-stone-400 hover:text-stone-200'
-                              }`}
+                              className={`flex items-center justify-between text-[11px] py-1 px-2 rounded-lg transition-colors ${subActive
+                                ? 'text-[#C9A227] font-bold bg-[#4B161B]'
+                                : 'text-stone-400 hover:text-stone-200'
+                                }`}
                             >
                               <span>{sub.label}</span>
                               {subActive && <ChevronRight className="w-3 h-3 text-[#C9A227]" />}

@@ -4,6 +4,7 @@ import { resolveStrictDomainTenantId, getRequestHost } from '@/lib/tenant/tenant
 import { resolveSearchQuery } from '@/lib/directory/normalize-search';
 import { findBusinessesByMasonicMember } from '@/lib/directory/masonic-member-search';
 import { sortBusinessesBySearchRelevance } from '@/lib/directory/search-relevance';
+import { resolveCanonicalViewsCountsMap } from '@/lib/analytics/canonical-views-reader';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -109,9 +110,19 @@ export async function GET(request: Request) {
     }
 
     const ordered = rawQ ? sortBusinessesBySearchRelevance(merged, rawQ) : merged;
+    const sliced = ordered.slice(0, limit);
+    const slicedIds = sliced.map((item) => item.id).filter(Boolean);
+    if (slicedIds.length > 0) {
+      const viewsMap = await resolveCanonicalViewsCountsMap(slicedIds, supabase).catch(() => ({} as Record<string, number>));
+      for (const item of sliced) {
+        if (typeof viewsMap[item.id] === 'number') {
+          item.views_count = viewsMap[item.id];
+        }
+      }
+    }
 
     return NextResponse.json({
-      items: ordered.slice(0, limit),
+      items: sliced,
       total: ordered.length,
     });
   } catch (error) {

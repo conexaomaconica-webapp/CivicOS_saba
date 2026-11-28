@@ -5,6 +5,7 @@ import { resolveBusinessMedia, resolveLogoUrl, resolveCoverUrl } from '@/lib/bus
 import { findAdvertiserBusiness } from '@/lib/advertiser/advertiser-access';
 import { getCommercialPlanName } from '@/lib/billing/plans-service';
 import { getAdvertiserFeaturesAction } from '@/lib/advertiser/advertiser-entitlements';
+import { resolveSingleBusinessCanonicalViewsCount } from '@/lib/analytics/canonical-views-reader';
 
 export interface AdvertiserDashboardDTO {
   business: {
@@ -24,6 +25,7 @@ export interface AdvertiserDashboardDTO {
     cover_url?: string;
   };
   results30d: {
+    total_views: number;
     views: number;
     interactions: number;
     whatsapp_clicks: number;
@@ -49,6 +51,10 @@ export interface AdvertiserDashboardDTO {
     action_label?: string;
     action_url?: string;
   }>;
+}
+
+function previousViewsCountFallback(count: unknown): number {
+  return typeof count === 'number' && Number.isFinite(count) ? Math.max(0, count) : 0;
 }
 
 export async function getAdvertiserDashboardDTOAction(_userId?: string): Promise<AdvertiserDashboardDTO> {
@@ -112,21 +118,80 @@ export async function getAdvertiserDashboardDTOAction(_userId?: string): Promise
     ]);
     const hasMapLocation = (locationRows || []).some((l: any) => l.latitude != null && l.longitude != null);
 
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
-    const [{ data: analyticsRows }, { data: subscription }] = await Promise.all([
-      (supabase as any).from('analytics_events').select('event_name, created_at')
-        .eq('business_id', bizId).gte('created_at', sixtyDaysAgo.toISOString()),
-      (supabase as any).from('subscriptions').select('status, current_period_end')
-        .eq('business_id', bizId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const sixtyDaysAgoIso = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    const [
+      totalViewsOfficial,
+      { count: views30dCount },
+      { count: prevViews30dCount },
+      { count: whatsapp30dCount },
+      { count: route30dCount },
+      { count: website30dCount },
+      { count: interactions30dCount },
+      { data: subscription },
+    ] = await Promise.all([
+      resolveSingleBusinessCanonicalViewsCount(bizId, supabase),
+      (supabase as any)
+        .from('analytics_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('business_id', bizId)
+        .eq('event_name', 'view')
+        .gte('created_at', thirtyDaysAgoIso),
+      (supabase as any)
+        .from('analytics_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('business_id', bizId)
+        .eq('event_name', 'view')
+        .gte('created_at', sixtyDaysAgoIso)
+        .lt('created_at', thirtyDaysAgoIso),
+      (supabase as any)
+        .from('analytics_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('business_id', bizId)
+        .eq('event_name', 'whatsapp_click')
+        .gte('created_at', thirtyDaysAgoIso),
+      (supabase as any)
+        .from('analytics_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('business_id', bizId)
+        .in('event_name', ['route_click', 'directions_click'])
+        .gte('created_at', thirtyDaysAgoIso),
+      (supabase as any)
+        .from('analytics_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('business_id', bizId)
+        .eq('event_name', 'website_click')
+        .gte('created_at', thirtyDaysAgoIso),
+      (supabase as any)
+        .from('analytics_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('business_id', bizId)
+        .in('event_name', [
+          'whatsapp_click',
+          'phone_click',
+          'website_click',
+          'route_click',
+          'directions_click',
+          'benefit_click',
+          'social_click',
+          'instagram_click',
+          'share',
+        ])
+        .gte('created_at', thirtyDaysAgoIso),
+      (supabase as any)
+        .from('subscriptions')
+        .select('status, current_period_end')
+        .eq('business_id', bizId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
-    const events30d = (analyticsRows || []).filter((event: any) => new Date(event.created_at) >= thirtyDaysAgo);
-    const previousViews = (analyticsRows || []).filter((event: any) => new Date(event.created_at) < thirtyDaysAgo && ['view', 'page_view'].includes(event.event_name)).length;
-    const views = events30d.filter((event: any) => ['view', 'page_view'].includes(event.event_name)).length;
-    const whatsappClicks = events30d.filter((event: any) => event.event_name === 'whatsapp_click').length;
-    const routeClicks = events30d.filter((event: any) => ['route_click', 'directions_click'].includes(event.event_name)).length;
-    const websiteClicks = events30d.filter((event: any) => event.event_name === 'website_click').length;
-    const interactions = events30d.filter((event: any) => ['whatsapp_click', 'phone_click', 'website_click', 'route_click', 'directions_click', 'benefit_click', 'social_click'].includes(event.event_name)).length;
+    const previousViews = previousViewsCountFallback(prevViews30dCount);
+    const views = previousViewsCountFallback(views30dCount);
+    const whatsappClicks = previousViewsCountFallback(whatsapp30dCount);
+    const routeClicks = previousViewsCountFallback(route30dCount);
+    const websiteClicks = previousViewsCountFallback(website30dCount);
+    const interactions = previousViewsCountFallback(interactions30dCount);
     const growthPercent = previousViews > 0 ? Math.round(((views - previousViews) / previousViews) * 100) : 0;
     const isPaymentUpToDate = subscription?.status === 'active';
 
@@ -217,6 +282,7 @@ export async function getAdvertiserDashboardDTOAction(_userId?: string): Promise
         cover_url: resolveCoverUrl(media.cover_url),
       },
       results30d: {
+        total_views: totalViewsOfficial,
         views,
         interactions,
         whatsapp_clicks: whatsappClicks,
@@ -258,6 +324,7 @@ export async function getAdvertiserDashboardDTOAction(_userId?: string): Promise
         cover_url: '/capa-padrao.jpg',
       },
       results30d: {
+        total_views: 0,
         views: 0,
         interactions: 0,
         whatsapp_clicks: 0,

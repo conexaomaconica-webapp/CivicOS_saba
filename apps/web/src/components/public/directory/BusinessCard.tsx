@@ -6,6 +6,7 @@ import { Heart, Share2, MapPin, Briefcase, Star, Crown, Award, ShieldCheck, User
 import { useFavorites } from '@/lib/directory/favorites-context';
 import { usePedraCardDisplay, usePedraHorizontalSeal, type PedraCardDisplay } from '@/lib/directory/pedra-card-display-context';
 import { useSearchImpression } from '@/lib/analytics/use-search-impression';
+import { useLiveBusinessViewsCount } from '@/lib/analytics/live-views-store';
 import { CardReferModal } from './CardReferModal';
 import type { DiscoverySource } from '@/lib/analytics/traffic-sources';
 
@@ -280,6 +281,7 @@ export function BusinessCard({
   const hasRealRating = showRating && data.rating_average != null && data.reviews_count != null && data.reviews_count > 0;
   const isFeatured = variant === 'featured';
   const masonicConnection = formatMasonicConnection(data);
+  const liveViewsCount = useLiveBusinessViewsCount(data.id, data.views_count);
 
   return (
     <div ref={impressionRef} className="bg-white border border-amber-900/15 rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col group relative">
@@ -440,7 +442,7 @@ export function BusinessCard({
           </h3>
 
           {/* Avaliação Real e Contador de Visualizações por Atualização */}
-          {(hasRealRating || typeof data.views_count === 'number') && (
+          {(hasRealRating || typeof liveViewsCount === 'number') && (
             <div className="flex items-center gap-2 flex-wrap text-xs text-stone-600 mt-1">
               {hasRealRating && (
                 <div className="flex items-center gap-1 font-semibold">
@@ -449,14 +451,14 @@ export function BusinessCard({
                   <span className="text-stone-400 font-normal">({data.reviews_count})</span>
                 </div>
               )}
-              {typeof data.views_count === 'number' && (
+              {typeof liveViewsCount === 'number' && (
                 <div
                   className="flex items-center gap-1 text-stone-500 font-medium"
                   title="Visualizações da página da empresa"
                 >
                   {hasRealRating && <span className="text-stone-300">·</span>}
                   <Eye className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                  <span>{data.views_count.toLocaleString('pt-BR')} {data.views_count === 1 ? 'visualização' : 'visualizações'}</span>
+                  <span>{liveViewsCount.toLocaleString('pt-BR')} {liveViewsCount === 1 ? 'visualização' : 'visualizações'}</span>
                 </div>
               )}
             </div>

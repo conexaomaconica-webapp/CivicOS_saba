@@ -1636,8 +1636,9 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
       payments_history = [];
     }
 
-    // 8. Query Factual de Analytics (Últimos 30 Dias)
+    // 8. Query Factual de Analytics (Contador Oficial Acumulado + Últimos 30 Dias sem truncamento de 1.000 linhas)
     let analytics_summary = {
+      total_views: 0,
       views_30d: 0,
       views_growth_percent: 0,
       interactions_30d: 0,
@@ -1647,30 +1648,79 @@ export async function getAdminBusiness360Action(businessId: string): Promise<Adm
     };
     try {
       const date30daysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const { data: eventsRaw } = await (supabase as any)
-        .from('analytics_events')
-        .select('event_name, created_at')
-        .eq('business_id', businessId)
-        .gte('created_at', date30daysAgo);
+      const [
+        { data: bizViewRow },
+        { count: exactAllTimeViews },
+        { count: views30d },
+        { count: whatsapp30d },
+        { count: route30d },
+        { count: website30d },
+        { count: interactions30d },
+      ] = await Promise.all([
+        (supabase as any).from('businesses').select('views_count').eq('id', businessId).maybeSingle(),
+        (supabase as any)
+          .from('analytics_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('business_id', businessId)
+          .eq('event_name', 'view'),
+        (supabase as any)
+          .from('analytics_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('business_id', businessId)
+          .eq('event_name', 'view')
+          .gte('created_at', date30daysAgo),
+        (supabase as any)
+          .from('analytics_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('business_id', businessId)
+          .eq('event_name', 'whatsapp_click')
+          .gte('created_at', date30daysAgo),
+        (supabase as any)
+          .from('analytics_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('business_id', businessId)
+          .in('event_name', ['route_click', 'directions_click'])
+          .gte('created_at', date30daysAgo),
+        (supabase as any)
+          .from('analytics_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('business_id', businessId)
+          .eq('event_name', 'website_click')
+          .gte('created_at', date30daysAgo),
+        (supabase as any)
+          .from('analytics_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('business_id', businessId)
+          .in('event_name', [
+            'whatsapp_click',
+            'phone_click',
+            'website_click',
+            'route_click',
+            'directions_click',
+            'benefit_click',
+            'social_click',
+            'instagram_click',
+            'share',
+          ])
+          .gte('created_at', date30daysAgo),
+      ]);
 
-      if (eventsRaw && eventsRaw.length > 0) {
-        const views = eventsRaw.filter((e: any) => e.event_name === 'view' || e.event_name === 'page_view').length;
-        const whatsappClicks = eventsRaw.filter((e: any) => e.event_name === 'whatsapp_click').length;
-        const routeClicks = eventsRaw.filter((e: any) => e.event_name === 'route_click' || e.event_name === 'directions_click').length;
-        const websiteClicks = eventsRaw.filter((e: any) => e.event_name === 'website_click').length;
-        const totalInteractions = eventsRaw.filter((e: any) =>
-          ['whatsapp_click', 'phone_click', 'website_click', 'route_click', 'directions_click', 'benefit_click', 'social_click'].includes(e.event_name)
-        ).length;
+      const totalOfficial =
+        typeof bizViewRow?.views_count === 'number' && Number.isFinite(bizViewRow.views_count)
+          ? bizViewRow.views_count
+          : typeof exactAllTimeViews === 'number'
+          ? exactAllTimeViews
+          : 0;
 
-        analytics_summary = {
-          views_30d: views,
-          views_growth_percent: 0,
-          interactions_30d: totalInteractions,
-          whatsapp_clicks_30d: whatsappClicks,
-          route_clicks_30d: routeClicks,
-          website_clicks_30d: websiteClicks,
-        };
-      }
+      analytics_summary = {
+        total_views: totalOfficial,
+        views_30d: typeof views30d === 'number' ? views30d : 0,
+        views_growth_percent: 0,
+        interactions_30d: typeof interactions30d === 'number' ? interactions30d : 0,
+        whatsapp_clicks_30d: typeof whatsapp30d === 'number' ? whatsapp30d : 0,
+        route_clicks_30d: typeof route30d === 'number' ? route30d : 0,
+        website_clicks_30d: typeof website30d === 'number' ? website30d : 0,
+      };
     } catch (_e) { }
 
     // Buscar reconhecimentos nas tabelas canônicas business_recognitions e business_masonic_links

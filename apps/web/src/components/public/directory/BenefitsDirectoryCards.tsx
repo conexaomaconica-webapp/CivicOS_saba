@@ -14,6 +14,7 @@ import { formatBenefitBadgeLabel, type PublicBusinessBenefit } from '@/lib/busin
 import { redeemBenefitAction } from '@/lib/business/benefit-redemption-service';
 import { formatDateBR } from '@/lib/format/datetime-br';
 import { BusinessCard, type BusinessCardData } from './BusinessCard';
+import { useLiveBusinessViewsCount } from '@/lib/analytics/live-views-store';
 
 export interface BenefitDirectoryBusinessItem {
   business_id: string;
@@ -27,8 +28,32 @@ export interface BenefitDirectoryBusinessItem {
   cover_url?: string | null;
   is_founder?: boolean;
   is_pedra_fundamental?: boolean;
+  views_count?: number | null;
   card?: BusinessCardData;
   benefits: PublicBusinessBenefit[];
+}
+
+function BenefitBusinessCardWrapper({ biz }: { biz: BenefitDirectoryBusinessItem }) {
+  const initialViews = biz.card?.views_count ?? biz.views_count ?? null;
+  const liveViews = useLiveBusinessViewsCount(biz.business_id, initialViews);
+  const cardData: BusinessCardData = biz.card
+    ? { ...biz.card, views_count: liveViews ?? biz.card.views_count ?? null }
+    : {
+        id: biz.business_id,
+        slug: biz.business_slug,
+        name: biz.business_name,
+        short_description: biz.description ?? null,
+        logo_url: biz.logo_url ?? null,
+        cover_url: biz.cover_url ?? null,
+        category_name: biz.primary_category_name ?? null,
+        city: biz.city ?? null,
+        state: biz.state ?? null,
+        is_founder: Boolean(biz.is_founder),
+        is_pedra_fundamental: Boolean(biz.is_pedra_fundamental),
+        views_count: liveViews ?? initialViews,
+        has_benefits: true,
+      };
+  return <BusinessCard data={cardData} discoverySource="benefits_club" />;
 }
 
 type RedemptionCardState = {
@@ -150,27 +175,12 @@ export function BenefitsDirectoryCards({ items }: { items: BenefitDirectoryBusin
     <>
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((biz) => {
-          const cardData: BusinessCardData = biz.card ?? {
-            id: biz.business_id,
-            slug: biz.business_slug,
-            name: biz.business_name,
-            short_description: biz.description ?? null,
-            logo_url: biz.logo_url ?? null,
-            cover_url: biz.cover_url ?? null,
-            category_name: biz.primary_category_name ?? null,
-            city: biz.city ?? null,
-            state: biz.state ?? null,
-            is_founder: Boolean(biz.is_founder),
-            is_pedra_fundamental: Boolean(biz.is_pedra_fundamental),
-            has_benefits: true,
-          };
-
           return (
             <article
               key={biz.business_id || biz.business_slug}
               className="flex min-w-0 flex-col gap-2.5"
             >
-              <BusinessCard data={cardData} discoverySource="benefits_club" />
+              <BenefitBusinessCardWrapper biz={biz} />
 
               {/* Lista Direta de Benefícios Ativos da Empresa */}
               {biz.benefits.length > 0 && (
