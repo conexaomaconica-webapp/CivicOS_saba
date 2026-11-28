@@ -166,32 +166,29 @@ export default function AdvertiseLandingClient({
   return (
     <div className="min-h-screen bg-[#F8F5EF] font-sans text-[#625B55] selection:bg-[#C9A227]/30">
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-[#DED5C7] bg-white">
+      <header className="sticky top-0 z-30 border-b border-[#C9A227]/30 bg-[#4B161B]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 min-h-16 flex items-center justify-between gap-2 py-2 sm:gap-4">
-          <Link href="/" className="flex items-center gap-2 min-w-0">
+          <Link href="/" className="block w-36 min-w-0 sm:w-56">
             <Image
               src={logoUrl || '/logoconexao_red_vert.png'}
               alt={appName}
-              width={36}
-              height={36}
+              width={971}
+              height={208}
               unoptimized
-              className="size-9 shrink-0 object-contain"
+              className="h-11 w-full object-contain object-left sm:h-12"
             />
-            <span className="font-bold text-sm sm:text-base tracking-tight text-[#4B161B] truncate">
-              {appName}
-            </span>
           </Link>
 
           <div className="flex shrink-0 items-center gap-3">
             <a
               href="#planos"
-              className="hidden sm:inline-flex items-center px-3.5 py-2 rounded-full text-xs font-semibold text-[#4B161B] hover:bg-[#F0EBE2] motion-safe:transition-colors motion-safe:duration-200"
+              className="hidden sm:inline-flex items-center px-3.5 py-2 rounded-full text-xs font-semibold text-[#F8F5EF] hover:bg-white/10 motion-safe:transition-colors motion-safe:duration-200"
             >
               Conhecer planos
             </a>
             <Link
               href={registrationHref}
-              className={PRIMARY_BUTTON + " min-h-11 px-3 text-xs sm:px-4"}
+              className={GOLD_BUTTON + " min-h-11 px-3 text-xs sm:px-4"}
             >
               <span>{continueStepHref ? 'Continuar cadastro' : 'Cadastrar empresa'}</span>
               <ArrowRight aria-hidden="true" className="size-3.5 shrink-0" />
