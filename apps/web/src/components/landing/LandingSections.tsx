@@ -43,7 +43,6 @@ export function LandingHeader({ primaryColor: _primaryColor }: { primaryColor?: 
             <a href="#mural" className="text-white transition hover:text-[#C9A227]">Mural</a>
             <a href="#resultados" className="text-white transition hover:text-[#C9A227]">Resultados</a>
             <a href="#planos" className="text-white transition hover:text-[#C9A227]">Planos</a>
-            <a href="#lancamento" className="text-white transition hover:text-[#C9A227]">Lançamento</a>
             <a href="#faq" className="text-white transition hover:text-[#C9A227]">Dúvidas</a>
           </nav>
           <div className="flex items-center gap-2">
@@ -65,8 +64,8 @@ export function LandingHero() {
     <section className="relative overflow-hidden bg-gradient-to-b from-[#fbf7ee] to-white">
       <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-[#C9A227]/15 blur-3xl" />
       <div aria-hidden className="pointer-events-none absolute -left-24 top-40 h-80 w-80 rounded-full bg-[#5d1523]/10 blur-3xl" />
-      <div className={`${SECTION} relative grid items-center gap-10 py-16 sm:py-24 lg:grid-cols-[1.15fr_0.85fr]`}>
-        <div>
+      <div className={`${SECTION} relative py-16 sm:py-24`}>
+        <div className="max-w-3xl">
           <span className="inline-flex items-center gap-2 rounded-full border border-[#C9A227]/50 bg-white px-3 py-1 text-xs font-bold text-[#8a6d12]">
             <span className="h-1.5 w-1.5 rounded-full bg-[#C9A227]" /> Tradição que une! conexão que fortalece!
           </span>
@@ -91,62 +90,6 @@ export function LandingHero() {
             <li>✓ Empresas verificadas</li>
             <li>✓ Painel de desempenho para todos os planos</li>
           </ul>
-        </div>
-        <div className="relative mx-auto w-full max-w-sm">
-          <div className="rounded-3xl border border-[#C9A227]/30 bg-white p-8 shadow-2xl shadow-[#5d1523]/10">
-            <Image
-              src={PEDRA_SEAL}
-              alt="Selo Pedra Fundamental, reconhecimento dos primeiros anunciantes"
-              width={220}
-              height={220}
-              className="mx-auto h-auto w-56"
-              priority
-            />
-            <p className="mt-6 text-center text-sm font-bold uppercase tracking-widest text-[#8a6d12]">Pedra Fundamental</p>
-            <p className="mt-1 text-center text-sm text-stone-600">
-              Reconhecimento institucional para quem constrói a plataforma desde o início.
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-export function LandingLaunchSection() {
-  return (
-    <section id="lancamento" className="scroll-mt-24 bg-[#4B161B] py-14 text-white sm:py-20">
-      <div className={`${SECTION} grid items-center gap-8 lg:grid-cols-[1.2fr_0.8fr]`}>
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C9A227]">Lançamento oficial</p>
-          <h2 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Uma noite de relacionamentos, oportunidades e negócios</h2>
-          <p className="mt-4 max-w-2xl leading-relaxed text-white/80">
-            A Conexão Maçônica convida você para uma noite especial de relacionamentos, oportunidades e fortalecimento de negócios.
-            Um encontro pensado para aproximar irmãos, cunhadas, familiares e empresários, estimulando parcerias e novas conexões.
-          </p>
-          <div className="mt-6 rounded-2xl bg-white/5 p-5 ring-1 ring-[#C9A227]/30 space-y-3">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#C9A227]">Palestras da Noite</p>
-            <div className="space-y-0.5">
-              <p className="text-sm font-semibold text-white/95">&ldquo;Ninguém prospera sozinho&rdquo;</p>
-              <p className="text-xs text-white/70">com <strong className="text-[#C9A227] font-semibold">Dr. Luccas Almeida</strong> — Empresário, Médico e Advogado</p>
-            </div>
-            <div className="h-[1px] w-full bg-[#C9A227]/20" />
-            <div className="space-y-0.5">
-              <p className="text-sm font-semibold text-white/95">&ldquo;Síndrome dos Pais Culpados&rdquo;</p>
-              <p className="text-xs text-white/70">com <strong className="text-[#C9A227] font-semibold">Dr. Alfredo Morais</strong> — Psicólogo</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-3xl bg-white p-7 text-[#2a0a10] shadow-2xl">
-          <p className="text-xs font-bold uppercase tracking-widest text-[#8a6d12]">Terça-feira</p>
-          <p className="mt-1 text-5xl font-extrabold text-[#5d1523]">24</p>
-          <p className="text-lg font-bold">de novembro de 2026</p>
-          <p className="mt-4 text-sm font-semibold">19h00</p>
-          <p className="mt-1 text-sm text-stone-600">Centro de Convenções de Feira de Santana</p>
-          <p className="text-sm text-stone-600">Feira de Santana — BA</p>
-          <a href="#captacao-lead" className={`${CTA_PRIMARY} mt-6 w-full`}>
-            Quero participar do evento
-          </a>
         </div>
       </div>
     </section>
@@ -255,8 +198,15 @@ export function LandingPlansSection({ plans }: { plans: CommercialPlan[] }) {
         <p className="mt-3 max-w-2xl text-stone-600">
           Conheça os planos Esquadro, Compasso e Acácia e escolha a opção de visibilidade e recursos mais adequada ao seu negócio.
         </p>
-        <div className="mt-10 grid gap-6 lg:grid-cols-3">
+        <div className="mt-10 grid items-start gap-6 lg:grid-cols-3 lg:pt-4">
           {sortedPlans.map((plan) => {
+            // Desktop: Compasso | Acácia (centro, elevado) | Esquadro. Mobile: Acácia primeiro.
+            const placement =
+              plan.tier === 'ouro'
+                ? 'order-1 lg:order-2 lg:-mt-8 lg:scale-[1.03]'
+                : plan.tier === 'prata'
+                  ? 'order-2 lg:order-1'
+                  : 'order-3 lg:order-3';
             const pricing = PRICING_BY_TIER[plan.tier];
             const installments = plan.installmentsMax ?? pricing.installments;
             const installmentValue = plan.installmentValueCents
@@ -270,7 +220,7 @@ export function LandingPlansSection({ plans }: { plans: CommercialPlan[] }) {
             return (
               <article
                 key={plan.tier}
-                className={`relative flex flex-col rounded-3xl bg-white p-7 ${highlight ? 'shadow-2xl ring-2 ring-[#C9A227]' : 'shadow-sm ring-1 ring-stone-200'
+                className={`relative flex flex-col rounded-3xl bg-white p-7 ${placement} ${highlight ? 'shadow-2xl ring-2 ring-[#C9A227]' : 'shadow-sm ring-1 ring-stone-200'
                   }`}
               >
                 {badgeLabel ? (
@@ -350,12 +300,6 @@ export function LandingPedraSection() {
           <p className="mt-3 text-sm text-white/60">
             Vagas limitadas
           </p>
-          <Link
-            href="/anunciar"
-            className="mt-8 inline-flex items-center justify-center rounded-xl bg-[#C9A227] px-6 py-3 text-sm font-extrabold text-[#2a0a10] transition hover:bg-[#e0b92f]"
-          >
-            Quero ser dos primeiros
-          </Link>
         </div>
       </div>
     </section>

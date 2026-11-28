@@ -54,7 +54,6 @@ describe('JSON-LD da landing acompanha o endereço real dela', () => {
     await render();
     expect(byType('WebPage')).toMatchObject({ url: `${BASE}/`, '@id': `${BASE}/#webpage` });
     expect(byType('WebPage')!.breadcrumb.itemListElement).toHaveLength(1);
-    expect(byType('Event')!.url).toBe(`${BASE}/#lancamento`);
     expect(byType('Organization')!.url).toBe(`${BASE}/`);
     expect(byType('WebSite')!.url).toBe(`${BASE}/`);
   });
@@ -63,7 +62,6 @@ describe('JSON-LD da landing acompanha o endereço real dela', () => {
     setSwitch('on');
     await render();
     expect(byType('WebPage')).toMatchObject({ url: `${BASE}/institucional`, '@id': `${BASE}/institucional#webpage` });
-    expect(byType('Event')!.url).toBe(`${BASE}/institucional#lancamento`);
     expect(byType('Organization')!.url).toBe(`${BASE}/`);
     expect(byType('WebSite')!.url).toBe(`${BASE}/`);
   });
@@ -87,7 +85,6 @@ describe('JSON-LD da landing acompanha o endereço real dela', () => {
     vi.setSystemTime(new Date('2026-11-24T10:00:00-03:00'));
     await render();
     expect(byType('WebPage')!.url).toBe(`${BASE}/institucional`);
-    expect(byType('Event')!.url).toBe(`${BASE}/institucional#lancamento`);
 
     setSwitch('off', OFFICIAL); // rollback
     await render();

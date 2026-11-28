@@ -10,7 +10,6 @@ import { resolveTenantBrandContext } from '@/lib/tenant/tenant-brand';
 import {
   LandingHeader,
   LandingHero,
-  LandingLaunchSection,
   LandingAudienceSection,
   LandingPlansSection,
   LandingPedraSection,
@@ -145,30 +144,6 @@ function buildWebPageSchema(path: '/' | '/institucional') {
   };
 }
 
-function buildLaunchEventSchema(path: '/' | '/institucional') {
-  return {
-  '@context': 'https://schema.org',
-  '@type': 'Event',
-  name: 'Lançamento oficial da Conexão Maçônica',
-  description:
-    'Noite de relacionamentos, oportunidades e fortalecimento de negócios para irmãos, cunhadas e sobrinhos empresários, com palestras "Ninguém prospera sozinho" com Dr. Luccas Almeida (Empresário, Médico e Advogado) e "Síndrome dos Pais Culpados" com Dr. Alfredo Morais (Psicólogo).',
-  startDate: '2026-11-24T19:00:00-03:00',
-  eventStatus: 'https://schema.org/EventScheduled',
-  eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
-  location: {
-    '@type': 'Place',
-    name: 'Centro de Convenções de Feira de Santana',
-    address: { '@type': 'PostalAddress', addressLocality: 'Feira de Santana', addressRegion: 'BA', addressCountry: 'BR' },
-  },
-  performer: [
-    { '@type': 'Person', name: 'Dr. Luccas Almeida', jobTitle: 'Empresário, Médico e Advogado' },
-    { '@type': 'Person', name: 'Dr. Alfredo Morais', jobTitle: 'Psicólogo' },
-  ],
-  organizer: { '@id': appUrl('/#organization') },
-  url: appUrl(path === '/' ? '/#lancamento' : `${path}#lancamento`),
-  };
-}
-
 function buildPlansSchema(plans: CommercialPlan[]) {
   return {
     '@context': 'https://schema.org',
@@ -239,7 +214,6 @@ export default async function LandingHome() {
       <StructuredData schema={organizationSchema} />
       <StructuredData schema={websiteSchema} />
       <StructuredData schema={buildWebPageSchema(currentLandingPath)} />
-      <StructuredData schema={buildLaunchEventSchema(currentLandingPath)} />
       <StructuredData schema={buildPlansSchema(sortedPlans)} />
       <StructuredData schema={faqSchema} />
       <div className="w-full">
@@ -268,10 +242,7 @@ export default async function LandingHome() {
         {/* 8. Pedra Fundamental */}
         <LandingPedraSection />
 
-        {/* 9. Lançamento oficial de 24/11/2026 */}
-        <LandingLaunchSection />
-
-        {/* 10. FAQ e captação de interessados */}
+        {/* 9. FAQ e captação de interessados */}
         <LandingFaqSection items={FAQ_ITEMS} />
         <LandingLeadCapture planOptions={planOptions} />
       </div>
