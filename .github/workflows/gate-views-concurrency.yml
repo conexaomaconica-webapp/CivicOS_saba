@@ -49,6 +49,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspace packages
+        run: pnpm --filter "!@saas/web" build
+
       - name: Execute Multi-Connection PostgreSQL 16 Concurrency Validation (9 Scenarios)
         env:
           DATABASE_URL: postgresql://postgres:postgres_disposable_ci@localhost:5432/civicos_concurrency_test

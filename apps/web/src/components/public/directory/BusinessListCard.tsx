@@ -209,7 +209,7 @@ export function BusinessListCard({ data, onViewOnMap, pedraCardDisplay, discover
               >
                 <Eye className="w-3.5 h-3.5 text-stone-500 shrink-0" />
                 <span>
-                  {Number(liveViewsCount || 0).toLocaleString('pt-BR')} {Number(liveViewsCount || 0) === 1 ? 'view' : 'views'}
+                  {Number(liveViewsCount || 0).toLocaleString('pt-BR')} {Number(liveViewsCount || 0) === 1 ? 'visualização' : 'visualizações'}
                 </span>
               </span>
             )}
